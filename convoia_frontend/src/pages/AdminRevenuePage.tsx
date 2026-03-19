@@ -1,0 +1,81 @@
+import { useEffect, useState } from 'react'
+import { DollarSign, TrendingUp, BarChart3 } from 'lucide-react'
+import { StatCard } from '../components/shared/StatCard'
+import { Card } from '../components/ui/Card'
+import { LineChart } from '../components/charts/LineChart'
+import { DonutChart } from '../components/charts/DonutChart'
+import { LoadingPage } from '../components/shared/LoadingPage'
+import { ErrorState } from '../components/shared/ErrorState'
+import { formatCurrency, formatNumber } from '../lib/utils'
+import api from '../lib/api'
+
+export function AdminRevenuePage() {
+  const [data, setData] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    api.get('/admin/revenue/dashboard').then((res) => setData(res.data.data))
+      .catch(() => setError('Failed to load revenue data')).finally(() => setIsLoading(false))
+  }, [])
+
+  if (isLoading) return <LoadingPage />
+  if (error) return <ErrorState message={error} />
+
+  const revenue = data?.totalRevenue || 0
+  const cost = data?.totalProviderCost || 0
+  const profit = revenue - cost
+  const margin = revenue > 0 ? (profit / revenue) * 100 : 0
+
+  const dailyData = data?.dailyRevenue || []
+  const providerData = (data?.providerRevenue || []).map((p: any) => ({ name: p.provider, value: p.revenue }))
+  const topOrgs = data?.topOrgs || []
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-semibold text-text-primary">Revenue</h2>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard title="Total Revenue" value={formatCurrency(revenue)} icon={<DollarSign size={20} />} />
+        <StatCard title="Provider Cost" value={formatCurrency(cost)} icon={<TrendingUp size={20} />} />
+        <StatCard title="Profit" value={formatCurrency(profit)} icon={<BarChart3 size={20} />} />
+        <StatCard title="Margin" value={`${margin.toFixed(1)}%`} icon={<TrendingUp size={20} />} />
+      </div>
+
+      <Card padding="lg">
+        <h3 className="text-sm font-medium text-text-secondary mb-4">Revenue vs Cost</h3>
+        {dailyData.length > 0 ? (
+          <LineChart data={dailyData} xKey="date" yKey="revenue" yKey2="cost" color="#7C3AED" color2="#EF4444" height={320} formatY={(v: number) => `$${v.toFixed(0)}`} />
+        ) : <div className="h-[320px] flex items-center justify-center text-text-muted">No data</div>}
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card padding="lg">
+          <h3 className="text-sm font-medium text-text-secondary mb-4">Revenue by Provider</h3>
+          {providerData.length > 0 ? <DonutChart data={providerData} /> : <p className="text-center text-text-muted py-8">No data</p>}
+        </Card>
+        <Card padding="none">
+          <div className="px-5 py-4 border-b border-border">
+            <h3 className="text-sm font-semibold text-text-primary">Top Organizations</h3>
+          </div>
+          <div className="divide-y divide-border/50">
+            {topOrgs.length === 0 ? (
+              <div className="px-5 py-8 text-center text-text-muted text-sm">No data</div>
+            ) : topOrgs.slice(0, 10).map((org: any, i: number) => (
+              <div key={org.name} className="px-5 py-3 flex items-center gap-3">
+                <span className="text-sm font-mono text-text-muted w-6">#{i + 1}</span>
+                <div className="flex-1"><p className="text-sm font-medium text-text-primary">{org.name}</p></div>
+                <div className="text-right">
+                  <p className="text-sm font-mono text-primary">{formatCurrency(org.revenue)}</p>
+                  <p className="text-xs text-text-muted">{formatNumber(org.queries)} queries</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
+export default AdminRevenuePage;

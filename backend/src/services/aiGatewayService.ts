@@ -1,0 +1,653 @@
+import axios, { AxiosRequestConfig } from 'axios';
+import { config } from '../config/env.js';
+import logger from '../config/logger.js';
+import { AppError } from '../middleware/errorHandler.js';
+import prisma from '../config/db.js';
+
+interface AgentConfig {
+  systemPrompt: string;
+  temperature: number;
+  maxTokens: number;
+  topP: number;
+  name: string;
+}
+
+interface SendMessageParams {
+  userId: string;
+  organizationId: string;
+  modelId: string;
+  messages: Array<{ role: string; content: string }>;
+  industry?: string;
+  agentConfig?: AgentConfig;
+}
+
+interface SendVisionParams {
+  userId: string;
+  organizationId: string;
+  modelId: string;
+  prompt: string;
+  imageBase64: string;
+  mimeType: string;
+  industry?: string;
+}
+
+interface AIResponse {
+  response: string;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  providerCost: number;
+  customerPrice: number;
+  profit: number;
+  markupPercentage: number;
+  fallbackUsed: boolean;
+  fallbackReason?: string;
+  aiModel: any;
+}
+
+// Shared timeout config for all provider calls
+const axiosConfig = (headers: Record<string, string>): AxiosRequestConfig => ({
+  headers,
+  timeout: config.aiRequestTimeout,
+});
+
+export function getSystemPrompt(industry?: string): string {
+  const baseInstructions = `You are an intelligent, knowledgeable AI assistant powered by ConvoiaAI. Follow these guidelines:
+- Be concise yet thorough. Provide actionable, well-structured answers.
+- Use markdown formatting (headers, bullet points, code blocks) for readability.
+- When asked about current events or recent news, provide the most recent information you have and clearly state your knowledge cutoff date so users understand the limitation.
+- Think step-by-step for complex questions before answering.
+- If you're unsure about something, say so honestly rather than guessing.
+- Adapt your tone to the context: professional for business, casual for general chat.`;
+
+  const industryPrompts: Record<string, string> = {
+    legal: '\nYou specialize in legal topics. Be precise, cite relevant legal considerations, and always recommend consulting a licensed attorney for specific legal advice.',
+    healthcare: '\nYou specialize in healthcare topics. Be evidence-based, conservative with medical advice, and always recommend consulting a qualified healthcare professional.',
+    finance: '\nYou specialize in financial topics. Be data-driven, risk-aware, and always recommend consulting a certified financial advisor for investment decisions.',
+    hr: '\nYou specialize in HR topics. Be professional, inclusive, and compliant with general employment best practices.',
+    marketing: '\nYou specialize in marketing. Be creative, data-driven, and focused on ROI and measurable outcomes.',
+    education: '\nYou specialize in education. Be clear, patient, pedagogically sound, and adapt explanations to the learner\'s level.',
+    technology: '\nYou specialize in technology. Be precise, provide practical solutions with code examples when relevant.',
+    ecommerce: '\nYou specialize in e-commerce. Focus on conversion optimization, customer experience, and data-driven product recommendations.',
+  };
+
+  return baseInstructions + (industryPrompts[industry || ''] || '');
+}
+
+function calculateCosts(inputTokens: number, outputTokens: number, aiModel: any) {
+  const providerCost =
+    inputTokens * aiModel.inputTokenPrice +
+    outputTokens * aiModel.outputTokenPrice;
+  const customerPrice = providerCost * (1 + aiModel.markupPercentage / 100);
+  const profit = customerPrice - providerCost;
+  return { providerCost, customerPrice, profit };
+}
+
+// ─── Text-only provider calls ───
+
+interface ProviderOverrides {
+  temperature?: number;
+  maxTokens?: number;
+  topP?: number;
+}
+
+async function callOpenAI(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
+  const body: Record<string, any> = {
+    model: modelId,
+    messages: [{ role: 'system', content: systemPrompt }, ...messages],
+    temperature: overrides?.temperature ?? 0.7,
+    max_tokens: overrides?.maxTokens ?? 2000,
+  };
+  if (overrides?.topP != null) body.top_p = overrides.topP;
+
+  const response = await axios.post(
+    'https://api.openai.com/v1/chat/completions',
+    body,
+    axiosConfig({
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    })
+  );
+  return {
+    response: response.data.choices[0].message.content,
+    inputTokens: response.data.usage.prompt_tokens,
+    outputTokens: response.data.usage.completion_tokens,
+  };
+}
+
+async function callAnthropic(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
+  const body: Record<string, any> = {
+    model: modelId,
+    max_tokens: overrides?.maxTokens ?? 2000,
+    system: systemPrompt,
+    messages,
+    temperature: overrides?.temperature ?? 0.7,
+  };
+  if (overrides?.topP != null) body.top_p = overrides.topP;
+
+  const response = await axios.post(
+    'https://api.anthropic.com/v1/messages',
+    body,
+    axiosConfig({
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'Content-Type': 'application/json',
+    })
+  );
+  return {
+    response: response.data.content[0].text,
+    inputTokens: response.data.usage.input_tokens,
+    outputTokens: response.data.usage.output_tokens,
+  };
+}
+
+async function callGoogle(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
+  const contents = messages.map((m) => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }],
+  }));
+
+  const response = await axios.post(
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`,
+    {
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      contents,
+      generationConfig: {
+        temperature: overrides?.temperature ?? 0.7,
+        maxOutputTokens: overrides?.maxTokens ?? 2000,
+        ...(overrides?.topP != null ? { topP: overrides.topP } : {}),
+      },
+    },
+    {
+      params: { key: apiKey },
+      timeout: config.aiRequestTimeout,
+    }
+  );
+  return {
+    response: response.data.candidates[0].content.parts[0].text,
+    inputTokens: response.data.usageMetadata?.promptTokenCount || 0,
+    outputTokens: response.data.usageMetadata?.candidatesTokenCount || 0,
+  };
+}
+
+async function callGroq(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
+  const body: Record<string, any> = {
+    model: modelId,
+    messages: [{ role: 'system', content: systemPrompt }, ...messages],
+    temperature: overrides?.temperature ?? 0.7,
+    max_tokens: overrides?.maxTokens ?? 2000,
+  };
+  if (overrides?.topP != null) body.top_p = overrides.topP;
+
+  const response = await axios.post(
+    'https://api.groq.com/openai/v1/chat/completions',
+    body,
+    axiosConfig({
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    })
+  );
+  return {
+    response: response.data.choices[0].message.content,
+    inputTokens: response.data.usage.prompt_tokens,
+    outputTokens: response.data.usage.completion_tokens,
+  };
+}
+
+async function callMistral(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
+  const body: Record<string, any> = {
+    model: modelId,
+    messages: [{ role: 'system', content: systemPrompt }, ...messages],
+    temperature: overrides?.temperature ?? 0.7,
+    max_tokens: overrides?.maxTokens ?? 2000,
+  };
+  if (overrides?.topP != null) body.top_p = overrides.topP;
+
+  const response = await axios.post(
+    'https://api.mistral.ai/v1/chat/completions',
+    body,
+    axiosConfig({
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    })
+  );
+  return {
+    response: response.data.choices[0].message.content,
+    inputTokens: response.data.usage.prompt_tokens,
+    outputTokens: response.data.usage.completion_tokens,
+  };
+}
+
+async function callDeepSeek(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
+  const body: Record<string, any> = {
+    model: modelId,
+    messages: [{ role: 'system', content: systemPrompt }, ...messages],
+    temperature: overrides?.temperature ?? 0.7,
+    max_tokens: overrides?.maxTokens ?? 2000,
+  };
+  if (overrides?.topP != null) body.top_p = overrides.topP;
+
+  const response = await axios.post(
+    'https://api.deepseek.com/v1/chat/completions',
+    body,
+    axiosConfig({
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    })
+  );
+  return {
+    response: response.data.choices[0].message.content,
+    inputTokens: response.data.usage.prompt_tokens,
+    outputTokens: response.data.usage.completion_tokens,
+  };
+}
+
+// ─── Vision-capable provider calls ───
+
+async function callOpenAIVision(modelId: string, prompt: string, imageBase64: string, mimeType: string, apiKey: string) {
+  const response = await axios.post(
+    'https://api.openai.com/v1/chat/completions',
+    {
+      model: modelId,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}`, detail: 'auto' } },
+            { type: 'text', text: prompt },
+          ],
+        },
+      ],
+      max_tokens: 1500,
+    },
+    axiosConfig({
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    })
+  );
+  return {
+    response: response.data.choices[0].message.content,
+    inputTokens: response.data.usage.prompt_tokens,
+    outputTokens: response.data.usage.completion_tokens,
+  };
+}
+
+async function callAnthropicVision(modelId: string, prompt: string, imageBase64: string, mimeType: string, apiKey: string) {
+  // Anthropic vision uses content blocks with image type
+  const mediaType = mimeType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
+  const response = await axios.post(
+    'https://api.anthropic.com/v1/messages',
+    {
+      model: modelId,
+      max_tokens: 1500,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
+            { type: 'text', text: prompt },
+          ],
+        },
+      ],
+    },
+    axiosConfig({
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'Content-Type': 'application/json',
+    })
+  );
+  return {
+    response: response.data.content[0].text,
+    inputTokens: response.data.usage.input_tokens,
+    outputTokens: response.data.usage.output_tokens,
+  };
+}
+
+async function callGoogleVision(modelId: string, prompt: string, imageBase64: string, mimeType: string, apiKey: string) {
+  const response = await axios.post(
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`,
+    {
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { inlineData: { mimeType, data: imageBase64 } },
+            { text: prompt },
+          ],
+        },
+      ],
+      generationConfig: { temperature: 0.7, maxOutputTokens: 1500 },
+    },
+    {
+      params: { key: apiKey },
+      timeout: config.aiRequestTimeout,
+    }
+  );
+  return {
+    response: response.data.candidates[0].content.parts[0].text,
+    inputTokens: response.data.usageMetadata?.promptTokenCount || 0,
+    outputTokens: response.data.usageMetadata?.candidatesTokenCount || 0,
+  };
+}
+
+// ─── Routing ───
+
+async function routeToProvider(aiModel: any, messages: any[], systemPrompt: string, overrides?: ProviderOverrides) {
+  const { provider, modelId } = aiModel;
+
+  switch (provider) {
+    case 'openai':
+      if (!config.apiKeys.openai) throw new AppError('OpenAI API key not configured', 500);
+      return await callOpenAI(modelId, messages, systemPrompt, config.apiKeys.openai, overrides);
+
+    case 'anthropic':
+      if (!config.apiKeys.anthropic) throw new AppError('Anthropic API key not configured', 500);
+      return await callAnthropic(modelId, messages, systemPrompt, config.apiKeys.anthropic, overrides);
+
+    case 'google':
+      if (!config.apiKeys.google) throw new AppError('Google API key not configured', 500);
+      return await callGoogle(modelId, messages, systemPrompt, config.apiKeys.google, overrides);
+
+    case 'groq':
+      if (!config.apiKeys.groq) throw new AppError('Groq API key not configured', 500);
+      return await callGroq(modelId, messages, systemPrompt, config.apiKeys.groq, overrides);
+
+    case 'mistral':
+      if (!config.apiKeys.mistral) throw new AppError('Mistral API key not configured', 500);
+      return await callMistral(modelId, messages, systemPrompt, config.apiKeys.mistral, overrides);
+
+    case 'deepseek':
+      if (!config.apiKeys.deepseek) throw new AppError('DeepSeek API key not configured', 500);
+      return await callDeepSeek(modelId, messages, systemPrompt, config.apiKeys.deepseek, overrides);
+
+    default:
+      throw new AppError(`Unsupported provider: ${provider}`, 400);
+  }
+}
+
+async function routeVisionToProvider(aiModel: any, prompt: string, imageBase64: string, mimeType: string) {
+  const { provider, modelId } = aiModel;
+
+  switch (provider) {
+    case 'openai':
+      if (!config.apiKeys.openai) throw new AppError('OpenAI API key not configured', 500);
+      return await callOpenAIVision(modelId, prompt, imageBase64, mimeType, config.apiKeys.openai);
+
+    case 'anthropic':
+      if (!config.apiKeys.anthropic) throw new AppError('Anthropic API key not configured', 500);
+      return await callAnthropicVision(modelId, prompt, imageBase64, mimeType, config.apiKeys.anthropic);
+
+    case 'google':
+      if (!config.apiKeys.google) throw new AppError('Google API key not configured', 500);
+      return await callGoogleVision(modelId, prompt, imageBase64, mimeType, config.apiKeys.google);
+
+    default:
+      // Groq, Mistral, DeepSeek don't have vision — find best available vision model
+      return null;
+  }
+}
+
+// Providers that support vision natively
+const VISION_PROVIDERS = ['openai', 'anthropic', 'google'];
+
+// Find the best available fallback model from a different provider
+async function findFallbackModel(excludeProvider: string) {
+  // Priority order: try providers we have keys for, cheapest first
+  const availableProviders = Object.entries(config.apiKeys)
+    .filter(([p, key]) => p !== excludeProvider && !!key)
+    .map(([p]) => p);
+
+  if (availableProviders.length === 0) return null;
+
+  return prisma.aIModel.findFirst({
+    where: {
+      isActive: true,
+      provider: { in: availableProviders },
+    },
+    orderBy: { inputTokenPrice: 'asc' },
+  });
+}
+
+export class AIGatewayService {
+  // ─── Text message routing ───
+  static async sendMessage(params: SendMessageParams): Promise<AIResponse> {
+    const { modelId, messages, industry, agentConfig } = params;
+
+    const aiModel = await prisma.aIModel.findUnique({
+      where: { id: modelId },
+    });
+
+    if (!aiModel) {
+      throw new AppError('AI Model not found', 404);
+    }
+
+    if (!aiModel.isActive) {
+      throw new AppError('This model is currently unavailable', 400);
+    }
+
+    // Use agent's system prompt if available, otherwise default
+    const systemPrompt = agentConfig?.systemPrompt || getSystemPrompt(industry);
+    const overrides: ProviderOverrides | undefined = agentConfig
+      ? { temperature: agentConfig.temperature, maxTokens: agentConfig.maxTokens, topP: agentConfig.topP }
+      : undefined;
+    let result;
+    let fallbackUsed = false;
+    let fallbackReason;
+
+    try {
+      result = await routeToProvider(aiModel, messages, systemPrompt, overrides);
+    } catch (error: any) {
+      const status = error?.response?.status;
+      const errorBody = error?.response?.data;
+      logger.error(`Provider error — ${aiModel.provider}/${aiModel.modelId} — HTTP ${status}`, {
+        error: errorBody?.error?.message || errorBody?.message || error.message,
+        type: errorBody?.error?.type,
+      });
+      const isRateLimit = status === 429;
+      const isProviderDown = status === 503;
+      const isModelNotFound = status === 404;
+      const isAuthError = status === 401 || status === 403;
+      const isTimeout = error?.code === 'ECONNABORTED' || error?.code === 'ETIMEDOUT';
+
+      // Auth errors and model-not-found should NOT fallback silently —
+      // these indicate config issues that the user/admin needs to fix.
+      if (isAuthError) {
+        throw new AppError(
+          `${aiModel.provider} API key is invalid or missing. Please check your configuration.`,
+          401
+        );
+      }
+      if (isModelNotFound) {
+        throw new AppError(
+          `Model "${aiModel.modelId}" was not found by ${aiModel.provider}. It may be deprecated or the model ID is incorrect.`,
+          404
+        );
+      }
+
+      if (isRateLimit || isProviderDown || isTimeout) {
+        fallbackReason = isRateLimit
+          ? 'Rate limited'
+          : isTimeout
+          ? 'Provider timeout'
+          : 'Provider unavailable';
+
+        logger.warn(`${fallbackReason} for ${aiModel.provider}, trying fallback`);
+
+        const fallbackModel = await findFallbackModel(aiModel.provider);
+
+        if (!fallbackModel) {
+          throw new AppError(`${aiModel.provider} is unavailable (${fallbackReason}) and no other provider is configured.`, 503);
+        }
+
+        logger.info(`Falling back to ${fallbackModel.name} (${fallbackModel.provider})`);
+
+        result = await routeToProvider(fallbackModel, messages, systemPrompt, overrides);
+        fallbackUsed = true;
+
+        const costs = calculateCosts(result.inputTokens, result.outputTokens, fallbackModel);
+
+        return {
+          response: result.response,
+          inputTokens: result.inputTokens,
+          outputTokens: result.outputTokens,
+          totalTokens: result.inputTokens + result.outputTokens,
+          ...costs,
+          markupPercentage: fallbackModel.markupPercentage,
+          fallbackUsed: true,
+          fallbackReason,
+          aiModel: fallbackModel,
+        };
+      }
+
+      logger.error(`AI Gateway error for ${aiModel.provider}:`, {
+        status: error?.response?.status,
+        message: error?.response?.data?.error?.message || error.message,
+      });
+      throw new AppError(
+        `AI provider error: ${error?.response?.data?.error?.message || 'Failed to get response'}`,
+        error?.response?.status || 500
+      );
+    }
+
+    const costs = calculateCosts(result.inputTokens, result.outputTokens, aiModel);
+
+    return {
+      response: result.response,
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
+      totalTokens: result.inputTokens + result.outputTokens,
+      ...costs,
+      markupPercentage: aiModel.markupPercentage,
+      fallbackUsed,
+      aiModel,
+    };
+  }
+
+  // ─── Vision message routing (image analysis) ───
+  static async sendVisionMessage(params: SendVisionParams): Promise<AIResponse> {
+    const { modelId, prompt, imageBase64, mimeType } = params;
+
+    // Look up the user-selected model
+    let aiModel = await prisma.aIModel.findUnique({
+      where: { id: modelId },
+    });
+
+    if (!aiModel) {
+      throw new AppError('AI Model not found', 404);
+    }
+
+    if (!aiModel.isActive) {
+      throw new AppError('This model is currently unavailable', 400);
+    }
+
+    logger.info(`Vision request for model: ${aiModel.name} (${aiModel.provider})`);
+
+    // If the selected model's provider doesn't support vision,
+    // find the best vision-capable model we can use
+    let visionModel = aiModel;
+    let fallbackUsed = false;
+    let fallbackReason: string | undefined;
+
+    if (!VISION_PROVIDERS.includes(aiModel.provider)) {
+      logger.info(`${aiModel.provider} doesn't support vision, finding vision-capable fallback`);
+
+      // Priority: try to find a vision model from a provider we have a key for
+      const visionFallback = await prisma.aIModel.findFirst({
+        where: {
+          isActive: true,
+          provider: { in: VISION_PROVIDERS.filter((p) => {
+            const key = config.apiKeys[p as keyof typeof config.apiKeys];
+            return !!key;
+          }) },
+        },
+        orderBy: { inputTokenPrice: 'asc' }, // cheapest first
+      });
+
+      if (!visionFallback) {
+        throw new AppError(
+          'No vision-capable model available. Configure an API key for OpenAI, Anthropic, or Google.',
+          400
+        );
+      }
+
+      visionModel = visionFallback;
+      fallbackUsed = true;
+      fallbackReason = `${aiModel.name} doesn't support image analysis, using ${visionFallback.name}`;
+      logger.info(`Vision fallback: ${visionFallback.name} (${visionFallback.provider})`);
+    }
+
+    // Try the vision call
+    let result;
+    try {
+      result = await routeVisionToProvider(visionModel, prompt, imageBase64, mimeType);
+
+      // If routeVisionToProvider returned null (shouldn't happen after our check, but safety)
+      if (!result) {
+        throw new AppError('Vision routing failed unexpectedly', 500);
+      }
+    } catch (error: any) {
+      if (error instanceof AppError) throw error;
+
+      const status = error?.response?.status;
+      const isRateLimit = status === 429;
+      const isProviderDown = status === 503;
+      const isTimeout = error?.code === 'ECONNABORTED' || error?.code === 'ETIMEDOUT';
+
+      if (isRateLimit || isProviderDown || isTimeout) {
+        const reason = isRateLimit ? 'Rate limited' : isTimeout ? 'Provider timeout' : 'Provider unavailable';
+        logger.warn(`Vision ${reason} for ${visionModel.provider}, trying other vision provider`);
+
+        // Try another vision provider
+        const otherVisionModel = await prisma.aIModel.findFirst({
+          where: {
+            isActive: true,
+            provider: {
+              in: VISION_PROVIDERS.filter((p) => {
+                return p !== visionModel.provider && !!config.apiKeys[p as keyof typeof config.apiKeys];
+              }),
+            },
+          },
+          orderBy: { inputTokenPrice: 'asc' },
+        });
+
+        if (!otherVisionModel) {
+          throw new AppError(`Image analysis failed: ${reason}. No other vision provider available.`, status || 503);
+        }
+
+        result = await routeVisionToProvider(otherVisionModel, prompt, imageBase64, mimeType);
+        if (!result) {
+          throw new AppError('Vision fallback routing failed', 500);
+        }
+
+        visionModel = otherVisionModel;
+        fallbackUsed = true;
+        fallbackReason = reason;
+      } else {
+        logger.error(`Vision error for ${visionModel.provider}:`, {
+          status: error?.response?.status,
+          message: error?.response?.data?.error?.message || error.message,
+        });
+        throw new AppError(
+          `Image analysis failed: ${error?.response?.data?.error?.message || error.message || 'Unknown error'}`,
+          error?.response?.status || 500
+        );
+      }
+    }
+
+    const costs = calculateCosts(result.inputTokens, result.outputTokens, visionModel);
+
+    return {
+      response: result.response,
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
+      totalTokens: result.inputTokens + result.outputTokens,
+      ...costs,
+      markupPercentage: visionModel.markupPercentage,
+      fallbackUsed,
+      fallbackReason,
+      aiModel: visionModel,
+    };
+  }
+}
+
+export default AIGatewayService;

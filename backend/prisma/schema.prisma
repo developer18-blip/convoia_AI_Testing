@@ -1,0 +1,429 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id              String          @id @default(uuid())
+  name            String
+  email           String          @unique
+  phone           String?
+  website         String?
+  logo            String?
+  industry        String?
+  tier            String          @default("free")
+  status          String          @default("active")
+  monthlyBudget   Float?
+  budgetAlertSent Boolean         @default(false)
+  ownerId         String
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  apiKeys         APIKey[]
+  billingRecords  BillingRecord[]
+  budgets         Budget[]
+  owner           User            @relation("OrganizationOwner", fields: [ownerId], references: [id])
+  subscriptions   Subscription[]
+  usageLogs       UsageLog[]
+  users           User[]          @relation("OrganizationUsers")
+
+  // Enterprise features
+  tokenAllocations TokenAllocation[]
+  tokenPool        TokenPool?
+  tasks            Task[]
+  agents           Agent[]
+  invites          OrgInvite[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([tier])
+}
+
+model User {
+  id                 String          @id @default(uuid())
+  email              String          @unique
+  name               String
+  password           String
+  avatar             String?
+  role               String          @default("employee")
+  isVerified         Boolean         @default(false)
+  verificationToken  String?
+  isActive           Boolean         @default(true)
+  organizationId     String?
+  managerId          String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  apiKeys            APIKey[]
+  billingRecords     BillingRecord[]
+  budgets            Budget[]
+  hourlySessions     HourlySession[]
+  ownedOrganizations Organization[]  @relation("OrganizationOwner")
+  subscriptions      Subscription[]
+  usageLogs          UsageLog[]
+  manager            User?           @relation("ManagerEmployee", fields: [managerId], references: [id])
+  employees          User[]          @relation("ManagerEmployee")
+  organization       Organization?   @relation("OrganizationUsers", fields: [organizationId], references: [id])
+  wallet             Wallet?
+
+  // Enterprise features
+  tokenAllocationsGiven    TokenAllocation[] @relation("AssignedBy")
+  tokenAllocationsReceived TokenAllocation[] @relation("AssignedTo")
+  tasksCreated             Task[]            @relation("TaskCreator")
+  tasksAssigned            Task[]            @relation("TaskAssignee")
+  taskComments             TaskComment[]
+  notifications            Notification[]
+  agents                   Agent[]
+  invitesCreated           OrgInvite[]       @relation("InviteCreator")
+  invitesAccepted          OrgInvite[]       @relation("InviteAcceptor")
+
+  @@index([organizationId])
+  @@index([managerId])
+  @@index([email])
+  @@index([role])
+  @@index([isActive])
+}
+
+model APIKey {
+  id             String        @id @default(uuid())
+  key            String        @unique
+  name           String
+  lastUsed       DateTime?
+  isActive       Boolean       @default(true)
+  userId         String
+  organizationId String?
+  createdAt      DateTime      @default(now())
+  expiresAt      DateTime?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([isActive])
+}
+
+model AIModel {
+  id               String          @id @default(uuid())
+  name             String          @unique
+  provider         String
+  modelId          String
+  description      String?
+  inputTokenPrice  Float
+  outputTokenPrice Float
+  markupPercentage Float           @default(25)
+  capabilities     String[]
+  contextWindow    Int
+  isActive         Boolean         @default(true)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  hourlySessions   HourlySession[]
+  usageLogs        UsageLog[]
+  agents           Agent[]
+
+  @@index([provider])
+  @@index([name])
+  @@index([isActive])
+}
+
+model UsageLog {
+  id                 String        @id @default(uuid())
+  userId             String
+  organizationId     String?
+  modelId            String
+  prompt             String
+  response           String?
+  tokensInput        Int
+  tokensOutput       Int
+  totalTokens        Int
+  providerCost       Float
+  markupPercentage   Float
+  customerPrice      Float
+  estimatedCostShown Float?
+  sessionId          String?
+  status             String        @default("completed")
+  errorMessage       String?
+  createdAt          DateTime      @default(now())
+  model              AIModel       @relation(fields: [modelId], references: [id])
+  organization       Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([modelId])
+  @@index([createdAt])
+  @@index([status])
+  @@index([userId, createdAt])
+}
+
+model Wallet {
+  id            String              @id @default(uuid())
+  userId        String              @unique
+  balance       Float               @default(0)
+  totalToppedUp Float               @default(0)
+  totalSpent    Float               @default(0)
+  currency      String              @default("USD")
+  lastTopedUpAt DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions  WalletTransaction[]
+}
+
+model WalletTransaction {
+  id          String   @id @default(uuid())
+  walletId    String
+  amount      Float
+  type        String
+  description String
+  reference   String?
+  createdAt   DateTime @default(now())
+  wallet      Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model Budget {
+  id              String        @id @default(uuid())
+  userId          String
+  organizationId  String?
+  monthlyCap      Float
+  currentUsage    Float         @default(0)
+  alertThreshold  Float         @default(80)
+  alertSent       Boolean       @default(false)
+  autoDowngrade   Boolean       @default(true)
+  fallbackModelId String?
+  resetDate       DateTime
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([resetDate])
+}
+
+model HourlySession {
+  id            String   @id @default(uuid())
+  userId        String
+  modelId       String
+  durationHours Int
+  amountPaid    Float
+  startTime     DateTime @default(now())
+  endTime       DateTime
+  isActive      Boolean  @default(true)
+  isExpired     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  model         AIModel  @relation(fields: [modelId], references: [id])
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([modelId])
+  @@index([isActive])
+  @@index([endTime])
+  @@index([userId, modelId, isActive])
+}
+
+model Subscription {
+  id                   String          @id @default(uuid())
+  userId               String
+  organizationId       String?
+  plan                 String          @default("free")
+  status               String          @default("active")
+  monthlyTokenQuota    Int             @default(1000000)
+  tokensUsedThisMonth  Int             @default(0)
+  quotaResetDate       DateTime
+  stripeSubscriptionId String?         @unique
+  stripePriceId        String?
+  startDate            DateTime        @default(now())
+  endDate              DateTime?
+  renewalDate          DateTime?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  billingRecords       BillingRecord[]
+  organization         Organization?   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user                 User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([status])
+}
+
+model BillingRecord {
+  id              String        @id @default(uuid())
+  userId          String
+  organizationId  String?
+  subscriptionId  String?
+  amount          Float
+  currency        String        @default("USD")
+  description     String
+  type            String
+  status          String        @default("pending")
+  invoiceNumber   String?       @unique
+  stripePriceId   String?
+  stripePaymentId String?       @unique
+  dueDate         DateTime?
+  paidDate        DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subscription    Subscription? @relation(fields: [subscriptionId], references: [id])
+  user            User          @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([type])
+}
+
+// ============== AI EMPLOYEES / AGENTS ==============
+
+model Agent {
+  id              String    @id @default(uuid())
+  name            String
+  role            String                          // e.g. "Senior Backend Developer"
+  avatar          String?                         // emoji or icon identifier
+  description     String?
+  systemPrompt    String    @db.Text
+  personality     String    @default("professional") // professional, friendly, strict, creative
+  defaultModelId  String?
+  defaultModel    AIModel?  @relation(fields: [defaultModelId], references: [id])
+  temperature     Float     @default(0.7)
+  maxTokens       Int       @default(2000)
+  topP            Float     @default(0.9)
+  industry        String?
+  isDefault       Boolean   @default(false)       // platform-level default employee
+  isActive        Boolean   @default(true)
+  userId          String?                         // null = platform default, set = user-created
+  user            User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId  String?                         // org-shared employee
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([isDefault])
+  @@index([isActive])
+}
+
+// ============== ENTERPRISE FEATURES ==============
+
+model TokenAllocation {
+  id              String       @id @default(uuid())
+  assignedById    String
+  assignedBy      User         @relation("AssignedBy", fields: [assignedById], references: [id])
+  assignedToId    String
+  assignedTo      User         @relation("AssignedTo", fields: [assignedToId], references: [id])
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  tokensAllocated Int
+  tokensUsed      Int          @default(0)
+  tokensRemaining Int
+  periodStart     DateTime
+  periodEnd       DateTime
+  status          String       @default("active")
+  notes           String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([assignedToId])
+  @@index([assignedById])
+  @@index([organizationId])
+}
+
+model TokenPool {
+  id              String       @id @default(uuid())
+  organizationId  String       @unique
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  totalTokens     Int
+  allocatedTokens Int          @default(0)
+  usedTokens      Int          @default(0)
+  availableTokens Int
+  updatedAt       DateTime     @updatedAt
+}
+
+model Task {
+  id               String        @id @default(uuid())
+  title            String
+  description      String?
+  createdById      String
+  createdBy        User          @relation("TaskCreator", fields: [createdById], references: [id])
+  assignedToId     String
+  assignedTo       User          @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  organizationId   String
+  organization     Organization  @relation(fields: [organizationId], references: [id])
+  priority         String        @default("medium")
+  status           String        @default("pending")
+  dueDate          DateTime?
+  completedAt      DateTime?
+  suggestedModelId String?
+  comments         TaskComment[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([assignedToId])
+  @@index([createdById])
+  @@index([organizationId])
+  @@index([status])
+}
+
+model TaskComment {
+  id        String   @id @default(uuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([taskId])
+}
+
+model Notification {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type          String
+  title         String
+  message       String
+  referenceId   String?
+  referenceType String?
+  isRead        Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+// ============== ORGANIZATION INVITES ==============
+
+model OrgInvite {
+  id              String    @id @default(uuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedById     String
+  invitedBy       User      @relation("InviteCreator", fields: [invitedById], references: [id])
+  email           String
+  role            String
+  token           String    @unique
+  status          String    @default("pending")
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  acceptedById    String?
+  acceptedBy      User?     @relation("InviteAcceptor", fields: [acceptedById], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([token])
+  @@index([organizationId])
+  @@index([email])
+  @@index([status])
+}

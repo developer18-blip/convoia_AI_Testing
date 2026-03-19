@@ -1,0 +1,373 @@
+@import "tailwindcss";
+
+@theme {
+  /* ─── Dark Mode: Neon Green Palette ─── */
+  --color-primary: #10A37F;
+  --color-primary-hover: #0D8A6A;
+  --color-primary-light: rgba(16, 163, 127, 0.15);
+  --color-primary-glow: rgba(16, 163, 127, 0.08);
+
+  --color-accent-start: #10A37F;
+  --color-accent-mid: #34D399;
+  --color-accent-end: #6EE7B7;
+
+  --color-background: #0D0D0D;
+  --color-surface: #171717;
+  --color-surface-2: #1E1E1E;
+  --color-surface-3: #2A2A2A;
+  --color-border: #2F2F2F;
+  --color-border-subtle: #252525;
+  --color-border-hover: #404040;
+  --color-border-strong: #525252;
+  --color-text-primary: #ECECEC;
+  --color-text-secondary: #B4B4B4;
+  --color-text-muted: #8E8E8E;
+  --color-text-meta: #8E8E8E;
+  --color-text-dim: #676767;
+
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
+  --color-info: #3B82F6;
+
+  --color-glass: rgba(13, 13, 13, 0.9);
+  --color-glass-border: rgba(255, 255, 255, 0.06);
+  --color-glass-hover: rgba(255, 255, 255, 0.04);
+
+  --font-sans: 'Inter', -apple-system, system-ui, sans-serif;
+}
+
+/* ─── Light theme overrides: White + Blue ─── */
+html.light {
+  --color-primary: #3B5BDB;
+  --color-primary-hover: #2F4AC2;
+  --color-primary-light: rgba(59, 91, 219, 0.08);
+  --color-primary-glow: rgba(59, 91, 219, 0.06);
+
+  --color-accent-start: #3B5BDB;
+  --color-accent-mid: #4C6EF5;
+  --color-accent-end: #748FFC;
+
+  --color-background: #FFFFFF;
+  --color-surface: #F8F9FF;
+  --color-surface-2: #EEF2FF;
+  --color-surface-3: #E0E4FF;
+  --color-border: #E0E4FF;
+  --color-border-subtle: #EEF2FF;
+  --color-border-hover: #C7D2FE;
+  --color-border-strong: #A5B4FC;
+  --color-text-primary: #0F0F2E;
+  --color-text-secondary: #4B5380;
+  --color-text-muted: #8B92B8;
+  --color-text-meta: #8B92B8;
+  --color-text-dim: #C7D2FE;
+
+  --color-success: #0EA5E9;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
+  --color-info: #3B82F6;
+
+  --color-glass: rgba(255, 255, 255, 0.9);
+  --color-glass-border: rgba(59, 91, 219, 0.06);
+  --color-glass-hover: rgba(59, 91, 219, 0.03);
+}
+
+html.light,
+html.light body,
+html.light #root {
+  background-color: #FFFFFF !important;
+  color: #0F0F2E !important;
+  color-scheme: light !important;
+}
+
+html.light input,
+html.light textarea,
+html.light select {
+  color-scheme: light;
+  color: #0F0F2E;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #8B92B8;
+}
+
+html.light input:-webkit-autofill,
+html.light input:-webkit-autofill:hover,
+html.light input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0px 1000px #F8F9FF inset;
+  -webkit-text-fill-color: #0F0F2E;
+  caret-color: #0F0F2E;
+}
+
+html.light * {
+  scrollbar-color: #C7D2FE transparent;
+}
+html.light ::-webkit-scrollbar-thumb { background: #C7D2FE; }
+html.light ::-webkit-scrollbar-thumb:hover { background: #A5B4FC; }
+
+html.light ::selection {
+  background: rgba(59, 91, 219, 0.2);
+  color: #0F0F2E;
+}
+
+html.light .animate-pulse-glow {
+  animation: pulse-glow-light 2s ease-in-out infinite;
+}
+@keyframes pulse-glow-light {
+  0%, 100% { box-shadow: 0 0 5px rgba(59, 91, 219, 0.3); }
+  50% { box-shadow: 0 0 15px rgba(59, 91, 219, 0.5); }
+}
+
+/* ─── Chat-specific CSS variables (dark default) ─── */
+:root {
+  --chat-bg: #0D0D0D;
+  --chat-sidebar-bg: #0A0A0A;
+  --chat-surface: #171717;
+  --chat-hover: #1E1E1E;
+  --chat-border: #2F2F2F;
+  --chat-text: #ECECEC;
+  --chat-text-secondary: #B4B4B4;
+  --chat-text-muted: #8E8E8E;
+  --chat-text-dim: #676767;
+  --chat-code-bg: #0A0A0A;
+  --chat-code-header: #171717;
+  --chat-input-bg: #171717;
+  --chat-user-bubble: #1E1E1E;
+}
+
+html.light {
+  --chat-bg: #FFFFFF;
+  --chat-sidebar-bg: #F8F9FF;
+  --chat-surface: #EEF2FF;
+  --chat-hover: #E0E4FF;
+  --chat-border: #E0E4FF;
+  --chat-text: #0F0F2E;
+  --chat-text-secondary: #4B5380;
+  --chat-text-muted: #8B92B8;
+  --chat-text-dim: #C7D2FE;
+  --chat-code-bg: #F8F9FF;
+  --chat-code-header: #EEF2FF;
+  --chat-input-bg: #EEF2FF;
+  --chat-user-bubble: #EEF2FF;
+}
+
+/* ─── Base box sizing ─── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* ─── Full dark everywhere (default) ─── */
+html, body, #root {
+  background-color: #0D0D0D !important;
+  color: #ECECEC !important;
+  color-scheme: dark !important;
+}
+
+/* ─── Base ─── */
+body {
+  font-family: var(--font-sans);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  background-color: #0D0D0D;
+  color: #ECECEC;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Dark form elements everywhere ─── */
+input, textarea, select {
+  color-scheme: dark;
+  background-color: transparent;
+  color: #ECECEC;
+}
+
+input::placeholder, textarea::placeholder {
+  color: #8E8E8E;
+}
+
+/* Remove autofill yellow bg */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0px 1000px #171717 inset;
+  -webkit-text-fill-color: #ECECEC;
+  caret-color: #ECECEC;
+}
+
+/* ─── Scrollbar (thin dark) ─── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2F2F2F transparent;
+}
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2F2F2F; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #404040; }
+
+/* ─── Selection ─── */
+::selection {
+  background: rgba(16, 163, 127, 0.3);
+  color: white;
+}
+
+/* ─── Chat input focus state ─── */
+.chat-input-box:focus-within {
+  border-color: var(--color-primary) !important;
+}
+
+/* ─── Main chat area - NO horizontal scroll ─── */
+.chat-messages-container {
+  overflow-x: hidden !important;
+}
+
+/* Code blocks scroll within themselves */
+pre {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+/* Prevent any element from causing overflow */
+.message-content * {
+  max-width: 100%;
+  word-break: break-word;
+}
+
+/* Tables scroll within their container */
+.table-wrapper {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+/* ─── Prose overrides for markdown in chat ─── */
+.prose pre {
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
+.prose code::before,
+.prose code::after {
+  content: none !important;
+}
+
+/* ─── Keyframe animations ─── */
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+  30% { transform: translateY(-6px); opacity: 1; }
+}
+
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 5px rgba(16, 163, 127, 0.3); }
+  50% { box-shadow: 0 0 15px rgba(16, 163, 127, 0.5); }
+}
+
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes messageIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Utility animation classes ─── */
+.animate-gradient-shift { background-size: 200% 200%; animation: gradient-shift 6s ease infinite; }
+.animate-float { animation: float 3s ease-in-out infinite; }
+.animate-shimmer { animation: shimmer 2s ease-in-out infinite; }
+.animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+.animate-slide-up { animation: slide-up 0.3s ease-out; }
+.animate-slide-down { animation: slide-down 0.2s ease-out; }
+.animate-fade-in { animation: fade-in 0.2s ease-out; }
+.animate-spin-slow { animation: spin-slow 8s linear infinite; }
+.animate-message-in { animation: messageIn 200ms ease-out; }
+.message-enter { animation: fadeSlideIn 200ms ease-out forwards; }
+
+/* ─── Glass utility ─── */
+.glass {
+  background: var(--color-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--color-glass-border);
+}
+.glass-strong {
+  background: var(--color-glass);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--color-glass-border);
+}
+
+/* ─── Gradient border utility ─── */
+.gradient-border { position: relative; }
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, var(--color-accent-start), var(--color-accent-end));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.gradient-border:hover::before { opacity: 1; }
+
+/* ─── Glow effect ─── */
+.glow-primary { box-shadow: 0 0 20px rgba(16, 163, 127, 0.15), 0 0 60px rgba(16, 163, 127, 0.05); }
+.glow-primary-strong { box-shadow: 0 0 20px rgba(16, 163, 127, 0.3), 0 0 60px rgba(16, 163, 127, 0.1); }
+
+/* Light mode glow overrides */
+html.light .glow-primary { box-shadow: 0 0 20px rgba(59, 91, 219, 0.15), 0 0 60px rgba(59, 91, 219, 0.05); }
+html.light .glow-primary-strong { box-shadow: 0 0 20px rgba(59, 91, 219, 0.3), 0 0 60px rgba(59, 91, 219, 0.1); }
+
+/* ─── Focus ring ─── */
+.focus-ring { outline: none; }
+.focus-ring:focus-visible { box-shadow: 0 0 0 2px var(--color-background), 0 0 0 4px var(--color-primary); }

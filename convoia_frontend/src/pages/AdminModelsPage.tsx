@@ -1,0 +1,113 @@
+import { useState } from 'react'
+import { Save, ToggleLeft, ToggleRight } from 'lucide-react'
+import { useModels } from '../hooks/useModels'
+import { useToast } from '../hooks/useToast'
+import { Card } from '../components/ui/Card'
+import { Button } from '../components/ui/Button'
+import { Input } from '../components/ui/Input'
+import { ProviderBadge } from '../components/shared/ProviderBadge'
+import { LoadingPage } from '../components/shared/LoadingPage'
+import { ErrorState } from '../components/shared/ErrorState'
+import api from '../lib/api'
+
+export function AdminModelsPage() {
+  const { models, isLoading, error, refetch } = useModels()
+  const toast = useToast()
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editValues, setEditValues] = useState({ inputPrice: '', outputPrice: '', markup: '' })
+  const [isSaving, setIsSaving] = useState(false)
+
+  const handleEdit = (model: any) => {
+    setEditingId(model.id)
+    setEditValues({
+      inputPrice: String(model.inputTokenPrice),
+      outputPrice: String(model.outputTokenPrice),
+      markup: String(model.markupPercentage),
+    })
+  }
+
+  const handleSave = async (modelId: string) => {
+    try {
+      setIsSaving(true)
+      await api.put(`/admin/models/${modelId}/pricing`, {
+        inputTokenPrice: parseFloat(editValues.inputPrice),
+        outputTokenPrice: parseFloat(editValues.outputPrice),
+        markupPercentage: parseFloat(editValues.markup),
+      })
+      toast.success('Pricing updated')
+      setEditingId(null)
+      refetch()
+    } catch { toast.error('Failed to update pricing') } finally { setIsSaving(false) }
+  }
+
+  const handleToggle = async (modelId: string, isActive: boolean) => {
+    try {
+      await api.post(`/admin/models/${modelId}/toggle`)
+      toast.success(isActive ? 'Model deactivated' : 'Model activated')
+      refetch()
+    } catch { toast.error('Failed to toggle model') }
+  }
+
+  if (isLoading) return <LoadingPage />
+  if (error) return <ErrorState message={error} onRetry={refetch} />
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-semibold text-text-primary">Model Pricing</h2>
+
+      <Card padding="none">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead><tr className="border-b border-border">
+              <th className="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase">Model</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase">Provider</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-text-muted uppercase">Input $/1M</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-text-muted uppercase">Output $/1M</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-text-muted uppercase">Markup %</th>
+              <th className="px-4 py-3 text-center text-xs font-medium text-text-muted uppercase">Active</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-text-muted uppercase">Actions</th>
+            </tr></thead>
+            <tbody>
+              {models.map((model) => (
+                <tr key={model.id} className="border-b border-border/50 hover:bg-surface-2 transition-colors">
+                  <td className="px-4 py-3 text-sm font-medium text-text-primary">{model.name}</td>
+                  <td className="px-4 py-3"><ProviderBadge provider={model.provider} /></td>
+                  {editingId === model.id ? (
+                    <>
+                      <td className="px-4 py-3"><Input type="number" value={editValues.inputPrice} onChange={(e) => setEditValues((v) => ({ ...v, inputPrice: e.target.value }))} className="w-24" /></td>
+                      <td className="px-4 py-3"><Input type="number" value={editValues.outputPrice} onChange={(e) => setEditValues((v) => ({ ...v, outputPrice: e.target.value }))} className="w-24" /></td>
+                      <td className="px-4 py-3"><Input type="number" value={editValues.markup} onChange={(e) => setEditValues((v) => ({ ...v, markup: e.target.value }))} className="w-20" /></td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="px-4 py-3 text-sm font-mono text-text-secondary text-right">${model.inputTokenPrice.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-sm font-mono text-text-secondary text-right">${model.outputTokenPrice.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-sm font-mono text-text-secondary text-right">{model.markupPercentage}%</td>
+                    </>
+                  )}
+                  <td className="px-4 py-3 text-center">
+                    <button onClick={() => handleToggle(model.id, model.isActive)} className="text-text-muted hover:text-text-primary">
+                      {model.isActive ? <ToggleRight size={24} className="text-success" /> : <ToggleLeft size={24} />}
+                    </button>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {editingId === model.id ? (
+                      <div className="flex items-center justify-end gap-1">
+                        <Button size="sm" onClick={() => handleSave(model.id)} isLoading={isSaving}><Save size={14} /></Button>
+                        <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>Cancel</Button>
+                      </div>
+                    ) : (
+                      <Button size="sm" variant="ghost" onClick={() => handleEdit(model)}>Edit</Button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  )
+}
+
+export default AdminModelsPage;
