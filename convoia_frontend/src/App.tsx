@@ -152,8 +152,9 @@ function AppRoutes() {
           {/* Wallet — only freelancers (no org) */}
           <Route element={<FreelancerGuard />}>
             <Route path="/wallet" element={<WalletPage />} />
-            <Route path="/api-keys" element={<ApiKeysPage />} />
           </Route>
+          {/* API Keys — all authenticated users */}
+          <Route path="/api-keys" element={<ApiKeysPage />} />
 
           {/* Sessions — freelancers OR org_owner/platform_admin */}
           <Route element={<SessionGuard />}>

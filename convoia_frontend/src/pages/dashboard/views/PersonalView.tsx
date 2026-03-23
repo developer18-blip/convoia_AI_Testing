@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Wallet, MessageSquare, Coins, DollarSign, ArrowRight, Zap, Bot, Plus } from 'lucide-react'
+import { MessageSquare, Coins, ArrowRight, Zap, Bot, Plus } from 'lucide-react'
 import { StatCard } from '../../../components/shared/StatCard'
 import { InsightCard } from '../../../components/shared/InsightCard'
 import { Card } from '../../../components/ui/Card'
@@ -8,13 +8,13 @@ import { Tabs } from '../../../components/ui/Tabs'
 import { Badge } from '../../../components/ui/Badge'
 import { AreaChart } from '../../../components/charts/AreaChart'
 import { DonutChart } from '../../../components/charts/DonutChart'
-import { useWallet } from '../../../hooks/useWallet'
+import { useTokens } from '../../../contexts/TokenContext'
 import { formatCurrency, formatNumber, formatTokens, formatDateTime, getGreeting, truncate } from '../../../lib/utils'
-import type { DashboardStats, Wallet as WalletType, HourlySession, UsageLog, InsightData } from '../../../types'
+import type { DashboardStats, HourlySession, UsageLog, InsightData } from '../../../types'
 
 interface PersonalViewProps {
   stats: DashboardStats
-  wallet: WalletType | null
+  wallet: any
   sessions: HourlySession[]
   recentUsage: UsageLog[]
   insights: InsightData[]
@@ -23,24 +23,14 @@ interface PersonalViewProps {
 
 export function PersonalView({ stats, wallet, sessions, recentUsage, insights, userName }: PersonalViewProps) {
   const navigate = useNavigate()
-  const { setShowTopUp } = useWallet()
-  const [chartMode, setChartMode] = useState('cost')
+  const { tokenBalance, formattedBalance, totalPurchased, totalUsed } = useTokens()
+  const [chartMode, setChartMode] = useState('queries')
 
   const monthCost = Number(stats?.thisMonth?.cost ?? 0) || 0
   const monthQueries = Number(stats?.thisMonth?.queries ?? 0) || 0
   const monthTokens = Number(stats?.thisMonth?.tokens ?? 0) || 0
   const todayQueries = Number(stats?.today?.queries ?? 0) || 0
-  const lastMonthCost = Number(stats?.lastMonth?.cost ?? 0) || 0
   const lastMonthQueries = Number(stats?.lastMonth?.queries ?? 0) || 0
-
-  const dailyRate = monthCost / Math.max(new Date().getDate(), 1)
-  const walletBalance = Number(wallet?.balance ?? 0) || 0
-  const walletSpent = Number(wallet?.totalSpent ?? 0) || 0
-  const daysRemaining = walletBalance > 0 && dailyRate > 0 ? Math.floor(walletBalance / dailyRate) : null
-  const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()
-  const projectedEOM = dailyRate * daysInMonth
-
-  const costTrend = lastMonthCost > 0 ? ((monthCost - lastMonthCost) / lastMonthCost) * 100 : 0
   const queryTrend = lastMonthQueries > 0 ? ((monthQueries - lastMonthQueries) / lastMonthQueries) * 100 : 0
 
   const modelBreakdown = (stats?.topModels ?? []).map((m) => ({ name: m.name, value: Number(m.cost ?? 0) || 0 }))
@@ -55,14 +45,14 @@ export function PersonalView({ stats, wallet, sessions, recentUsage, insights, u
         <p className="text-sm text-text-muted mt-1">Your personal AI workspace</p>
       </div>
 
-      {/* 4 Stat Cards */}
+      {/* 4 Stat Cards — Token-based */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Wallet Balance"
-          value={formatCurrency(walletBalance)}
-          subtitle={daysRemaining !== null ? `~${daysRemaining} days remaining` : 'Top up to get started'}
-          icon={<Wallet size={20} />}
-          className={walletBalance < 1 ? 'border-red-500/30' : 'border-emerald-500/20'}
+          title="Token Balance"
+          value={formattedBalance}
+          subtitle={tokenBalance > 0 ? 'Available to use' : 'Buy tokens to get started'}
+          icon={<Zap size={20} />}
+          className={tokenBalance < 1000 ? 'border-red-500/30' : 'border-emerald-500/20'}
         />
         <StatCard
           title="Queries This Month"
@@ -78,11 +68,10 @@ export function PersonalView({ stats, wallet, sessions, recentUsage, insights, u
           icon={<Coins size={20} />}
         />
         <StatCard
-          title="Amount Spent"
-          value={formatCurrency(monthCost)}
-          subtitle={projectedEOM > 0 ? `~${formatCurrency(projectedEOM)} projected EOM` : undefined}
-          icon={<DollarSign size={20} />}
-          trend={costTrend}
+          title="Total Purchased"
+          value={formatTokens(totalPurchased)}
+          subtitle={`${formatTokens(totalUsed)} used overall`}
+          icon={<Coins size={20} />}
         />
       </div>
 
@@ -102,8 +91,8 @@ export function PersonalView({ stats, wallet, sessions, recentUsage, insights, u
             <h3 className="text-sm font-medium text-text-secondary">Usage Over Time</h3>
             <Tabs
               tabs={[
-                { id: 'cost', label: 'Cost' },
                 { id: 'queries', label: 'Queries' },
+                { id: 'cost', label: 'Cost' },
               ]}
               activeTab={chartMode}
               onChange={setChartMode}
@@ -128,7 +117,7 @@ export function PersonalView({ stats, wallet, sessions, recentUsage, insights, u
         </Card>
       </div>
 
-      {/* Bottom Row: Recent Queries + Wallet/Sessions */}
+      {/* Bottom Row: Recent Queries + Token Balance/Sessions */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         {/* Recent Queries */}
         <Card className="lg:col-span-3" padding="none">
@@ -150,7 +139,6 @@ export function PersonalView({ stats, wallet, sessions, recentUsage, insights, u
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-xs font-mono text-text-secondary">{formatTokens(log.totalTokens)} tokens</p>
-                    <p className="text-xs font-mono text-primary">{formatCurrency(log.customerPrice)}</p>
                   </div>
                 </div>
               ))
@@ -158,29 +146,28 @@ export function PersonalView({ stats, wallet, sessions, recentUsage, insights, u
           </div>
         </Card>
 
-        {/* Right Column: Wallet + Sessions */}
+        {/* Right Column: Token Balance + Sessions */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Wallet Mini Card */}
+          {/* Token Balance Card */}
           <Card padding="lg">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium text-text-secondary">Wallet</h3>
-              <button onClick={() => navigate('/wallet')} className="text-xs text-primary hover:text-primary-hover">Details</button>
+              <h3 className="text-sm font-medium text-text-secondary">My Tokens</h3>
             </div>
-            <p className="text-2xl font-semibold font-mono text-text-primary mb-1">
-              {formatCurrency(walletBalance)}
+            <p className="text-2xl font-semibold font-mono mb-1" style={{ color: 'var(--color-primary)' }}>
+              {formattedBalance}
             </p>
             <p className="text-xs text-text-muted mb-3">
-              Total spent: {formatCurrency(walletSpent)}
+              {formatTokens(totalUsed)} used &middot; {formatTokens(totalPurchased)} purchased
             </p>
             <button
-              onClick={() => setShowTopUp(true)}
+              onClick={() => navigate('/tokens/buy')}
               className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-colors"
               style={{
                 background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-hover))',
                 color: 'white', border: 'none', cursor: 'pointer',
               }}
             >
-              <Plus size={14} /> Top Up Wallet
+              <Plus size={14} /> Buy Tokens
             </button>
           </Card>
 
@@ -194,13 +181,7 @@ export function PersonalView({ stats, wallet, sessions, recentUsage, insights, u
               <div className="text-center py-2">
                 <Zap size={24} className="mx-auto text-text-muted mb-2" />
                 <p className="text-sm text-text-muted mb-1">No active sessions</p>
-                <p className="text-xs text-text-muted mb-3">Purchase hourly access on Sessions page</p>
-                <button
-                  onClick={() => navigate('/sessions')}
-                  className="text-xs font-medium text-primary hover:text-primary-hover"
-                >
-                  Buy Session
-                </button>
+                <p className="text-xs text-text-muted">Start a chat to begin</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -216,18 +197,18 @@ export function PersonalView({ stats, wallet, sessions, recentUsage, insights, u
       {/* Quick Actions Row */}
       <div className="flex flex-wrap gap-3">
         <button
-          onClick={() => setShowTopUp(true)}
+          onClick={() => navigate('/tokens/buy')}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:scale-[1.02]"
           style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)/20' }}
         >
-          <Plus size={16} /> Top Up Wallet
+          <Plus size={16} /> Buy Tokens
         </button>
         <button
-          onClick={() => navigate('/sessions')}
+          onClick={() => navigate('/chat')}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:scale-[1.02]"
           style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)/20' }}
         >
-          <Zap size={16} /> Buy Session
+          <MessageSquare size={16} /> Start Chat
         </button>
         <button
           onClick={() => navigate('/models')}
