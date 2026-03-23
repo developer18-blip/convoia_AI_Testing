@@ -48,7 +48,7 @@ export const updateOrgSettings = asyncHandler(async (req: Request, res: Response
     throw new AppError('You do not belong to an organization', 400);
   }
 
-  const { name, industry, phone, website } = req.body;
+  const { name, industry, phone, website, allowEmployeeAvatar } = req.body;
 
   const updated = await prisma.organization.update({
     where: { id: req.user.organizationId },
@@ -57,6 +57,7 @@ export const updateOrgSettings = asyncHandler(async (req: Request, res: Response
       ...(industry !== undefined && { industry }),
       ...(phone !== undefined && { phone }),
       ...(website !== undefined && { website }),
+      ...(allowEmployeeAvatar !== undefined && { allowEmployeeAvatar: Boolean(allowEmployeeAvatar) }),
     },
     select: {
       id: true,
@@ -67,6 +68,7 @@ export const updateOrgSettings = asyncHandler(async (req: Request, res: Response
       industry: true,
       tier: true,
       status: true,
+      allowEmployeeAvatar: true,
     },
   });
 
@@ -109,6 +111,7 @@ export const getOrgTeam = asyncHandler(async (req: Request, res: Response) => {
       id: true,
       name: true,
       email: true,
+      avatar: true,
       role: true,
       managerId: true,
       createdAt: true,
@@ -166,6 +169,7 @@ export const getOrgTeam = asyncHandler(async (req: Request, res: Response) => {
       id: u.id,
       name: u.name,
       email: u.email,
+      avatar: u.avatar,
       role: u.role,
       managerId: u.managerId,
       queries: usage?.queries ?? 0,

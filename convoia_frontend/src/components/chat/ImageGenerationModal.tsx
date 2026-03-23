@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Wand2, Download, Copy, X } from 'lucide-react'
 import api from '../../lib/api'
-import { formatCurrency } from '../../lib/utils'
 
 interface Props {
   isOpen: boolean
@@ -13,15 +12,15 @@ export function ImageGenerationModal({ isOpen, onClose, onImageGenerated }: Prop
   const [prompt, setPrompt] = useState('')
   const [size, setSize] = useState<'1024x1024' | '1792x1024' | '1024x1792'>('1024x1024')
   const [quality, setQuality] = useState<'standard' | 'hd'>('standard')
+  const [provider, setProvider] = useState<'gemini' | 'dalle'>('gemini')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState<{
     imageUrl: string
     revisedPrompt: string
-    cost: number
+    provider?: string
+    tokensUsed?: number
   } | null>(null)
-
-  const cost = quality === 'hd' ? 0.08 : 0.04
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -34,7 +33,7 @@ export function ImageGenerationModal({ isOpen, onClose, onImageGenerated }: Prop
     setResult(null)
 
     try {
-      const res = await api.post('/files/generate-image', { prompt, size, quality })
+      const res = await api.post('/files/generate-image', { prompt, size, quality, provider })
       setResult(res.data.data)
     } catch (err: unknown) {
       const apiErr = err as { response?: { data?: { message?: string } } }
@@ -71,7 +70,7 @@ export function ImageGenerationModal({ isOpen, onClose, onImageGenerated }: Prop
         <div className="flex items-center justify-between p-4 border-b border-border">
           <div className="flex items-center gap-2">
             <Wand2 size={20} className="text-primary" />
-            <h2 className="text-white font-semibold">Generate Image with DALL-E 3</h2>
+            <h2 className="text-white font-semibold">Generate Image</h2>
           </div>
           <button onClick={onClose} className="text-text-muted hover:text-white">
             <X size={20} />
@@ -118,26 +117,26 @@ export function ImageGenerationModal({ isOpen, onClose, onImageGenerated }: Prop
             </div>
           </div>
 
-          {/* Quality */}
+          {/* Provider */}
           <div>
-            <label className="block text-sm text-text-secondary mb-1.5">Quality</label>
+            <label className="block text-sm text-text-secondary mb-1.5">AI Provider</label>
             <div className="grid grid-cols-2 gap-2">
               {([
-                { value: 'standard', label: 'Standard', price: '$0.04', desc: 'Good quality, faster' },
-                { value: 'hd', label: 'HD', price: '$0.08', desc: 'Higher detail, slower' },
-              ] as const).map((opt) => (
+                { value: 'gemini' as const, label: 'Gemini Flash', tokens: '500', desc: 'Fast, free tier, 1500/day', color: '#4285F4' },
+                { value: 'dalle' as const, label: 'DALL-E 3', tokens: '1,000', desc: 'Photorealistic, HD option', color: '#10A37F' },
+              ]).map((opt) => (
                 <button
                   key={opt.value}
-                  onClick={() => setQuality(opt.value)}
+                  onClick={() => setProvider(opt.value)}
                   className={`py-2 px-3 rounded-lg border text-sm transition-colors text-left ${
-                    quality === opt.value
+                    provider === opt.value
                       ? 'border-primary bg-primary/10 text-white'
                       : 'border-border text-text-secondary hover:border-primary/50'
                   }`}
                 >
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center">
                     <span className="font-medium">{opt.label}</span>
-                    <span className="text-primary">{opt.price}</span>
+                    <span style={{ color: opt.color, fontSize: '11px' }}>{opt.tokens} tokens</span>
                   </div>
                   <div className="text-xs text-text-muted mt-0.5">{opt.desc}</div>
                 </button>
@@ -145,10 +144,36 @@ export function ImageGenerationModal({ isOpen, onClose, onImageGenerated }: Prop
             </div>
           </div>
 
-          {/* Cost preview */}
+          {/* Quality (only for DALL-E) */}
+          {provider === 'dalle' && (
+            <div>
+              <label className="block text-sm text-text-secondary mb-1.5">Quality</label>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { value: 'standard' as const, label: 'Standard', desc: 'Good quality, faster' },
+                  { value: 'hd' as const, label: 'HD', desc: 'Higher detail, slower' },
+                ]).map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setQuality(opt.value)}
+                    className={`py-2 px-3 rounded-lg border text-sm transition-colors text-left ${
+                      quality === opt.value
+                        ? 'border-primary bg-primary/10 text-white'
+                        : 'border-border text-text-secondary hover:border-primary/50'
+                    }`}
+                  >
+                    <div className="font-medium">{opt.label}</div>
+                    <div className="text-xs text-text-muted mt-0.5">{opt.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Token cost preview */}
           <div className="bg-surface-2 rounded-lg p-3 flex justify-between items-center">
-            <span className="text-text-secondary text-sm">Generation cost</span>
-            <span className="text-white font-mono font-medium">{formatCurrency(cost)}</span>
+            <span className="text-text-secondary text-sm">Token cost</span>
+            <span className="text-white font-mono font-medium">{provider === 'gemini' ? '500' : '1,000'} tokens</span>
           </div>
 
           {/* Error */}
@@ -180,12 +205,23 @@ export function ImageGenerationModal({ isOpen, onClose, onImageGenerated }: Prop
                 <img src={result.imageUrl} alt={prompt} className="w-full" />
               </div>
 
-              {result.revisedPrompt !== prompt && (
-                <div className="bg-surface-2 rounded-lg p-3">
-                  <p className="text-xs text-text-muted mb-1">DALL-E enhanced your prompt:</p>
-                  <p className="text-sm text-text-secondary">{result.revisedPrompt}</p>
+              {/* Provider badge + revised prompt */}
+              <div className="bg-surface-2 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{
+                    backgroundColor: result.provider?.includes('Gemini') ? '#4285F420' : '#10A37F20',
+                    color: result.provider?.includes('Gemini') ? '#4285F4' : '#10A37F',
+                  }}>
+                    {result.provider || 'Gemini Flash'}
+                  </span>
+                  {result.tokensUsed && (
+                    <span className="text-xs text-text-muted">{result.tokensUsed} tokens used</span>
+                  )}
                 </div>
-              )}
+                {result.revisedPrompt !== prompt && (
+                  <p className="text-sm text-text-secondary mt-1">{result.revisedPrompt}</p>
+                )}
+              </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <button

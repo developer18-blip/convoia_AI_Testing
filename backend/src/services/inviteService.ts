@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import prisma from '../config/db.js';
 import logger from '../config/logger.js';
+import { EmailService } from './emailService.js';
 
 export class InviteService {
   /**
@@ -18,8 +19,9 @@ export class InviteService {
     invitedById: string;
     email: string;
     role: 'manager' | 'employee';
+    tokensAllocated?: number;
   }) {
-    const { organizationId, invitedById, email, role } = params;
+    const { organizationId, invitedById, email, role, tokensAllocated } = params;
 
     // Validate role
     if (!['manager', 'employee'].includes(role)) {
@@ -97,6 +99,7 @@ export class InviteService {
         token,
         expiresAt,
         status: 'pending',
+        tokensAllocated: tokensAllocated || 0,
       },
       include: {
         organization: true,
@@ -106,7 +109,30 @@ export class InviteService {
       },
     });
 
-    logger.info(`Invite created: org=${organizationId} email=${email} role=${role}`);
+    // Send invite email (fire-and-forget)
+    EmailService.sendInviteEmail({
+      recipientEmail: email,
+      inviterName: invite.invitedBy.name,
+      orgName: invite.organization.name,
+      role,
+      inviteToken: token,
+      tokensAllocated,
+      expiresAt,
+    }).catch(() => {});
+
+    // Log activity
+    try {
+      await (prisma as any).activityLog.create({
+        data: {
+          organizationId,
+          actorId: invitedById,
+          action: 'member_invited',
+          details: { email, role, tokensAllocated: tokensAllocated || 0 },
+        },
+      });
+    } catch { /* activity log is optional */ }
+
+    logger.info(`Invite created: org=${organizationId} email=${email} role=${role} tokens=${tokensAllocated || 0}`);
     return invite;
   }
 
@@ -158,12 +184,17 @@ export class InviteService {
 
     const invite = await this.validateToken(token);
 
+    // If inviter is a manager, set managerId on the new employee
+    const inviter = await prisma.user.findUnique({ where: { id: invite.invitedById } });
+    const managerId = inviter?.role === 'manager' ? invite.invitedById : undefined;
+
     // Update user to join org with the invited role
-    await prisma.user.update({
+    const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
         organizationId: invite.organizationId,
         role: invite.role,
+        ...(managerId ? { managerId } : {}),
       },
     });
 
@@ -177,14 +208,54 @@ export class InviteService {
       },
     });
 
-    // Notify the inviter
+    // Allocate tokens if specified on the invite
+    const tokensToAllocate = (invite as any).tokensAllocated || 0;
+    if (tokensToAllocate > 0) {
+      try {
+        const pool = await prisma.tokenPool.findUnique({
+          where: { organizationId: invite.organizationId },
+        });
+
+        if (pool && pool.availableTokens >= tokensToAllocate) {
+          const now = new Date();
+          const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+          await prisma.$transaction([
+            prisma.tokenAllocation.create({
+              data: {
+                assignedById: invite.invitedById,
+                assignedToId: userId,
+                organizationId: invite.organizationId,
+                tokensAllocated: tokensToAllocate,
+                tokensRemaining: tokensToAllocate,
+                periodStart: now,
+                periodEnd,
+              },
+            }),
+            prisma.tokenPool.update({
+              where: { organizationId: invite.organizationId },
+              data: {
+                allocatedTokens: { increment: tokensToAllocate },
+                availableTokens: { decrement: tokensToAllocate },
+              },
+            }),
+          ]);
+
+          logger.info(`Tokens allocated on invite accept: ${tokensToAllocate} to user=${userId}`);
+        }
+      } catch (err) {
+        logger.warn('Failed to allocate invite tokens:', err);
+      }
+    }
+
+    // Notify the inviter (in-app)
     try {
       await prisma.notification.create({
         data: {
           userId: invite.invitedById,
           type: 'team_member_joined',
           title: 'New team member joined',
-          message: `Someone accepted your invite and joined as ${invite.role}`,
+          message: `${updatedUser.name} accepted your invite and joined as ${invite.role}`,
           referenceId: invite.organizationId,
           referenceType: 'organization',
         },
@@ -192,6 +263,36 @@ export class InviteService {
     } catch (err) {
       logger.warn('Failed to create invite-accepted notification', err);
     }
+
+    // Send email to org owner (fire-and-forget)
+    try {
+      const org = await prisma.organization.findUnique({
+        where: { id: invite.organizationId },
+        include: { owner: { select: { email: true, name: true } } },
+      });
+      if (org) {
+        EmailService.sendMemberJoinedEmail({
+          ownerEmail: org.owner.email,
+          ownerName: org.owner.name,
+          newMemberName: updatedUser.name,
+          newMemberEmail: updatedUser.email,
+          newMemberRole: invite.role,
+          orgName: org.name,
+        }).catch(() => {});
+      }
+    } catch { /* email notification is optional */ }
+
+    // Log activity
+    try {
+      await (prisma as any).activityLog.create({
+        data: {
+          organizationId: invite.organizationId,
+          actorId: userId,
+          action: 'member_joined',
+          details: { role: invite.role, invitedBy: invite.invitedById, tokensAllocated: tokensToAllocate },
+        },
+      });
+    } catch { /* activity log is optional */ }
 
     logger.info(`Invite accepted: org=${invite.organizationId} userId=${userId} role=${invite.role}`);
     return invite;

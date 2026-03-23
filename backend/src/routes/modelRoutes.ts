@@ -8,7 +8,7 @@ const router = Router();
 router.get('/', asyncHandler(async (_req: Request, res: Response) => {
   const models = await prisma.aIModel.findMany({
     where: { isActive: true },
-    orderBy: { name: 'asc' },
+    orderBy: [{ provider: 'asc' }, { name: 'asc' }],
     select: {
       id: true,
       name: true,

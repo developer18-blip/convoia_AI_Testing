@@ -71,7 +71,7 @@ export function AdminUsersPage() {
                 <tbody>
                   {users.map((u: any) => (
                     <tr key={u.id} className="border-b border-border/50 hover:bg-surface-2 transition-colors">
-                      <td className="px-4 py-3"><div className="flex items-center gap-3"><Avatar name={u.name} size="sm" /><div><p className="text-sm font-medium text-text-primary">{u.name}</p><p className="text-xs text-text-muted">{u.email}</p></div></div></td>
+                      <td className="px-4 py-3"><div className="flex items-center gap-3"><Avatar name={u.name} src={u.avatar} size="sm" /><div><p className="text-sm font-medium text-text-primary">{u.name}</p><p className="text-xs text-text-muted">{u.email}</p></div></div></td>
                       <td className="px-4 py-3 text-sm text-text-secondary">{u.organization?.name || '-'}</td>
                       <td className="px-4 py-3">
                         <Select

@@ -3,6 +3,7 @@ export interface User {
   email: string
   name: string
   role: 'platform_admin' | 'org_owner' | 'manager' | 'employee'
+  avatar?: string | null
   organizationId?: string
   organization?: Organization
   isVerified: boolean
@@ -210,6 +211,17 @@ export interface Agent {
   isActive: boolean
   userId?: string
   organizationId?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CanvasItem {
+  id: string
+  type: 'code' | 'text'
+  title: string
+  content: string
+  language?: string
+  messageId?: string
   createdAt: string
   updatedAt: string
 }

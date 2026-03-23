@@ -1,30 +1,24 @@
 import { Router } from 'express';
-import express from 'express';
-import { handleStripeWebhook } from '../controllers/stripeWebhookController.js';
 import {
-  createSubscriptionCheckout,
+  getTokenPackages,
+  purchaseTokens,
+  getTokenPoolStatus,
   createPortalSession,
-  getSubscriptionStatus,
-  cancelSubscription,
+  verifyAndCreditSession,
 } from '../controllers/stripeController.js';
 import { jwtOrApiKey } from '../middleware/apiKeyAuth.js';
 
 const router = Router();
 
-// ─── Webhook — raw body, NO auth ─────────────────────────────────────────────
-// Must be BEFORE any JSON body parser middleware
-router.post(
-  '/webhook',
-  express.raw({ type: 'application/json' }),
-  handleStripeWebhook
-);
+// Public
+router.get('/token-packages', getTokenPackages);
 
-// ─── Protected subscription routes ───────────────────────────────────────────
+// Protected (global express.json + optionalAuth already ran)
 router.use(jwtOrApiKey);
 
-router.post('/create-checkout', createSubscriptionCheckout);
+router.post('/purchase-tokens', purchaseTokens);
+router.get('/verify-session/:sessionId', verifyAndCreditSession);
+router.get('/token-pool', getTokenPoolStatus);
 router.post('/create-portal', createPortalSession);
-router.get('/subscription', getSubscriptionStatus);
-router.post('/cancel-subscription', cancelSubscription);
 
 export default router;

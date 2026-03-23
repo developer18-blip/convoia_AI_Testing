@@ -4,7 +4,6 @@ import { StatCard } from '../../../components/shared/StatCard'
 import { Card } from '../../../components/ui/Card'
 import { Badge } from '../../../components/ui/Badge'
 import { ProgressBar } from '../../../components/ui/ProgressBar'
-import { AreaChart } from '../../../components/charts/AreaChart'
 import { formatNumber, formatTokens, formatDateTime, getGreeting, truncate } from '../../../lib/utils'
 import type { DashboardStats, UsageLog, InsightData, Budget } from '../../../types'
 

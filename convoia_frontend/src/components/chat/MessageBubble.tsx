@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { AlertCircle, RefreshCw, Copy, Check, Pencil, Trash2, ThumbsUp, ThumbsDown, Download, FileText, Music } from 'lucide-react'
+import { AlertCircle, RefreshCw, Copy, Check, Pencil, Trash2, ThumbsUp, ThumbsDown, Download, FileText, Music, PanelRight } from 'lucide-react'
 import { CodeBlock } from './CodeBlock'
 import { AgentPanel } from './AgentPanel'
 import { formatCurrency, formatTokens } from '../../lib/utils'
@@ -15,6 +15,7 @@ interface MessageBubbleProps {
   onDelete?: (id: string) => void
   onCopy?: (content: string) => void
   onRunCode?: (code: string, language: string) => void
+  onOpenInCanvas?: (content: string, language: string, type: 'code' | 'text') => void
 }
 
 function formatFileSize(bytes: number): string {
@@ -31,7 +32,7 @@ function downloadImage(url: string) {
   a.click()
 }
 
-export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRunCode }: MessageBubbleProps) {
+export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRunCode, onOpenInCanvas }: MessageBubbleProps) {
   const isUser = message.role === 'user'
   const [copied, setCopied] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -232,7 +233,8 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
                 const match = /language-(\w+)/.exec(className || '')
                 if (!inline && match) {
                   return <CodeBlock language={match[1]}
-                    onRun={onRunCode ? () => onRunCode(String(children).replace(/\n$/, ''), match[1]) : undefined}>
+                    onRun={onRunCode ? () => onRunCode(String(children).replace(/\n$/, ''), match[1]) : undefined}
+                    onOpenInCanvas={onOpenInCanvas ? (code, lang) => onOpenInCanvas(code, lang, 'code') : undefined}>
                     {String(children).replace(/\n$/, '')}
                   </CodeBlock>
                 }
@@ -283,6 +285,7 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
         }}>
           {([
             { show: true, action: handleCopy, icon: copied ? <Check size={13} style={{ color: 'var(--color-primary)' }} /> : <Copy size={13} />, title: 'Copy' },
+            { show: !!onOpenInCanvas && message.content.length > 100, action: () => onOpenInCanvas!(message.content, 'markdown', 'text'), icon: <PanelRight size={13} />, title: 'Open in Canvas' },
             { show: !!onRetry, action: onRetry!, icon: <RefreshCw size={13} />, title: 'Regenerate' },
             { show: true, action: () => {}, icon: <ThumbsUp size={13} />, title: 'Good' },
             { show: true, action: () => {}, icon: <ThumbsDown size={13} />, title: 'Bad' },

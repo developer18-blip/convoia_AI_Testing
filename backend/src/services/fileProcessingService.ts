@@ -1,7 +1,31 @@
 import fs from 'fs'
 import path from 'path'
+import crypto from 'crypto'
+import axios from 'axios'
 import OpenAI from 'openai'
 import logger from '../config/logger.js'
+
+const IMAGES_DIR = path.join(process.cwd(), 'uploads', 'images')
+// Ensure directory exists
+if (!fs.existsSync(IMAGES_DIR)) {
+  fs.mkdirSync(IMAGES_DIR, { recursive: true })
+}
+
+/** Save image data to disk, return permanent API URL */
+function saveImageToDisk(data: Buffer | string, ext = 'png'): string {
+  const filename = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}.${ext}`
+  const filePath = path.join(IMAGES_DIR, filename)
+
+  if (typeof data === 'string') {
+    // Base64 string
+    fs.writeFileSync(filePath, Buffer.from(data, 'base64'))
+  } else {
+    fs.writeFileSync(filePath, data)
+  }
+
+  // Return URL path (served via express.static at /api/uploads)
+  return `/api/uploads/images/${filename}`
+}
 
 function getOpenAI(): OpenAI {
   const apiKey = process.env.OPENAI_API_KEY
@@ -9,6 +33,12 @@ function getOpenAI(): OpenAI {
     throw new Error('OpenAI API key not configured. Add OPENAI_API_KEY to your .env file.')
   }
   return new OpenAI({ apiKey })
+}
+
+function getGoogleKey(): string {
+  const key = process.env.GOOGLE_AI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY
+  if (!key) throw new Error('Google AI API key not configured.')
+  return key
 }
 
 export class FileProcessingService {
@@ -114,28 +144,108 @@ export class FileProcessingService {
     }
   }
 
-  // Generate image with DALL-E
+  // Generate image — tries Gemini first (free, high limits), falls back to DALL-E
   static async generateImage(
+    prompt: string,
+    size: '1024x1024' | '1792x1024' | '1024x1792' = '1024x1024',
+    quality: 'standard' | 'hd' = 'standard',
+    provider?: 'gemini' | 'dalle'
+  ): Promise<{
+    imageUrl: string
+    revisedPrompt: string
+    provider: string
+  }> {
+    const preferredProvider = provider || 'gemini'
+
+    // Try Gemini first (free tier, 1500/day)
+    if (preferredProvider === 'gemini') {
+      try {
+        return await this.generateImageGemini(prompt)
+      } catch (err: any) {
+        logger.warn(`Gemini image generation failed, falling back to DALL-E: ${err.message}`)
+        // Fall through to DALL-E
+      }
+    }
+
+    // DALL-E fallback (or explicit choice)
+    return await this.generateImageDallE(prompt, size, quality)
+  }
+
+  // Generate image with Gemini 2.5 Flash Image
+  private static async generateImageGemini(prompt: string): Promise<{
+    imageUrl: string
+    revisedPrompt: string
+    provider: string
+  }> {
+    const apiKey = getGoogleKey()
+    const response = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent`,
+      {
+        contents: [{ parts: [{ text: `Generate an image: ${prompt}` }] }],
+        generationConfig: {
+          responseModalities: ['TEXT', 'IMAGE'],
+        },
+      },
+      {
+        params: { key: apiKey },
+        timeout: 60000,
+      }
+    )
+
+    const parts = response.data?.candidates?.[0]?.content?.parts || []
+    let imageUrl = ''
+    let revisedPrompt = prompt
+
+    for (const part of parts) {
+      if (part.inlineData?.mimeType?.startsWith('image/')) {
+        // Save base64 image to disk for permanent storage
+        const ext = part.inlineData.mimeType.split('/')[1] || 'png'
+        imageUrl = saveImageToDisk(part.inlineData.data, ext)
+      }
+      if (part.text) {
+        revisedPrompt = part.text
+      }
+    }
+
+    if (!imageUrl) {
+      throw new Error('Gemini did not return an image')
+    }
+
+    return { imageUrl, revisedPrompt, provider: 'gemini' }
+  }
+
+  // Generate image with DALL-E 3
+  private static async generateImageDallE(
     prompt: string,
     size: '1024x1024' | '1792x1024' | '1024x1792' = '1024x1024',
     quality: 'standard' | 'hd' = 'standard'
   ): Promise<{
     imageUrl: string
     revisedPrompt: string
+    provider: string
   }> {
+    // Request base64 directly to avoid expiring URLs
     const response = await getOpenAI().images.generate({
       model: 'dall-e-3',
       prompt,
       n: 1,
       size,
       quality,
-      response_format: 'url',
+      response_format: 'b64_json',
     })
 
     const imageData = response.data?.[0]
+    if (!imageData?.b64_json) {
+      throw new Error('DALL-E did not return image data')
+    }
+
+    // Save to disk for permanent storage
+    const imageUrl = saveImageToDisk(imageData.b64_json, 'png')
+
     return {
-      imageUrl: imageData?.url || '',
-      revisedPrompt: imageData?.revised_prompt || prompt,
+      imageUrl,
+      revisedPrompt: imageData.revised_prompt || prompt,
+      provider: 'dalle',
     }
   }
 

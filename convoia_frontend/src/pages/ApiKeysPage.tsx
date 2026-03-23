@@ -82,7 +82,7 @@ export function ApiKeysPage() {
           <Info size={18} className="text-info mt-0.5 shrink-0" />
           <div>
             <p className="text-sm font-medium text-text-primary mb-1">Using API Keys</p>
-            <p className="text-xs text-text-muted">Use your API key to authenticate requests from external tools like Open WebUI. Set the base URL to your Convoia API endpoint and use the key as the API token.</p>
+            <p className="text-xs text-text-muted">Use your API key to authenticate requests from external applications and integrations. Set the base URL to your Convoia API endpoint and use the key as the Bearer token in the Authorization header.</p>
           </div>
         </div>
       </Card>
@@ -105,7 +105,7 @@ export function ApiKeysPage() {
                 {keys.map((k) => (
                   <tr key={k.id} className="border-b border-border/50 hover:bg-surface-2 transition-colors">
                     <td className="px-4 py-3 text-sm font-medium text-text-primary">{k.name}</td>
-                    <td className="px-4 py-3"><code className="text-xs bg-surface-2 px-2 py-1 rounded font-mono text-text-muted">{k.key.slice(0, 8)}...{k.key.slice(-4)}</code></td>
+                    <td className="px-4 py-3"><code className="text-xs bg-surface-2 px-2 py-1 rounded font-mono text-text-muted">{k.key ? `${k.key.slice(0, 8)}...${k.key.slice(-4)}` : '••••••••'}</code></td>
                     <td className="px-4 py-3 text-sm text-text-muted">{formatDate(k.createdAt)}</td>
                     <td className="px-4 py-3 text-sm text-text-muted">{k.lastUsedAt ? formatDate(k.lastUsedAt) : 'Never'}</td>
                     <td className="px-4 py-3 text-center"><Badge size="sm" variant={k.isActive ? 'success' : 'danger'}>{k.isActive ? 'Active' : 'Revoked'}</Badge></td>
@@ -135,7 +135,7 @@ export function ApiKeysPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            <Input label="Key Name" value={newKeyName} onChange={(e) => setNewKeyName(e.target.value)} placeholder="e.g., Open WebUI" />
+            <Input label="Key Name" value={newKeyName} onChange={(e) => setNewKeyName(e.target.value)} placeholder="e.g., My Integration" />
             <div className="flex justify-end gap-3">
               <Button variant="secondary" onClick={() => setShowCreate(false)}>Cancel</Button>
               <Button onClick={handleCreate} isLoading={isCreating}>Create</Button>

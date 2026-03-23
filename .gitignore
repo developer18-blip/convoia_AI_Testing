@@ -26,3 +26,4 @@ Thumbs.db
 
 # Coverage
 coverage/
+.claude/

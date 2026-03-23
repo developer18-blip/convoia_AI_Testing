@@ -1,28 +1,32 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { v4 as uuidv4 } from 'uuid'
+import api from '../lib/api'
 import { ConversationList } from '../components/chat/ConversationList'
 import { MessageArea } from '../components/chat/MessageArea'
 import { MessageInput } from '../components/chat/MessageInput'
 import { CodeInterpreter } from '../components/chat/CodeInterpreter'
+import { CanvasPanel } from '../components/chat/CanvasPanel'
 import { CostEstimator } from '../components/chat/CostEstimator'
 import { ModelSelector } from '../components/shared/ModelSelector'
 import { AgentSelector } from '../components/shared/AgentSelector'
 import { useChat } from '../hooks/useChat'
-import type { Agent, Message } from '../types'
+import type { Agent, Message, CanvasItem } from '../types'
 import { useModels } from '../hooks/useModels'
 import { useAgents } from '../hooks/useAgents'
-import { useWallet } from '../hooks/useWallet'
 import { useToast } from '../hooks/useToast'
-import { formatCurrency, formatTokens } from '../lib/utils'
+import { useAuth } from '../hooks/useAuth'
+import { useTokens } from '../contexts/TokenContext'
+import { formatTokens } from '../lib/utils'
 import {
-  Wallet, PanelLeftClose, PanelLeft,
+  Zap, PanelLeftClose, PanelLeft,
   MoreHorizontal, Trash2, Download, Menu,
 } from 'lucide-react'
 
 export function ChatPage() {
   const { models } = useModels()
   const { agents, createAgent } = useAgents()
-  const { wallet } = useWallet()
+  const { user: authUser } = useAuth()
+  const { tokenBalance, formattedBalance, refresh } = useTokens()
   const toast = useToast()
   const {
     conversations, folders, activeConversationId, activeConversation, messages, isStreaming,
@@ -36,11 +40,18 @@ export function ChatPage() {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
   const [lastResponseModel, setLastResponseModel] = useState<string | null>(null)
   const prevStreaming = useRef(false)
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false)
+  const imageGenLock = useRef(false)
   const [industry, setIndustry] = useState('')
   const [leftOpen, setLeftOpen] = useState(true)
   const [mobileLeftOpen, setMobileLeftOpen] = useState(false)
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [codeInterpreter, setCodeInterpreter] = useState<{ code: string; language: string } | null>(null)
+
+  // Canvas state
+  const [canvasItems, setCanvasItems] = useState<CanvasItem[]>([])
+  const [activeCanvasId, setActiveCanvasId] = useState<string | null>(null)
+  const canvasOpen = canvasItems.length > 0
 
   useEffect(() => {
     if (window.innerWidth < 768) setLeftOpen(false)
@@ -100,7 +111,105 @@ export function ChatPage() {
 
   const selectedModel = models.find((m) => m.id === selectedModelId) || null
 
+  // Detect if message is an image generation request and extract the prompt
+  const isImageRequest = (text: string): string | null => {
+    const t = text.trim()
+    // /imagine or /image shorthand
+    if (/^\/(?:imagine|image)\s+/i.test(t)) return t.replace(/^\/(?:imagine|image)\s+/i, '').trim()
+    // "image: ..." / "picture: ..." shorthand
+    if (/^(?:image|picture|photo)\s*:\s*/i.test(t)) return t.replace(/^(?:image|picture|photo)\s*:\s*/i, '').trim()
+
+    // Broad verb + noun pattern: covers most natural phrasings
+    // "generate/create/make/draw [me] [a/an/the] [animated/realistic/...] image/picture/... [of/about/showing/...] ..."
+    const verbNounMatch = t.match(
+      /^(?:please\s+)?(?:can\s+you\s+)?(?:generate|create|make|draw|design|paint|render|produce|craft|build)\s+(?:me\s+)?(?:an?\s+|the\s+)?(?:\w+\s+)?(?:image|picture|photo|photograph|illustration|artwork|painting|poster|banner|icon|logo|graphic|visual|wallpaper|thumbnail)(?:\s+(?:of|about|showing|depicting|with|for|that|where|featuring|based on))?\s+(.+)/i
+    )
+    if (verbNounMatch?.[1]) return verbNounMatch[1].trim()
+
+    // "I want/need/would like [a/an] image/picture of ..."
+    const wantMatch = t.match(
+      /^(?:i\s+(?:want|need|would like|'d like)\s+(?:an?\s+)?(?:image|picture|photo|illustration)\s+(?:of|about|showing|for|depicting)\s+)(.+)/i
+    )
+    if (wantMatch?.[1]) return wantMatch[1].trim()
+
+    // "show me [a/an] image/picture of..."
+    const showMatch = t.match(
+      /^(?:show\s+me\s+(?:an?\s+)?(?:image|picture|photo|illustration)\s+(?:of|about|showing|for)\s+)(.+)/i
+    )
+    if (showMatch?.[1]) return showMatch[1].trim()
+
+    return null
+  }
+
   const handleSend = async (content: string) => {
+    // Ensure a model is selected
+    if (!selectedModelId) {
+      toast.error('Please select a model first. If models are not loading, check your connection.')
+      return
+    }
+
+    // Pre-flight token check
+    if (tokenBalance <= 0) {
+      const isOrgMember = !!authUser?.organizationId
+      const isOwner = authUser?.role === 'org_owner'
+      if (isOrgMember && !isOwner) {
+        toast.error('No tokens remaining. Contact your manager for more tokens.')
+      } else {
+        toast.error('No tokens remaining. Purchase more tokens to continue.')
+      }
+      return
+    }
+
+    // Auto-detect image generation requests
+    const imagePrompt = isImageRequest(content)
+    if (imagePrompt) {
+      // Guard: ref-based lock prevents double-fire from React batching
+      if (imageGenLock.current) return
+      imageGenLock.current = true
+      setIsGeneratingImage(true)
+
+      if (!activeConversationId) {
+        createConversation(selectedModelId, selectedModel?.name || 'AI', industry || undefined)
+      }
+      const userMsg: Message = {
+        id: uuidv4(), role: 'user', content, timestamp: new Date().toISOString(),
+      }
+      addMessages([userMsg])
+
+      try {
+        const res = await api.post('/files/generate-image', { prompt: imagePrompt, size: '1024x1024', quality: 'standard' })
+        const data = res.data.data
+        const providerName = data.provider || 'Gemini Flash'
+        addMessages([{
+          id: uuidv4(), role: 'assistant',
+          content: `Here's the generated image for: "${imagePrompt}"`,
+          imageUrl: data.imageUrl, imagePrompt: data.revisedPrompt || imagePrompt,
+          model: providerName, provider: data.provider?.includes('Gemini') ? 'google' : 'openai',
+          timestamp: new Date().toISOString(),
+        }])
+        refresh()
+      } catch (err: any) {
+        const errMsg = err?.response?.data?.message || 'Image generation failed. Try again.'
+        addMessages([{
+          id: uuidv4(), role: 'assistant',
+          content: `Image generation failed: ${errMsg}`,
+          model: 'Image Gen', provider: 'system',
+          timestamp: new Date().toISOString(),
+        }])
+        toast.error(errMsg)
+      } finally {
+        setIsGeneratingImage(false)
+        imageGenLock.current = false
+      }
+      return // STOP — do NOT proceed to sendMessage
+    }
+
+    const estimated = Math.ceil(content.length / 4) + 500
+    if (tokenBalance < estimated) {
+      toast.warning(`Low token balance: ${formattedBalance} remaining. This message may fail.`)
+      // Still allow — backend will do the final check
+    }
+
     let convId = activeConversationId
     if (!convId) {
       const conv = createConversation(selectedModelId, selectedModel?.name || 'AI', industry || undefined)
@@ -124,6 +233,57 @@ export function ChatPage() {
     setCodeInterpreter({ code, language })
   }
 
+  // Canvas handlers
+  const handleOpenInCanvas = useCallback((content: string, language: string, type: 'code' | 'text') => {
+    // Check if this exact content already exists in canvas
+    const existing = canvasItems.find(i => i.content === content && i.type === type)
+    if (existing) {
+      setActiveCanvasId(existing.id)
+      return
+    }
+
+    const title = type === 'code'
+      ? `${(language || 'code').charAt(0).toUpperCase() + (language || 'code').slice(1)} snippet`
+      : content.split('\n')[0]?.slice(0, 50).replace(/^#+\s*/, '') || 'Document'
+
+    const item: CanvasItem = {
+      id: uuidv4(),
+      type,
+      title,
+      content,
+      language: type === 'code' ? language : undefined,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    setCanvasItems(prev => [...prev, item])
+    setActiveCanvasId(item.id)
+  }, [canvasItems])
+
+  const handleUpdateCanvasItem = useCallback((id: string, content: string) => {
+    setCanvasItems(prev => prev.map(i =>
+      i.id === id ? { ...i, content, updatedAt: new Date().toISOString() } : i
+    ))
+  }, [])
+
+  const handleRemoveCanvasItem = useCallback((id: string) => {
+    setCanvasItems(prev => {
+      const next = prev.filter(i => i.id !== id)
+      if (activeCanvasId === id) {
+        setActiveCanvasId(next.length > 0 ? next[next.length - 1].id : null)
+      }
+      return next
+    })
+  }, [activeCanvasId])
+
+  const handleCloseCanvas = useCallback(() => {
+    setCanvasItems([])
+    setActiveCanvasId(null)
+  }, [])
+
+  const handleInsertToChat = useCallback((content: string) => {
+    handleSend(content)
+  }, [activeConversationId, selectedModelId, industry, selectedAgent])
+
   const handleFileProcessed = (data: {
     userContent: string; assistantContent: string; cost: number
     tokens: { input: number; output: number }
@@ -131,6 +291,7 @@ export function ChatPage() {
     fileAttachment?: { name: string; type: 'image' | 'document' | 'audio' | 'video'; size: number }
     model?: string; provider?: string
   }) => {
+    if (!data?.assistantContent && !data?.userContent) return
     if (!activeConversationId) {
       createConversation(selectedModelId, selectedModel?.name || 'AI', industry || undefined)
     }
@@ -200,7 +361,6 @@ export function ChatPage() {
     { value: 'marketing', label: 'Marketing' },
   ]
 
-  const totalCost = messages.reduce((s, m) => s + (m.cost || 0), 0)
   const totalTokens = messages.reduce((s, m) => s + (m.tokensInput || 0) + (m.tokensOutput || 0), 0)
 
   return (
@@ -261,8 +421,12 @@ export function ChatPage() {
           </button>
 
           {/* Model selector — ChatGPT style text */}
-          {models.length > 0 && (
+          {models.length > 0 ? (
             <ModelSelector models={models} selectedId={selectedModelId} onChange={handleModelChange} />
+          ) : (
+            <span style={{ fontSize: '14px', color: '#8E8E8E', padding: '6px 8px' }}>
+              Loading models...
+            </span>
           )}
 
           {/* Industry */}
@@ -290,8 +454,8 @@ export function ChatPage() {
             <CostEstimator model={selectedModel} />
 
             <div className="flex items-center gap-1.5" style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums' }}>
-              <Wallet size={12} style={{ color: 'var(--color-primary)' }} />
-              {formatCurrency(wallet?.balance)}
+              <Zap size={12} style={{ color: '#A78BFA' }} />
+              {formattedBalance}
             </div>
 
             {/* More menu */}
@@ -330,8 +494,7 @@ export function ChatPage() {
                       <div style={{ borderTop: '1px solid var(--chat-border)', margin: '4px 0' }} />
                       <div style={{ padding: '8px 12px', fontSize: '11px', color: 'var(--color-text-dim)' }}>
                         <div className="flex justify-between"><span>Messages</span><span style={{ color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>{messages.length}</span></div>
-                        <div className="flex justify-between"><span>Tokens</span><span style={{ color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>{formatTokens(totalTokens)}</span></div>
-                        <div className="flex justify-between"><span>Cost</span><span style={{ color: 'var(--color-primary)', fontFamily: 'monospace' }}>{formatCurrency(totalCost)}</span></div>
+                        <div className="flex justify-between"><span>Tokens used</span><span style={{ color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>{formatTokens(totalTokens)}</span></div>
                       </div>
                     </>
                   )}
@@ -366,6 +529,7 @@ export function ChatPage() {
             onEditMessage={handleEditMessage}
             onDeleteMessage={deleteMessage}
             onRunCode={handleRunCode}
+            onOpenInCanvas={handleOpenInCanvas}
           />
         </div>
 
@@ -386,7 +550,7 @@ export function ChatPage() {
         {/* Input */}
         <MessageInput
           onSend={handleSend}
-          isLoading={isStreaming}
+          isLoading={isStreaming || isGeneratingImage}
           selectedModelId={selectedModelId}
           onFileProcessed={handleFileProcessed}
           onImageGenerated={handleImageGenerated}
@@ -394,6 +558,20 @@ export function ChatPage() {
           onError={(msg) => toast.error(msg)}
         />
       </div>
+
+      {/* RIGHT PANEL — Canvas */}
+      {canvasOpen && (
+        <CanvasPanel
+          items={canvasItems}
+          activeItemId={activeCanvasId}
+          onClose={handleCloseCanvas}
+          onUpdateItem={handleUpdateCanvasItem}
+          onRemoveItem={handleRemoveCanvasItem}
+          onSetActive={setActiveCanvasId}
+          onInsertToChat={handleInsertToChat}
+          onRunCode={handleRunCode}
+        />
+      )}
 
     </div>
   )

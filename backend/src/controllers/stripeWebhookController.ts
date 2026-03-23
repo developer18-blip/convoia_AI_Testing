@@ -3,8 +3,8 @@ import Stripe from 'stripe';
 import prisma from '../config/db.js';
 import { config } from '../config/env.js';
 import logger from '../config/logger.js';
-import { StripeService, PLAN_CONFIG } from '../services/stripeService.js';
-import type { PlanKey } from '../services/stripeService.js';
+import { EmailService } from '../services/emailService.js';
+import { TokenWalletService } from '../services/tokenWalletService.js';
 
 const stripe = config.stripeSecretKey
   ? new Stripe(config.stripeSecretKey)
@@ -48,6 +48,7 @@ export const handleStripeWebhook = async (
       // ---- Checkout session completed (Stripe-hosted checkout) ----
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
+        logger.info(`=== CHECKOUT SESSION COMPLETED === id=${session.id} mode=${session.mode} status=${session.payment_status} type=${session.metadata?.type}`);
         await handleCheckoutSessionCompleted(session);
         break;
       }
@@ -125,9 +126,9 @@ async function handleCheckoutSessionCompleted(
     return;
   }
 
-  // ── Subscription checkout ──
-  if (session.mode === 'subscription') {
-    await handleSubscriptionCheckoutCompleted(session);
+  // ── Token purchase checkout ──
+  if (session.metadata?.type === 'token_purchase') {
+    await handleTokenPurchaseCompleted(session);
     return;
   }
 
@@ -205,18 +206,7 @@ async function handleCheckoutSessionCompleted(
     });
   });
 
-  // Send receipt email (fire-and-forget)
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  const wallet = await prisma.wallet.findUnique({ where: { userId } });
-  if (user && wallet) {
-    StripeService.sendTopUpReceipt({
-      userEmail: user.email,
-      userName: user.name,
-      amount,
-      newBalance: wallet.balance,
-      transactionId: session.id,
-    }).catch(() => {});
-  }
+  // Receipt email handled by verify endpoint
 
   logger.info(
     `Wallet topped up via Checkout: user=${userId} amount=$${amount} session=${session.id}`
@@ -224,104 +214,103 @@ async function handleCheckoutSessionCompleted(
 }
 
 /**
- * Handle subscription checkout.session.completed.
- * Creates/updates the subscription record and org tier, sends confirmation email.
+ * Handle token purchase checkout.session.completed.
+ * Credits tokens to the organization's pool.
  */
-async function handleSubscriptionCheckoutCompleted(
+async function handleTokenPurchaseCompleted(
   session: Stripe.Checkout.Session
 ) {
+  if (session.payment_status !== 'paid') {
+    logger.info(`Token purchase ${session.id} not paid — skipping`);
+    return;
+  }
+
   const userId = session.metadata?.userId;
-  const organizationId = session.metadata?.organizationId;
-  const plan = session.metadata?.plan as PlanKey | undefined;
+  const organizationId = session.metadata?.organizationId || undefined;
+  const tokens = parseInt(session.metadata?.tokens || '0', 10);
+  const packageId = session.metadata?.packageId || 'unknown';
+  const packageName = session.metadata?.packageName || 'Token Purchase';
+  const amount = parseFloat(session.metadata?.amount || '0');
 
-  if (!userId || !organizationId || !plan) {
-    logger.warn(`Subscription checkout ${session.id} missing metadata — skipping`);
+  if (!userId || tokens <= 0) {
+    logger.warn(`Token purchase ${session.id} missing metadata — skipping`);
     return;
   }
 
-  const planConfig = PLAN_CONFIG[plan];
-  if (!planConfig) {
-    logger.warn(`Unknown plan "${plan}" in checkout ${session.id}`);
+  // Idempotency
+  const existing = await prisma.tokenPurchase.findFirst({
+    where: { stripePaymentId: session.id },
+  }).catch(() => null);
+  if (existing) {
+    logger.info(`Token purchase ${session.id} already processed — skipping`);
     return;
   }
 
-  const stripeSubId = session.subscription as string;
-  let renewalDate: Date | null = null;
-
-  if (stripeSubId && stripe) {
-    try {
-      const stripeSub = await stripe.subscriptions.retrieve(stripeSubId);
-      const periodEnd = (stripeSub as any).current_period_end as number | undefined;
-      if (periodEnd) {
-        renewalDate = new Date(periodEnd * 1000);
-      }
-    } catch (err) {
-      logger.warn(`Could not retrieve subscription ${stripeSubId}: ${err}`);
-    }
-  }
-
-  // Upsert subscription record
-  const existingSub = await prisma.subscription.findFirst({
-    where: { userId, organizationId },
+  // Record purchase
+  await prisma.tokenPurchase.create({
+    data: {
+      userId,
+      organizationId: organizationId || null,
+      packageId,
+      packageName,
+      tokensPurchased: tokens,
+      amountPaid: amount,
+      stripePaymentId: session.id,
+      expiresAt: null, // never expires
+    },
   });
 
-  if (existingSub) {
-    await prisma.subscription.update({
-      where: { id: existingSub.id },
-      data: {
-        plan,
-        status: 'active',
-        monthlyTokenQuota: planConfig.monthlyTokens,
-        tokensUsedThisMonth: 0,
-        stripeSubscriptionId: stripeSubId,
-        stripePriceId: planConfig.priceId,
-        renewalDate,
-        quotaResetDate: renewalDate ?? new Date(),
-      },
-    });
-  } else {
-    await prisma.subscription.create({
-      data: {
-        userId,
-        organizationId,
-        plan,
-        status: 'active',
-        monthlyTokenQuota: planConfig.monthlyTokens,
-        tokensUsedThisMonth: 0,
-        stripeSubscriptionId: stripeSubId,
-        stripePriceId: planConfig.priceId,
-        renewalDate,
-        quotaResetDate: renewalDate ?? new Date(),
-        startDate: new Date(),
-      },
-    });
-  }
-
-  // Update org tier
-  await prisma.organization.update({
-    where: { id: organizationId },
-    data: { tier: plan },
+  // Credit tokens to user's wallet
+  await TokenWalletService.addTokens({
+    userId,
+    tokens,
+    reference: session.id,
+    description: `Purchased ${packageName} (${TokenWalletService.formatTokens(tokens)} tokens)`,
+    organizationId,
   });
 
-  // Send confirmation email (fire-and-forget)
+  // Create billing record (internal, not shown to users)
+  await prisma.billingRecord.create({
+    data: {
+      userId,
+      organizationId: organizationId || null,
+      amount,
+      description: `Token purchase — ${packageName}`,
+      type: 'token_purchase',
+      status: 'paid',
+      stripePaymentId: session.id,
+      paidDate: new Date(),
+    },
+  });
+
+  // Send receipt email
   const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (user && renewalDate) {
-    StripeService.sendSubscriptionEmail({
-      userEmail: user.email,
-      userName: user.name,
-      plan: planConfig.name,
-      amount: planConfig.price,
-      nextBillingDate: renewalDate.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      }),
+  if (user) {
+    EmailService.sendTokenPurchaseReceipt({
+      ownerEmail: user.email,
+      ownerName: user.name,
+      orgName: organizationId ? (await prisma.organization.findUnique({ where: { id: organizationId } }))?.name || '' : '',
+      amount,
+      tokensReceived: tokens,
+      transactionId: session.id,
     }).catch(() => {});
   }
 
-  logger.info(
-    `Subscription activated via Checkout: org=${organizationId} plan=${plan} stripe=${stripeSubId}`
-  );
+  // Log activity
+  if (organizationId) {
+    try {
+      await prisma.activityLog.create({
+        data: {
+          organizationId,
+          actorId: userId,
+          action: 'tokens_purchased',
+          details: { tokens, amount, packageName },
+        },
+      });
+    } catch { /* optional */ }
+  }
+
+  logger.info(`Token purchase completed: userId=${userId} tokens=${tokens} package=${packageName}`);
 }
 
 async function handlePaymentIntentSucceeded(
@@ -396,19 +385,6 @@ async function handlePaymentIntentSucceeded(
       },
     });
   });
-
-  // Send receipt email (fire-and-forget)
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  const wallet = await prisma.wallet.findUnique({ where: { userId } });
-  if (user && wallet) {
-    StripeService.sendTopUpReceipt({
-      userEmail: user.email,
-      userName: user.name,
-      amount,
-      newBalance: wallet.balance,
-      transactionId: paymentIntent.id,
-    }).catch(() => {});
-  }
 
   logger.info(
     `Wallet topped up: user=${userId} amount=$${amount} stripe=${paymentIntent.id}`

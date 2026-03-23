@@ -77,7 +77,7 @@ export function OrgPage() {
         <div className="divide-y divide-border/50">
           {members.map((m: any) => (
             <div key={m.id} className="px-5 py-3 flex items-center gap-3">
-              <Avatar name={m.name} size="sm" />
+              <Avatar name={m.name} src={m.avatar} size="sm" />
               <div className="flex-1"><p className="text-sm text-text-primary">{m.name}</p><p className="text-xs text-text-muted">{m.email}</p></div>
               <Badge size="sm" variant="primary">{m.role?.replace('_', ' ')}</Badge>
               <span className="text-sm font-mono text-primary">{formatCurrency(Number(m.cost) || 0)}</span>

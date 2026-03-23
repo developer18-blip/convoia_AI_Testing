@@ -1,16 +1,20 @@
 import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Zap, Mail, Lock } from 'lucide-react'
+import { GoogleLogin } from '@react-oauth/google'
 import { ThemeToggle } from '../../components/shared/ThemeToggle'
 import { Input } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
+import api from '../../lib/api'
 
 export function LoginPage() {
-  const { login } = useAuth()
+  const { login, googleLogin } = useAuth()
   const toast = useToast()
+  const [searchParams] = useSearchParams()
+  const inviteToken = searchParams.get('inviteToken')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -32,7 +36,18 @@ export function LoginPage() {
     try {
       setIsLoading(true)
       await login(email, password)
-      toast.success('Welcome back!')
+
+      // If there's an invite token, accept it after login
+      if (inviteToken) {
+        try {
+          const res = await api.post('/team/accept-invite', { token: inviteToken })
+          toast.success(res.data.message || 'Joined organization successfully!')
+        } catch (inviteErr: any) {
+          toast.error(inviteErr.response?.data?.message || 'Failed to accept invite')
+        }
+      } else {
+        toast.success('Welcome back!')
+      }
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Login failed'
       toast.error(msg)
@@ -141,13 +156,24 @@ export function LoginPage() {
                 <span className="bg-surface/80 px-3 text-text-muted">or continue with</span>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3 mt-4">
-              <button disabled className="flex items-center justify-center gap-2 py-2.5 border border-border/50 rounded-xl text-sm text-text-muted bg-surface-2/50 cursor-not-allowed opacity-50 transition-all">
-                Google
-              </button>
-              <button disabled className="flex items-center justify-center gap-2 py-2.5 border border-border/50 rounded-xl text-sm text-text-muted bg-surface-2/50 cursor-not-allowed opacity-50 transition-all">
-                GitHub
-              </button>
+            <div className="flex justify-center mt-4">
+              <GoogleLogin
+                onSuccess={async (credentialResponse) => {
+                  if (!credentialResponse.credential) return
+                  try {
+                    await googleLogin(credentialResponse.credential)
+                    toast.success('Welcome!')
+                  } catch (err: any) {
+                    toast.error(err?.response?.data?.message || 'Google sign-in failed')
+                  }
+                }}
+                onError={() => toast.error('Google sign-in failed')}
+                theme="filled_black"
+                shape="pill"
+                size="large"
+                width="320"
+                text="continue_with"
+              />
             </div>
           </div>
         </motion.div>
@@ -156,6 +182,10 @@ export function LoginPage() {
           Don&apos;t have an account?{' '}
           <Link to="/register" className="text-primary hover:text-primary-hover font-semibold transition-colors">Sign up</Link>
         </p>
+        <div className="flex justify-center gap-4 mt-3">
+          <Link to="/privacy" className="text-xs text-text-muted hover:text-text-secondary transition-colors">Privacy Policy</Link>
+          <Link to="/terms" className="text-xs text-text-muted hover:text-text-secondary transition-colors">Terms of Service</Link>
+        </div>
       </motion.div>
     </div>
   )

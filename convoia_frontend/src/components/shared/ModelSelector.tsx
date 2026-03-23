@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Search, Check, ChevronDown } from 'lucide-react'
+import { Search, Check, ChevronDown, ImageIcon } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import type { AIModel } from '../../types'
 
@@ -21,6 +21,11 @@ const PROVIDER_COLORS: Record<string, string> = {
 
 function getProviderColor(provider: string): string {
   return PROVIDER_COLORS[provider.toLowerCase()] ?? '#6B7280'
+}
+
+const IMAGE_CAPABILITIES = ['image_generation']
+function isImageModel(model: AIModel): boolean {
+  return model.capabilities?.some((c: string) => IMAGE_CAPABILITIES.includes(c)) ?? false
 }
 
 export function ModelSelector({ models, selectedId, onChange, className }: ModelSelectorProps) {
@@ -47,23 +52,31 @@ export function ModelSelector({ models, selectedId, onChange, className }: Model
     setSearch('')
   }
 
-  // Group models by provider
-  const providers = [...new Set(models.map((m) => m.provider))]
+  // Split into chat and image models
+  const chatModels = models.filter((m) => !isImageModel(m))
+  const imageModels = models.filter((m) => isImageModel(m))
 
-  const filteredModels = search
-    ? models.filter((m) => m.name.toLowerCase().includes(search.toLowerCase()) || m.provider.toLowerCase().includes(search.toLowerCase()))
-    : models
+  // Group chat models by provider
+  const chatProviders = [...new Set(chatModels.map((m) => m.provider))]
 
-  const groupedFiltered = providers
+  const filteredChat = search
+    ? chatModels.filter((m) => m.name.toLowerCase().includes(search.toLowerCase()) || m.provider.toLowerCase().includes(search.toLowerCase()))
+    : chatModels
+
+  const filteredImage = search
+    ? imageModels.filter((m) => m.name.toLowerCase().includes(search.toLowerCase()) || m.provider.toLowerCase().includes(search.toLowerCase()))
+    : imageModels
+
+  const groupedChat = chatProviders
     .map((provider) => ({
       provider,
-      models: filteredModels.filter((m) => m.provider === provider),
+      models: filteredChat.filter((m) => m.provider === provider),
     }))
     .filter((g) => g.models.length > 0)
 
   return (
     <div className={cn('relative', className)} ref={ref}>
-      {/* Trigger — ChatGPT style: just text + chevron */}
+      {/* Trigger */}
       <button
         onClick={() => { setIsOpen(!isOpen); setSearch('') }}
         style={{
@@ -76,6 +89,9 @@ export function ModelSelector({ models, selectedId, onChange, className }: Model
         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2F2F2F'}
         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
       >
+        {selected && isImageModel(selected) && (
+          <ImageIcon size={14} style={{ color: '#F59E0B' }} />
+        )}
         {selected?.name ?? 'Select model'}
         <ChevronDown size={16} style={{ color: '#8E8E8E' }} />
       </button>
@@ -83,7 +99,7 @@ export function ModelSelector({ models, selectedId, onChange, className }: Model
       {/* Dropdown */}
       {isOpen && (
         <div className="absolute top-full left-0 z-50" style={{
-          marginTop: '4px', minWidth: '280px',
+          marginTop: '4px', minWidth: '300px',
           backgroundColor: '#2F2F2F', border: '1px solid #383838',
           borderRadius: '12px', padding: '6px',
           boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
@@ -106,55 +122,107 @@ export function ModelSelector({ models, selectedId, onChange, className }: Model
             />
           </div>
 
-          <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-            {groupedFiltered.map((group) => (
+          <div style={{ maxHeight: '450px', overflowY: 'auto' }}>
+            {/* ─── Chat Models ─── */}
+            {groupedChat.map((group) => (
               <div key={group.provider}>
-                {/* Provider label */}
                 <div style={{
                   padding: '6px 12px 2px', fontSize: '11px', color: '#8E8E8E',
                   fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em',
                 }}>
                   {group.provider}
                 </div>
-                {group.models.map((model) => {
-                  const isSelected = model.id === selectedId
-                  return (
-                    <button
-                      key={model.id}
-                      onClick={() => handleSelectModel(model.id)}
-                      className="w-full text-left"
-                      style={{
-                        padding: '10px 12px', borderRadius: '8px', cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', gap: '10px',
-                        border: 'none', backgroundColor: 'transparent',
-                        transition: 'background-color 150ms',
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#383838'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                    >
-                      {/* Provider dot */}
-                      <span style={{
-                        width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
-                        backgroundColor: getProviderColor(model.provider),
-                      }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '14px', color: '#ECECEC', fontWeight: 500 }}>{model.name}</div>
-                        <div style={{ fontSize: '12px', color: '#8E8E8E', marginTop: '1px' }}>
-                          {(model.contextWindow / 1000).toFixed(0)}K ctx &middot; ${model.inputTokenPrice.toFixed(2)}/${model.outputTokenPrice.toFixed(2)} per 1M
-                        </div>
-                      </div>
-                      {isSelected && <Check size={16} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />}
-                    </button>
-                  )
-                })}
+                {group.models.map((model) => (
+                  <ModelOption
+                    key={model.id}
+                    model={model}
+                    isSelected={model.id === selectedId}
+                    onSelect={handleSelectModel}
+                  />
+                ))}
               </div>
             ))}
-            {groupedFiltered.length === 0 && (
+
+            {/* ─── Image Generation Models ─── */}
+            {filteredImage.length > 0 && (
+              <>
+                <div style={{
+                  borderTop: '1px solid #4A4A4A', margin: '6px 0',
+                }} />
+                <div style={{
+                  padding: '6px 12px 2px', fontSize: '11px', color: '#F59E0B',
+                  fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em',
+                  display: 'flex', alignItems: 'center', gap: '4px',
+                }}>
+                  <ImageIcon size={10} />
+                  Image Generation
+                </div>
+                {filteredImage.map((model) => (
+                  <ModelOption
+                    key={model.id}
+                    model={model}
+                    isSelected={model.id === selectedId}
+                    onSelect={handleSelectModel}
+                    isImage
+                  />
+                ))}
+              </>
+            )}
+
+            {groupedChat.length === 0 && filteredImage.length === 0 && (
               <div style={{ textAlign: 'center', padding: '16px', fontSize: '13px', color: '#8E8E8E' }}>No models found</div>
             )}
           </div>
         </div>
       )}
     </div>
+  )
+}
+
+function ModelOption({ model, isSelected, onSelect, isImage }: {
+  model: AIModel
+  isSelected: boolean
+  onSelect: (id: string) => void
+  isImage?: boolean
+}) {
+  return (
+    <button
+      onClick={() => onSelect(model.id)}
+      className="w-full text-left"
+      style={{
+        padding: '10px 12px', borderRadius: '8px', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', gap: '10px',
+        border: 'none', backgroundColor: 'transparent',
+        transition: 'background-color 150ms',
+      }}
+      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#383838'}
+      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+    >
+      {/* Provider dot */}
+      <span style={{
+        width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
+        backgroundColor: getProviderColor(model.provider),
+      }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ fontSize: '14px', color: '#ECECEC', fontWeight: 500 }}>{model.name}</span>
+          {isImage && (
+            <span style={{
+              fontSize: '9px', fontWeight: 600, padding: '1px 5px', borderRadius: '4px',
+              backgroundColor: '#F59E0B20', color: '#F59E0B', textTransform: 'uppercase',
+            }}>
+              IMG
+            </span>
+          )}
+        </div>
+        <div style={{ fontSize: '12px', color: '#8E8E8E', marginTop: '1px' }}>
+          {isImage
+            ? model.description
+            : `${(model.contextWindow / 1000).toFixed(0)}K ctx \u00B7 $${model.inputTokenPrice.toFixed(2)}/$${model.outputTokenPrice.toFixed(2)} per 1M`
+          }
+        </div>
+      </div>
+      {isSelected && <Check size={16} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />}
+    </button>
   )
 }

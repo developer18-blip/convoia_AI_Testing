@@ -17,8 +17,10 @@ model Organization {
   industry        String?
   tier            String          @default("free")
   status          String          @default("active")
+  orgTokenBalance Int             @default(0)
   monthlyBudget   Float?
   budgetAlertSent Boolean         @default(false)
+  allowEmployeeAvatar Boolean      @default(true)
   ownerId         String
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
@@ -36,6 +38,8 @@ model Organization {
   tasks            Task[]
   agents           Agent[]
   invites          OrgInvite[]
+  activityLogs     ActivityLog[]
+  tokenPurchases   TokenPurchase[]
 
   @@index([ownerId])
   @@index([status])
@@ -46,11 +50,14 @@ model User {
   id                 String          @id @default(uuid())
   email              String          @unique
   name               String
-  password           String
+  password           String?
   avatar             String?
-  role               String          @default("employee")
+  authProvider       String          @default("local")
+  googleId           String?         @unique
+  role               String          @default("user")
   isVerified         Boolean         @default(false)
   verificationToken  String?
+  verificationExpiry DateTime?
   isActive           Boolean         @default(true)
   organizationId     String?
   managerId          String?
@@ -78,6 +85,11 @@ model User {
   agents                   Agent[]
   invitesCreated           OrgInvite[]       @relation("InviteCreator")
   invitesAccepted          OrgInvite[]       @relation("InviteAcceptor")
+  activityLogsAsActor      ActivityLog[]     @relation("ActivityActor")
+  activityLogsAsTarget     ActivityLog[]     @relation("ActivityTarget")
+  tokenPurchases           TokenPurchase[]
+  tokenWallet              TokenWallet?
+  tokenTransactions        TokenTransaction[]
 
   @@index([organizationId])
   @@index([managerId])
@@ -415,6 +427,7 @@ model OrgInvite {
   role            String
   token           String    @unique
   status          String    @default("pending")
+  tokensAllocated Int       @default(0)
   expiresAt       DateTime
   acceptedAt      DateTime?
   acceptedById    String?
@@ -426,4 +439,73 @@ model OrgInvite {
   @@index([organizationId])
   @@index([email])
   @@index([status])
+}
+
+// ============== ACTIVITY LOG ==============
+
+model ActivityLog {
+  id              String       @id @default(uuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actorId         String
+  actor           User         @relation("ActivityActor", fields: [actorId], references: [id])
+  targetId        String?
+  target          User?        @relation("ActivityTarget", fields: [targetId], references: [id])
+  action          String       // token_assigned, token_revoked, member_invited, member_joined, member_removed, query_executed
+  details         Json?
+  createdAt       DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([actorId])
+  @@index([targetId])
+}
+
+// ============== TOKEN WALLET SYSTEM ==============
+
+model TokenWallet {
+  id                   String   @id @default(uuid())
+  userId               String   @unique
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenBalance         Int      @default(0)
+  totalTokensPurchased Int      @default(0)
+  totalTokensUsed      Int      @default(0)
+  allocatedTokens      Int      @default(0)
+  allocatedBy          String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model TokenPurchase {
+  id              String        @id @default(uuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+  packageId       String
+  packageName     String
+  tokensPurchased Int
+  amountPaid      Float
+  stripePaymentId String        @unique
+  expiresAt       DateTime?
+  createdAt       DateTime      @default(now())
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([stripePaymentId])
+}
+
+model TokenTransaction {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type         String   // purchase, usage, allocation_received, allocation_given, adjustment
+  tokens       Int      // positive = added, negative = deducted
+  balanceAfter Int
+  description  String
+  reference    String?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
 }

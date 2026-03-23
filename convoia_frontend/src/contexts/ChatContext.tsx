@@ -1,6 +1,5 @@
 import { createContext, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { v4 as uuidv4 } from 'uuid'
-import api from '../lib/api'
 import { useAuth } from '../hooks/useAuth'
 import type { Conversation, Message, ChatFolder } from '../types'
 
@@ -187,38 +186,92 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const sendMessage = useCallback(async (content: string, modelId: string, industry?: string, agentId?: string) => {
     const userMsg: Message = { id: uuidv4(), role: 'user', content, timestamp: new Date().toISOString() }
-    const loadingMsg: Message = { id: uuidv4(), role: 'assistant', content: '', timestamp: new Date().toISOString(), isLoading: true }
+    const assistantId = uuidv4()
+    const streamingMsg: Message = { id: assistantId, role: 'assistant', content: '', timestamp: new Date().toISOString(), isLoading: true }
 
-    setMessages((prev) => [...prev, userMsg, loadingMsg])
+    setMessages((prev) => [...prev, userMsg, streamingMsg])
     setIsStreaming(true)
 
     try {
       const allMsgs = [...messages, userMsg].map((m) => ({ role: m.role, content: m.content }))
-      const res = await api.post('/ai/query', { modelId, messages: allMsgs, industry, agentId })
-      const data = res.data.data
-      let responseContent = data.response || data.content || ''
-      if (data.fallback?.used) {
-        responseContent = `> **Note:** ${data.fallback.reason}. Response from **${data.fallback.model}** instead.\n\n${responseContent}`
+      const token = localStorage.getItem('convoia_token')
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+
+      const response = await fetch(`${baseUrl}/ai/query/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ modelId, messages: allMsgs, industry, agentId }),
+      })
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({ message: 'Failed to get response' }))
+        throw new Error(errData.message || `HTTP ${response.status}`)
       }
-      if (data.autoDowngraded) {
-        responseContent = `> **Budget limit reached.** ${data.autoDowngradeReason}\n\n${responseContent}`
+
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('No response body')
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let accumulated = ''
+      let metadata: { model?: string; provider?: string; tokens?: { input: number; output: number }; cost?: { charged: string } } = {}
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (!trimmed || trimmed === 'data: [DONE]') continue
+          if (!trimmed.startsWith('data: ')) continue
+
+          try {
+            const parsed = JSON.parse(trimmed.slice(6))
+
+            if (parsed.type === 'chunk') {
+              accumulated += parsed.content
+              setMessages((prev) => prev.map((m) =>
+                m.id === assistantId ? { ...m, content: accumulated, isLoading: false } : m
+              ))
+            } else if (parsed.type === 'note') {
+              accumulated += `> **Note:** ${parsed.content}\n\n`
+              setMessages((prev) => prev.map((m) =>
+                m.id === assistantId ? { ...m, content: accumulated, isLoading: false } : m
+              ))
+            } else if (parsed.type === 'done') {
+              metadata = parsed
+            } else if (parsed.type === 'error') {
+              throw new Error(parsed.content)
+            }
+          } catch (e) {
+            if (e instanceof Error && e.message !== 'Unexpected end of JSON input') throw e
+          }
+        }
       }
-      const assistantMsg: Message = {
-        id: uuidv4(),
-        role: 'assistant',
-        content: responseContent,
-        tokensInput: Number(data.tokens?.input || data.tokensInput || 0) || 0,
-        tokensOutput: Number(data.tokens?.output || data.tokensOutput || 0) || 0,
-        cost: Number(data.cost?.charged || data.customerPrice || 0) || 0,
-        model: data.model || modelId,
-        provider: data.provider,
-        timestamp: new Date().toISOString(),
-      }
-      setMessages((prev) => prev.map((m) => m.id === loadingMsg.id ? assistantMsg : m))
+
+      // Apply final metadata
+      setMessages((prev) => prev.map((m) =>
+        m.id === assistantId ? {
+          ...m,
+          content: accumulated,
+          isLoading: false,
+          tokensInput: metadata.tokens?.input || 0,
+          tokensOutput: metadata.tokens?.output || 0,
+          cost: Number(metadata.cost?.charged || 0) || 0,
+          model: metadata.model || modelId,
+          provider: metadata.provider,
+        } : m
+      ))
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message :
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to get response'
-      setMessages((prev) => prev.map((m) => m.id === loadingMsg.id ? { ...m, isLoading: false, error: errorMsg, content: errorMsg } : m))
+      const errorMsg = err instanceof Error ? err.message : 'Failed to get response'
+      setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, isLoading: false, error: errorMsg, content: errorMsg } : m))
     } finally {
       setIsStreaming(false)
     }
@@ -232,43 +285,95 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       timestamp: new Date().toISOString(),
       ...messageExtras,
     }
-    const loadingMsg: Message = { id: uuidv4(), role: 'assistant', content: '', timestamp: new Date().toISOString(), isLoading: true }
+    const assistantId = uuidv4()
+    const streamingMsg: Message = { id: assistantId, role: 'assistant', content: '', timestamp: new Date().toISOString(), isLoading: true }
 
-    setMessages((prev) => [...prev, userMsg, loadingMsg])
+    setMessages((prev) => [...prev, userMsg, streamingMsg])
     setIsStreaming(true)
 
     try {
-      // Build messages for API — include system context if provided (invisible to UI)
       const history = [...messages, userMsg].map((m) => ({ role: m.role, content: m.content }))
       const messagesForAPI = systemContext
         ? [{ role: 'system' as const, content: systemContext }, ...history]
         : history
 
-      const res = await api.post('/ai/query', { modelId, messages: messagesForAPI, industry, agentId })
-      const data = res.data.data
-      let responseContent = data.response || data.content || ''
-      if (data.fallback?.used) {
-        responseContent = `> **Note:** ${data.fallback.reason}. Response from **${data.fallback.model}** instead.\n\n${responseContent}`
+      const token = localStorage.getItem('convoia_token')
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+
+      const response = await fetch(`${baseUrl}/ai/query/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ modelId, messages: messagesForAPI, industry, agentId }),
+      })
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({ message: 'Failed to get response' }))
+        throw new Error(errData.message || `HTTP ${response.status}`)
       }
-      if (data.autoDowngraded) {
-        responseContent = `> **Budget limit reached.** ${data.autoDowngradeReason}\n\n${responseContent}`
+
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('No response body')
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let accumulated = ''
+      let metadata: { model?: string; provider?: string; tokens?: { input: number; output: number }; cost?: { charged: string } } = {}
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (!trimmed || trimmed === 'data: [DONE]') continue
+          if (!trimmed.startsWith('data: ')) continue
+
+          try {
+            const parsed = JSON.parse(trimmed.slice(6))
+
+            if (parsed.type === 'chunk') {
+              accumulated += parsed.content
+              setMessages((prev) => prev.map((m) =>
+                m.id === assistantId ? { ...m, content: accumulated, isLoading: false } : m
+              ))
+            } else if (parsed.type === 'note') {
+              accumulated += `> **Note:** ${parsed.content}\n\n`
+              setMessages((prev) => prev.map((m) =>
+                m.id === assistantId ? { ...m, content: accumulated, isLoading: false } : m
+              ))
+            } else if (parsed.type === 'done') {
+              metadata = parsed
+            } else if (parsed.type === 'error') {
+              throw new Error(parsed.content)
+            }
+          } catch (e) {
+            if (e instanceof Error && e.message !== 'Unexpected end of JSON input') throw e
+          }
+        }
       }
-      const assistantMsg: Message = {
-        id: uuidv4(),
-        role: 'assistant',
-        content: responseContent,
-        tokensInput: Number(data.tokens?.input || data.tokensInput || 0) || 0,
-        tokensOutput: Number(data.tokens?.output || data.tokensOutput || 0) || 0,
-        cost: Number(data.cost?.charged || data.customerPrice || 0) || 0,
-        model: data.model || modelId,
-        provider: data.provider,
-        timestamp: new Date().toISOString(),
-      }
-      setMessages((prev) => prev.map((m) => m.id === loadingMsg.id ? assistantMsg : m))
+
+      setMessages((prev) => prev.map((m) =>
+        m.id === assistantId ? {
+          ...m,
+          content: accumulated,
+          isLoading: false,
+          tokensInput: metadata.tokens?.input || 0,
+          tokensOutput: metadata.tokens?.output || 0,
+          cost: Number(metadata.cost?.charged || 0) || 0,
+          model: metadata.model || modelId,
+          provider: metadata.provider,
+        } : m
+      ))
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message :
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to get response'
-      setMessages((prev) => prev.map((m) => m.id === loadingMsg.id ? { ...m, isLoading: false, error: errorMsg, content: errorMsg } : m))
+      const errorMsg = err instanceof Error ? err.message : 'Failed to get response'
+      setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, isLoading: false, error: errorMsg, content: errorMsg } : m))
     } finally {
       setIsStreaming(false)
     }

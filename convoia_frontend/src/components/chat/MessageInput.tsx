@@ -196,25 +196,34 @@ export function MessageInput({
         return false
       }
 
-      const data = await res.json()
-      if (!data.success) {
-        const errorMsg = data.message || 'Image processing failed'
+      const data = await res.json().catch(() => null)
+      if (!data || !data.success) {
+        const errorMsg = data?.message || 'Image processing failed'
         setFileError(errorMsg)
         onError?.(errorMsg)
         setAttachedFile(attached)
         return false
       }
 
-      if (data.data.type === 'image_analysis') {
+      const result = data?.data
+      if (!result || !result.type) {
+        const errorMsg = data?.message || 'Invalid response from server'
+        setFileError(errorMsg)
+        onError?.(errorMsg)
+        setAttachedFile(attached)
+        return false
+      }
+
+      if (result.type === 'image_analysis') {
         onFileProcessed?.({
           userContent: question || 'Analyze this image',
-          assistantContent: data.data.response,
-          cost: data.data.cost || 0,
-          tokens: { input: data.data.tokensInput || 0, output: data.data.tokensOutput || 0 },
+          assistantContent: result.response || 'Image analyzed successfully.',
+          cost: result.cost || 0,
+          tokens: { input: result.tokensInput || 0, output: result.tokensOutput || 0 },
           imagePreview: attached.preview,
           fileAttachment: { name: attached.file.name, type: 'image', size: attached.file.size },
-          model: data.data.model,
-          provider: data.data.provider,
+          model: result.model,
+          provider: result.provider,
         })
         window.dispatchEvent(new Event('wallet:refresh'))
         setAttachedFile(null)

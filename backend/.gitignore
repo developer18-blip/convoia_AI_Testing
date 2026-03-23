@@ -4,6 +4,9 @@ node_modules/
 # Build output
 dist/
 
+# Uploaded/generated files
+uploads/
+
 # Environment variables — NEVER commit
 .env
 .env.local

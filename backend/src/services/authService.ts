@@ -5,6 +5,9 @@ import { AppError } from '../middleware/errorHandler.js';
 import logger from '../config/logger.js';
 import { RegisterRequest, LoginRequest, AuthResponse } from '../types/index.js';
 import { InviteService } from './inviteService.js';
+import { EmailService } from './emailService.js';
+import { OAuth2Client } from 'google-auth-library';
+import config from '../config/env.js';
 
 export class AuthService {
   static async register(data: RegisterRequest & { inviteToken?: string }): Promise<AuthResponse> {
@@ -21,11 +24,13 @@ export class AuthService {
     try {
       const hashedPassword = await bcrypt.hash(password, 12);
 
-      // Determine role: org_owner forced when org provided > explicit role > employee
-      // Creating an org always means org_owner (prevents employee+org mismatch)
+      // Determine role:
+      // - Creating org → org_owner (always)
+      // - Self-registration (no org, no invite) → 'user' (individual/freelancer)
+      // - Only invite acceptance can set 'employee' or 'manager'
       const resolvedRole = organizationName
-        ? (role === 'manager' ? 'manager' : 'org_owner')
-        : role || 'employee';
+        ? 'org_owner'
+        : (inviteToken ? (role || 'employee') : 'user');
 
       // Use transaction to prevent orphan orgs if user creation fails
       const result = await prisma.$transaction(async (tx) => {
@@ -104,26 +109,66 @@ export class AuthService {
         }
       }
 
+      // If invite-based registration, skip email verification (invite proves email ownership)
+      if (inviteToken) {
+        await prisma.user.update({
+          where: { id: finalUser.id },
+          data: { isVerified: true },
+        });
+
+        const token = generateToken({
+          userId: finalUser.id,
+          organizationId: finalUser.organizationId || undefined,
+          role: finalUser.role,
+        });
+        const refreshToken = generateRefreshToken({
+          userId: finalUser.id,
+          organizationId: finalUser.organizationId || undefined,
+          role: finalUser.role,
+        });
+
+        return {
+          user: {
+            id: finalUser.id,
+            email: finalUser.email,
+            name: finalUser.name,
+            avatar: finalUser.avatar || null,
+            role: finalUser.role,
+            organizationId: finalUser.organizationId || undefined,
+            isVerified: true,
+          },
+          token,
+          refreshToken,
+        };
+      }
+
+      // Email verification disabled — auto-verify and issue token immediately
+      await prisma.user.update({
+        where: { id: finalUser.id },
+        data: { isVerified: true },
+      });
+
       const token = generateToken({
         userId: finalUser.id,
         organizationId: finalUser.organizationId || undefined,
         role: finalUser.role,
       });
-
       const refreshToken = generateRefreshToken({
         userId: finalUser.id,
         organizationId: finalUser.organizationId || undefined,
         role: finalUser.role,
       });
 
+      // Return with JWT — skip verification
       return {
         user: {
           id: finalUser.id,
           email: finalUser.email,
           name: finalUser.name,
+          avatar: finalUser.avatar || null,
           role: finalUser.role,
           organizationId: finalUser.organizationId || undefined,
-          isVerified: false,
+          isVerified: true,
         },
         token,
         refreshToken,
@@ -134,6 +179,194 @@ export class AuthService {
       }
       logger.error('Registration error:', error);
       throw new AppError('Failed to register user', 500);
+    }
+  }
+
+  /**
+   * Verify email with 6-digit OTP code.
+   */
+  static async verifyEmail(email: string, code: string): Promise<AuthResponse> {
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    if (user.isVerified) {
+      throw new AppError('Email is already verified', 400);
+    }
+
+    if (!user.verificationToken || !user.verificationExpiry) {
+      throw new AppError('No verification code found. Please register again.', 400);
+    }
+
+    if (new Date() > user.verificationExpiry) {
+      throw new AppError('Verification code has expired. Please request a new one.', 400);
+    }
+
+    if (user.verificationToken !== code) {
+      throw new AppError('Invalid verification code', 400);
+    }
+
+    // Mark user as verified and clear the code
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        isVerified: true,
+        verificationToken: null,
+        verificationExpiry: null,
+      },
+    });
+
+    logger.info(`Email verified for user: ${user.email}`);
+
+    const token = generateToken({
+      userId: user.id,
+      organizationId: user.organizationId || undefined,
+      role: user.role,
+    });
+    const refreshToken = generateRefreshToken({
+      userId: user.id,
+      organizationId: user.organizationId || undefined,
+      role: user.role,
+    });
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        avatar: user.avatar || null,
+        role: user.role,
+        organizationId: user.organizationId || undefined,
+        isVerified: true,
+      },
+      token,
+      refreshToken,
+    };
+  }
+
+  /**
+   * Resend verification code.
+   */
+  static async resendVerificationCode(email: string): Promise<void> {
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    if (user.isVerified) {
+      throw new AppError('Email is already verified', 400);
+    }
+
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const verificationExpiry = new Date(Date.now() + 10 * 60 * 1000);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { verificationToken: verificationCode, verificationExpiry },
+    });
+
+    await EmailService.sendVerificationCode({
+      recipientEmail: user.email,
+      name: user.name,
+      code: verificationCode,
+    });
+
+    logger.info(`Verification code resent to ${user.email}`);
+  }
+
+  static async googleAuth(idToken: string): Promise<AuthResponse> {
+    const client = new OAuth2Client(config.googleClientId);
+
+    try {
+      const ticket = await client.verifyIdToken({
+        idToken,
+        audience: config.googleClientId,
+      });
+
+      const payload = ticket.getPayload();
+      if (!payload || !payload.email) {
+        throw new AppError('Invalid Google token', 401);
+      }
+
+      const { email, name, sub: googleId, picture } = payload;
+
+      // Check if user exists by googleId or email
+      let user = await prisma.user.findFirst({
+        where: { OR: [{ googleId }, { email }] },
+      });
+
+      if (user) {
+        // Existing user — link Google account if not already linked
+        if (!user.googleId) {
+          user = await prisma.user.update({
+            where: { id: user.id },
+            data: { googleId, authProvider: 'google', avatar: picture || user.avatar },
+          });
+        }
+
+        if (!user.isActive) {
+          throw new AppError('Account has been deactivated. Contact support.', 403);
+        }
+
+        logger.info(`Google login: ${user.email}`);
+      } else {
+        // New user — create account
+        user = await prisma.$transaction(async (tx) => {
+          const newUser = await tx.user.create({
+            data: {
+              email: email!,
+              name: name || email!.split('@')[0],
+              password: null,
+              avatar: picture || null,
+              authProvider: 'google',
+              googleId,
+              role: 'user',
+              isVerified: true,
+            },
+          });
+
+          await tx.wallet.create({
+            data: { userId: newUser.id, balance: 0, totalToppedUp: 0, totalSpent: 0, currency: 'USD' },
+          });
+
+          return newUser;
+        });
+
+        logger.info(`New Google user registered: ${user.email}`);
+      }
+
+      const token = generateToken({
+        userId: user.id,
+        organizationId: user.organizationId || undefined,
+        role: user.role,
+      });
+
+      const refreshToken = generateRefreshToken({
+        userId: user.id,
+        organizationId: user.organizationId || undefined,
+        role: user.role,
+      });
+
+      return {
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          avatar: user.avatar || null,
+          role: user.role,
+          organizationId: user.organizationId || undefined,
+          isVerified: user.isVerified ?? true,
+        },
+        token,
+        refreshToken,
+      };
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      logger.error('Google auth error:', error);
+      throw new AppError('Google authentication failed', 401);
     }
   }
 
@@ -154,9 +387,31 @@ export class AuthService {
         throw new AppError('Account has been deactivated. Contact support.', 403);
       }
 
+      // If user signed up via Google and has no password
+      if (!user.password) {
+        throw new AppError('This account uses Google sign-in. Please use the Google button to log in.', 400);
+      }
+
       const passwordMatch = await bcrypt.compare(password, user.password);
       if (!passwordMatch) {
         throw new AppError('Invalid credentials', 401);
+      }
+
+      // Block unverified users — resend code and tell them to verify
+      if (!user.isVerified) {
+        // Auto-resend a fresh code
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiry = new Date(Date.now() + 10 * 60 * 1000);
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { verificationToken: code, verificationExpiry: expiry },
+        });
+        await EmailService.sendVerificationCode({
+          recipientEmail: user.email,
+          name: user.name,
+          code,
+        });
+        throw new AppError('EMAIL_NOT_VERIFIED', 403);
       }
 
       logger.info(`User logged in: ${user.email}`);
@@ -178,6 +433,7 @@ export class AuthService {
           id: user.id,
           email: user.email,
           name: user.name,
+          avatar: user.avatar || null,
           role: user.role,
           organizationId: user.organizationId || undefined,
           isVerified: user.isVerified ?? false,
@@ -201,6 +457,7 @@ export class AuthService {
         id: true,
         email: true,
         name: true,
+        avatar: true,
         role: true,
         isVerified: true,
         isActive: true,
@@ -249,6 +506,10 @@ export class AuthService {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       throw new AppError('User not found', 404);
+    }
+
+    if (!user.password) {
+      throw new AppError('This account uses Google sign-in and has no password. Please use Google to log in.', 400);
     }
 
     const passwordMatch = await bcrypt.compare(currentPassword, user.password);

@@ -7,6 +7,7 @@ import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { afterQueryMiddleware, estimateCost } from '../middleware/tokenTracker.js';
 import { getOrCreatePersonalOrg } from '../utils/orgHelper.js';
 import AIGatewayService from '../services/aiGatewayService.js';
+import { TokenWalletService } from '../services/tokenWalletService.js';
 import logger from '../config/logger.js';
 
 const router = Router();
@@ -69,19 +70,29 @@ router.post('/chat/completions', queryLimiter, asyncHandler(async (req: Request,
   // Fetch user with wallet
   const user = await prisma.user.findUnique({
     where: { id: req.user.userId },
-    include: { organization: true, wallet: true },
+    include: { organization: true },
   });
   if (!user) throw new AppError('User not found', 404);
 
   const organizationId = await getOrCreatePersonalOrg(user.id);
 
-  // Check wallet balance
-  if (!user.wallet || user.wallet.balance <= 0) {
+  // Check token balance with estimation
+  const owuiTokenBal = await TokenWalletService.getBalance(user.id);
+  const owuiInputText = messages.map((m: any) => m.content || '').join(' ');
+  const owuiEstimatedInput = Math.ceil(owuiInputText.length / 4) + 500;
+  const owuiMinRequired = owuiEstimatedInput + 200;
+
+  if (owuiTokenBal.tokenBalance <= 0) {
+    return res.status(402).json({
+      error: { message: 'No tokens remaining.', type: 'no_tokens', code: 'NO_TOKENS' },
+    });
+  }
+  if (owuiTokenBal.tokenBalance < owuiMinRequired) {
     return res.status(402).json({
       error: {
-        message: 'Insufficient wallet balance. Please top up to continue.',
-        type: 'insufficient_funds',
-        code: 'balance_too_low',
+        message: `Insufficient tokens. Balance: ${TokenWalletService.formatTokens(owuiTokenBal.tokenBalance)}, estimated need: ${TokenWalletService.formatTokens(owuiMinRequired)}.`,
+        type: 'insufficient_tokens',
+        code: 'INSUFFICIENT_TOKENS',
       },
     });
   }
@@ -116,18 +127,12 @@ router.post('/chat/completions', queryLimiter, asyncHandler(async (req: Request,
     }
   }
 
-  // Pre-query cost estimate
+  // Pre-query cost estimate (kept for usage tracking)
   const inputText = messages.map((m: any) => m.content || '').join(' ');
   const estimate = await estimateCost(finalModelId, inputText);
-  if (estimate && user.wallet.balance < estimate.customerPrice) {
-    return res.status(402).json({
-      error: {
-        message: 'Insufficient balance for this query.',
-        type: 'insufficient_funds',
-        code: 'balance_too_low',
-      },
-    });
-  }
+
+  // Cap output tokens so total stays within user's balance
+  const owuiMaxOutput = Math.max(owuiTokenBal.tokenBalance - owuiEstimatedInput, 200);
 
   // Call AI provider
   const aiResponse = await AIGatewayService.sendMessage({
@@ -136,6 +141,7 @@ router.post('/chat/completions', queryLimiter, asyncHandler(async (req: Request,
     modelId: finalModelId,
     messages,
     industry: user.organization?.industry || undefined,
+    maxOutputTokens: owuiMaxOutput,
   });
 
   // Billing
@@ -153,6 +159,14 @@ router.post('/chat/completions', queryLimiter, asyncHandler(async (req: Request,
     estimate?.customerPrice,
     activeSession?.id
   );
+
+  // Deduct tokens from wallet
+  await TokenWalletService.deductTokens({
+    userId: user.id,
+    tokens: aiResponse.totalTokens,
+    reference: aiResponse.aiModel.id,
+    description: `OpenWebUI: ${aiResponse.aiModel.name}`,
+  });
 
   logger.info(
     `OpenWebUI query — User: ${user.id}, Model: ${aiResponse.aiModel.name}, Cost: $${aiResponse.customerPrice.toFixed(6)}`

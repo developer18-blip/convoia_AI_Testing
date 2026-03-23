@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   createInvite,
+  acceptInvite,
   getInviteByToken,
   getOrgInvites,
   revokeInvite,
@@ -21,6 +22,7 @@ router.get('/invite/:token', getInviteByToken);
 router.use(jwtOrApiKey);
 
 router.post('/invite', createInvite);
+router.post('/accept-invite', acceptInvite);
 router.get('/invites', getOrgInvites);
 router.delete('/invite/:inviteId', revokeInvite);
 router.post('/invite/:inviteId/resend', resendInvite);

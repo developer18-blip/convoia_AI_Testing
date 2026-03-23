@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Zap, User, Building2, Mail, Lock, ArrowLeft, ArrowRight } from 'lucide-react'
+import { GoogleLogin } from '@react-oauth/google'
 import { ThemeToggle } from '../../components/shared/ThemeToggle'
 import { Input } from '../../components/ui/Input'
 import { Select } from '../../components/ui/Select'
@@ -26,7 +27,7 @@ const roleOptions = [
 ]
 
 export function RegisterPage() {
-  const { register } = useAuth()
+  const { register, googleLogin } = useAuth()
   const toast = useToast()
   const [searchParams] = useSearchParams()
   const inviteToken = searchParams.get('token')
@@ -178,6 +179,34 @@ export function RegisterPage() {
                   <p className="text-xs text-text-muted mt-1">For companies and teams</p>
                 </motion.button>
               </div>
+
+              <div className="relative mt-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-border/50" />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-surface/80 px-3 text-text-muted">or sign up instantly with</span>
+                </div>
+              </div>
+              <div className="flex justify-center mt-4">
+                <GoogleLogin
+                  onSuccess={async (credentialResponse) => {
+                    if (!credentialResponse.credential) return
+                    try {
+                      await googleLogin(credentialResponse.credential)
+                      toast.success('Account created!')
+                    } catch (err: any) {
+                      toast.error(err?.response?.data?.message || 'Google sign-up failed')
+                    }
+                  }}
+                  onError={() => toast.error('Google sign-up failed')}
+                  theme="filled_black"
+                  shape="pill"
+                  size="large"
+                  width="320"
+                  text="signup_with"
+                />
+              </div>
             </div>
           )}
 
@@ -231,7 +260,7 @@ export function RegisterPage() {
               <label className="flex items-start gap-2 cursor-pointer">
                 <input type="checkbox" checked={agreed} onChange={(e) => { setAgreed(e.target.checked); setErrors((p) => ({ ...p, terms: '' })) }} className="mt-1 rounded border-border bg-surface text-primary focus:ring-primary" />
                 <span className="text-sm text-text-secondary">
-                  I agree to the <button type="button" className="text-primary hover:underline">Terms of Service</button> and <button type="button" className="text-primary hover:underline">Privacy Policy</button>
+                  I agree to the <Link to="/terms" target="_blank" className="text-primary hover:underline">Terms of Service</Link> and <Link to="/privacy" target="_blank" className="text-primary hover:underline">Privacy Policy</Link>
                 </span>
               </label>
               {errors.terms && <p className="text-xs text-danger">{errors.terms}</p>}

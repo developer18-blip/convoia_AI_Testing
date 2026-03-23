@@ -15,7 +15,7 @@ export function DashboardPage() {
   if (isLoading) return <LoadingPage />
   if (error) return <ErrorState message={error} onRetry={refetch} />
 
-  const role = user?.role || 'employee'
+  const role = user?.role || 'user'
   const hasOrg = !!user?.organizationId
   const userName = user?.name || 'User'
   const orgName = user?.organization?.name || 'Organization'

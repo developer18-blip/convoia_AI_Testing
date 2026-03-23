@@ -14,7 +14,7 @@ import api from '../lib/api'
 import type { Budget } from '../types'
 
 interface BudgetMember {
-  id: string; name: string; budget: Budget | null
+  id: string; name: string; avatar?: string | null; budget: Budget | null
 }
 
 export function BudgetsPage() {
@@ -82,7 +82,7 @@ export function BudgetsPage() {
           <div className="divide-y divide-border/50">
             {members.map((m) => (
               <div key={m.id} className="px-5 py-3 flex items-center gap-4">
-                <Avatar name={m.name} size="sm" />
+                <Avatar name={m.name} src={m.avatar} size="sm" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-text-primary">{m.name}</p>
                   {m.budget ? (

@@ -29,12 +29,17 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import fileRoutes from './routes/fileRoutes.js';
 import agentRoutes from './routes/agentRoutes.js';
 import teamRoutes from './routes/teamRoutes.js';
+import activityRoutes from './routes/activityRoutes.js';
+import tokenWalletRoutes from './routes/tokenWalletRoutes.js';
 
 const app: Express = express();
 
 // ============== STRIPE WEBHOOK (must be before express.json()) ==============
-// Stripe needs the raw body for signature verification
-app.use('/api/stripe', stripeRoutes);
+// Only the webhook needs raw body — mount on exact path, not a sub-router,
+// so it doesn't intercept OPTIONS preflight for other /api/stripe/* routes.
+import expressModule from 'express';
+import { handleStripeWebhook } from './controllers/stripeWebhookController.js';
+app.post('/api/stripe/webhook', expressModule.raw({ type: 'application/json' }), handleStripeWebhook);
 
 // ============== SECURITY HEADERS ==============
 app.use(
@@ -60,21 +65,27 @@ app.use(
 );
 
 // ============== CORS ==============
+const isDev = process.env.NODE_ENV !== 'production';
 const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:5175',
-  'http://localhost:8080',
-  'http://localhost:3001',
-  'http://127.0.0.1:5173',
-  'http://127.0.0.1:5175',
-  'http://127.0.0.1:8080',
   process.env.CORS_ORIGIN,
+  process.env.FRONTEND_URL,
+  // Development origins — excluded in production
+  ...(isDev ? [
+    'http://localhost:5173',
+    'http://localhost:5175',
+    'http://localhost:8080',
+    'http://localhost:3001',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:5175',
+    'http://127.0.0.1:8080',
+  ] : []),
 ].filter(Boolean);
 
 app.use(
   cors({
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      // Allow all ngrok domains + configured origins
+      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.ngrok-free.dev') || origin.endsWith('.ngrok.io')) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));
@@ -87,7 +98,13 @@ app.use(
 ); 
 
 // ============== COMPRESSION ==============
-app.use(compression());
+// Skip compression for SSE streaming endpoints (compression buffers chunks)
+app.use(compression({
+  filter: (req, res) => {
+    if (req.path.includes('/query/stream')) return false;
+    return compression.filter(req, res);
+  },
+}));
 
 // ============== LOGGING ==============
 app.use(morganMiddleware);
@@ -95,6 +112,13 @@ app.use(morganMiddleware);
 // ============== PARSING ==============
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// ============== STATIC FILES (generated images) ==============
+import path from 'path';
+app.use('/api/uploads', express.static(path.join(process.cwd(), 'uploads'), {
+  maxAge: '30d',
+  immutable: true,
+}));
 
 // ============== INPUT SANITIZATION ==============
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -211,6 +235,9 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/agents', agentRoutes);
 app.use('/api/team', teamRoutes);
+app.use('/api/activity', activityRoutes);
+app.use('/api/token-wallet', tokenWalletRoutes);
+app.use('/api/stripe', stripeRoutes);
 
 // ============== 404 HANDLER ==============
 app.use('*', (req: Request, res: Response) => {

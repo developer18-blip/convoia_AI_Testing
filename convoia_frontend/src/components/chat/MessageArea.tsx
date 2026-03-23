@@ -11,6 +11,7 @@ interface MessageAreaProps {
   onEditMessage?: (id: string, content: string) => void
   onDeleteMessage?: (id: string) => void
   onRunCode?: (code: string, language: string) => void
+  onOpenInCanvas?: (content: string, language: string, type: 'code' | 'text') => void
 }
 
 const suggestions = [
@@ -20,7 +21,7 @@ const suggestions = [
   { icon: <BarChart3 size={16} style={{ color: 'var(--color-primary)' }} />, title: 'Analyze something', prompt: 'Explain how transformer models work in natural language processing' },
 ]
 
-export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, onEditMessage, onDeleteMessage, onRunCode }: MessageAreaProps) {
+export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, onEditMessage, onDeleteMessage, onRunCode, onOpenInCanvas }: MessageAreaProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -83,7 +84,8 @@ export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, o
         {messages.map((msg) => (
           <MessageBubble key={msg.id} message={msg}
             onRetry={msg.error ? onRetry : undefined}
-            onEdit={onEditMessage} onDelete={onDeleteMessage} onRunCode={onRunCode} />
+            onEdit={onEditMessage} onDelete={onDeleteMessage} onRunCode={onRunCode}
+            onOpenInCanvas={onOpenInCanvas} />
         ))}
         <div ref={bottomRef} style={{ height: '20px' }} />
       </div>

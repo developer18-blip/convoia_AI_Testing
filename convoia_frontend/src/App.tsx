@@ -1,9 +1,11 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
+import { GoogleOAuthProvider } from '@react-oauth/google'
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { ToastProvider } from './contexts/ToastContext'
 import { WalletProvider } from './contexts/WalletContext'
+import { TokenProvider } from './contexts/TokenContext'
 import { ChatProvider } from './contexts/ChatContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ToastContainer } from './components/ui/Toast'
@@ -16,6 +18,7 @@ import { useToast } from './hooks/useToast'
 const LandingPage = lazy(() => import('./pages/public/LandingPage'))
 const LoginPage = lazy(() => import('./pages/public/LoginPage'))
 const RegisterPage = lazy(() => import('./pages/public/RegisterPage'))
+const VerifyEmailPage = lazy(() => import('./pages/public/VerifyEmailPage'))
 const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'))
 const ChatPage = lazy(() => import('./pages/ChatPage'))
 const ModelsPage = lazy(() => import('./pages/ModelsPage'))
@@ -37,8 +40,11 @@ const ApiDocsPage = lazy(() => import('./pages/ApiDocsPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 const JoinPage = lazy(() => import('./pages/JoinPage'))
+const TokenStorePage = lazy(() => import('./pages/TokenStorePage'))
 const PaymentSuccessPage = lazy(() => import('./pages/PaymentSuccessPage'))
 const PaymentCancelPage = lazy(() => import('./pages/PaymentCancelPage'))
+const PrivacyPolicyPage = lazy(() => import('./pages/public/PrivacyPolicyPage'))
+const TermsOfServicePage = lazy(() => import('./pages/public/TermsOfServicePage'))
 
 function ProtectedRoute() {
   const { isAuthenticated, isLoading } = useAuth()
@@ -61,6 +67,23 @@ function RoleGuard({ allowedRoles }: { allowedRoles: string[] }) {
 
   if (!user || !allowedRoles.includes(user.role)) {
     toast.error('This page is not available for your role.')
+    return <Navigate to="/dashboard" replace />
+  }
+
+  return <Outlet />
+}
+
+/**
+ * Guard: only allow users who can BUY tokens (freelancers, org_owner, platform_admin)
+ * Employees and managers must receive tokens via allocation.
+ */
+function TokenBuyGuard() {
+  const { user } = useAuth()
+  const toast = useToast()
+
+  const canBuy = !user?.organizationId || user?.role === 'org_owner' || user?.role === 'platform_admin'
+  if (!canBuy) {
+    toast.error('Ask your organization owner to allocate tokens.')
     return <Navigate to="/dashboard" replace />
   }
 
@@ -106,7 +129,10 @@ function AppRoutes() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/join" element={<JoinPage />} />
+        <Route path="/privacy" element={<PrivacyPolicyPage />} />
+        <Route path="/terms" element={<TermsOfServicePage />} />
 
         {/* Protected */}
         <Route element={<ProtectedRoute />}>
@@ -116,6 +142,10 @@ function AppRoutes() {
           <Route path="/usage" element={<UsagePage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/api-docs" element={<ApiDocsPage />} />
+          {/* Token purchase — only freelancers + org_owner + platform_admin */}
+          <Route element={<TokenBuyGuard />}>
+            <Route path="/tokens/buy" element={<TokenStorePage />} />
+          </Route>
           <Route path="/payment/success" element={<PaymentSuccessPage />} />
           <Route path="/payment/cancel" element={<PaymentCancelPage />} />
 
@@ -167,23 +197,29 @@ function AppRoutes() {
   )
 }
 
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
+
 export default function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider>
-        <BrowserRouter>
-          <AuthProvider>
-            <ToastProvider>
-              <WalletProvider>
-                <ChatProvider>
-                  <AppRoutes />
-                  <ToastContainer />
-                </ChatProvider>
-              </WalletProvider>
-            </ToastProvider>
-          </AuthProvider>
-        </BrowserRouter>
-      </ThemeProvider>
+      <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+        <ThemeProvider>
+          <BrowserRouter>
+            <AuthProvider>
+              <ToastProvider>
+                <WalletProvider>
+                  <TokenProvider>
+                    <ChatProvider>
+                      <AppRoutes />
+                      <ToastContainer />
+                    </ChatProvider>
+                  </TokenProvider>
+                </WalletProvider>
+              </ToastProvider>
+            </AuthProvider>
+          </BrowserRouter>
+        </ThemeProvider>
+      </GoogleOAuthProvider>
     </ErrorBoundary>
   )
 }

@@ -5,6 +5,7 @@ import { FileProcessingService } from '../services/fileProcessingService.js'
 import { AIGatewayService } from '../services/aiGatewayService.js'
 import { afterQueryMiddleware } from '../middleware/tokenTracker.js'
 import { getOrCreatePersonalOrg } from '../utils/orgHelper.js'
+import { TokenWalletService } from '../services/tokenWalletService.js'
 import logger from '../config/logger.js'
 import prisma from '../config/db.js'
 
@@ -21,16 +22,25 @@ export const processFile = asyncHandler(async (req: Request, res: Response): Pro
 
   const user = await prisma.user.findUnique({
     where: { id: req.user.userId },
-    include: { wallet: true },
   })
 
   if (!user) throw new AppError('User not found', 404)
 
-  if (!user.wallet || user.wallet.balance <= 0) {
+  // Check token balance — vision/image needs ~2000 tokens minimum
+  const tokenBal = await TokenWalletService.getBalance(user.id)
+  const minRequired = category === 'image' ? 2000 : 500
+  if (tokenBal.tokenBalance < minRequired) {
     FileProcessingService.cleanupFile(file.path)
+    const isOrgMember = !!user.organizationId
     res.status(402).json({
       success: false,
-      message: 'Insufficient wallet balance. Top up to continue.',
+      code: tokenBal.tokenBalance <= 0 ? 'NO_TOKENS' : 'INSUFFICIENT_TOKENS',
+      message: isOrgMember
+        ? `Insufficient tokens (${TokenWalletService.formatTokens(tokenBal.tokenBalance)} remaining). Contact your manager.`
+        : `Insufficient tokens (${TokenWalletService.formatTokens(tokenBal.tokenBalance)} remaining).`,
+      currentBalance: tokenBal.tokenBalance,
+      estimatedRequired: minRequired,
+      canBuyTokens: !isOrgMember || user.role === 'org_owner',
     })
     return
   }
@@ -66,6 +76,10 @@ export const processFile = asyncHandler(async (req: Request, res: Response): Pro
           resolvedModelId = anyVisionModel.id
         }
 
+        // Cap vision output — min of user's balance and model hard limit (most models cap at 8192 for vision)
+        const MODEL_VISION_LIMIT = 8192;
+        const visionMaxOutput = Math.min(Math.max(tokenBal.tokenBalance - 2000, 500), MODEL_VISION_LIMIT);
+
         // Route through the AI Gateway — respects user's selected model
         const aiResponse = await AIGatewayService.sendVisionMessage({
           userId: user.id,
@@ -74,6 +88,7 @@ export const processFile = asyncHandler(async (req: Request, res: Response): Pro
           prompt: prompt?.trim() || 'Please analyze this image and describe what you see in detail.',
           imageBase64: base64Image,
           mimeType,
+          maxOutputTokens: visionMaxOutput,
         })
 
         // Track usage and billing
@@ -89,6 +104,14 @@ export const processFile = asyncHandler(async (req: Request, res: Response): Pro
           aiResponse.customerPrice,
           aiResponse.markupPercentage
         )
+
+        // Deduct tokens from wallet
+        await TokenWalletService.deductTokens({
+          userId: user.id,
+          tokens: aiResponse.totalTokens,
+          reference: aiResponse.aiModel.id,
+          description: `Vision: ${aiResponse.aiModel.name}`,
+        })
 
         res.json({
           success: true,
@@ -224,69 +247,60 @@ export const processFile = asyncHandler(async (req: Request, res: Response): Pro
   }
 })
 
-// Generate image with DALL-E
+// Generate image — Gemini (default, free) or DALL-E (fallback)
 export const generateImage = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   if (!req.user) throw new AppError('Unauthorized', 401)
 
-  const { prompt, size, quality } = req.body
+  const { prompt, size, quality, provider } = req.body
 
   if (!prompt?.trim()) {
     throw new AppError('Prompt is required', 400)
   }
 
-  // Get user and wallet
+  // Get user
   const user = await prisma.user.findUnique({
     where: { id: req.user.userId },
-    include: { wallet: true },
   })
 
   if (!user) throw new AppError('User not found', 404)
 
-  // DALL-E costs
-  const imageCost = quality === 'hd' ? 0.08 : 0.04
-
-  if (!user.wallet || user.wallet.balance < imageCost) {
+  // Check token balance
+  const imgTokenBal = await TokenWalletService.getBalance(user.id)
+  if (imgTokenBal.tokenBalance < 500) {
     res.status(402).json({
       success: false,
-      message: `Insufficient balance. Image generation costs $${imageCost}`,
-      required: imageCost,
-      current: user.wallet?.balance ?? 0,
+      code: 'INSUFFICIENT_TOKENS',
+      message: 'You need more tokens to generate images.',
+      currentBalance: imgTokenBal.tokenBalance,
+      action: 'BUY_TOKENS',
     })
     return
   }
 
-  // Generate image
-  const result = await FileProcessingService.generateImage(prompt, size, quality)
+  // Generate image (Gemini first, DALL-E fallback)
+  const result = await FileProcessingService.generateImage(prompt, size, quality, provider)
 
-  // Deduct cost from wallet
-  await prisma.wallet.update({
-    where: { userId: user.id },
-    data: {
-      balance: { decrement: imageCost },
-      totalSpent: { increment: imageCost },
-    },
+  // Token cost: Gemini is cheaper (uses actual token count ~1300), DALL-E flat 1000
+  const imageTokenCost = result.provider === 'gemini' ? 500 : 1000
+  await TokenWalletService.deductTokens({
+    userId: user.id,
+    tokens: imageTokenCost,
+    reference: result.provider === 'gemini' ? 'gemini-2.5-flash-image' : 'dall-e-3',
+    description: `Image generation (${result.provider === 'gemini' ? 'Gemini' : 'DALL-E'})`,
   })
 
-  await prisma.walletTransaction.create({
-    data: {
-      walletId: user.wallet!.id,
-      amount: imageCost,
-      type: 'debit',
-      description: 'DALL-E image generation',
-      reference: 'dall-e-3',
-    },
-  })
-
-  logger.info(`Image generated for user ${user.id}, cost: $${imageCost}`)
+  const providerLabel = result.provider === 'gemini' ? 'Gemini Flash' : 'DALL-E 3'
+  logger.info(`Image generated via ${providerLabel} for user ${user.id}, tokens: ${imageTokenCost}`)
 
   res.json({
     success: true,
     data: {
       imageUrl: result.imageUrl,
       revisedPrompt: result.revisedPrompt,
-      cost: imageCost,
+      tokensUsed: imageTokenCost,
       size: size || '1024x1024',
       quality: quality || 'standard',
+      provider: providerLabel,
     },
     timestamp: new Date().toISOString(),
   })

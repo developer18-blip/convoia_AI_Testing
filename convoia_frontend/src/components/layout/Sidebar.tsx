@@ -1,17 +1,15 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
-  LayoutDashboard, MessageSquare, Bot, Wallet, BarChart3, Zap, Key,
-  Settings, Users, Target, CreditCard, ChevronLeft, ChevronRight,
-  LogOut, Plus, Building2, LineChart, TrendingUp, CheckSquare, Coins, Shield,
+  LayoutDashboard, MessageSquare, Bot, BarChart3, Zap, Key,
+  Settings, Users, Target, ChevronLeft, ChevronRight,
+  LogOut, Plus, Building2, TrendingUp, CheckSquare, Coins, Shield,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
-import { useWallet } from '../../hooks/useWallet'
+import { useTokens } from '../../contexts/TokenContext'
 import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
-import { ProgressBar } from '../ui/ProgressBar'
-import { cn, formatCurrency, formatTokens } from '../../lib/utils'
-import { useDashboard } from '../../hooks/useDashboard'
+import { cn } from '../../lib/utils'
 
 interface SidebarProps {
   collapsed: boolean
@@ -34,11 +32,11 @@ function getNavItems(role: string, hasOrg: boolean): NavItem[] {
 
   const settingsItem: NavItem = { icon: <Settings size={20} />, label: 'Settings', path: '/settings' }
 
-  // Individual/Freelancer (no org)
-  if (!hasOrg) {
+  // Individual/Freelancer (no org OR role='user')
+  if (!hasOrg || role === 'user') {
     return [
       ...base,
-      { icon: <Wallet size={20} />, label: 'Wallet', path: '/wallet' },
+      { icon: <Coins size={20} />, label: 'Buy Tokens', path: '/tokens/buy' },
       { icon: <BarChart3 size={20} />, label: 'Usage', path: '/usage' },
       { icon: <Zap size={20} />, label: 'Sessions', path: '/sessions' },
       { icon: <Key size={20} />, label: 'API Keys', path: '/api-keys' },
@@ -76,7 +74,7 @@ function getNavItems(role: string, hasOrg: boolean): NavItem[] {
       { icon: <Users size={20} />, label: 'Team', path: '/team' },
       { icon: <Coins size={20} />, label: 'Token Pools', path: '/tokens' },
       { icon: <BarChart3 size={20} />, label: 'Analytics', path: '/org/analytics' },
-      { icon: <CreditCard size={20} />, label: 'Billing', path: '/org/billing' },
+      { icon: <Coins size={20} />, label: 'Buy Tokens', path: '/tokens/buy' },
       { icon: <CheckSquare size={20} />, label: 'Tasks', path: '/tasks' },
       settingsItem,
     ]
@@ -99,75 +97,37 @@ function getNavItems(role: string, hasOrg: boolean): NavItem[] {
 }
 
 function SidebarBottomWidget({ role, hasOrg, collapsed }: { role: string; hasOrg: boolean; collapsed: boolean }) {
-  const { wallet, setShowTopUp } = useWallet()
-  const { budget } = useDashboard()
+  const navigate = useNavigate()
+  const { formattedBalance, tokenBalance } = useTokens()
 
   if (collapsed) return null
 
-  // General user / Freelancer — show wallet balance + top up
-  if (!hasOrg) {
-    return (
-      <div style={{ padding: '10px 12px', borderTop: '1px solid var(--chat-border)' }}>
-        <div style={{ background: 'var(--chat-bg)', borderRadius: '14px', padding: '12px', border: '1px solid var(--chat-border)' }}>
-          <div className="flex items-center justify-between" style={{ marginBottom: '8px' }}>
-            <div className="flex items-center gap-2">
-              <div style={{ padding: '4px', background: 'var(--color-primary-light)', borderRadius: '8px' }}>
-                <Wallet size={14} style={{ color: 'var(--color-primary)' }} />
-              </div>
-              <span style={{ fontSize: '13px', fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                {wallet ? formatCurrency(wallet.balance) : '$0.00'}
-              </span>
-            </div>
-          </div>
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setShowTopUp(true)}
-            className="w-full flex items-center justify-center gap-1.5"
-            style={{
-              background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-hover))',
-              color: 'white', fontSize: '12px', fontWeight: 600, padding: '7px 0',
-              borderRadius: '10px', border: 'none', cursor: 'pointer',
-            }}
-          >
-            <Plus size={14} />
-            Top Up
-          </motion.button>
-        </div>
-      </div>
-    )
-  }
-
-  // Employee — show token budget progress (no money)
-  if (role === 'employee') {
-    const currentUsage = Number(budget?.currentUsage ?? 0) || 0
-    const monthlyCap = Number(budget?.monthlyCap ?? 0) || 0
-    const pct = monthlyCap > 0 ? Math.round((currentUsage / monthlyCap) * 100) : 0
-
+  // Employee — show allocated token balance (no buy button)
+  if (hasOrg && role === 'employee') {
     return (
       <div style={{ padding: '10px 12px', borderTop: '1px solid var(--chat-border)' }}>
         <div style={{ background: 'var(--chat-bg)', borderRadius: '14px', padding: '12px', border: '1px solid var(--chat-border)' }}>
           <div className="flex items-center gap-2" style={{ marginBottom: '6px' }}>
-            <Target size={14} style={{ color: pct > 80 ? '#F59E0B' : 'var(--color-primary)' }} />
+            <Target size={14} style={{ color: tokenBalance < 1000 ? '#F59E0B' : '#A78BFA' }} />
             <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-              {formatTokens(currentUsage)} / {formatTokens(monthlyCap)} tokens
+              {formattedBalance} tokens
             </span>
           </div>
-          <ProgressBar value={currentUsage} max={monthlyCap || 1} size="sm" />
+          <span style={{ fontSize: '10px', color: 'var(--color-text-dim)' }}>Allocated by manager</span>
         </div>
       </div>
     )
   }
 
-  // Manager — show team token health
-  if (role === 'manager') {
+  // Manager — show token balance (no buy button)
+  if (hasOrg && role === 'manager') {
     return (
       <div style={{ padding: '10px 12px', borderTop: '1px solid var(--chat-border)' }}>
-        <div style={{ background: 'var(--chat-bg)', borderRadius: '14px', padding: '10px 12px', border: '1px solid var(--chat-border)' }}>
+        <div style={{ background: 'var(--chat-bg)', borderRadius: '14px', padding: '12px', border: '1px solid var(--chat-border)' }}>
           <div className="flex items-center gap-2">
-            <Users size={14} style={{ color: 'var(--color-primary)' }} />
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
-              Team Overview
+            <Users size={14} style={{ color: '#A78BFA' }} />
+            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+              {formattedBalance} tokens
             </span>
           </div>
         </div>
@@ -175,23 +135,7 @@ function SidebarBottomWidget({ role, hasOrg, collapsed }: { role: string; hasOrg
     )
   }
 
-  // Org Owner — show org spend
-  if (role === 'org_owner') {
-    return (
-      <div style={{ padding: '10px 12px', borderTop: '1px solid var(--chat-border)' }}>
-        <div style={{ background: 'var(--chat-bg)', borderRadius: '14px', padding: '10px 12px', border: '1px solid var(--chat-border)' }}>
-          <div className="flex items-center gap-2">
-            <CreditCard size={14} style={{ color: 'var(--color-primary)' }} />
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
-              {wallet ? formatCurrency(wallet.totalSpent || 0) : '$0.00'} this month
-            </span>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Platform Admin — show platform stats
+  // Platform Admin
   if (role === 'platform_admin') {
     return (
       <div style={{ padding: '10px 12px', borderTop: '1px solid var(--chat-border)' }}>
@@ -207,13 +151,39 @@ function SidebarBottomWidget({ role, hasOrg, collapsed }: { role: string; hasOrg
     )
   }
 
-  return null
+  // Default: Freelancer + Org Owner — token balance + buy button
+  return (
+    <div style={{ padding: '10px 12px', borderTop: '1px solid var(--chat-border)' }}>
+      <div style={{ background: 'var(--chat-bg)', borderRadius: '14px', padding: '12px', border: '1px solid var(--chat-border)' }}>
+        <div className="flex items-center gap-2" style={{ marginBottom: '8px' }}>
+          <Zap size={14} style={{ color: '#A78BFA' }} />
+          <span style={{ fontSize: '13px', fontFamily: 'monospace', fontWeight: 700, color: '#A78BFA' }}>
+            {formattedBalance} tokens
+          </span>
+        </div>
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => navigate('/tokens/buy')}
+          className="w-full flex items-center justify-center gap-1.5"
+          style={{
+            background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-hover))',
+            color: 'white', fontSize: '12px', fontWeight: 600, padding: '7px 0',
+            borderRadius: '10px', border: 'none', cursor: 'pointer',
+          }}
+        >
+          <Plus size={14} />
+          Buy Tokens
+        </motion.button>
+      </div>
+    </div>
+  )
 }
 
 export function Sidebar({ collapsed, onToggle, onClose }: SidebarProps) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
-  const role = user?.role || 'employee'
+  const role = user?.role || 'user'
   const hasOrg = !!user?.organizationId
 
   const navItems = getNavItems(role, hasOrg)
@@ -300,11 +270,11 @@ export function Sidebar({ collapsed, onToggle, onClose }: SidebarProps) {
 
       {/* User */}
       <div className={cn('flex items-center gap-3', collapsed && 'justify-center')} style={{ padding: '10px 12px', borderTop: '1px solid var(--chat-border)' }}>
-        {user && <Avatar name={user.name} size="sm" />}
+        {user && <Avatar name={user.name} src={user.avatar} size="sm" />}
         {!collapsed && user && (
           <div className="flex-1 min-w-0">
             <p className="truncate" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-primary)', margin: 0 }}>{user.name}</p>
-            <Badge size="sm" variant="primary">{user.role.replace('_', ' ')}</Badge>
+            <Badge size="sm" variant="primary">{(!hasOrg || role === 'user') ? 'individual' : user.role.replace('_', ' ')}</Badge>
           </div>
         )}
         {!collapsed && (

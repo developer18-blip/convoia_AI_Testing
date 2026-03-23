@@ -11,7 +11,7 @@ import sql from 'react-syntax-highlighter/dist/esm/languages/prism/sql'
 import markdown from 'react-syntax-highlighter/dist/esm/languages/prism/markdown'
 import jsx from 'react-syntax-highlighter/dist/esm/languages/prism/jsx'
 import tsx from 'react-syntax-highlighter/dist/esm/languages/prism/tsx'
-import { Copy, Check, Play } from 'lucide-react'
+import { Copy, Check, Play, PanelRight } from 'lucide-react'
 
 SyntaxHighlighter.registerLanguage('javascript', javascript)
 SyntaxHighlighter.registerLanguage('js', javascript)
@@ -33,11 +33,11 @@ interface CodeBlockProps {
   language?: string
   children: string
   onRun?: () => void
+  onOpenInCanvas?: (code: string, language: string) => void
 }
 
-export function CodeBlock({ language = 'text', children, onRun }: CodeBlockProps) {
+export function CodeBlock({ language = 'text', children, onRun, onOpenInCanvas }: CodeBlockProps) {
   const [copied, setCopied] = useState(false)
-  const [hovered, setHovered] = useState(false)
 
   const handleCopy = () => {
     navigator.clipboard.writeText(children)
@@ -55,8 +55,6 @@ export function CodeBlock({ language = 'text', children, onRun }: CodeBlockProps
   return (
     <div
       style={{ margin: '16px 0', borderRadius: '10px', overflow: 'hidden', border: '1px solid #2a2a2a', backgroundColor: '#1a1a1a' }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
     >
       {/* Header bar — always visible */}
       <div style={{
@@ -71,8 +69,8 @@ export function CodeBlock({ language = 'text', children, onRun }: CodeBlockProps
           </span>
         </div>
 
-        {/* Action buttons — visible on hover */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: hovered ? 1 : 0, transition: 'opacity 150ms ease' }}>
+        {/* Action buttons — always visible */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           {/* Run button — only if onRun provided */}
           {onRun && (
             <button onClick={onRun}
@@ -87,6 +85,23 @@ export function CodeBlock({ language = 'text', children, onRun }: CodeBlockProps
               onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#333'; e.currentTarget.style.color = '#888' }}
             >
               <Play size={11} /> Run
+            </button>
+          )}
+
+          {/* Open in Canvas */}
+          {onOpenInCanvas && (
+            <button onClick={() => onOpenInCanvas(children, displayLang)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '5px',
+                padding: '3px 10px', borderRadius: '5px',
+                backgroundColor: 'transparent', border: '1px solid #333',
+                color: '#888', fontSize: '11.5px', cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                transition: 'all 150ms',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#7C3AED'; e.currentTarget.style.color = '#A78BFA' }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#333'; e.currentTarget.style.color = '#888' }}
+            >
+              <PanelRight size={11} /> Canvas
             </button>
           )}
 

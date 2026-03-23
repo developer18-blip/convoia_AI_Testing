@@ -50,7 +50,7 @@ export function MemberPage() {
       </button>
 
       <div className="flex items-center gap-4">
-        <Avatar name={member.name} size="lg" />
+        <Avatar name={member.name} src={member.avatar} size="lg" />
         <div>
           <h2 className="text-2xl font-semibold text-text-primary">{member.name}</h2>
           <div className="flex items-center gap-2 mt-1">

@@ -8,7 +8,7 @@ import logger from '../config/logger.js';
 export const createInvite = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) throw new AppError('Unauthorized', 401);
 
-  const { email, role } = req.body;
+  const { email, role, tokensAllocated } = req.body;
 
   if (!email?.trim()) {
     throw new AppError('Email is required', 400);
@@ -21,6 +21,11 @@ export const createInvite = asyncHandler(async (req: Request, res: Response) => 
 
   if (!role || !['manager', 'employee'].includes(role)) {
     throw new AppError('Role must be manager or employee', 400);
+  }
+
+  const parsedTokens = tokensAllocated ? parseInt(tokensAllocated, 10) : 0;
+  if (parsedTokens < 0) {
+    throw new AppError('tokensAllocated must be positive', 400);
   }
 
   const user = await prisma.user.findUnique({
@@ -36,6 +41,7 @@ export const createInvite = asyncHandler(async (req: Request, res: Response) => 
     invitedById: user.id,
     email: email.toLowerCase().trim(),
     role,
+    tokensAllocated: parsedTokens || undefined,
   });
 
   const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -55,6 +61,42 @@ export const createInvite = asyncHandler(async (req: Request, res: Response) => 
       status: invite.status,
     },
     message: 'Invite created successfully',
+  });
+});
+
+// ── ACCEPT INVITE (authenticated user) ───────────
+export const acceptInvite = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new AppError('Unauthorized', 401);
+
+  const { token } = req.body;
+  if (!token) throw new AppError('Invite token is required', 400);
+
+  const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
+  if (!user) throw new AppError('User not found', 404);
+
+  if (user.organizationId) {
+    throw new AppError('You are already a member of an organization. Leave it first to join another.', 400);
+  }
+
+  const invite = await InviteService.acceptInvite({
+    token,
+    userId: user.id,
+  });
+
+  // Fetch updated user
+  const updatedUser = await prisma.user.findUnique({
+    where: { id: user.id },
+    include: { organization: true },
+  });
+
+  res.json({
+    success: true,
+    message: `Successfully joined ${invite.organization.name} as ${invite.role}`,
+    data: {
+      organizationId: updatedUser?.organizationId,
+      organizationName: updatedUser?.organization?.name,
+      role: updatedUser?.role,
+    },
   });
 });
 

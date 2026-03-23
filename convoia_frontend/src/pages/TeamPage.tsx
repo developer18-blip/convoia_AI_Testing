@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Users, Activity, DollarSign, UserPlus, Mail, Copy, Check, X,
-  MoreHorizontal, Shield, ArrowRight, Clock, Search, RefreshCw, Trash2,
+  MoreHorizontal, Shield, ArrowRight, Search, RefreshCw, Trash2,
 } from 'lucide-react'
 import { StatCard } from '../components/shared/StatCard'
 import { Card } from '../components/ui/Card'
@@ -18,13 +18,14 @@ import { ErrorState } from '../components/shared/ErrorState'
 import { EmptyState } from '../components/shared/EmptyState'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../hooks/useToast'
-import { formatCurrency, formatNumber, formatTokens, formatRelativeTime } from '../lib/utils'
+import { formatCurrency, formatNumber, formatTokens } from '../lib/utils'
 import api from '../lib/api'
 
 interface TeamMember {
   id: string
   name: string
   email: string
+  avatar?: string | null
   role: string
   isActive: boolean
   joinedAt: string
@@ -377,7 +378,7 @@ export function TeamPage() {
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <Avatar name={m.name} size="sm" />
+                        <Avatar name={m.name} src={m.avatar} size="sm" />
                         <div>
                           <p className="text-sm font-medium text-text-primary">{m.name}</p>
                           <p className="text-xs text-text-muted">{m.email}</p>

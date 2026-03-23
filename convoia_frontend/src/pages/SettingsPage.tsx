@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from 'react'
-import { Lock, Save, LogOut } from 'lucide-react'
+import { useState, useRef, type FormEvent } from 'react'
+import { Lock, Save, LogOut, Upload, Camera, Check } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../hooks/useToast'
 import { Tabs } from '../components/ui/Tabs'
@@ -12,6 +12,11 @@ import { Badge } from '../components/ui/Badge'
 import { Toggle } from '../components/ui/Toggle'
 import { cn, passwordStrength } from '../lib/utils'
 import api from '../lib/api'
+
+const BUILT_IN_AVATARS = Array.from({ length: 12 }, (_, i) => ({
+  id: `avatar-${i + 1}`,
+  src: `/avatars/avatar-${i + 1}.svg`,
+}))
 
 export function SettingsPage() {
   const { user, updateUser } = useAuth()
@@ -27,6 +32,9 @@ export function SettingsPage() {
   const [passwordErrors, setPasswordErrors] = useState<Record<string, string>>({})
   const [isChangingPassword, setIsChangingPassword] = useState(false)
 
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+
   const [showCostEstimates, setShowCostEstimates] = useState(true)
   const [showTokenCounts, setShowTokenCounts] = useState(true)
   const [autoSave, setAutoSave] = useState(true)
@@ -38,6 +46,49 @@ export function SettingsPage() {
       updateUser({ name })
       toast.success('Profile updated')
     } catch { toast.error('Failed to update profile') } finally { setIsSavingProfile(false) }
+  }
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
+      toast.error('Please upload a JPG, PNG, WebP, or GIF image')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be under 5MB')
+      return
+    }
+
+    try {
+      setIsUploadingAvatar(true)
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await api.post('/auth/avatar/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      updateUser({ avatar: res.data.data.avatar })
+      toast.success('Avatar updated!')
+    } catch {
+      toast.error('Failed to upload avatar')
+    } finally {
+      setIsUploadingAvatar(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const handleSelectBuiltIn = async (avatarId: string) => {
+    try {
+      setIsUploadingAvatar(true)
+      const res = await api.post('/auth/avatar/select', { avatarId })
+      updateUser({ avatar: res.data.data.avatar })
+      toast.success('Avatar updated!')
+    } catch {
+      toast.error('Failed to update avatar')
+    } finally {
+      setIsUploadingAvatar(false)
+    }
   }
 
   const handleChangePassword = async (e: FormEvent) => {
@@ -76,20 +127,79 @@ export function SettingsPage() {
       ]} activeTab={tab} onChange={setTab} />
 
       {tab === 'profile' && (
-        <Card padding="lg">
-          <div className="flex items-center gap-4 mb-6">
-            {user && <Avatar name={user.name} size="lg" />}
-            <div>
-              <h3 className="text-lg font-semibold text-text-primary">{user?.name}</h3>
-              <p className="text-sm text-text-muted">{user?.email}</p>
+        <div className="space-y-6">
+          <Card padding="lg">
+            <div className="flex items-start gap-5 mb-6">
+              {/* Avatar with upload overlay */}
+              <div className="relative group">
+                {user && <Avatar name={user.name} src={user.avatar} size="xl" />}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingAvatar}
+                  className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                >
+                  {isUploadingAvatar ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Camera size={20} className="text-white" />
+                  )}
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  onChange={handleAvatarUpload}
+                  className="hidden"
+                />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-text-primary">{user?.name}</h3>
+                <p className="text-sm text-text-muted">{user?.email}</p>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="mt-2 flex items-center gap-1.5 text-xs text-primary hover:text-primary-hover transition-colors"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                >
+                  <Upload size={12} /> Upload photo
+                </button>
+              </div>
             </div>
-          </div>
-          <div className="space-y-4">
-            <Input label="Display Name" value={name} onChange={(e) => setName(e.target.value)} />
-            <Input label="Email" value={user?.email || ''} disabled />
-            <Button onClick={handleSaveProfile} isLoading={isSavingProfile}><Save size={16} /> Save</Button>
-          </div>
-        </Card>
+            <div className="space-y-4">
+              <Input label="Display Name" value={name} onChange={(e) => setName(e.target.value)} />
+              <Input label="Email" value={user?.email || ''} disabled />
+              <Button onClick={handleSaveProfile} isLoading={isSavingProfile}><Save size={16} /> Save</Button>
+            </div>
+          </Card>
+
+          {/* Built-in avatars */}
+          <Card padding="lg">
+            <h3 className="text-sm font-semibold text-text-primary mb-3">Or choose an avatar</h3>
+            <div className="grid grid-cols-6 gap-3">
+              {BUILT_IN_AVATARS.map((avatar) => {
+                const isSelected = user?.avatar === avatar.src
+                return (
+                  <button
+                    key={avatar.id}
+                    onClick={() => handleSelectBuiltIn(avatar.id)}
+                    disabled={isUploadingAvatar}
+                    className={cn(
+                      'relative rounded-xl overflow-hidden border-2 transition-all hover:scale-105',
+                      isSelected ? 'border-primary ring-2 ring-primary/30' : 'border-transparent hover:border-border'
+                    )}
+                    style={{ aspectRatio: '1', background: 'none', cursor: 'pointer', padding: 0 }}
+                  >
+                    <img src={avatar.src} alt={avatar.id} className="w-full h-full" />
+                    {isSelected && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-primary/20">
+                        <Check size={16} className="text-white" />
+                      </div>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </Card>
+        </div>
       )}
 
       {tab === 'security' && (

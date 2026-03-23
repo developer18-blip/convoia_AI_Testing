@@ -99,7 +99,7 @@ export function JoinPage() {
         {/* Actions */}
         <div className="flex gap-3">
           <button
-            onClick={() => navigate('/login')}
+            onClick={() => navigate(`/login?inviteToken=${token}`)}
             className="flex-1 py-3 bg-transparent border border-border rounded-xl text-sm text-text-muted hover:bg-surface-2 transition-colors"
           >
             I have an account

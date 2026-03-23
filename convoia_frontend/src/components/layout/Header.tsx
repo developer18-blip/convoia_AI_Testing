@@ -1,12 +1,11 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Menu, Search, Bell, Wallet, User, Key, LogOut, Sun, Moon } from 'lucide-react'
+import { Menu, Search, Bell, Zap, User, Key, LogOut, Sun, Moon } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useTheme } from '../../hooks/useTheme'
-import { useWallet } from '../../hooks/useWallet'
+import { useTokens } from '../../contexts/TokenContext'
 import { Avatar } from '../ui/Avatar'
 import { Dropdown } from '../ui/Dropdown'
-import { formatCurrency } from '../../lib/utils'
 
 const pageTitles: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -38,7 +37,10 @@ export function Header({ onMenuClick }: HeaderProps) {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
-  const { wallet, setShowTopUp } = useWallet()
+  const { formattedBalance } = useTokens()
+
+  // Only org_owner, freelancers (no org), and platform_admin can buy tokens
+  const canBuyTokens = !user?.organizationId || user?.role === 'org_owner' || user?.role === 'platform_admin'
 
   const title = pageTitles[location.pathname] || 'Convoia AI'
 
@@ -77,10 +79,11 @@ export function Header({ onMenuClick }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-1.5">
+        {/* Token balance — click navigates to buy only for allowed roles */}
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          onClick={() => setShowTopUp(true)}
+          onClick={() => canBuyTokens ? navigate('/tokens/buy') : navigate('/dashboard')}
           className="hidden sm:flex items-center gap-2"
           style={{
             padding: '5px 10px', background: 'var(--chat-hover)', border: '1px solid var(--chat-border)',
@@ -88,10 +91,8 @@ export function Header({ onMenuClick }: HeaderProps) {
             color: 'var(--color-text-primary)', cursor: 'pointer', transition: 'border-color 150ms',
           }}
         >
-          <div style={{ padding: '2px', background: 'var(--color-primary-light)', borderRadius: '4px' }}>
-            <Wallet size={13} style={{ color: 'var(--color-primary)' }} />
-          </div>
-          {wallet ? formatCurrency(wallet.balance) : '$0.00'}
+          <Zap size={13} style={{ color: '#A78BFA' }} />
+          {formattedBalance}
         </motion.button>
 
         <motion.button
@@ -116,7 +117,7 @@ export function Header({ onMenuClick }: HeaderProps) {
           <Dropdown
             trigger={
               <div style={{ padding: '2px', borderRadius: '10px', cursor: 'pointer' }}>
-                <Avatar name={user.name} size="sm" />
+                <Avatar name={user.name} src={user.avatar} size="sm" />
               </div>
             }
             items={[

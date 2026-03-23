@@ -9,6 +9,7 @@ interface AuthContextType {
   isAuthenticated: boolean
   isLoading: boolean
   login: (email: string, password: string) => Promise<void>
+  googleLogin: (idToken: string) => Promise<void>
   register: (data: Record<string, string>) => Promise<void>
   logout: () => void
   updateUser: (updates: Partial<User>) => void
@@ -20,6 +21,7 @@ export const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   isLoading: true,
   login: async () => {},
+  googleLogin: async () => {},
   register: async () => {},
   logout: () => {},
   updateUser: () => {},
@@ -57,7 +59,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
-      const res = await api.post('/auth/login', { email, password })
+      try {
+        const res = await api.post('/auth/login', { email, password })
+        const { token: newToken, refreshToken, user: userData } = res.data.data
+        localStorage.setItem('convoia_token', newToken)
+        localStorage.setItem('convoia_refresh_token', refreshToken)
+        localStorage.setItem('convoia_user', JSON.stringify(userData))
+        setToken(newToken)
+        setUser(userData)
+        redirectByRole(userData.role)
+      } catch (err: any) {
+        // If email not verified, redirect to verification page
+        if (err?.response?.data?.message === 'EMAIL_NOT_VERIFIED') {
+          localStorage.setItem('convoia_pending_email', email)
+          navigate('/verify-email')
+          return
+        }
+        throw err
+      }
+    },
+    [redirectByRole, navigate]
+  )
+
+  const googleLogin = useCallback(
+    async (idToken: string) => {
+      const res = await api.post('/auth/google', { idToken })
       const { token: newToken, refreshToken, user: userData } = res.data.data
       localStorage.setItem('convoia_token', newToken)
       localStorage.setItem('convoia_refresh_token', refreshToken)
@@ -72,7 +98,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = useCallback(
     async (data: Record<string, string>) => {
       const res = await api.post('/auth/register', data)
-      const { token: newToken, refreshToken, user: userData } = res.data.data
+      const { token: newToken, refreshToken, user: userData, requiresVerification } = res.data.data
+
+      if (requiresVerification) {
+        // Store email for verification page, redirect there
+        localStorage.setItem('convoia_pending_email', userData.email)
+        navigate('/verify-email')
+        return
+      }
+
       localStorage.setItem('convoia_token', newToken)
       localStorage.setItem('convoia_refresh_token', refreshToken)
       localStorage.setItem('convoia_user', JSON.stringify(userData))
@@ -80,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(userData)
       redirectByRole(userData.role)
     },
-    [redirectByRole]
+    [redirectByRole, navigate]
   )
 
   const logout = useCallback(() => {
@@ -110,6 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!token,
         isLoading,
         login,
+        googleLogin,
         register,
         logout,
         updateUser,

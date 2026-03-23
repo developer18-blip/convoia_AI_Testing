@@ -1,5 +1,8 @@
 import { Request, Response } from 'express';
+import path from 'path';
+import fs from 'fs';
 import AuthService from '../services/authService.js';
+import prisma from '../config/db.js';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { isValidEmail } from '../utils/validators.js';
 import { sanitizeEmail, validatePasswordStrength } from '../utils/security.js';
@@ -137,6 +140,85 @@ export const updateProfile = asyncHandler(async (req: Request, res: Response) =>
   });
 });
 
+// Helper: check if user's org allows avatar changes for employees/managers
+async function checkAvatarPermission(role: string, orgId: string | null | undefined) {
+  if (!orgId || role === 'org_owner' || role === 'platform_admin' || role === 'user') return;
+  try {
+    const org = await prisma.organization.findUnique({
+      where: { id: orgId },
+    });
+    // allowEmployeeAvatar defaults to true; only block if explicitly false
+    if (org && (org as any).allowEmployeeAvatar === false) {
+      throw new AppError('Your organization does not allow profile picture changes. Contact your owner.', 403);
+    }
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    // If field doesn't exist yet (pre-migration), allow by default
+  }
+}
+
+export const uploadAvatar = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new AppError('Unauthorized', 401);
+  if (!req.file) throw new AppError('No file uploaded', 400);
+
+  await checkAvatarPermission(req.user.role, req.user.organizationId);
+
+  // Move from temp to avatars directory
+  const avatarsDir = path.join(process.cwd(), 'uploads', 'avatars');
+  if (!fs.existsSync(avatarsDir)) fs.mkdirSync(avatarsDir, { recursive: true });
+
+  const ext = path.extname(req.file.originalname).toLowerCase();
+  const filename = `${req.user.userId}${ext}`;
+  const destPath = path.join(avatarsDir, filename);
+
+  // Remove old avatar file if exists
+  const oldFiles = fs.readdirSync(avatarsDir).filter(f => f.startsWith(req.user!.userId));
+  oldFiles.forEach(f => { try { fs.unlinkSync(path.join(avatarsDir, f)); } catch {} });
+
+  fs.renameSync(req.file.path, destPath);
+
+  // Add timestamp to bust browser cache when re-uploading
+  const avatarUrl = `/api/uploads/avatars/${filename}?v=${Date.now()}`;
+
+  await prisma.user.update({
+    where: { id: req.user.userId },
+    data: { avatar: avatarUrl },
+  });
+
+  res.json({
+    success: true,
+    statusCode: 200,
+    message: 'Avatar updated',
+    data: { avatar: avatarUrl },
+    timestamp: new Date().toISOString(),
+  });
+});
+
+export const selectAvatar = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new AppError('Unauthorized', 401);
+
+  await checkAvatarPermission(req.user.role, req.user.organizationId);
+
+  const { avatarId } = req.body;
+  if (!avatarId || typeof avatarId !== 'string') throw new AppError('avatarId is required', 400);
+
+  // Built-in avatars are served from frontend public directory
+  const avatarUrl = `/avatars/${avatarId}.svg`;
+
+  await prisma.user.update({
+    where: { id: req.user.userId },
+    data: { avatar: avatarUrl },
+  });
+
+  res.json({
+    success: true,
+    statusCode: 200,
+    message: 'Avatar updated',
+    data: { avatar: avatarUrl },
+    timestamp: new Date().toISOString(),
+  });
+});
+
 export const changePassword = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) {
     throw new AppError('Unauthorized', 401);
@@ -162,6 +244,64 @@ export const changePassword = asyncHandler(async (req: Request, res: Response) =
     statusCode: 200,
     message: 'Password changed successfully',
     data: null,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+export const verifyEmail = asyncHandler(async (req: Request, res: Response) => {
+  const { email, code } = req.body;
+
+  if (!email || !code) {
+    throw new AppError('Email and verification code are required', 400);
+  }
+
+  if (!/^\d{6}$/.test(code)) {
+    throw new AppError('Verification code must be 6 digits', 400);
+  }
+
+  const result = await AuthService.verifyEmail(email, code);
+
+  res.json({
+    success: true,
+    statusCode: 200,
+    message: 'Email verified successfully',
+    data: result,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+export const resendVerification = asyncHandler(async (req: Request, res: Response) => {
+  const { email } = req.body;
+
+  if (!email) {
+    throw new AppError('Email is required', 400);
+  }
+
+  await AuthService.resendVerificationCode(email);
+
+  res.json({
+    success: true,
+    statusCode: 200,
+    message: 'Verification code sent',
+    data: null,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+export const googleAuth = asyncHandler(async (req: Request, res: Response) => {
+  const { idToken } = req.body;
+
+  if (!idToken) {
+    throw new AppError('Google ID token is required', 400);
+  }
+
+  const result = await AuthService.googleAuth(idToken);
+
+  res.json({
+    success: true,
+    statusCode: 200,
+    message: 'Google authentication successful',
+    data: result,
     timestamp: new Date().toISOString(),
   });
 });

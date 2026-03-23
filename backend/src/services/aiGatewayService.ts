@@ -19,6 +19,7 @@ interface SendMessageParams {
   messages: Array<{ role: string; content: string }>;
   industry?: string;
   agentConfig?: AgentConfig;
+  maxOutputTokens?: number; // Cap output to user's available token balance
 }
 
 interface SendVisionParams {
@@ -29,6 +30,7 @@ interface SendVisionParams {
   imageBase64: string;
   mimeType: string;
   industry?: string;
+  maxOutputTokens?: number;
 }
 
 interface AIResponse {
@@ -83,6 +85,22 @@ function calculateCosts(inputTokens: number, outputTokens: number, aiModel: any)
   return { providerCost, customerPrice, profit };
 }
 
+// ─── Provider output limits (hard caps set by each API) ───
+const PROVIDER_MAX_OUTPUT: Record<string, number> = {
+  openai: 16384,
+  anthropic: 16384,
+  google: 8192,
+  deepseek: 8192,
+  mistral: 8192,
+  groq: 8192,
+};
+
+function clampMaxTokens(provider: string, requested?: number): number {
+  const providerMax = PROVIDER_MAX_OUTPUT[provider] ?? 8192;
+  if (!requested || requested <= 0) return providerMax;
+  return Math.min(requested, providerMax);
+}
+
 // ─── Text-only provider calls ───
 
 interface ProviderOverrides {
@@ -91,14 +109,35 @@ interface ProviderOverrides {
   topP?: number;
 }
 
+// Reasoning models (o-series) reject temperature, top_p, max_tokens, and system role
+const isReasoningModel = (id: string) => /^o\d/.test(id);
+// GPT-5+ models use max_completion_tokens instead of max_tokens
+const usesCompletionTokens = (id: string) => /^(gpt-5|o\d)/.test(id);
+
 async function callOpenAI(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
+  const reasoning = isReasoningModel(modelId);
+
+  // Reasoning models use 'developer' role; standard models use 'system'
+  const systemRole = reasoning ? 'developer' : 'system';
   const body: Record<string, any> = {
     model: modelId,
-    messages: [{ role: 'system', content: systemPrompt }, ...messages],
-    temperature: overrides?.temperature ?? 0.7,
-    max_tokens: overrides?.maxTokens ?? 2000,
+    messages: [{ role: systemRole, content: systemPrompt }, ...messages],
   };
-  if (overrides?.topP != null) body.top_p = overrides.topP;
+
+  if (reasoning) {
+    // o-series: only max_completion_tokens, no temperature/top_p
+    body.max_completion_tokens = overrides?.maxTokens ?? 16384;
+  } else if (usesCompletionTokens(modelId)) {
+    // GPT-5+: uses max_completion_tokens
+    body.max_completion_tokens = overrides?.maxTokens ?? 16384;
+    body.temperature = overrides?.temperature ?? 0.7;
+    if (overrides?.topP != null) body.top_p = overrides.topP;
+  } else {
+    // GPT-4o, GPT-4.1, etc: classic params
+    body.max_tokens = overrides?.maxTokens ?? 16384;
+    body.temperature = overrides?.temperature ?? 0.7;
+    if (overrides?.topP != null) body.top_p = overrides.topP;
+  }
 
   const response = await axios.post(
     'https://api.openai.com/v1/chat/completions',
@@ -118,12 +157,18 @@ async function callOpenAI(modelId: string, messages: any[], systemPrompt: string
 async function callAnthropic(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
   const body: Record<string, any> = {
     model: modelId,
-    max_tokens: overrides?.maxTokens ?? 2000,
+    max_tokens: overrides?.maxTokens ?? 16384,
     system: systemPrompt,
     messages,
-    temperature: overrides?.temperature ?? 0.7,
   };
-  if (overrides?.topP != null) body.top_p = overrides.topP;
+  // Anthropic rejects requests with BOTH temperature AND top_p — use only one
+  if (overrides?.temperature != null) {
+    body.temperature = overrides.temperature;
+  } else if (overrides?.topP != null) {
+    body.top_p = overrides.topP;
+  } else {
+    body.temperature = 0.7;
+  }
 
   const response = await axios.post(
     'https://api.anthropic.com/v1/messages',
@@ -154,7 +199,7 @@ async function callGoogle(modelId: string, messages: any[], systemPrompt: string
       contents,
       generationConfig: {
         temperature: overrides?.temperature ?? 0.7,
-        maxOutputTokens: overrides?.maxTokens ?? 2000,
+        maxOutputTokens: overrides?.maxTokens ?? 16384,
         ...(overrides?.topP != null ? { topP: overrides.topP } : {}),
       },
     },
@@ -175,7 +220,7 @@ async function callGroq(modelId: string, messages: any[], systemPrompt: string, 
     model: modelId,
     messages: [{ role: 'system', content: systemPrompt }, ...messages],
     temperature: overrides?.temperature ?? 0.7,
-    max_tokens: overrides?.maxTokens ?? 2000,
+    max_tokens: overrides?.maxTokens ?? 16384,
   };
   if (overrides?.topP != null) body.top_p = overrides.topP;
 
@@ -199,7 +244,7 @@ async function callMistral(modelId: string, messages: any[], systemPrompt: strin
     model: modelId,
     messages: [{ role: 'system', content: systemPrompt }, ...messages],
     temperature: overrides?.temperature ?? 0.7,
-    max_tokens: overrides?.maxTokens ?? 2000,
+    max_tokens: overrides?.maxTokens ?? 16384,
   };
   if (overrides?.topP != null) body.top_p = overrides.topP;
 
@@ -223,7 +268,7 @@ async function callDeepSeek(modelId: string, messages: any[], systemPrompt: stri
     model: modelId,
     messages: [{ role: 'system', content: systemPrompt }, ...messages],
     temperature: overrides?.temperature ?? 0.7,
-    max_tokens: overrides?.maxTokens ?? 2000,
+    max_tokens: overrides?.maxTokens ?? 16384,
   };
   if (overrides?.topP != null) body.top_p = overrides.topP;
 
@@ -244,22 +289,31 @@ async function callDeepSeek(modelId: string, messages: any[], systemPrompt: stri
 
 // ─── Vision-capable provider calls ───
 
-async function callOpenAIVision(modelId: string, prompt: string, imageBase64: string, mimeType: string, apiKey: string) {
+async function callOpenAIVision(modelId: string, prompt: string, imageBase64: string, mimeType: string, apiKey: string, maxTokens?: number) {
+  const tokenLimit = maxTokens ?? 16384;
+  const body: Record<string, any> = {
+    model: modelId,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}`, detail: 'auto' } },
+          { type: 'text', text: prompt },
+        ],
+      },
+    ],
+  };
+
+  // GPT-5+ and reasoning models use max_completion_tokens
+  if (usesCompletionTokens(modelId) || isReasoningModel(modelId)) {
+    body.max_completion_tokens = tokenLimit;
+  } else {
+    body.max_tokens = tokenLimit;
+  }
+
   const response = await axios.post(
     'https://api.openai.com/v1/chat/completions',
-    {
-      model: modelId,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}`, detail: 'auto' } },
-            { type: 'text', text: prompt },
-          ],
-        },
-      ],
-      max_tokens: 1500,
-    },
+    body,
     axiosConfig({
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
@@ -272,14 +326,14 @@ async function callOpenAIVision(modelId: string, prompt: string, imageBase64: st
   };
 }
 
-async function callAnthropicVision(modelId: string, prompt: string, imageBase64: string, mimeType: string, apiKey: string) {
+async function callAnthropicVision(modelId: string, prompt: string, imageBase64: string, mimeType: string, apiKey: string, maxTokens?: number) {
   // Anthropic vision uses content blocks with image type
   const mediaType = mimeType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
   const response = await axios.post(
     'https://api.anthropic.com/v1/messages',
     {
       model: modelId,
-      max_tokens: 1500,
+      max_tokens: maxTokens ?? 16384,
       messages: [
         {
           role: 'user',
@@ -303,7 +357,7 @@ async function callAnthropicVision(modelId: string, prompt: string, imageBase64:
   };
 }
 
-async function callGoogleVision(modelId: string, prompt: string, imageBase64: string, mimeType: string, apiKey: string) {
+async function callGoogleVision(modelId: string, prompt: string, imageBase64: string, mimeType: string, apiKey: string, maxTokens?: number) {
   const response = await axios.post(
     `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`,
     {
@@ -316,7 +370,7 @@ async function callGoogleVision(modelId: string, prompt: string, imageBase64: st
           ],
         },
       ],
-      generationConfig: { temperature: 0.7, maxOutputTokens: 1500 },
+      generationConfig: { temperature: 0.7, maxOutputTokens: maxTokens ?? 16384 },
     },
     {
       params: { key: apiKey },
@@ -365,21 +419,21 @@ async function routeToProvider(aiModel: any, messages: any[], systemPrompt: stri
   }
 }
 
-async function routeVisionToProvider(aiModel: any, prompt: string, imageBase64: string, mimeType: string) {
+async function routeVisionToProvider(aiModel: any, prompt: string, imageBase64: string, mimeType: string, maxTokens?: number) {
   const { provider, modelId } = aiModel;
 
   switch (provider) {
     case 'openai':
       if (!config.apiKeys.openai) throw new AppError('OpenAI API key not configured', 500);
-      return await callOpenAIVision(modelId, prompt, imageBase64, mimeType, config.apiKeys.openai);
+      return await callOpenAIVision(modelId, prompt, imageBase64, mimeType, config.apiKeys.openai, maxTokens);
 
     case 'anthropic':
       if (!config.apiKeys.anthropic) throw new AppError('Anthropic API key not configured', 500);
-      return await callAnthropicVision(modelId, prompt, imageBase64, mimeType, config.apiKeys.anthropic);
+      return await callAnthropicVision(modelId, prompt, imageBase64, mimeType, config.apiKeys.anthropic, maxTokens);
 
     case 'google':
       if (!config.apiKeys.google) throw new AppError('Google API key not configured', 500);
-      return await callGoogleVision(modelId, prompt, imageBase64, mimeType, config.apiKeys.google);
+      return await callGoogleVision(modelId, prompt, imageBase64, mimeType, config.apiKeys.google, maxTokens);
 
     default:
       // Groq, Mistral, DeepSeek don't have vision — find best available vision model
@@ -408,10 +462,288 @@ async function findFallbackModel(excludeProvider: string) {
   });
 }
 
+// ─── Streaming provider calls (SSE) ───
+
+interface StreamCallbacks {
+  onChunk: (text: string) => void;
+  onDone: (inputTokens: number, outputTokens: number) => void;
+  onError: (error: Error) => void;
+}
+
+function callOpenAIStream(
+  modelId: string, messages: any[], systemPrompt: string,
+  apiKey: string, callbacks: StreamCallbacks, overrides?: ProviderOverrides
+): Promise<void> {
+  const reasoning = isReasoningModel(modelId);
+  const systemRole = reasoning ? 'developer' : 'system';
+
+  const body: Record<string, any> = {
+    model: modelId,
+    messages: [{ role: systemRole, content: systemPrompt }, ...messages],
+    stream: true,
+    stream_options: { include_usage: true },
+  };
+
+  if (reasoning) {
+    body.max_completion_tokens = overrides?.maxTokens ?? 16384;
+  } else if (usesCompletionTokens(modelId)) {
+    body.max_completion_tokens = overrides?.maxTokens ?? 16384;
+    body.temperature = overrides?.temperature ?? 0.7;
+    if (overrides?.topP != null) body.top_p = overrides.topP;
+  } else {
+    body.max_tokens = overrides?.maxTokens ?? 16384;
+    body.temperature = overrides?.temperature ?? 0.7;
+    if (overrides?.topP != null) body.top_p = overrides.topP;
+  }
+
+  return new Promise(async (resolve, reject) => {
+    try {
+      const response = await axios.post(
+        'https://api.openai.com/v1/chat/completions',
+        body,
+        {
+          headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+          timeout: config.aiRequestTimeout,
+          responseType: 'stream',
+        }
+      );
+
+      let inputTokens = 0, outputTokens = 0;
+      let buffer = '';
+
+      response.data.on('data', (chunk: Buffer) => {
+        buffer += chunk.toString();
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed === 'data: [DONE]') continue;
+          if (!trimmed.startsWith('data: ')) continue;
+          try {
+            const json = JSON.parse(trimmed.slice(6));
+            const delta = json.choices?.[0]?.delta?.content;
+            if (delta) callbacks.onChunk(delta);
+            if (json.usage) {
+              inputTokens = json.usage.prompt_tokens || 0;
+              outputTokens = json.usage.completion_tokens || 0;
+            }
+          } catch { /* skip malformed chunks */ }
+        }
+      });
+
+      response.data.on('end', () => {
+        callbacks.onDone(inputTokens, outputTokens);
+        resolve();
+      });
+      response.data.on('error', (err: Error) => {
+        callbacks.onError(err);
+        reject(err);
+      });
+    } catch (err: any) {
+      callbacks.onError(err);
+      reject(err);
+    }
+  });
+}
+
+function callAnthropicStream(
+  modelId: string, messages: any[], systemPrompt: string,
+  apiKey: string, callbacks: StreamCallbacks, overrides?: ProviderOverrides
+): Promise<void> {
+  const body: Record<string, any> = {
+    model: modelId,
+    max_tokens: overrides?.maxTokens ?? 16384,
+    system: systemPrompt,
+    messages,
+    stream: true,
+  };
+  // Anthropic rejects requests with BOTH temperature AND top_p — use only one
+  if (overrides?.temperature != null) {
+    body.temperature = overrides.temperature;
+  } else if (overrides?.topP != null) {
+    body.top_p = overrides.topP;
+  } else {
+    body.temperature = 0.7;
+  }
+
+  return new Promise(async (resolve, reject) => {
+    try {
+      const response = await axios.post(
+        'https://api.anthropic.com/v1/messages',
+        body,
+        {
+          headers: {
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+            'Content-Type': 'application/json',
+          },
+          timeout: config.aiRequestTimeout,
+          responseType: 'stream',
+        }
+      );
+
+      let inputTokens = 0, outputTokens = 0;
+      let buffer = '';
+
+      response.data.on('data', (chunk: Buffer) => {
+        buffer += chunk.toString();
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data: ')) continue;
+          try {
+            const json = JSON.parse(trimmed.slice(6));
+            if (json.type === 'content_block_delta' && json.delta?.text) {
+              callbacks.onChunk(json.delta.text);
+            }
+            if (json.type === 'message_start' && json.message?.usage) {
+              inputTokens = json.message.usage.input_tokens || 0;
+            }
+            if (json.type === 'message_delta' && json.usage) {
+              outputTokens = json.usage.output_tokens || 0;
+            }
+          } catch { /* skip */ }
+        }
+      });
+
+      response.data.on('end', () => {
+        callbacks.onDone(inputTokens, outputTokens);
+        resolve();
+      });
+      response.data.on('error', (err: Error) => {
+        callbacks.onError(err);
+        reject(err);
+      });
+    } catch (err: any) {
+      callbacks.onError(err);
+      reject(err);
+    }
+  });
+}
+
+// Generic OpenAI-compatible streaming (Groq, Mistral, DeepSeek)
+function callOpenAICompatibleStream(
+  url: string, modelId: string, messages: any[], systemPrompt: string,
+  apiKey: string, callbacks: StreamCallbacks, overrides?: ProviderOverrides
+): Promise<void> {
+  const body: Record<string, any> = {
+    model: modelId,
+    messages: [{ role: 'system', content: systemPrompt }, ...messages],
+    temperature: overrides?.temperature ?? 0.7,
+    max_tokens: overrides?.maxTokens ?? 16384,
+    stream: true,
+    stream_options: { include_usage: true },
+  };
+  if (overrides?.topP != null) body.top_p = overrides.topP;
+
+  return new Promise(async (resolve, reject) => {
+    try {
+      const response = await axios.post(url, body, {
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        timeout: config.aiRequestTimeout,
+        responseType: 'stream',
+      });
+
+      let inputTokens = 0, outputTokens = 0;
+      let buffer = '';
+
+      response.data.on('data', (chunk: Buffer) => {
+        buffer += chunk.toString();
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed === 'data: [DONE]') continue;
+          if (!trimmed.startsWith('data: ')) continue;
+          try {
+            const json = JSON.parse(trimmed.slice(6));
+            const delta = json.choices?.[0]?.delta?.content;
+            if (delta) callbacks.onChunk(delta);
+            if (json.usage) {
+              inputTokens = json.usage.prompt_tokens || 0;
+              outputTokens = json.usage.completion_tokens || 0;
+            }
+          } catch { /* skip */ }
+        }
+      });
+
+      response.data.on('end', () => {
+        callbacks.onDone(inputTokens, outputTokens);
+        resolve();
+      });
+      response.data.on('error', (err: Error) => {
+        callbacks.onError(err);
+        reject(err);
+      });
+    } catch (err: any) {
+      callbacks.onError(err);
+      reject(err);
+    }
+  });
+}
+
+async function routeToProviderStream(
+  aiModel: any, messages: any[], systemPrompt: string,
+  callbacks: StreamCallbacks, overrides?: ProviderOverrides
+) {
+  const { provider, modelId } = aiModel;
+
+  switch (provider) {
+    case 'openai':
+      if (!config.apiKeys.openai) throw new AppError('OpenAI API key not configured', 500);
+      return callOpenAIStream(modelId, messages, systemPrompt, config.apiKeys.openai, callbacks, overrides);
+
+    case 'anthropic':
+      if (!config.apiKeys.anthropic) throw new AppError('Anthropic API key not configured', 500);
+      return callAnthropicStream(modelId, messages, systemPrompt, config.apiKeys.anthropic, callbacks, overrides);
+
+    case 'groq':
+      if (!config.apiKeys.groq) throw new AppError('Groq API key not configured', 500);
+      return callOpenAICompatibleStream(
+        'https://api.groq.com/openai/v1/chat/completions',
+        modelId, messages, systemPrompt, config.apiKeys.groq, callbacks, overrides
+      );
+
+    case 'mistral':
+      if (!config.apiKeys.mistral) throw new AppError('Mistral API key not configured', 500);
+      return callOpenAICompatibleStream(
+        'https://api.mistral.ai/v1/chat/completions',
+        modelId, messages, systemPrompt, config.apiKeys.mistral, callbacks, overrides
+      );
+
+    case 'deepseek':
+      if (!config.apiKeys.deepseek) throw new AppError('DeepSeek API key not configured', 500);
+      return callOpenAICompatibleStream(
+        'https://api.deepseek.com/v1/chat/completions',
+        modelId, messages, systemPrompt, config.apiKeys.deepseek, callbacks, overrides
+      );
+
+    case 'google':
+      // Google Gemini streaming uses a different format; fall back to non-streaming
+      // and emit the full response as a single chunk
+      if (!config.apiKeys.google) throw new AppError('Google API key not configured', 500);
+      try {
+        const result = await callGoogle(modelId, messages, systemPrompt, config.apiKeys.google, overrides);
+        callbacks.onChunk(result.response);
+        callbacks.onDone(result.inputTokens, result.outputTokens);
+      } catch (err: any) {
+        callbacks.onError(err);
+      }
+      return;
+
+    default:
+      throw new AppError(`Unsupported provider for streaming: ${provider}`, 400);
+  }
+}
+
 export class AIGatewayService {
   // ─── Text message routing ───
   static async sendMessage(params: SendMessageParams): Promise<AIResponse> {
-    const { modelId, messages, industry, agentConfig } = params;
+    const { modelId, messages, industry, agentConfig, maxOutputTokens } = params;
 
     const aiModel = await prisma.aIModel.findUnique({
       where: { id: modelId },
@@ -427,9 +759,22 @@ export class AIGatewayService {
 
     // Use agent's system prompt if available, otherwise default
     const systemPrompt = agentConfig?.systemPrompt || getSystemPrompt(industry);
-    const overrides: ProviderOverrides | undefined = agentConfig
-      ? { temperature: agentConfig.temperature, maxTokens: agentConfig.maxTokens, topP: agentConfig.topP }
-      : undefined;
+
+    // Determine max output tokens: smallest of agent config, user's balance cap, and provider limit
+    let effectiveMaxTokens = agentConfig?.maxTokens;
+    if (maxOutputTokens && maxOutputTokens > 0) {
+      effectiveMaxTokens = effectiveMaxTokens
+        ? Math.min(effectiveMaxTokens, maxOutputTokens)
+        : maxOutputTokens;
+    }
+    // Clamp to provider's hard limit (e.g. Anthropic max 16384)
+    effectiveMaxTokens = clampMaxTokens(aiModel.provider, effectiveMaxTokens);
+
+    const overrides: ProviderOverrides | undefined = {
+      temperature: agentConfig?.temperature,
+      maxTokens: effectiveMaxTokens,
+      topP: agentConfig?.topP,
+    };
     let result;
     let fallbackUsed = false;
     let fallbackReason;
@@ -523,9 +868,42 @@ export class AIGatewayService {
     };
   }
 
+  // ─── Streaming text message ───
+  static async sendMessageStream(
+    params: SendMessageParams,
+    callbacks: StreamCallbacks
+  ): Promise<{ aiModel: any; overrides?: ProviderOverrides }> {
+    const { modelId, messages, industry, agentConfig, maxOutputTokens } = params;
+
+    const aiModel = await prisma.aIModel.findUnique({ where: { id: modelId } });
+    if (!aiModel) throw new AppError('AI Model not found', 404);
+    if (!aiModel.isActive) throw new AppError('This model is currently unavailable', 400);
+
+    const systemPrompt = agentConfig?.systemPrompt || getSystemPrompt(industry);
+
+    // Cap output tokens to user's balance AND provider's hard limit
+    let effectiveMaxTokens = agentConfig?.maxTokens;
+    if (maxOutputTokens && maxOutputTokens > 0) {
+      effectiveMaxTokens = effectiveMaxTokens
+        ? Math.min(effectiveMaxTokens, maxOutputTokens)
+        : maxOutputTokens;
+    }
+    effectiveMaxTokens = clampMaxTokens(aiModel.provider, effectiveMaxTokens);
+
+    const overrides: ProviderOverrides = {
+      temperature: agentConfig?.temperature,
+      maxTokens: effectiveMaxTokens,
+      topP: agentConfig?.topP,
+    };
+
+    await routeToProviderStream(aiModel, messages, systemPrompt, callbacks, overrides);
+
+    return { aiModel, overrides };
+  }
+
   // ─── Vision message routing (image analysis) ───
   static async sendVisionMessage(params: SendVisionParams): Promise<AIResponse> {
-    const { modelId, prompt, imageBase64, mimeType } = params;
+    const { modelId, prompt, imageBase64, mimeType, maxOutputTokens } = params;
 
     // Look up the user-selected model
     let aiModel = await prisma.aIModel.findUnique({
@@ -579,7 +957,7 @@ export class AIGatewayService {
     // Try the vision call
     let result;
     try {
-      result = await routeVisionToProvider(visionModel, prompt, imageBase64, mimeType);
+      result = await routeVisionToProvider(visionModel, prompt, imageBase64, mimeType, maxOutputTokens);
 
       // If routeVisionToProvider returned null (shouldn't happen after our check, but safety)
       if (!result) {
@@ -614,7 +992,7 @@ export class AIGatewayService {
           throw new AppError(`Image analysis failed: ${reason}. No other vision provider available.`, status || 503);
         }
 
-        result = await routeVisionToProvider(otherVisionModel, prompt, imageBase64, mimeType);
+        result = await routeVisionToProvider(otherVisionModel, prompt, imageBase64, mimeType, maxOutputTokens);
         if (!result) {
           throw new AppError('Vision fallback routing failed', 500);
         }

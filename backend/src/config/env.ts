@@ -47,6 +47,10 @@ export const config = {
     groq: process.env.GROQ_API_KEY,
   },
 
+  // Google OAuth
+  googleClientId: process.env.GOOGLE_CLIENT_ID,
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
+
   // Stripe
   stripeSecretKey: process.env.STRIPE_SECRET_KEY,
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,

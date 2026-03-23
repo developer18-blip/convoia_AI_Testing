@@ -6,7 +6,7 @@ import { Card } from '../../../components/ui/Card'
 import { Avatar } from '../../../components/ui/Avatar'
 import { Badge } from '../../../components/ui/Badge'
 import { ProgressBar } from '../../../components/ui/ProgressBar'
-import { formatNumber, formatTokens, formatRelativeTime, getGreeting } from '../../../lib/utils'
+import { formatNumber, formatTokens, getGreeting } from '../../../lib/utils'
 import api from '../../../lib/api'
 import type { DashboardStats } from '../../../types'
 
@@ -14,6 +14,7 @@ interface TeamMember {
   id: string
   name: string
   email?: string
+  avatar?: string | null
   role: string
   queries: number
   cost: number
@@ -143,7 +144,7 @@ export function ManagerView({ stats, userName, orgName }: ManagerViewProps) {
               return (
                 <div key={m.id} onClick={() => navigate(`/team/${m.id}`)} className="px-5 py-3 grid grid-cols-12 gap-2 items-center hover:bg-surface-2 transition-colors cursor-pointer">
                   <div className="col-span-4 flex items-center gap-2 min-w-0">
-                    <Avatar name={m.name} size="sm" />
+                    <Avatar name={m.name} src={m.avatar} size="sm" />
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-text-primary truncate">{m.name}</p>
                       <p className="text-[10px] text-text-muted">{m.role?.replace('_', ' ')}</p>
