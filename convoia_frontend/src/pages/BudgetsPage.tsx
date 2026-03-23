@@ -35,7 +35,7 @@ export function BudgetsPage() {
         api.get('/budget/team'),
       ])
       if (budgetRes.status === 'fulfilled') setMyBudget(budgetRes.value.data.data)
-      if (membersRes.status === 'fulfilled') setMembers(membersRes.value.data.data || [])
+      if (membersRes.status === 'fulfilled') setMembers(membersRes.value.data.data?.budgets || [])
     } catch { setError('Failed to load budgets') } finally { setIsLoading(false) }
   }
 

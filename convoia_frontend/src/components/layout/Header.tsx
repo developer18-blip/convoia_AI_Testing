@@ -87,7 +87,7 @@ export function Header({ onMenuClick }: HeaderProps) {
         api.get('/notifications?limit=10'),
         api.get('/notifications/count'),
       ])
-      setNotifications(notifRes.data.data || [])
+      setNotifications(notifRes.data.data?.notifications || [])
       setUnreadCount(countRes.data.data?.unreadCount || 0)
     } catch {
       // silently fail

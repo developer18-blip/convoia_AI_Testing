@@ -18,6 +18,7 @@ router.use(authMiddleware);
 // Set budget for a user
 router.post('/set/:userId', apiLimiter, setBudget);
 router.post('/set', apiLimiter, setBudget);
+router.put('/set', apiLimiter, setBudget);
 
 // Get current user's budget status (dashboard)
 router.get('/status', getBudgetStatus);
@@ -25,6 +26,15 @@ router.get('/status', getBudgetStatus);
 // Check budget for a specific user
 router.get('/check/:userId', checkBudget);
 router.get('/check', checkBudget);
+
+// Get team budgets for current user's organization
+router.get('/team', async (req, res, next) => {
+  if (!req.user?.organizationId) {
+    return res.json({ success: true, data: [] });
+  }
+  (req.params as any).orgId = req.user.organizationId;
+  return getOrgBudgets(req, res, next);
+});
 
 // Get all budgets for an organization (manager+)
 router.get('/org/:orgId', getOrgBudgets);

@@ -28,6 +28,7 @@ const SessionsPage = lazy(() => import('./pages/SessionsPage'))
 const TeamPage = lazy(() => import('./pages/TeamPage'))
 const MemberPage = lazy(() => import('./pages/MemberPage'))
 const BudgetsPage = lazy(() => import('./pages/BudgetsPage'))
+const TasksPage = lazy(() => import('./pages/TasksPage'))
 const OrgPage = lazy(() => import('./pages/OrgPage'))
 const OrgBillingPage = lazy(() => import('./pages/OrgBillingPage'))
 const OrgAnalyticsPage = lazy(() => import('./pages/OrgAnalyticsPage'))
@@ -163,7 +164,7 @@ function AppRoutes() {
 
           {/* Budget page — employees can see their own */}
           <Route path="/budget" element={<BudgetsPage />} />
-          <Route path="/tasks" element={<BudgetsPage />} />
+          <Route path="/tasks" element={<TasksPage />} />
 
           {/* Manager+ */}
           <Route element={<RoleGuard allowedRoles={['manager', 'org_owner', 'platform_admin']} />}>

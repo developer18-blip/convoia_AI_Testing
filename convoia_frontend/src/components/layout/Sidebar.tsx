@@ -38,7 +38,6 @@ function getNavItems(role: string, hasOrg: boolean): NavItem[] {
       ...base,
       { icon: <Coins size={20} />, label: 'Buy Tokens', path: '/tokens/buy' },
       { icon: <BarChart3 size={20} />, label: 'Usage', path: '/usage' },
-      { icon: <Zap size={20} />, label: 'Sessions', path: '/sessions' },
       { icon: <Key size={20} />, label: 'API Keys', path: '/api-keys' },
       settingsItem,
     ]
