@@ -3,6 +3,7 @@ import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { StripeService, stripe } from '../services/stripeService.js';
 import { TOKEN_PACKAGES } from '../config/tokenPackages.js';
 import { TokenWalletService } from '../services/tokenWalletService.js';
+import { NotificationService } from '../services/notificationService.js';
 import prisma from '../config/db.js';
 import logger from '../config/logger.js';
 
@@ -171,6 +172,9 @@ export const verifyAndCreditSession = asyncHandler(
         description: `Purchased ${packageName} (${TokenWalletService.formatTokens(tokens)} tokens)`,
         organizationId,
       });
+
+      // Notify user of purchase (fire and forget)
+      NotificationService.onTokenPurchase(req.user.userId, tokens).catch(() => {});
 
       await prisma.billingRecord.create({
         data: {

@@ -5,6 +5,7 @@ import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { afterQueryMiddleware, estimateCost } from '../middleware/tokenTracker.js';
 import { getOrCreatePersonalOrg } from '../utils/orgHelper.js';
 import { TokenWalletService } from '../services/tokenWalletService.js';
+import { NotificationService } from '../services/notificationService.js';
 import logger from '../config/logger.js';
 
 // Image-only models that cannot handle chat/streaming
@@ -149,6 +150,12 @@ export const queryAI = asyncHandler(async (req: Request, res: Response) => {
     reference: aiResponse.aiModel.id,
     description: `Query: ${aiResponse.aiModel.name}`,
   });
+
+  // Check for low balance and notify (fire and forget)
+  const balAfter = await TokenWalletService.getBalance(user.id);
+  if (balAfter.tokenBalance > 0 && balAfter.tokenBalance < 5000) {
+    NotificationService.onLowBalance(user.id, balAfter.tokenBalance).catch(() => {});
+  }
 
   logger.info(
     `Query complete — User: ${user.id}, Model: ${aiResponse.aiModel.name}, Tokens: ${aiResponse.totalTokens}`

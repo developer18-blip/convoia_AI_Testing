@@ -6,6 +6,7 @@ import logger from '../config/logger.js';
 import { RegisterRequest, LoginRequest, AuthResponse } from '../types/index.js';
 import { InviteService } from './inviteService.js';
 import { EmailService } from './emailService.js';
+import { NotificationService } from './notificationService.js';
 import { OAuth2Client } from 'google-auth-library';
 import config from '../config/env.js';
 
@@ -158,6 +159,9 @@ export class AuthService {
         organizationId: finalUser.organizationId || undefined,
         role: finalUser.role,
       });
+
+      // Send welcome notification (fire and forget)
+      NotificationService.onWelcome(finalUser.id, finalUser.name).catch(() => {});
 
       // Return with JWT — skip verification
       return {
@@ -415,6 +419,9 @@ export class AuthService {
       }
 
       logger.info(`User logged in: ${user.email}`);
+
+      // Send login notification (fire and forget)
+      NotificationService.onLogin(user.id, user.name).catch(() => {});
 
       const token = generateToken({
         userId: user.id,

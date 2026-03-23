@@ -287,46 +287,6 @@ export function TokenStorePage() {
         </div>
       </div>
 
-      {/* Dev-only test — hidden in production builds */}
-      {import.meta.env.DEV && (
-        <details style={{ marginTop: '40px' }}>
-          <summary style={{ color: '#555', fontSize: '11px', cursor: 'pointer', userSelect: 'none' }}>
-            Developer Tools
-          </summary>
-          <div style={{
-            marginTop: '8px', padding: '16px',
-            backgroundColor: '#1A1A2E', border: '1px dashed #3D3D5C', borderRadius: '12px',
-          }}>
-            <p style={{ color: '#666', fontSize: '11px', marginBottom: '10px' }}>
-              Test token addition (bypasses Stripe, dev only)
-            </p>
-            <div className="flex gap-2">
-              {[100000, 1000000, 5000000].map(amt => (
-                <button
-                  key={amt}
-                  onClick={async () => {
-                    try {
-                      await api.post('/token-wallet/dev-add', { tokens: amt })
-                      toast.success(`${fmtTokens(amt)} test tokens added!`)
-                      refresh()
-                      window.dispatchEvent(new Event('tokens:refresh'))
-                    } catch (err: any) {
-                      console.error('[DevAdd] Error:', err.response?.data || err.message)
-                      toast.error(err.response?.data?.message || 'Failed')
-                    }
-                  }}
-                  style={{
-                    padding: '6px 12px', backgroundColor: '#2D2D3F', border: '1px solid #3D3D5C',
-                    borderRadius: '6px', color: '#888', cursor: 'pointer', fontSize: '11px',
-                  }}
-                >
-                  + {fmtTokens(amt)}
-                </button>
-              ))}
-            </div>
-          </div>
-        </details>
-      )}
     </div>
   )
 }
