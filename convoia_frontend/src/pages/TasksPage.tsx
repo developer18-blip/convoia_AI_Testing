@@ -352,111 +352,192 @@ function TaskDetailModal({ task, isManager, comment, setComment, onClose, onStat
   const isCreator = task.createdBy?.id === user?.id
   const isAssignee = task.assignedTo?.id === user?.id
 
+  // Progress stepper
+  const steps = ['pending', 'in_progress', 'completed']
+  const currentStep = task.status === 'cancelled' ? -1 : steps.indexOf(task.status)
+  const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'completed'
+
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)' }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--chat-bg)', borderRadius: '16px', border: '1px solid var(--chat-border)', width: '540px', maxHeight: '90vh', overflow: 'auto', padding: '24px' }}>
-        {/* Header */}
-        <div className="flex items-start justify-between" style={{ marginBottom: '16px' }}>
-          <div style={{ flex: 1 }}>
-            <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-primary)', margin: 0 }}>{task.title}</h3>
-            <div className="flex items-center gap-2" style={{ marginTop: '8px' }}>
-              <Badge size="sm" style={{ background: `${sc.color}20`, color: sc.color }}>{sc.label}</Badge>
-              <Badge size="sm" style={{ background: `${priorityColors[task.priority]}20`, color: priorityColors[task.priority] }}>{task.priority}</Badge>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--chat-bg)', borderRadius: '20px', border: '1px solid var(--chat-border)', width: '580px', maxHeight: '90vh', overflow: 'auto', boxShadow: '0 24px 48px rgba(0,0,0,0.4)' }}>
+        {/* Color accent bar */}
+        <div style={{ height: '4px', background: `linear-gradient(90deg, ${sc.color}, ${priorityColors[task.priority]})`, borderRadius: '20px 20px 0 0' }} />
+
+        <div style={{ padding: '24px' }}>
+          {/* Header */}
+          <div className="flex items-start justify-between" style={{ marginBottom: '20px' }}>
+            <div style={{ flex: 1 }}>
+              <h3 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0, lineHeight: 1.3 }}>{task.title}</h3>
+              <div className="flex items-center gap-2 flex-wrap" style={{ marginTop: '10px' }}>
+                <Badge size="sm" style={{ background: `${sc.color}15`, color: sc.color, border: `1px solid ${sc.color}30`, fontWeight: 600 }}>{sc.label}</Badge>
+                <Badge size="sm" style={{ background: `${priorityColors[task.priority]}15`, color: priorityColors[task.priority], border: `1px solid ${priorityColors[task.priority]}30` }}>{task.priority} priority</Badge>
+                {isOverdue && <Badge size="sm" style={{ background: '#EF444415', color: '#EF4444', border: '1px solid #EF444430' }}>Overdue</Badge>}
+              </div>
+            </div>
+            <button onClick={onClose} style={{ background: 'var(--chat-hover)', border: '1px solid var(--chat-border)', color: 'var(--color-text-muted)', cursor: 'pointer', borderRadius: '10px', padding: '6px' }}><X size={16} /></button>
+          </div>
+
+          {/* Progress Stepper */}
+          {task.status !== 'cancelled' && (
+            <div style={{ marginBottom: '20px', padding: '16px', background: 'var(--chat-hover)', borderRadius: '14px' }}>
+              <div className="flex items-center justify-between" style={{ position: 'relative' }}>
+                {/* Progress line */}
+                <div style={{ position: 'absolute', top: '14px', left: '28px', right: '28px', height: '3px', background: 'var(--chat-border)', borderRadius: '2px' }} />
+                <div style={{ position: 'absolute', top: '14px', left: '28px', height: '3px', background: 'var(--color-primary)', borderRadius: '2px', width: `${Math.max(0, currentStep) * 50}%`, transition: 'width 0.5s ease' }} />
+                {steps.map((step, i) => {
+                  const done = i <= currentStep
+                  const active = i === currentStep
+                  return (
+                    <div key={step} className="flex flex-col items-center" style={{ position: 'relative', zIndex: 1 }}>
+                      <div style={{
+                        width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: done ? 'var(--color-primary)' : 'var(--chat-bg)',
+                        border: `2px solid ${done ? 'var(--color-primary)' : 'var(--chat-border)'}`,
+                        boxShadow: active ? '0 0 0 4px rgba(124, 58, 237, 0.2)' : 'none',
+                        transition: 'all 0.3s ease',
+                      }}>
+                        {done ? <CheckCircle2 size={14} style={{ color: 'white' }} /> : <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--chat-border)' }} />}
+                      </div>
+                      <span style={{ fontSize: '10px', color: done ? 'var(--color-primary)' : 'var(--color-text-dim)', marginTop: '6px', fontWeight: active ? 700 : 400 }}>
+                        {step === 'pending' ? 'Assigned' : step === 'in_progress' ? 'In Progress' : 'Completed'}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Description */}
+          {task.description && (
+            <div style={{ marginBottom: '16px', padding: '14px', background: 'var(--chat-hover)', borderRadius: '12px', borderLeft: `3px solid ${sc.color}` }}>
+              <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: 1.7, margin: 0 }}>{task.description}</p>
+            </div>
+          )}
+
+          {/* Info Grid */}
+          <div className="grid grid-cols-2 gap-3" style={{ marginBottom: '20px' }}>
+            {[
+              { label: 'Created by', value: task.createdBy?.name, sub: task.createdBy?.role?.replace('_', ' ') },
+              { label: 'Assigned to', value: task.assignedTo?.name, sub: task.assignedTo?.role?.replace('_', ' ') },
+              { label: 'Created', value: new Date(task.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) },
+              { label: 'Due date', value: task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'No deadline', highlight: isOverdue },
+            ].map((item, i) => (
+              <div key={i} style={{ padding: '12px', background: 'var(--chat-hover)', borderRadius: '12px', border: (item as any).highlight ? '1px solid #EF444440' : '1px solid transparent' }}>
+                <p style={{ fontSize: '10px', color: 'var(--color-text-dim)', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{item.label}</p>
+                <p style={{ fontSize: '14px', fontWeight: 600, color: (item as any).highlight ? '#EF4444' : 'var(--color-text-primary)', margin: 0 }}>{item.value}</p>
+                {(item as any).sub && <p style={{ fontSize: '10px', color: 'var(--color-text-dim)', margin: '2px 0 0' }}>{(item as any).sub}</p>}
+              </div>
+            ))}
+          </div>
+
+          {/* Action Buttons — prominent and clear */}
+          {(isAssignee || isManager) && task.status !== 'completed' && task.status !== 'cancelled' && (
+            <div style={{ marginBottom: '20px', padding: '16px', background: 'linear-gradient(135deg, rgba(124,58,237,0.05), rgba(59,130,246,0.05))', borderRadius: '14px', border: '1px solid var(--chat-border)' }}>
+              <p style={{ fontSize: '11px', color: 'var(--color-text-dim)', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Actions</p>
+              <div className="flex gap-2 flex-wrap">
+                {/* Accept / Start Working */}
+                {task.status === 'pending' && isAssignee && (
+                  <button onClick={() => onStatusChange(task.id, 'in_progress')} style={{ ...actionBtnNew('#10B981'), flex: 1 }}>
+                    <CheckCircle2 size={15} /> Accept & Start
+                  </button>
+                )}
+                {task.status === 'pending' && isAssignee && (
+                  <button onClick={() => onStatusChange(task.id, 'cancelled')} style={{ ...actionBtnNew('#EF4444'), flex: 1 }}>
+                    <X size={15} /> Decline
+                  </button>
+                )}
+                {task.status === 'pending' && isManager && !isAssignee && (
+                  <button onClick={() => onStatusChange(task.id, 'in_progress')} style={{ ...actionBtnNew('#3B82F6'), flex: 1 }}>
+                    <AlertCircle size={15} /> Mark In Progress
+                  </button>
+                )}
+                {/* Complete */}
+                {task.status === 'in_progress' && (
+                  <button onClick={() => onStatusChange(task.id, 'completed')} style={{ ...actionBtnNew('#10B981'), flex: 1 }}>
+                    <CheckCircle2 size={15} /> Mark Complete
+                  </button>
+                )}
+                {/* Reopen */}
+                {task.status === 'in_progress' && isManager && (
+                  <button onClick={() => onStatusChange(task.id, 'pending')} style={{ ...actionBtnNew('#F59E0B') }}>
+                    <Clock size={15} /> Reset to Pending
+                  </button>
+                )}
+                {/* Cancel */}
+                {isManager && task.status !== 'cancelled' && (
+                  <button onClick={() => onStatusChange(task.id, 'cancelled')} style={{ ...actionBtnNew('#6B7280') }}>
+                    <X size={15} /> Cancel Task
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Completed / Cancelled banner */}
+          {task.status === 'completed' && (
+            <div style={{ marginBottom: '16px', padding: '12px 16px', background: '#10B98115', borderRadius: '12px', border: '1px solid #10B98130' }}>
+              <p className="flex items-center gap-2" style={{ fontSize: '13px', fontWeight: 600, color: '#10B981', margin: 0 }}>
+                <CheckCircle2 size={16} /> Task completed {task.completedAt && `on ${new Date(task.completedAt).toLocaleDateString()}`}
+              </p>
+            </div>
+          )}
+          {task.status === 'cancelled' && (
+            <div style={{ marginBottom: '16px', padding: '12px 16px', background: '#6B728015', borderRadius: '12px', border: '1px solid #6B728030' }}>
+              <p className="flex items-center gap-2" style={{ fontSize: '13px', fontWeight: 600, color: '#6B7280', margin: 0 }}>
+                <X size={16} /> Task was cancelled
+              </p>
+              {isManager && (
+                <button onClick={() => onStatusChange(task.id, 'pending')} className="flex items-center gap-1" style={{ fontSize: '12px', color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', marginTop: '6px' }}>
+                  <Clock size={12} /> Reopen task
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Comments */}
+          <div style={{ borderTop: '1px solid var(--chat-border)', paddingTop: '16px' }}>
+            <p style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-secondary)', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Activity ({task.comments?.length || 0})
+            </p>
+            <div style={{ maxHeight: '220px', overflowY: 'auto', marginBottom: '12px' }}>
+              {(task.comments || []).length === 0 ? (
+                <p style={{ fontSize: '12px', color: 'var(--color-text-dim)', textAlign: 'center', padding: '20px' }}>No activity yet. Add a comment to get started.</p>
+              ) : (
+                task.comments.map(c => (
+                  <div key={c.id} style={{ padding: '10px 12px', background: 'var(--chat-hover)', borderRadius: '10px', marginBottom: '6px', borderLeft: '2px solid var(--color-primary)' }}>
+                    <div className="flex items-center justify-between">
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-primary)' }}>{c.user?.name}</span>
+                      <span style={{ fontSize: '10px', color: 'var(--color-text-dim)' }}>{new Date(c.createdAt).toLocaleString()}</span>
+                    </div>
+                    <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: '4px 0 0', lineHeight: 1.5 }}>{c.content}</p>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="flex gap-2">
+              <input
+                value={comment}
+                onChange={e => setComment(e.target.value)}
+                placeholder="Write an update..."
+                onKeyDown={e => e.key === 'Enter' && onAddComment(task.id)}
+                style={{ ...inputStyle, flex: 1, borderRadius: '12px' }}
+              />
+              <button onClick={() => onAddComment(task.id)} style={{ padding: '10px 14px', borderRadius: '12px', background: 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 600 }}>
+                <Send size={13} /> Send
+              </button>
             </div>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer' }}><X size={18} /></button>
-        </div>
 
-        {/* Description */}
-        {task.description && (
-          <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: 1.6, margin: '0 0 16px', padding: '12px', background: 'var(--chat-hover)', borderRadius: '10px' }}>
-            {task.description}
-          </p>
-        )}
-
-        {/* Info */}
-        <div className="grid grid-cols-2 gap-3" style={{ marginBottom: '16px' }}>
-          <div style={{ padding: '10px', background: 'var(--chat-hover)', borderRadius: '10px' }}>
-            <p style={{ fontSize: '10px', color: 'var(--color-text-dim)', margin: '0 0 2px' }}>Created by</p>
-            <p style={{ fontSize: '13px', color: 'var(--color-text-primary)', margin: 0 }}>{task.createdBy?.name}</p>
-          </div>
-          <div style={{ padding: '10px', background: 'var(--chat-hover)', borderRadius: '10px' }}>
-            <p style={{ fontSize: '10px', color: 'var(--color-text-dim)', margin: '0 0 2px' }}>Assigned to</p>
-            <p style={{ fontSize: '13px', color: 'var(--color-text-primary)', margin: 0 }}>{task.assignedTo?.name}</p>
-          </div>
-          <div style={{ padding: '10px', background: 'var(--chat-hover)', borderRadius: '10px' }}>
-            <p style={{ fontSize: '10px', color: 'var(--color-text-dim)', margin: '0 0 2px' }}>Created</p>
-            <p style={{ fontSize: '13px', color: 'var(--color-text-primary)', margin: 0 }}>{new Date(task.createdAt).toLocaleDateString()}</p>
-          </div>
-          <div style={{ padding: '10px', background: 'var(--chat-hover)', borderRadius: '10px' }}>
-            <p style={{ fontSize: '10px', color: 'var(--color-text-dim)', margin: '0 0 2px' }}>Due date</p>
-            <p style={{ fontSize: '13px', color: 'var(--color-text-primary)', margin: 0 }}>{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No deadline'}</p>
-          </div>
-        </div>
-
-        {/* Status Actions */}
-        {(isAssignee || isManager) && task.status !== 'completed' && task.status !== 'cancelled' && (
-          <div className="flex gap-2" style={{ marginBottom: '16px' }}>
-            {task.status === 'pending' && (
-              <button onClick={() => onStatusChange(task.id, 'in_progress')} style={actionBtn('#3B82F6')}>
-                Start Working
+          {/* Delete — bottom right, subtle */}
+          {isCreator && (
+            <div className="flex justify-end" style={{ marginTop: '16px' }}>
+              <button onClick={() => { if (confirm('Delete this task permanently?')) onDelete(task.id) }} className="flex items-center gap-1" style={{ fontSize: '11px', color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer', opacity: 0.7 }}>
+                <Trash2 size={11} /> Delete
               </button>
-            )}
-            {task.status === 'in_progress' && (
-              <button onClick={() => onStatusChange(task.id, 'completed')} style={actionBtn('#10B981')}>
-                Mark Complete
-              </button>
-            )}
-            {isManager && (
-              <button onClick={() => onStatusChange(task.id, 'cancelled')} style={actionBtn('#6B7280')}>
-                Cancel
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Comments */}
-        <div style={{ borderTop: '1px solid var(--chat-border)', paddingTop: '16px' }}>
-          <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-secondary)', margin: '0 0 10px' }}>
-            Comments ({task.comments?.length || 0})
-          </p>
-          <div style={{ maxHeight: '200px', overflowY: 'auto', marginBottom: '12px' }}>
-            {(task.comments || []).length === 0 ? (
-              <p style={{ fontSize: '12px', color: 'var(--color-text-dim)', textAlign: 'center', padding: '16px' }}>No comments yet</p>
-            ) : (
-              task.comments.map(c => (
-                <div key={c.id} style={{ padding: '8px 10px', background: 'var(--chat-hover)', borderRadius: '8px', marginBottom: '6px' }}>
-                  <div className="flex items-center justify-between">
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{c.user?.name}</span>
-                    <span style={{ fontSize: '10px', color: 'var(--color-text-dim)' }}>{new Date(c.createdAt).toLocaleString()}</span>
-                  </div>
-                  <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: '4px 0 0' }}>{c.content}</p>
-                </div>
-              ))
-            )}
-          </div>
-          <div className="flex gap-2">
-            <input
-              value={comment}
-              onChange={e => setComment(e.target.value)}
-              placeholder="Add a comment..."
-              onKeyDown={e => e.key === 'Enter' && onAddComment(task.id)}
-              style={{ ...inputStyle, flex: 1 }}
-            />
-            <button onClick={() => onAddComment(task.id)} style={{ padding: '8px 12px', borderRadius: '10px', background: 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer' }}>
-              <Send size={14} />
-            </button>
-          </div>
+            </div>
+          )}
         </div>
-
-        {/* Delete */}
-        {isCreator && (
-          <div style={{ borderTop: '1px solid var(--chat-border)', paddingTop: '12px', marginTop: '16px' }}>
-            <button onClick={() => onDelete(task.id)} className="flex items-center gap-1" style={{ fontSize: '12px', color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer' }}>
-              <Trash2 size={12} /> Delete Task
-            </button>
-          </div>
-        )}
       </div>
     </div>
   )
@@ -471,4 +552,11 @@ const inputStyle: React.CSSProperties = {
 const actionBtn = (color: string): React.CSSProperties => ({
   padding: '7px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 600,
   background: `${color}20`, color, border: `1px solid ${color}40`, cursor: 'pointer',
+})
+
+const actionBtnNew = (color: string): React.CSSProperties => ({
+  padding: '10px 16px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
+  background: `${color}15`, color, border: `1px solid ${color}30`, cursor: 'pointer',
+  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+  transition: 'all 150ms ease',
 })
