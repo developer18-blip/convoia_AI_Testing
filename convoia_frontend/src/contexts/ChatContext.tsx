@@ -1,4 +1,4 @@
-import { createContext, useCallback, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { useAuth } from '../hooks/useAuth'
 import type { Conversation, Message, ChatFolder } from '../types'
@@ -49,6 +49,7 @@ export interface ChatContextType {
   activeConversation: Conversation | null
   messages: Message[]
   isStreaming: boolean
+  stopStreaming: () => void
   agentMode: boolean
   setAgentMode: (v: boolean) => void
   createConversation: (modelId: string, modelName: string, industry?: string) => Conversation
@@ -80,6 +81,17 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const [agentMode, setAgentMode] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
+
+  const stopStreaming = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort()
+      abortRef.current = null
+    }
+    setIsStreaming(false)
+    // Remove isLoading from any streaming message
+    setMessages((prev) => prev.map((m) => m.isLoading ? { ...m, isLoading: false, content: m.content || '*(Generation stopped)*' } : m))
+  }, [])
 
   // Reload conversations when user changes
   useEffect(() => {
@@ -192,6 +204,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setMessages((prev) => [...prev, userMsg, streamingMsg])
     setIsStreaming(true)
 
+    // Create abort controller for stop functionality
+    const controller = new AbortController()
+    abortRef.current = controller
+
     try {
       const allMsgs = [...messages, userMsg].map((m) => ({ role: m.role, content: m.content }))
       const token = localStorage.getItem('convoia_token')
@@ -204,6 +220,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({ modelId, messages: allMsgs, industry, agentId }),
+        signal: controller.signal,
       })
 
       if (!response.ok) {
@@ -270,9 +287,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         } : m
       ))
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to get response'
-      setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, isLoading: false, error: errorMsg, content: errorMsg } : m))
+      // If user stopped, don't show error
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setMessages((prev) => prev.map((m) => m.id === assistantId && m.isLoading ? { ...m, isLoading: false } : m))
+      } else {
+        const errorMsg = err instanceof Error ? err.message : 'Failed to get response'
+        setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, isLoading: false, error: errorMsg, content: errorMsg } : m))
+      }
     } finally {
+      abortRef.current = null
       setIsStreaming(false)
     }
   }, [messages])
@@ -408,7 +431,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   return (
     <ChatContext.Provider value={{
       conversations, folders, activeConversationId: activeId, activeConversation,
-      messages, isStreaming, agentMode, setAgentMode,
+      messages, isStreaming, stopStreaming, agentMode, setAgentMode,
       createConversation, deleteConversation, setActiveConversation,
       renameConversation, togglePin, moveToFolder,
       createFolder, deleteFolder,

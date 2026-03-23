@@ -29,7 +29,7 @@ export function ChatPage() {
   const { tokenBalance, formattedBalance, refresh } = useTokens()
   const toast = useToast()
   const {
-    conversations, folders, activeConversationId, activeConversation, messages, isStreaming,
+    conversations, folders, activeConversationId, activeConversation, messages, isStreaming, stopStreaming,
     setAgentMode,
     createConversation, deleteConversation, setActiveConversation,
     renameConversation, togglePin, moveToFolder, createFolder, deleteFolder,
@@ -551,6 +551,7 @@ export function ChatPage() {
         <MessageInput
           onSend={handleSend}
           isLoading={isStreaming || isGeneratingImage}
+          onStop={stopStreaming}
           selectedModelId={selectedModelId}
           onFileProcessed={handleFileProcessed}
           onImageGenerated={handleImageGenerated}

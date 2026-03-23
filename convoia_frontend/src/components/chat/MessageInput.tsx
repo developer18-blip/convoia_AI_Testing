@@ -38,6 +38,7 @@ interface MessageInputProps {
   estimatedCost?: number
   tokenCount?: number
   selectedModelId?: string
+  onStop?: () => void
   onFileProcessed?: (data: FileProcessedData) => void
   onImageGenerated?: (data: ImageGeneratedData) => void
   onSendWithContext?: (text: string, systemContext: string | null, extras?: { fileAttachment?: { name: string; type: 'image' | 'document' | 'audio' | 'video'; size: number } }) => void
@@ -53,6 +54,7 @@ export function MessageInput({
   hasActiveSession,
   tokenCount,
   selectedModelId,
+  onStop,
   onFileProcessed,
   onImageGenerated,
   onSendWithContext,
@@ -449,11 +451,18 @@ export function MessageInput({
                 <span style={{ fontSize: '11px', color: 'var(--color-primary)' }}>Session active</span>
               )}
               <button
-                onClick={(e) => { e.stopPropagation(); handleSend() }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (isLoading && onStop) {
+                    onStop()
+                  } else {
+                    handleSend()
+                  }
+                }}
                 disabled={!canSend && !isLoading}
                 style={{
                   width: '32px', height: '32px', borderRadius: '50%', flexShrink: 0,
-                  backgroundColor: isLoading ? 'var(--chat-text)' : canSend ? 'var(--chat-text)' : 'var(--chat-text-dim)',
+                  backgroundColor: isLoading ? '#EF4444' : canSend ? 'var(--chat-text)' : 'var(--chat-text-dim)',
                   border: 'none',
                   cursor: (canSend || isLoading) ? 'pointer' : 'not-allowed',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -461,7 +470,7 @@ export function MessageInput({
                 }}
               >
                 {isLoading || fileLoading ? (
-                  <Square size={12} style={{ color: 'var(--color-background)', fill: 'var(--color-background)' }} />
+                  <Square size={12} style={{ color: 'white', fill: 'white' }} />
                 ) : (
                   <ArrowUp size={16} style={{ color: canSend ? 'var(--color-background)' : 'var(--color-background)' }} />
                 )}
