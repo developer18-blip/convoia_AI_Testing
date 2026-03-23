@@ -312,7 +312,7 @@ export function MessageInput({
   const canSend = (value.trim() || attachedFile) && !isLoading && !disabled && !fileLoading && !(attachedFile?.uploading)
 
   return (
-    <div style={{ flexShrink: 0, padding: '12px 16px 20px', backgroundColor: 'var(--chat-bg)' }}>
+    <div style={{ flexShrink: 0, padding: '0 16px 16px', backgroundColor: 'var(--chat-bg)' }}>
       <div style={{ maxWidth: '760px', margin: '0 auto', width: '100%' }}>
 
         {/* Error banner */}
@@ -328,10 +328,11 @@ export function MessageInput({
         {/* Input pill container */}
         <div className="chat-input-box" style={{
           display: 'flex', flexDirection: 'column',
-          backgroundColor: 'var(--chat-surface)', borderRadius: '28px',
-          border: inputFocused ? '1px solid var(--color-primary)' : '1px solid var(--chat-border)',
-          transition: 'border-color 200ms',
-          cursor: 'text',
+          backgroundColor: 'var(--chat-surface)', borderRadius: '24px',
+          border: inputFocused ? '1px solid rgba(124,58,237,0.5)' : '1px solid var(--chat-border)',
+          boxShadow: inputFocused ? '0 0 0 2px rgba(124,58,237,0.1)' : '0 1px 3px rgba(0,0,0,0.1)',
+          transition: 'all 200ms ease',
+          cursor: 'text', overflow: 'hidden', maxWidth: '100%',
         }}
         onClick={() => textareaRef.current?.focus()}
         >
@@ -404,14 +405,15 @@ export function MessageInput({
             disabled={disabled || fileLoading}
             style={{
               flex: 1, backgroundColor: 'transparent', border: 'none', outline: 'none',
-              color: 'var(--chat-text)', fontSize: '15px', lineHeight: '1.5', resize: 'none',
-              minHeight: '24px', maxHeight: '200px', fontFamily: 'Inter, sans-serif',
-              padding: '14px 16px 4px',
+              color: 'var(--chat-text)', fontSize: '15px', lineHeight: '1.6', resize: 'none',
+              minHeight: '28px', maxHeight: '200px', fontFamily: 'Inter, system-ui, sans-serif',
+              padding: '16px 20px 6px', overflowWrap: 'break-word', wordBreak: 'break-word',
+              overflowY: 'auto',
             }}
           />
 
           {/* Bottom bar inside pill */}
-          <div className="flex items-center justify-between" style={{ padding: '4px 10px 10px' }}>
+          <div className="flex items-center justify-between" style={{ padding: '6px 12px 12px' }}>
             {/* Left: Plus button + voice */}
             <div className="flex items-center" style={{ gap: '2px' }}>
               <input
@@ -461,18 +463,19 @@ export function MessageInput({
                 }}
                 disabled={!canSend && !isLoading}
                 style={{
-                  width: '32px', height: '32px', borderRadius: '50%', flexShrink: 0,
+                  width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
                   backgroundColor: isLoading ? '#EF4444' : canSend ? 'var(--chat-text)' : 'var(--chat-text-dim)',
                   border: 'none',
                   cursor: (canSend || isLoading) ? 'pointer' : 'not-allowed',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  transition: 'all 150ms',
+                  transition: 'all 200ms ease',
+                  opacity: canSend || isLoading ? 1 : 0.4,
                 }}
               >
                 {isLoading || fileLoading ? (
-                  <Square size={12} style={{ color: 'white', fill: 'white' }} />
+                  <Square size={14} style={{ color: 'white', fill: 'white' }} />
                 ) : (
-                  <ArrowUp size={16} style={{ color: canSend ? 'var(--color-background)' : 'var(--color-background)' }} />
+                  <ArrowUp size={18} style={{ color: 'var(--color-background)' }} />
                 )}
               </button>
             </div>
@@ -481,7 +484,7 @@ export function MessageInput({
       </div>
 
       {/* Hint below input */}
-      <p style={{ textAlign: 'center', fontSize: '12px', color: 'var(--chat-text-muted)', marginTop: '8px' }}>
+      <p style={{ textAlign: 'center', fontSize: '11px', color: 'var(--chat-text-dim)', marginTop: '8px', opacity: 0.6 }}>
         Convoia AI can make mistakes. Check important info.
       </p>
 
