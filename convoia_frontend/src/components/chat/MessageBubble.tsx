@@ -57,20 +57,29 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
   if (message.isLoading) {
     return (
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '32px', animation: 'fadeSlideIn 200ms ease-out' }}>
-        {/* AI Avatar */}
         <div style={{
           width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
           backgroundColor: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: '14px', color: 'white',
         }}>✦</div>
-        <div style={{ display: 'flex', gap: '4px', padding: '4px 0' }}>
-          {[0, 1, 2].map((i) => (
-            <div key={i} style={{
-              width: '8px', height: '8px', borderRadius: '50%',
-              backgroundColor: 'var(--color-primary)',
-              animation: `bounce 1.4s ease-in-out ${i * 0.16}s infinite`,
-            }} />
-          ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {message.statusText && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
+              <div style={{ width: '16px', height: '16px', border: '2px solid var(--color-primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+              {message.statusText}
+            </div>
+          )}
+          {!message.statusText && (
+            <div style={{ display: 'flex', gap: '4px', padding: '4px 0' }}>
+              {[0, 1, 2].map((i) => (
+                <div key={i} style={{
+                  width: '8px', height: '8px', borderRadius: '50%',
+                  backgroundColor: 'var(--color-primary)',
+                  animation: `bounce 1.4s ease-in-out ${i * 0.16}s infinite`,
+                }} />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     )
@@ -191,6 +200,64 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
 
       {/* Text area — no background, no border */}
       <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
+
+        {/* Web Search Card */}
+        {message.webSearch && (
+          <div style={{
+            marginBottom: '16px', padding: '12px 16px',
+            background: 'linear-gradient(135deg, rgba(124,58,237,0.06), rgba(16,185,129,0.06))',
+            border: '1px solid rgba(124,58,237,0.15)',
+            borderRadius: '12px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+              <div style={{
+                width: '24px', height: '24px', borderRadius: '6px',
+                background: 'linear-gradient(135deg, #7C3AED, #10B981)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '12px', color: 'white',
+              }}>🔍</div>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                Searched the web
+              </span>
+              <span style={{ fontSize: '11px', color: 'var(--color-text-dim)', fontStyle: 'italic' }}>
+                "{message.webSearch.query}"
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {message.webSearch.sources.map((source, idx) => {
+                let domain = ''
+                try { domain = new URL(source.url).hostname.replace('www.', '') } catch { domain = source.url }
+                return (
+                  <a
+                    key={idx}
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '6px',
+                      padding: '4px 10px', borderRadius: '8px',
+                      background: 'var(--chat-surface)', border: '1px solid var(--chat-border)',
+                      fontSize: '11px', color: 'var(--color-text-secondary)',
+                      textDecoration: 'none', transition: 'all 0.15s',
+                      maxWidth: '200px',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-primary)'; e.currentTarget.style.color = 'var(--color-primary)' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--chat-border)'; e.currentTarget.style.color = 'var(--color-text-secondary)' }}
+                  >
+                    <img
+                      src={`https://www.google.com/s2/favicons?domain=${domain}&sz=16`}
+                      width={14} height={14} alt=""
+                      style={{ borderRadius: '2px', flexShrink: 0 }}
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                    />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{domain}</span>
+                  </a>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="prose prose-sm max-w-none message-content" style={{ fontSize: '15px', lineHeight: '1.75', color: 'var(--chat-text)' }}>
           <ReactMarkdown remarkPlugins={[remarkGfm]}
             components={{

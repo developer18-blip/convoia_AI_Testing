@@ -259,13 +259,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               ))
             } else if (parsed.type === 'status') {
               setMessages((prev) => prev.map((m) =>
-                m.id === assistantId ? { ...m, content: `*${parsed.content}*\n\n`, isLoading: true } : m
+                m.id === assistantId ? { ...m, content: '', isLoading: true, statusText: parsed.content } : m
               ))
             } else if (parsed.type === 'web_search') {
-              const sourcesText = parsed.sources?.map((s: any) => `[${s.title}](${s.url})`).join(' · ') || ''
-              accumulated = `🔍 **Searched the web** for "${parsed.query}"\n${sourcesText ? `> Sources: ${sourcesText}\n` : ''}\n`
+              accumulated = ''
               setMessages((prev) => prev.map((m) =>
-                m.id === assistantId ? { ...m, content: accumulated, isLoading: false } : m
+                m.id === assistantId ? { ...m, content: '', isLoading: false, webSearch: { query: parsed.query, sources: parsed.sources || [] } } : m
               ))
             } else if (parsed.type === 'note') {
               accumulated += `> **Note:** ${parsed.content}\n\n`
@@ -378,13 +377,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               ))
             } else if (parsed.type === 'status') {
               setMessages((prev) => prev.map((m) =>
-                m.id === assistantId ? { ...m, content: `*${parsed.content}*\n\n`, isLoading: true } : m
+                m.id === assistantId ? { ...m, content: '', isLoading: true, statusText: parsed.content } : m
               ))
             } else if (parsed.type === 'web_search') {
-              const sourcesText = parsed.sources?.map((s: any) => `[${s.title}](${s.url})`).join(' · ') || ''
-              accumulated = `🔍 **Searched the web** for "${parsed.query}"\n${sourcesText ? `> Sources: ${sourcesText}\n` : ''}\n`
+              accumulated = ''
               setMessages((prev) => prev.map((m) =>
-                m.id === assistantId ? { ...m, content: accumulated, isLoading: false } : m
+                m.id === assistantId ? { ...m, content: '', isLoading: false, webSearch: { query: parsed.query, sources: parsed.sources || [] } } : m
               ))
             } else if (parsed.type === 'note') {
               accumulated += `> **Note:** ${parsed.content}\n\n`

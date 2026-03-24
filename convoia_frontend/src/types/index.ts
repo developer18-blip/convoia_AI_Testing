@@ -171,6 +171,11 @@ export interface Message {
     type: 'image' | 'document' | 'audio' | 'video'
     size: number
   }
+  statusText?: string
+  webSearch?: {
+    query: string
+    sources: { title: string; url: string }[]
+  }
 }
 
 export interface ChatFolder {
