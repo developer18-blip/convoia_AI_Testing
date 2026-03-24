@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Plus, CheckCircle2, Clock, AlertCircle, MessageSquare, Trash2, X, Send } from 'lucide-react'
 import { Card } from '../components/ui/Card'
-import { Badge } from '../components/ui/Badge'
 import { LoadingPage } from '../components/shared/LoadingPage'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../hooks/useToast'
@@ -221,12 +220,12 @@ export default function TasksPage() {
                       {task.dueDate && ` · Due ${new Date(task.dueDate).toLocaleDateString()}`}
                     </p>
                   </div>
-                  <Badge size="sm" style={{ background: `${priorityColors[task.priority]}20`, color: priorityColors[task.priority] }}>
+                  <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 500, background: `${priorityColors[task.priority]}20`, color: priorityColors[task.priority] }}>
                     {task.priority}
-                  </Badge>
-                  <Badge size="sm" style={{ background: `${sc.color}20`, color: sc.color }}>
+                  </span>
+                  <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 500, background: `${sc.color}20`, color: sc.color }}>
                     {sc.label}
-                  </Badge>
+                  </span>
                   {task.comments?.length > 0 && (
                     <span className="flex items-center gap-1" style={{ fontSize: '11px', color: 'var(--color-text-dim)' }}>
                       <MessageSquare size={12} /> {task.comments.length}
@@ -369,9 +368,9 @@ function TaskDetailModal({ task, isManager, comment, setComment, onClose, onStat
             <div style={{ flex: 1 }}>
               <h3 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0, lineHeight: 1.3 }}>{task.title}</h3>
               <div className="flex items-center gap-2 flex-wrap" style={{ marginTop: '10px' }}>
-                <Badge size="sm" style={{ background: `${sc.color}15`, color: sc.color, border: `1px solid ${sc.color}30`, fontWeight: 600 }}>{sc.label}</Badge>
-                <Badge size="sm" style={{ background: `${priorityColors[task.priority]}15`, color: priorityColors[task.priority], border: `1px solid ${priorityColors[task.priority]}30` }}>{task.priority} priority</Badge>
-                {isOverdue && <Badge size="sm" style={{ background: '#EF444415', color: '#EF4444', border: '1px solid #EF444430' }}>Overdue</Badge>}
+                <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, background: `${sc.color}15`, color: sc.color, border: `1px solid ${sc.color}30` }}>{sc.label}</span>
+                <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 500, background: `${priorityColors[task.priority]}15`, color: priorityColors[task.priority], border: `1px solid ${priorityColors[task.priority]}30` }}>{task.priority} priority</span>
+                {isOverdue && <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 500, background: '#EF444415', color: '#EF4444', border: '1px solid #EF444430' }}>Overdue</span>}
               </div>
             </div>
             <button onClick={onClose} style={{ background: 'var(--chat-hover)', border: '1px solid var(--chat-border)', color: 'var(--color-text-muted)', cursor: 'pointer', borderRadius: '10px', padding: '6px' }}><X size={16} /></button>
@@ -548,11 +547,6 @@ const inputStyle: React.CSSProperties = {
   background: 'var(--chat-hover)', border: '1px solid var(--chat-border)',
   color: 'var(--color-text-primary)', outline: 'none',
 }
-
-const actionBtn = (color: string): React.CSSProperties => ({
-  padding: '7px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 600,
-  background: `${color}20`, color, border: `1px solid ${color}40`, cursor: 'pointer',
-})
 
 const actionBtnNew = (color: string): React.CSSProperties => ({
   padding: '10px 16px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,

@@ -9,7 +9,7 @@ import { Badge } from '../../../components/ui/Badge'
 import { AreaChart } from '../../../components/charts/AreaChart'
 import { DonutChart } from '../../../components/charts/DonutChart'
 import { useTokens } from '../../../contexts/TokenContext'
-import { formatCurrency, formatNumber, formatTokens, formatDateTime, getGreeting, truncate } from '../../../lib/utils'
+import { formatNumber, formatTokens, formatDateTime, getGreeting, truncate } from '../../../lib/utils'
 import type { DashboardStats, HourlySession, UsageLog, InsightData } from '../../../types'
 
 interface PersonalViewProps {
@@ -21,12 +21,11 @@ interface PersonalViewProps {
   userName: string
 }
 
-export function PersonalView({ stats, wallet, sessions, recentUsage, insights, userName }: PersonalViewProps) {
+export function PersonalView({ stats, wallet: _wallet, sessions, recentUsage, insights, userName }: PersonalViewProps) {
   const navigate = useNavigate()
   const { tokenBalance, formattedBalance, totalPurchased, totalUsed } = useTokens()
   const [chartMode, setChartMode] = useState('queries')
 
-  const monthCost = Number(stats?.thisMonth?.cost ?? 0) || 0
   const monthQueries = Number(stats?.thisMonth?.queries ?? 0) || 0
   const monthTokens = Number(stats?.thisMonth?.tokens ?? 0) || 0
   const todayQueries = Number(stats?.today?.queries ?? 0) || 0

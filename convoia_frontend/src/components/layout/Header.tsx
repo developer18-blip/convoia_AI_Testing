@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Menu, Search, Bell, Zap, User, Key, LogOut, Sun, Moon, Check, CheckCheck, X, MessageSquare, Bot, Settings, BarChart3 } from 'lucide-react'
+import { Menu, Search, Bell, Zap, User, Key, LogOut, Sun, Moon, CheckCheck, X, MessageSquare, Bot, Settings, BarChart3 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useTheme } from '../../hooks/useTheme'
 import { useTokens } from '../../contexts/TokenContext'
