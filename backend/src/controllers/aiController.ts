@@ -284,8 +284,9 @@ export const queryAIStream = async (req: Request, res: Response) => {
     if (agentId) {
       const agent = await (prisma as any).agent.findUnique({ where: { id: agentId } });
       if (agent && agent.isActive) {
+        const identityPrefix = `Your name is "${agent.name}". You are a specialized AI agent on the ConvoiaAI platform. When asked "who are you", always introduce yourself as "${agent.name}" — never say you are Claude, GPT, or any underlying model. You were created by ConvoiaAI.\n\n`;
         agentConfig = {
-          systemPrompt: agent.systemPrompt, temperature: agent.temperature,
+          systemPrompt: identityPrefix + agent.systemPrompt, temperature: agent.temperature,
           maxTokens: agent.maxTokens, topP: agent.topP, name: agent.name,
         };
       }
