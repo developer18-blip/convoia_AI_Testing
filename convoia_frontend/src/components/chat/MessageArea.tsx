@@ -50,8 +50,8 @@ export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, o
           }}>
             <Sparkles size={24} style={{ color: 'white' }} />
           </div>
-          <h2 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.5px', marginBottom: '8px', textAlign: 'center' }}>
-            Convoia AI
+          <h2 style={{ fontSize: '26px', fontWeight: 800, letterSpacing: '-0.5px', marginBottom: '8px', textAlign: 'center', background: 'linear-gradient(135deg, var(--color-primary), #A78BFA)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+            ConvoiaAI
           </h2>
           <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', textAlign: 'center', marginBottom: '32px' }}>
             How can I help you today?

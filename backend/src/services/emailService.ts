@@ -6,7 +6,7 @@ const resend = config.resendApiKey
   ? new Resend(config.resendApiKey)
   : null;
 
-const FROM = 'Convoia AI <onboarding@resend.dev>';
+const FROM = 'ConvoiaAI <onboarding@resend.dev>';
 const BRAND_COLOR = '#7C3AED';
 const FRONTEND_URL = config.frontendUrl;
 
@@ -30,7 +30,7 @@ function baseTemplate(title: string, body: string): string {
 <div class="container">
   <div class="header"><h1>${title}</h1></div>
   <div class="body">${body}</div>
-  <div class="footer">Convoia AI &middot; All rights reserved</div>
+  <div class="footer">ConvoiaAI &middot; All rights reserved</div>
 </div>
 </body></html>`;
 }
@@ -63,14 +63,14 @@ export class EmailService {
         </div>
       </div>
       <p class="muted" style="text-align:center;">This code expires in <strong>10 minutes</strong>.</p>
-      <p class="muted" style="margin-top:20px;">If you didn't create an account on Convoia AI, please ignore this email.</p>
+      <p class="muted" style="margin-top:20px;">If you didn't create an account on ConvoiaAI, please ignore this email.</p>
     `;
 
     try {
       await resend.emails.send({
         from: FROM,
         to: recipientEmail,
-        subject: `${code} is your Convoia AI verification code`,
+        subject: `${code} is your ConvoiaAI verification code`,
         html: baseTemplate('Verify Your Email', body),
       });
       logger.info(`Verification email sent to ${recipientEmail}`);
@@ -103,7 +103,7 @@ export class EmailService {
       : '';
 
     const body = `
-      <p style="color:#3f3f46; margin:0 0 16px;">You've been invited to join <strong>${orgName}</strong> on Convoia AI.</p>
+      <p style="color:#3f3f46; margin:0 0 16px;">You've been invited to join <strong>${orgName}</strong> on ConvoiaAI.</p>
       <div style="background:#fafafa; border-radius:10px; padding:16px; margin:0 0 20px;">
         <div class="row"><span class="label">Organization</span><span class="value">${orgName}</span></div>
         <div class="row"><span class="label">Your role</span><span class="badge">${roleLabel}</span></div>
@@ -121,7 +121,7 @@ export class EmailService {
       await resend.emails.send({
         from: FROM,
         to: recipientEmail,
-        subject: `${inviterName} invited you to join ${orgName} on Convoia AI`,
+        subject: `${inviterName} invited you to join ${orgName} on ConvoiaAI`,
         html: baseTemplate('You\'re Invited!', body),
       });
       logger.info(`Invite email sent to ${recipientEmail} for org ${orgName}`);
@@ -203,7 +203,7 @@ export class EmailService {
       await resend.emails.send({
         from: FROM,
         to: recipientEmail,
-        subject: `You received ${tokenLabel} tokens on Convoia AI`,
+        subject: `You received ${tokenLabel} tokens on ConvoiaAI`,
         html: baseTemplate('Tokens Assigned', body),
       });
       logger.info(`Token assigned email sent to ${recipientEmail}`);

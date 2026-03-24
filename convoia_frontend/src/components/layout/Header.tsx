@@ -64,7 +64,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { formattedBalance } = useTokens()
 
   const canBuyTokens = !user?.organizationId || user?.role === 'org_owner' || user?.role === 'platform_admin'
-  const title = pageTitles[location.pathname] || 'Convoia AI'
+  const title = pageTitles[location.pathname] || 'ConvoiaAI'
 
   // Notifications
   const [notifications, setNotifications] = useState<Notification[]>([])

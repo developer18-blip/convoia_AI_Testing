@@ -83,7 +83,7 @@ export function VerifyEmailPage() {
       localStorage.setItem('convoia_user', JSON.stringify(user))
       localStorage.removeItem('convoia_pending_email')
 
-      toast.success('Email verified! Welcome to Convoia AI.')
+      toast.success('Email verified! Welcome to ConvoiaAI.')
       // Small delay so the user sees the success message
       setTimeout(() => {
         window.location.href = '/dashboard'
@@ -139,7 +139,7 @@ export function VerifyEmailPage() {
               </div>
             </motion.div>
             <span className="text-2xl font-bold bg-gradient-to-r from-accent-start to-accent-end bg-clip-text text-transparent">
-              Convoia AI
+              ConvoiaAI
             </span>
           </Link>
           <h1 className="text-2xl font-bold text-text-primary">Verify your email</h1>

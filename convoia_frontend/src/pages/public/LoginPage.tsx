@@ -93,11 +93,12 @@ export function LoginPage() {
               </div>
             </motion.div>
             <span className="text-2xl font-bold bg-gradient-to-r from-accent-start to-accent-end bg-clip-text text-transparent">
-              Convoia AI
+              ConvoiaAI
             </span>
           </Link>
           <h1 className="text-2xl font-bold text-text-primary">Welcome back</h1>
-          <p className="text-sm text-text-muted mt-1.5">Sign in to continue to your workspace</p>
+          <p className="text-sm text-text-muted mt-1.5">Sign in to your AI gateway</p>
+          <p className="text-xs text-text-dim mt-1">30+ AI models. One platform. Unlimited potential.</p>
         </div>
 
         <motion.div

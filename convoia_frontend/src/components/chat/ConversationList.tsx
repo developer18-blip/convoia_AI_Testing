@@ -192,7 +192,7 @@ export function ConversationList({
       {/* Header */}
       <div style={{ padding: '12px 12px 10px', flexShrink: 0 }}>
         <div className="flex items-center justify-between" style={{ marginBottom: '10px' }}>
-          <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Convoia AI</span>
+          <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)' }}>ConvoiaAI</span>
           <div className="flex items-center gap-1">
             <button
               onClick={() => setShowNewFolder(true)}

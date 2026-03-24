@@ -196,7 +196,7 @@ export function LandingPage() {
               <div className="absolute inset-0 bg-primary/20 rounded-lg blur-md" />
               <Zap size={24} className="text-primary relative" />
             </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-accent-start to-accent-end bg-clip-text text-transparent">Convoia AI</span>
+            <span className="text-xl font-bold bg-gradient-to-r from-accent-start to-accent-end bg-clip-text text-transparent">ConvoiaAI</span>
           </Link>
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="text-sm text-text-secondary hover:text-text-primary transition-colors">Features</a>
@@ -629,9 +629,9 @@ export function LandingPage() {
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2.5">
               <Zap size={20} className="text-primary" />
-              <span className="font-bold bg-gradient-to-r from-accent-start to-accent-end bg-clip-text text-transparent">Convoia AI</span>
+              <span className="font-bold bg-gradient-to-r from-accent-start to-accent-end bg-clip-text text-transparent">ConvoiaAI</span>
             </div>
-            <p className="text-sm text-text-muted">&copy; {new Date().getFullYear()} Convoia AI. All rights reserved.</p>
+            <p className="text-sm text-text-muted">&copy; {new Date().getFullYear()} ConvoiaAI. All rights reserved.</p>
           </div>
         </div>
       </footer>

@@ -485,7 +485,7 @@ export function MessageInput({
 
       {/* Hint below input */}
       <p style={{ textAlign: 'center', fontSize: '11px', color: 'var(--chat-text-dim)', marginTop: '8px', opacity: 0.6 }}>
-        Convoia AI can make mistakes. Check important info.
+        ConvoiaAI can make mistakes. Check important info.
       </p>
 
       <ImageGenerationModal

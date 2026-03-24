@@ -428,7 +428,7 @@ export const createPaymentIntent = asyncHandler(
         currency: 'usd',
         automatic_payment_methods: { enabled: true },
         metadata: { userId },
-        description: `Convoia AI wallet top-up for user ${userId}`,
+        description: `ConvoiaAI wallet top-up for user ${userId}`,
       },
       { idempotencyKey }
     );
@@ -484,8 +484,8 @@ export const createCheckoutSession = asyncHandler(
           price_data: {
             currency: 'usd',
             product_data: {
-              name: 'Convoia AI — Wallet Top-Up',
-              description: `Add $${parsedAmount.toFixed(2)} to your Convoia AI wallet`,
+              name: 'ConvoiaAI — Wallet Top-Up',
+              description: `Add $${parsedAmount.toFixed(2)} to your ConvoiaAI wallet`,
             },
             unit_amount: amountInCents,
           },

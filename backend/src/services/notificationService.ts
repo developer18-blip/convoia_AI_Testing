@@ -34,7 +34,7 @@ export class NotificationService {
       userId,
       type: 'login',
       title: `${greeting}, ${name.split(' ')[0]}!`,
-      message: 'Welcome back to Convoia AI. Start a chat or explore new models.',
+      message: 'Welcome back to ConvoiaAI. Start a chat or explore new models.',
     });
   }
 
@@ -81,7 +81,7 @@ export class NotificationService {
     return this.create({
       userId,
       type: 'welcome',
-      title: `Welcome to Convoia AI!`,
+      title: `Welcome to ConvoiaAI!`,
       message: `Hi ${name.split(' ')[0]}, your account is ready. Start chatting with 30+ AI models.`,
     });
   }

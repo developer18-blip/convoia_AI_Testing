@@ -207,8 +207,8 @@ export function Sidebar({ collapsed, onToggle, onClose }: SidebarProps) {
             <Zap size={22} style={{ color: 'var(--color-primary)', position: 'relative' }} />
           </div>
           {!collapsed && (
-            <span style={{ fontWeight: 700, fontSize: '17px', color: 'var(--color-text-primary)' }}>
-              Convoia AI
+            <span style={{ fontWeight: 800, fontSize: '17px', background: 'linear-gradient(135deg, var(--color-primary), #A78BFA)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              ConvoiaAI
             </span>
           )}
         </button>

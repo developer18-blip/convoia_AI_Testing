@@ -128,9 +128,10 @@ export function RegisterPage() {
                 <Zap size={24} className="text-white" />
               </div>
             </motion.div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-accent-start to-accent-end bg-clip-text text-transparent">Convoia AI</span>
+            <span className="text-2xl font-bold bg-gradient-to-r from-accent-start to-accent-end bg-clip-text text-transparent">ConvoiaAI</span>
           </Link>
-          <h1 className="text-2xl font-bold text-text-primary">Create your account</h1>
+          <h1 className="text-2xl font-bold text-text-primary">Get started free</h1>
+          <p className="text-xs text-text-dim mt-1">Access 30+ AI models in under 2 minutes</p>
           <div className="flex items-center justify-center gap-2 mt-3">
             <div className={cn('h-1 w-16 rounded-full transition-all duration-300', step >= 1 ? 'bg-gradient-to-r from-accent-start to-accent-mid' : 'bg-surface-2')} />
             <div className={cn('h-1 w-16 rounded-full transition-all duration-300', step >= 2 ? 'bg-gradient-to-r from-accent-start to-accent-mid' : 'bg-surface-2')} />

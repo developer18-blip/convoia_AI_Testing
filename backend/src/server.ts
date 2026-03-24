@@ -163,7 +163,7 @@ app.get('/health', (req: Request, res: Response) => {
 const apiInfo = {
   success: true,
   statusCode: 200,
-  message: 'Convoia AI Backend API Root',
+  message: 'ConvoiaAI Backend API Root',
   endpoints: {
     auth: '/api/auth',
     ai: '/api/ai',
@@ -194,7 +194,7 @@ app.get('/', (req: Request, res: Response) => {
   res.json({
     success: true,
     statusCode: 200,
-    message: 'Convoia AI Backend API v1.0.0',
+    message: 'ConvoiaAI Backend API v1.0.0',
     version: '1.0.0',
     environment: config.nodeEnv,
     endpoints: {
