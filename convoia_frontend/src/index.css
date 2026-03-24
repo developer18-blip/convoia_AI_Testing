@@ -119,6 +119,16 @@ html.light .animate-pulse-glow {
   50% { box-shadow: 0 0 15px rgba(59, 91, 219, 0.5); }
 }
 
+/* ─── Dark select/option styling ─── */
+select option {
+  background: #171717;
+  color: #ECECEC;
+}
+html.light select option {
+  background: #FFFFFF;
+  color: #0F0F2E;
+}
+
 /* ─── Chat-specific CSS variables (dark default) ─── */
 :root {
   --chat-bg: #0D0D0D;
