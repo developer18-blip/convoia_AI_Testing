@@ -25,97 +25,98 @@ const providers = [
   { name: 'Groq', models: 'Llama 3.3 70B', color: '#F97316' },
 ]
 
-// ── Token-based pricing plans ──────────────────────────────────────────
+// ── Token packages (pay-as-you-go, no subscriptions) ──────────────────
 
-interface PricingPlan {
+interface TokenPackage {
   name: string
   price: number
-  yearlyPrice: number
   tokens: number
-  tokenLabel: string
+  pricePerMillion: number
   features: string[]
   popular: boolean
   cta: string
-  miniMsgs: number   // ~messages with GPT-4o-mini (500 tok/msg)
-  proMsgs: number     // ~messages with GPT-4o (1500 tok/msg)
+  icon: string
+  savings: string | null
+  miniMsgs: number
+  proMsgs: number
 }
 
-const plans: PricingPlan[] = [
+const plans: TokenPackage[] = [
   {
-    name: 'Free',
-    price: 0,
-    yearlyPrice: 0,
-    tokens: 50_000,
-    tokenLabel: '50K tokens/mo',
-    features: [
-      '50,000 tokens/month',
-      '3 models (GPT-4o-mini, Gemini Flash, DeepSeek)',
-      'Basic dashboard',
-      'Community support',
-      'Pay-per-query after limit',
-    ],
-    popular: false,
-    cta: 'Get Started Free',
-    miniMsgs: 100,
-    proMsgs: 33,
-  },
-  {
-    name: 'Starter',
-    price: 9,
-    yearlyPrice: 7,
+    name: 'Basic',
+    price: 1,
     tokens: 500_000,
-    tokenLabel: '500K tokens/mo',
+    pricePerMillion: 2.00,
+    icon: '⚡',
+    savings: null,
     features: [
-      '500,000 tokens/month',
-      'All 16 models',
-      'Usage analytics',
-      'Email support',
-      'API access',
-      'Pay-per-query after limit',
+      '500,000 tokens',
+      'All 35+ AI models',
+      'Image generation',
+      'No expiry — use anytime',
     ],
     popular: false,
-    cta: 'Start Free Trial',
+    cta: 'Buy 500K Tokens',
     miniMsgs: 1_000,
     proMsgs: 333,
   },
   {
-    name: 'Pro',
-    price: 29,
-    yearlyPrice: 23,
-    tokens: 2_000_000,
-    tokenLabel: '2M tokens/mo',
+    name: 'Standard',
+    price: 2,
+    tokens: 1_000_000,
+    pricePerMillion: 2.00,
+    icon: '🔥',
+    savings: null,
     features: [
-      '2,000,000 tokens/month',
-      'All models + priority access',
-      'Team management (up to 10 members)',
-      'Budget controls',
-      'Priority support',
-      'Hourly sessions',
-      'Pay-per-query after limit',
-    ],
-    popular: true,
-    cta: 'Start Free Trial',
-    miniMsgs: 4_000,
-    proMsgs: 1_333,
-  },
-  {
-    name: 'Business',
-    price: 99,
-    yearlyPrice: 79,
-    tokens: 10_000_000,
-    tokenLabel: '10M tokens/mo',
-    features: [
-      '10,000,000 tokens/month',
-      'Unlimited team members',
-      'Full org hierarchy',
-      'Custom integrations',
-      'SLA guarantee',
-      'Dedicated support',
-      'SSO (coming soon)',
-      'Pay-per-query after limit',
+      '1,000,000 tokens',
+      'All 35+ AI models',
+      'Image generation',
+      'Usage analytics',
+      'API access',
     ],
     popular: false,
-    cta: 'Start Free Trial',
+    cta: 'Buy 1M Tokens',
+    miniMsgs: 2_000,
+    proMsgs: 667,
+  },
+  {
+    name: 'Popular',
+    price: 8,
+    tokens: 5_000_000,
+    pricePerMillion: 1.60,
+    icon: '🚀',
+    savings: 'Save 20%',
+    features: [
+      '5,000,000 tokens',
+      'All 35+ AI models + priority',
+      'Image generation',
+      'Team token allocation',
+      'Usage analytics',
+      'API access',
+    ],
+    popular: true,
+    cta: 'Buy 5M Tokens',
+    miniMsgs: 10_000,
+    proMsgs: 3_333,
+  },
+  {
+    name: 'Power',
+    price: 14,
+    tokens: 10_000_000,
+    pricePerMillion: 1.40,
+    icon: '💎',
+    savings: 'Save 30%',
+    features: [
+      '10,000,000 tokens',
+      'All 35+ AI models + priority',
+      'Image generation',
+      'Full org hierarchy',
+      'Team management',
+      'Budget controls',
+      'Dedicated support',
+    ],
+    popular: false,
+    cta: 'Buy 10M Tokens',
     miniMsgs: 20_000,
     proMsgs: 6_667,
   },
@@ -163,7 +164,7 @@ const fadeUp = {
 }
 
 export function LandingPage() {
-  const [yearly, setYearly] = useState(false)
+  // Token-based pricing — no subscription toggle needed
   const [messagesPerDay, setMessagesPerDay] = useState(20)
   const [calcModelIdx, setCalcModelIdx] = useState(0)
   const [calcDropdownOpen, setCalcDropdownOpen] = useState(false)
@@ -350,7 +351,7 @@ export function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 text-center">
           <motion.div {...fadeUp}>
             <h2 className="text-3xl sm:text-4xl font-bold text-text-primary mb-4">
-              Every major model. One subscription.
+              Every major model. One platform.
             </h2>
             <p className="text-text-secondary max-w-xl mx-auto mb-12">Compare pricing, switch models mid-conversation, and always get the best result for your budget.</p>
           </motion.div>
@@ -381,18 +382,12 @@ export function LandingPage() {
       <section id="pricing" className="py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <motion.div {...fadeUp} className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-text-primary mb-4">Simple, transparent pricing</h2>
-            <p className="text-text-secondary mb-6">Start free. Scale as you grow. No hidden fees.</p>
-            <div className="inline-flex items-center bg-surface border border-border rounded-2xl p-1">
-              <button onClick={() => setYearly(false)} className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all ${!yearly ? 'bg-gradient-to-r from-accent-start to-accent-mid text-white shadow-lg shadow-primary/20' : 'text-text-secondary hover:text-text-primary'}`}>Monthly</button>
-              <button onClick={() => setYearly(true)} className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all ${yearly ? 'bg-gradient-to-r from-accent-start to-accent-mid text-white shadow-lg shadow-primary/20' : 'text-text-secondary hover:text-text-primary'}`}>Yearly <span className="text-xs opacity-70">(-20%)</span></button>
-            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold text-text-primary mb-4">Pay only for what you use</h2>
+            <p className="text-text-secondary mb-6">Buy tokens once. Use them anytime. No subscriptions. No monthly fees.</p>
           </motion.div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {plans.map((plan, i) => {
-              const displayPrice = yearly ? plan.yearlyPrice : plan.price
               const isRecommended = calcResult.recommended === plan.name
-              const yearlySavings = (plan.price - plan.yearlyPrice) * 12
 
               return (
                 <motion.div
@@ -421,18 +416,10 @@ export function LandingPage() {
                     </div>
                   )}
 
-                  {/* Plan name */}
-                  <p className="text-sm font-medium text-text-muted mb-2 uppercase tracking-wide">{plan.name}</p>
-
-                  {/* Price */}
-                  <div className="mb-3">
-                    <span className="text-3xl font-bold text-text-primary">${displayPrice}</span>
-                    {plan.price > 0 && <span className="text-text-muted text-sm">/mo</span>}
-                    {yearly && yearlySavings > 0 && (
-                      <span className="ml-2 inline-block px-2 py-0.5 bg-success/10 text-success text-xs font-semibold rounded-full">
-                        Save ${yearlySavings}/yr
-                      </span>
-                    )}
+                  {/* Icon + name */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-2xl">{plan.icon}</span>
+                    <p className="text-sm font-medium text-text-muted uppercase tracking-wide">{plan.name}</p>
                   </div>
 
                   {/* Token amount — PROMINENT */}
@@ -440,12 +427,25 @@ export function LandingPage() {
                     <span style={{ fontSize: '28px', fontWeight: 800, color: 'var(--color-primary)' }}>
                       {plan.tokens >= 1_000_000
                         ? `${plan.tokens / 1_000_000}M`
-                        : `${plan.tokens / 1_000}K`} tokens
+                        : `${plan.tokens / 1_000}K`}
                     </span>
+                    <span className="text-text-muted text-sm ml-1">tokens</span>
                   </div>
-                  <p className="text-text-muted text-xs mb-1">/month</p>
+
+                  {/* Price */}
+                  <div className="mb-1">
+                    <span className="text-3xl font-bold text-text-primary">${plan.price.toFixed(2)}</span>
+                    <span className="text-text-muted text-sm ml-1">one-time</span>
+                  </div>
+                  <p className="text-xs text-text-muted mb-1">${plan.pricePerMillion.toFixed(2)} per 1M tokens</p>
+                  {plan.savings && (
+                    <span className="inline-block px-2 py-0.5 bg-success/10 text-success text-xs font-semibold rounded-full mb-2">
+                      {plan.savings}
+                    </span>
+                  )}
+
                   {/* Helper text */}
-                  <p style={{ fontSize: '11px', color: '#8E8E8E', marginTop: '2px' }}>
+                  <p style={{ fontSize: '11px', color: '#8E8E8E', marginTop: '4px' }}>
                     ~{plan.miniMsgs.toLocaleString()} messages with GPT-4o-mini
                   </p>
                   <p style={{ fontSize: '11px', color: '#8E8E8E', marginTop: '2px' }} className="mb-4">
@@ -483,8 +483,8 @@ export function LandingPage() {
 
           {/* Note below cards */}
           <p className="text-center text-sm text-text-muted mt-8 max-w-2xl mx-auto">
-            All plans include pay-per-query pricing when monthly tokens are exhausted.
-            1 token &asymp; 0.75 words &middot; Hourly sessions available on Pro and Business.
+            Tokens never expire. Buy once, use anytime across all 35+ AI models.
+            1 token &asymp; 0.75 words &middot; Larger packages = lower cost per token.
           </p>
 
           {/* ── Token Calculator ───────────────────────────────────────── */}
