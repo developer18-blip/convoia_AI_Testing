@@ -331,7 +331,23 @@ export const queryAIStream = async (req: Request, res: Response) => {
           // Inject search results as a system message before the user's query
           const searchContext = {
             role: 'system' as const,
-            content: `You have access to real-time web search results. Use them to provide accurate, up-to-date information. Always cite your sources with URLs.\n\n${searchResult.contextText}`
+            content: `You have access to real-time web search results. Use them to provide accurate, up-to-date information. Always cite your sources with URLs.
+
+IMPORTANT: When the data contains numerical comparisons, prices over time, market data, statistics, or any data that would benefit from visualization, include an interactive chart using this EXACT format:
+
+\`\`\`chart
+{
+  "type": "line|bar|area|pie",
+  "title": "Chart Title",
+  "data": [{"name": "Label1", "value": 100}, {"name": "Label2", "value": 200}],
+  "xKey": "name",
+  "yKeys": [{"key": "value", "color": "#7C3AED", "label": "Display Name"}]
+}
+\`\`\`
+
+Use "line" or "area" for time-series/trends. Use "bar" for comparisons. Use "pie" for distributions/proportions. Always include real data from the search results.
+
+${searchResult.contextText}`
           };
           // Insert before the last user message
           enrichedMessages = [...messages];

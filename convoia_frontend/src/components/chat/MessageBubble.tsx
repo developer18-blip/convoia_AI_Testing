@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm'
 import { AlertCircle, RefreshCw, Copy, Check, Pencil, Trash2, ThumbsUp, ThumbsDown, Download, FileText, Music, PanelRight } from 'lucide-react'
 import { CodeBlock } from './CodeBlock'
 import { AgentPanel } from './AgentPanel'
+import { InlineChart, extractCharts } from './InlineChart'
 import { formatCurrency, formatTokens } from '../../lib/utils'
 import type { Message } from '../../types'
 import type { ComponentPropsWithoutRef } from 'react'
@@ -315,8 +316,11 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
               },
             }}
           >
-            {message.content}
+            {(() => { const { cleanText } = extractCharts(message.content); return cleanText || message.content; })()}
           </ReactMarkdown>
+
+          {/* Inline Charts */}
+          {(() => { const { charts } = extractCharts(message.content); return charts.map((chart, i) => <InlineChart key={i} chart={chart} />); })()}
         </div>
 
         {/* Generated image */}

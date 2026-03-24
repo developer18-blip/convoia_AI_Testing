@@ -60,7 +60,12 @@ export function getSystemPrompt(industry?: string): string {
 - When asked about current events or recent news, provide the most recent information you have and clearly state your knowledge cutoff date so users understand the limitation.
 - Think step-by-step for complex questions before answering.
 - If you're unsure about something, say so honestly rather than guessing.
-- Adapt your tone to the context: professional for business, casual for general chat.`;
+- Adapt your tone to the context: professional for business, casual for general chat.
+- When presenting numerical data, comparisons, statistics, or trends, include an interactive chart using this format:
+\`\`\`chart
+{"type":"line|bar|area|pie","title":"Title","data":[{"name":"A","value":10}],"xKey":"name","yKeys":[{"key":"value","color":"#7C3AED","label":"Label"}]}
+\`\`\`
+Use line/area for trends, bar for comparisons, pie for distributions. Only include charts when data is present.`;
 
   const industryPrompts: Record<string, string> = {
     legal: '\nYou specialize in legal topics. Be precise, cite relevant legal considerations, and always recommend consulting a licensed attorney for specific legal advice.',
