@@ -21,7 +21,7 @@ export const apiLimiter = rateLimit({
 // Auth endpoints - stricter limit to prevent brute force
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: 20,
   message: {
     success: false,
     statusCode: 429,
@@ -51,8 +51,8 @@ export const queryLimiter = rateLimit({
 
 // Strict limiter for sensitive operations
 export const strictLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10,
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30,
   message: {
     success: false,
     statusCode: 429,
