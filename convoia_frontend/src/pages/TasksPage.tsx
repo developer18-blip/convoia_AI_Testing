@@ -216,7 +216,7 @@ export function TasksPage() {
         {detailTask && (
           <TaskDetailPanel task={detailTask} onClose={() => setDetailTask(null)}
             onStatusChange={updateStatus} onDelete={handleDeleteTask} onRefresh={() => fetchDetail(detailTask.id)}
-            fetchTasks={fetchTasks} isManager={isManager} userId={user?.id || ''} />
+            isManager={isManager} userId={user?.id || ''} />
         )}
       </AnimatePresence>
 
@@ -283,7 +283,7 @@ function TaskCard({ task, onClick }: { task: Task; onClick: () => void }) {
   const subtasksTotal = task.subtasks?.length || 0
 
   return (
-    <motion.div draggable onDragStart={e => e.dataTransfer.setData('taskId', task.id)}
+    <motion.div draggable onDragStart={e => (e as any).dataTransfer?.setData('taskId', task.id)}
       onClick={onClick} whileHover={{ y: -1, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
       style={{
         background: 'var(--color-surface-2)', borderRadius: '10px', padding: '12px',
@@ -368,9 +368,9 @@ function ListView({ tasks, onTaskClick }: { tasks: Task[]; onTaskClick: (id: str
 // ═══════════════════════════════════════════
 // Task Detail Panel (Slide-out)
 // ═══════════════════════════════════════════
-function TaskDetailPanel({ task, onClose, onStatusChange, onDelete, onRefresh, fetchTasks, isManager, userId }: {
+function TaskDetailPanel({ task, onClose, onStatusChange, onDelete, onRefresh, isManager, userId }: {
   task: Task; onClose: () => void; onStatusChange: (id: string, s: string) => void
-  onDelete: (id: string) => void; onRefresh: () => void; fetchTasks: () => void
+  onDelete: (id: string) => void; onRefresh: () => void
   isManager: boolean; userId: string
 }) {
   const toast = useToast()
