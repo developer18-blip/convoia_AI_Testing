@@ -257,6 +257,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               setMessages((prev) => prev.map((m) =>
                 m.id === assistantId ? { ...m, content: accumulated, isLoading: false } : m
               ))
+            } else if (parsed.type === 'status') {
+              setMessages((prev) => prev.map((m) =>
+                m.id === assistantId ? { ...m, content: `*${parsed.content}*\n\n`, isLoading: true } : m
+              ))
+            } else if (parsed.type === 'web_search') {
+              const sourcesText = parsed.sources?.map((s: any) => `[${s.title}](${s.url})`).join(' · ') || ''
+              accumulated = `🔍 **Searched the web** for "${parsed.query}"\n${sourcesText ? `> Sources: ${sourcesText}\n` : ''}\n`
+              setMessages((prev) => prev.map((m) =>
+                m.id === assistantId ? { ...m, content: accumulated, isLoading: false } : m
+              ))
             } else if (parsed.type === 'note') {
               accumulated += `> **Note:** ${parsed.content}\n\n`
               setMessages((prev) => prev.map((m) =>
@@ -363,6 +373,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
             if (parsed.type === 'chunk') {
               accumulated += parsed.content
+              setMessages((prev) => prev.map((m) =>
+                m.id === assistantId ? { ...m, content: accumulated, isLoading: false } : m
+              ))
+            } else if (parsed.type === 'status') {
+              setMessages((prev) => prev.map((m) =>
+                m.id === assistantId ? { ...m, content: `*${parsed.content}*\n\n`, isLoading: true } : m
+              ))
+            } else if (parsed.type === 'web_search') {
+              const sourcesText = parsed.sources?.map((s: any) => `[${s.title}](${s.url})`).join(' · ') || ''
+              accumulated = `🔍 **Searched the web** for "${parsed.query}"\n${sourcesText ? `> Sources: ${sourcesText}\n` : ''}\n`
               setMessages((prev) => prev.map((m) =>
                 m.id === assistantId ? { ...m, content: accumulated, isLoading: false } : m
               ))

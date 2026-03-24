@@ -6,6 +6,7 @@ import { afterQueryMiddleware, estimateCost } from '../middleware/tokenTracker.j
 import { getOrCreatePersonalOrg } from '../utils/orgHelper.js';
 import { TokenWalletService } from '../services/tokenWalletService.js';
 import { NotificationService } from '../services/notificationService.js';
+import { needsWebSearch, searchWeb } from '../services/webSearchService.js';
 import logger from '../config/logger.js';
 
 // Image-only models that cannot handle chat/streaming
@@ -308,6 +309,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
     const startTime = Date.now();
     let fullResponse = '';
     let streamEnded = false;
+    let webSearched = false;
 
     // Handle client disconnect
     req.on('close', () => {
@@ -315,10 +317,40 @@ export const queryAIStream = async (req: Request, res: Response) => {
       logger.info(`Client disconnected from stream — User: ${user.id}`);
     });
 
+    // Web search: check if the latest user message needs real-time data
+    const lastUserMsg = [...messages].reverse().find((m: any) => m.role === 'user');
+    const userQuery = typeof lastUserMsg?.content === 'string' ? lastUserMsg.content : '';
+    let enrichedMessages = messages;
+
+    if (userQuery && needsWebSearch(userQuery)) {
+      try {
+        res.write(`data: ${JSON.stringify({ type: 'status', content: 'Searching the web...' })}\n\n`);
+        const searchResult = await searchWeb(userQuery, 5);
+        if (searchResult.searched && searchResult.results.length > 0) {
+          webSearched = true;
+          // Inject search results as a system message before the user's query
+          const searchContext = {
+            role: 'system' as const,
+            content: `You have access to real-time web search results. Use them to provide accurate, up-to-date information. Always cite your sources with URLs.\n\n${searchResult.contextText}`
+          };
+          // Insert before the last user message
+          enrichedMessages = [...messages];
+          const lastIdx = enrichedMessages.length - 1;
+          enrichedMessages.splice(lastIdx, 0, searchContext);
+
+          // Send search indicator to frontend
+          const sources = searchResult.results.slice(0, 3).map(r => ({ title: r.title, url: r.url }));
+          res.write(`data: ${JSON.stringify({ type: 'web_search', searched: true, query: searchResult.query, sources })}\n\n`);
+        }
+      } catch (err: any) {
+        logger.error(`Web search error: ${err.message}`);
+      }
+    }
+
     await AIGatewayService.sendMessageStream(
       {
         userId: user.id, organizationId,
-        modelId: finalModelId, messages,
+        modelId: finalModelId, messages: enrichedMessages,
         industry: industry || user.organization?.industry || undefined,
         agentConfig,
         maxOutputTokens: streamMaxOutput,
@@ -384,6 +416,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
                   tokens: { input: inputTokens, output: outputTokens, total: totalTokensUsed },
                   tokensUsed: totalTokensUsed,
                   executionTime,
+                  webSearched,
                 })}\n\n`);
                 res.write('data: [DONE]\n\n');
                 res.end();
