@@ -106,6 +106,7 @@ export const getMyTasks = asyncHandler(async (req: Request, res: Response) => {
       where,
       include: {
         createdBy: { select: { id: true, name: true, email: true } },
+        subtasks: { orderBy: { sortOrder: 'asc' } },
         _count: { select: { comments: true } },
       },
       orderBy: [{ priority: 'desc' }, { dueDate: 'asc' }, { createdAt: 'desc' }],
@@ -147,6 +148,7 @@ export const getCreatedTasks = asyncHandler(async (req: Request, res: Response) 
       where,
       include: {
         assignedTo: { select: { id: true, name: true, email: true } },
+        subtasks: { orderBy: { sortOrder: 'asc' } },
         _count: { select: { comments: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -208,6 +210,7 @@ export const getTeamTasks = asyncHandler(async (req: Request, res: Response) => 
       include: {
         createdBy: { select: { id: true, name: true, email: true } },
         assignedTo: { select: { id: true, name: true, email: true } },
+        subtasks: { orderBy: { sortOrder: 'asc' } },
         _count: { select: { comments: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -237,8 +240,8 @@ export const updateTaskStatus = asyncHandler(async (req: Request, res: Response)
   if (!isValidUUID(id)) throw new AppError('Invalid task ID', 400);
 
   const { status } = req.body;
-  if (!status || !['in_progress', 'completed', 'cancelled'].includes(status)) {
-    throw new AppError('Status must be in_progress, completed, or cancelled', 400);
+  if (!status || !['in_progress', 'review', 'completed', 'cancelled', 'revision'].includes(status)) {
+    throw new AppError('Status must be in_progress, review, completed, cancelled, or revision', 400);
   }
 
   const task = await prisma.task.findUnique({
@@ -353,7 +356,107 @@ export const addComment = asyncHandler(async (req: Request, res: Response) => {
   });
 });
 
-// ============ 7. DELETE /api/tasks/:id ============
+// ============ 7. PUT /api/tasks/:id ============
+export const updateTask = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new AppError('Unauthorized', 401);
+  const { id } = req.params;
+  if (!isValidUUID(id)) throw new AppError('Invalid task ID', 400);
+
+  const task = await prisma.task.findUnique({ where: { id } });
+  if (!task) throw new AppError('Task not found', 404);
+
+  const canUpdate = task.createdById === req.user.userId ||
+    ['org_owner', 'platform_admin'].includes(req.user.role);
+  if (!canUpdate) throw new AppError('Not authorized', 403);
+
+  const { title, description, priority, dueDate, assignedToId, section } = req.body;
+  const data: any = {};
+  if (title !== undefined) data.title = title.trim();
+  if (description !== undefined) data.description = description?.trim() || null;
+  if (priority !== undefined) data.priority = priority;
+  if (dueDate !== undefined) data.dueDate = dueDate ? new Date(dueDate) : null;
+  if (assignedToId !== undefined) data.assignedToId = assignedToId;
+  if (section !== undefined) data.section = section || null;
+
+  const updated = await prisma.task.update({
+    where: { id },
+    data,
+    include: {
+      createdBy: { select: { id: true, name: true, email: true } },
+      assignedTo: { select: { id: true, name: true, email: true } },
+      subtasks: { orderBy: { sortOrder: 'asc' } },
+      _count: { select: { comments: true } },
+    },
+  });
+
+  res.json({ success: true, data: updated });
+});
+
+// ============ 8. SUBTASK CRUD ============
+export const addSubtask = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new AppError('Unauthorized', 401);
+  const { id } = req.params;
+  const { title } = req.body;
+  if (!title?.trim()) throw new AppError('Title is required', 400);
+
+  const task = await prisma.task.findUnique({ where: { id } });
+  if (!task) throw new AppError('Task not found', 404);
+
+  const count = await prisma.subTask.count({ where: { taskId: id } });
+  const subtask = await prisma.subTask.create({
+    data: { taskId: id, title: title.trim(), sortOrder: count },
+  });
+
+  res.status(201).json({ success: true, data: subtask });
+});
+
+export const toggleSubtask = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new AppError('Unauthorized', 401);
+  const { subtaskId } = req.params;
+
+  const subtask = await prisma.subTask.findUnique({ where: { id: subtaskId } });
+  if (!subtask) throw new AppError('Subtask not found', 404);
+
+  const updated = await prisma.subTask.update({
+    where: { id: subtaskId },
+    data: { isCompleted: !subtask.isCompleted },
+  });
+
+  res.json({ success: true, data: updated });
+});
+
+export const deleteSubtask = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new AppError('Unauthorized', 401);
+  const { subtaskId } = req.params;
+
+  await prisma.subTask.delete({ where: { id: subtaskId } });
+  res.json({ success: true, message: 'Subtask deleted' });
+});
+
+// ============ 9. GET /api/tasks/:id ============
+export const getTaskDetail = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new AppError('Unauthorized', 401);
+  const { id } = req.params;
+  if (!isValidUUID(id)) throw new AppError('Invalid task ID', 400);
+
+  const task = await prisma.task.findUnique({
+    where: { id },
+    include: {
+      createdBy: { select: { id: true, name: true, email: true, avatar: true } },
+      assignedTo: { select: { id: true, name: true, email: true, avatar: true } },
+      subtasks: { orderBy: { sortOrder: 'asc' } },
+      comments: {
+        include: { user: { select: { id: true, name: true, avatar: true } } },
+        orderBy: { createdAt: 'asc' },
+      },
+    },
+  });
+  if (!task) throw new AppError('Task not found', 404);
+
+  res.json({ success: true, data: task });
+});
+
+// ============ 10. DELETE /api/tasks/:id ============
 export const deleteTask = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) throw new AppError('Unauthorized', 401);
 

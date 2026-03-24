@@ -6,34 +6,30 @@ import {
   getCreatedTasks,
   getTeamTasks,
   updateTaskStatus,
+  updateTask,
   addComment,
   deleteTask,
+  getTaskDetail,
+  addSubtask,
+  toggleSubtask,
+  deleteSubtask,
 } from '../controllers/taskController.js';
 
 const router = Router();
 
-// All routes require authentication
 router.use(authMiddleware);
 
-// Create a task
 router.post('/', createTask);
-
-// Get tasks assigned to me
 router.get('/my', getMyTasks);
-
-// Get tasks I created
 router.get('/created', getCreatedTasks);
-
-// Get team tasks (manager/org_owner)
 router.get('/team', getTeamTasks);
-
-// Update task status
+router.get('/:id', getTaskDetail);
+router.put('/:id', updateTask);
 router.patch('/:id/status', updateTaskStatus);
-
-// Add comment to task
 router.post('/:id/comments', addComment);
-
-// Delete task (creator only)
+router.post('/:id/subtasks', addSubtask);
+router.patch('/subtasks/:subtaskId/toggle', toggleSubtask);
+router.delete('/subtasks/:subtaskId', deleteSubtask);
 router.delete('/:id', deleteTask);
 
 export default router;

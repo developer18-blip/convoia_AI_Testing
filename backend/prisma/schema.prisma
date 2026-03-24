@@ -373,10 +373,12 @@ model Task {
   organization     Organization  @relation(fields: [organizationId], references: [id])
   priority         String        @default("medium")
   status           String        @default("pending")
+  section          String?
   dueDate          DateTime?
   completedAt      DateTime?
   suggestedModelId String?
   comments         TaskComment[]
+  subtasks         SubTask[]
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
@@ -384,6 +386,18 @@ model Task {
   @@index([createdById])
   @@index([organizationId])
   @@index([status])
+}
+
+model SubTask {
+  id          String   @id @default(uuid())
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  title       String
+  isCompleted Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@index([taskId])
 }
 
 model TaskComment {
