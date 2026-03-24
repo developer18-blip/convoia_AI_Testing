@@ -34,6 +34,9 @@ import tokenWalletRoutes from './routes/tokenWalletRoutes.js';
 
 const app: Express = express();
 
+// Trust proxy (required when behind Nginx/load balancer for rate limiter + real IP)
+app.set('trust proxy', 1);
+
 // ============== STRIPE WEBHOOK (must be before express.json()) ==============
 // Only the webhook needs raw body — mount on exact path, not a sub-router,
 // so it doesn't intercept OPTIONS preflight for other /api/stripe/* routes.

@@ -328,31 +328,16 @@ export const queryAIStream = async (req: Request, res: Response) => {
         const searchResult = await searchWeb(userQuery, 5);
         if (searchResult.searched && searchResult.results.length > 0) {
           webSearched = true;
-          // Inject search results as a system message before the user's query
-          const searchContext = {
-            role: 'system' as const,
-            content: `You have access to real-time web search results. Use them to provide accurate, up-to-date information. Always cite your sources with URLs.
-
-IMPORTANT: When the data contains numerical comparisons, prices over time, market data, statistics, or any data that would benefit from visualization, include an interactive chart using this EXACT format:
-
-\`\`\`chart
-{
-  "type": "line|bar|area|pie",
-  "title": "Chart Title",
-  "data": [{"name": "Label1", "value": 100}, {"name": "Label2", "value": 200}],
-  "xKey": "name",
-  "yKeys": [{"key": "value", "color": "#7C3AED", "label": "Display Name"}]
-}
-\`\`\`
-
-Use "line" or "area" for time-series/trends. Use "bar" for comparisons. Use "pie" for distributions/proportions. Always include real data from the search results.
-
-${searchResult.contextText}`
-          };
-          // Insert before the last user message
+          // Append search results to the last user message (not as system — Anthropic rejects system in messages array)
+          const searchPrefix = `\n\n[Web Search Context — use this data to answer accurately. Cite sources with URLs. If data contains numbers/comparisons, include a chart using \`\`\`chart {"type":"line|bar|area|pie","title":"...","data":[...],"xKey":"name","yKeys":[{"key":"value","color":"#7C3AED","label":"..."}]} \`\`\` format.]\n\n${searchResult.contextText}`;
           enrichedMessages = [...messages];
           const lastIdx = enrichedMessages.length - 1;
-          enrichedMessages.splice(lastIdx, 0, searchContext);
+          if (enrichedMessages[lastIdx]?.role === 'user') {
+            enrichedMessages[lastIdx] = {
+              ...enrichedMessages[lastIdx],
+              content: enrichedMessages[lastIdx].content + searchPrefix,
+            };
+          }
 
           // Send search indicator to frontend
           const sources = searchResult.results.slice(0, 3).map(r => ({ title: r.title, url: r.url }));
