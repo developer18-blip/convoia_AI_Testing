@@ -360,6 +360,34 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
         {/* Agent run */}
         {message.agentRun && <div style={{ marginTop: '12px' }}><AgentPanel agentRun={message.agentRun} /></div>}
 
+        {/* Try with another model — lazy execution */}
+        {showActions && message.content.length > 20 && onRetry && (
+          <div style={{
+            display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px',
+            opacity: showActions ? 1 : 0, transition: 'opacity 200ms',
+          }}>
+            {[
+              { label: 'GPT-5.4', color: '#10B981' },
+              { label: 'Claude 4.6', color: '#D97706' },
+              { label: 'Gemini Pro', color: '#3B82F6' },
+            ].filter(m => !message.model?.includes(m.label.split(' ')[0])).slice(0, 2).map(m => (
+              <button key={m.label}
+                style={{
+                  fontSize: '11px', padding: '3px 10px', borderRadius: '12px',
+                  border: `1px solid ${m.color}30`, background: `${m.color}08`,
+                  color: m.color, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
+                  transition: 'all 150ms',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = `${m.color}18`; e.currentTarget.style.borderColor = `${m.color}50` }}
+                onMouseLeave={e => { e.currentTarget.style.background = `${m.color}08`; e.currentTarget.style.borderColor = `${m.color}30` }}
+                title={`Regenerate this response with ${m.label}`}
+              >
+                Try {m.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Meta + action buttons */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: '12px', marginTop: '8px',

@@ -9,6 +9,7 @@ import { NotificationService } from '../services/notificationService.js';
 import { needsWebSearch, searchWeb } from '../services/webSearchService.js';
 import { detectImageIntent, enhanceImagePrompt } from '../services/imageIntentService.js';
 import { FileProcessingService } from '../services/fileProcessingService.js';
+import { getCachedResponse, setCachedResponse } from '../services/modelRecommendationService.js';
 import logger from '../config/logger.js';
 
 // Image-only models that cannot handle chat/streaming
@@ -393,6 +394,25 @@ export const queryAIStream = async (req: Request, res: Response) => {
     // Cap output tokens so total (input + output) stays within user's balance
     const streamMaxOutput = Math.max(streamTokenBalance.tokenBalance - estimatedInputTokens, 200);
 
+    // ── RESPONSE CACHE CHECK ──────────────────────────────────
+    // If identical prompt + model was recently answered, return cached (ZERO tokens)
+    const cachePrompt = lastUserText || inputText.substring(0, 500);
+    const cached = getCachedResponse(cachePrompt, finalModelId);
+    if (cached && !agentConfig) {
+      logger.info(`Cache hit — returning cached response for user ${user.id}, saved ${cached.tokens} tokens`);
+      const chunks = cached.response.match(/.{1,50}/gs) || [cached.response];
+      for (const chunk of chunks) {
+        res.write(`data: ${JSON.stringify({ type: 'chunk', content: chunk })}\n\n`);
+      }
+      res.write(`data: ${JSON.stringify({
+        type: 'done', inputTokens: 0, outputTokens: 0, totalTokens: 0,
+        model: streamModelCheck?.name || 'AI', cached: true,
+      })}\n\n`);
+      res.write('data: [DONE]\n\n');
+      res.end();
+      return;
+    }
+
     const startTime = Date.now();
     let fullResponse = '';
     let streamEnded = false;
@@ -469,6 +489,11 @@ export const queryAIStream = async (req: Request, res: Response) => {
               const inputTokens = rawInputTokens > 0 ? rawInputTokens : Math.ceil(inputText.length / 4) + 500;
               const outputTokens = rawOutputTokens > 0 ? rawOutputTokens : Math.ceil(fullResponse.length / 4);
               const totalTokensUsed = inputTokens + outputTokens;
+
+              // Cache the response for identical future queries (saves tokens)
+              if (fullResponse.length > 10 && !webSearched) {
+                setCachedResponse(cachePrompt, finalModelId, fullResponse, totalTokensUsed);
+              }
 
               if (rawInputTokens === 0 && rawOutputTokens === 0) {
                 logger.warn(`Provider reported 0 tokens — using estimates: input=${inputTokens} output=${outputTokens} total=${totalTokensUsed}`);
