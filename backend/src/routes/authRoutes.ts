@@ -6,13 +6,13 @@ import { uploadSingle } from '../middleware/uploadMiddleware.js';
 
 const router = Router();
 
-// Public routes
-router.post('/register', authLimiter, register);
-router.post('/login', authLimiter, login);
-router.post('/verify-email', authLimiter, verifyEmail);
-router.post('/resend-verification', authLimiter, resendVerification);
-router.post('/google', authLimiter, googleAuth);
-router.post('/refresh', authLimiter, refreshToken);
+// Public routes (no rate limiting — handled by Nginx in production)
+router.post('/register', register);
+router.post('/login', login);
+router.post('/verify-email', verifyEmail);
+router.post('/resend-verification', resendVerification);
+router.post('/google', googleAuth);
+router.post('/refresh', refreshToken);
 
 // Protected routes
 router.post('/verify', authMiddleware, verifyToken);

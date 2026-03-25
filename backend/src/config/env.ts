@@ -70,7 +70,7 @@ export const config = {
 
   // Rate Limiting
   rateLimitWindow: parseInt(process.env.RATE_LIMIT_WINDOW || '15', 10),
-  rateLimitMaxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100', 10),
+  rateLimitMaxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '5000', 10),
 
   // CORS
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3000',
