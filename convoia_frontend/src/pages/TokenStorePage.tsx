@@ -145,19 +145,18 @@ export function TokenStorePage() {
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-text-primary">Buy Tokens</h2>
-          <p className="text-sm text-text-muted mt-1">Power your AI conversations. Tokens never expire.</p>
+          <h2 className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>Buy Tokens</h2>
+          <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>Power your AI conversations. Tokens never expire.</p>
         </div>
-
-        {/* Balance chip */}
         <div style={{
-          backgroundColor: '#0D0D15', border: '1px solid #1E1E2E', borderRadius: '12px',
-          padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '12px',
+          background: 'linear-gradient(135deg, var(--color-accent-start), var(--color-accent-end))',
+          borderRadius: '16px', padding: '16px 24px', display: 'flex', alignItems: 'center', gap: '12px',
+          boxShadow: '0 4px 20px rgba(124,58,237,0.25)',
         }}>
-          <Zap size={22} style={{ color: '#A78BFA' }} />
+          <Zap size={22} style={{ color: 'white' }} />
           <div>
-            <p style={{ fontSize: '11px', color: '#8E8E8E', marginBottom: '2px' }}>Your Balance</p>
-            <p style={{ fontSize: '22px', fontWeight: 700, color: '#A78BFA', fontFamily: 'monospace', margin: 0 }}>
+            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', marginBottom: '2px' }}>Your Balance</p>
+            <p style={{ fontSize: '22px', fontWeight: 800, color: 'white', fontFamily: 'monospace', margin: 0 }}>
               {formattedBalance} tokens
             </p>
           </div>
@@ -165,125 +164,110 @@ export function TokenStorePage() {
       </div>
 
       {/* Package grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {packages.map(pkg => (
-          <div
-            key={pkg.id}
-            className="relative rounded-2xl transition-all duration-200 hover:-translate-y-0.5"
-            style={{
-              backgroundColor: '#0D0D15',
-              border: pkg.popular ? '2px solid #7C3AED' : '1px solid #1E1E2E',
-              padding: '28px',
-              cursor: 'pointer',
-            }}
-            onMouseEnter={e => {
-              if (!pkg.popular) (e.currentTarget as HTMLElement).style.borderColor = '#3D3D5C'
-            }}
-            onMouseLeave={e => {
-              if (!pkg.popular) (e.currentTarget as HTMLElement).style.borderColor = '#1E1E2E'
-            }}
-          >
-            {/* Popular badge */}
-            {pkg.popular && (
-              <div style={{
-                position: 'absolute', top: '-13px', left: '50%', transform: 'translateX(-50%)',
-                background: 'linear-gradient(135deg, #7C3AED, #4F46E5)', color: 'white',
-                padding: '4px 20px', borderRadius: '20px', fontSize: '11px', fontWeight: 700,
-                letterSpacing: '0.05em', textTransform: 'uppercase', whiteSpace: 'nowrap',
-              }}>
-                Most Popular
-              </div>
-            )}
-
-            {/* Top row */}
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <span style={{ fontSize: '24px' }}>{pkg.icon}</span>
-                <span style={{ fontSize: '15px', fontWeight: 600, color: '#ECECEC' }}>{pkg.name}</span>
-              </div>
-              {pkg.savings && (
-                <span style={{
-                  backgroundColor: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)',
-                  color: '#10B981', padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                }}>
-                  {pkg.savings}
-                </span>
-              )}
-            </div>
-
-            {/* Token amount */}
-            <p style={{ fontSize: '42px', fontWeight: 900, color: pkg.color, margin: '16px 0 4px', letterSpacing: '-1px' }}>
-              {fmtTokens(pkg.tokens)}
-            </p>
-            <p style={{ fontSize: '13px', color: '#55556A', marginBottom: '4px' }}>tokens</p>
-
-            {/* Price */}
-            <p style={{ fontSize: '26px', fontWeight: 700, color: '#ECECEC', margin: '8px 0 4px' }}>
-              ${pkg.price.toFixed(2)}
-            </p>
-            <p style={{ fontSize: '12px', color: '#55556A', marginBottom: '8px' }}>
-              ${pkg.pricePerMillion.toFixed(2)} per 1M tokens
-            </p>
-
-            {/* Description */}
-            <p style={{ fontSize: '13px', color: '#8E8E8E', marginBottom: '20px' }}>
-              {pkg.description}
-            </p>
-
-            {/* Buy button */}
-            <button
-              onClick={() => handleBuy(pkg.id)}
-              disabled={buyingId === pkg.id}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {packages.map(pkg => {
+          const isPopular = pkg.popular
+          return (
+            <div
+              key={pkg.id}
+              className="relative rounded-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
               style={{
-                width: '100%', padding: '12px', borderRadius: '10px', fontSize: '14px', fontWeight: 600,
-                cursor: buyingId === pkg.id ? 'not-allowed' : 'pointer', transition: 'all 150ms',
-                backgroundColor: pkg.popular ? '#7C3AED' : 'transparent',
-                border: pkg.popular ? 'none' : '1px solid #2D2D3F',
-                color: pkg.popular ? 'white' : '#8E8E8E',
-              }}
-              onMouseEnter={e => {
-                if (!pkg.popular) {
-                  (e.currentTarget as HTMLElement).style.backgroundColor = '#1A1A26';
-                  (e.currentTarget as HTMLElement).style.color = '#ECECEC';
-                  (e.currentTarget as HTMLElement).style.borderColor = '#3D3D5C';
-                }
-              }}
-              onMouseLeave={e => {
-                if (!pkg.popular) {
-                  (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
-                  (e.currentTarget as HTMLElement).style.color = '#8E8E8E';
-                  (e.currentTarget as HTMLElement).style.borderColor = '#2D2D3F';
-                }
+                background: isPopular
+                  ? 'linear-gradient(135deg, var(--color-accent-start), var(--color-accent-mid), var(--color-accent-end))'
+                  : 'var(--color-surface)',
+                border: isPopular ? 'none' : '1px solid var(--color-border)',
+                padding: '28px',
+                cursor: 'pointer',
+                boxShadow: isPopular
+                  ? '0 8px 32px rgba(124,58,237,0.3)'
+                  : '0 2px 8px rgba(0,0,0,0.06)',
               }}
             >
-              {buyingId === pkg.id ? 'Processing...' : `Buy ${fmtTokens(pkg.tokens)} Tokens`}
-            </button>
-          </div>
-        ))}
+              {isPopular && (
+                <div style={{
+                  position: 'absolute', top: '-13px', left: '50%', transform: 'translateX(-50%)',
+                  background: 'white', color: 'var(--color-accent-start)',
+                  padding: '5px 22px', borderRadius: '20px', fontSize: '11px', fontWeight: 800,
+                  letterSpacing: '0.05em', textTransform: 'uppercase', whiteSpace: 'nowrap',
+                  boxShadow: '0 2px 12px rgba(124,58,237,0.2)',
+                }}>
+                  Most Popular
+                </div>
+              )}
+
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span style={{ fontSize: '24px' }}>{pkg.icon}</span>
+                  <span style={{ fontSize: '15px', fontWeight: 700, color: isPopular ? 'white' : 'var(--color-text-primary)' }}>{pkg.name}</span>
+                </div>
+                {pkg.savings && (
+                  <span style={{
+                    background: isPopular ? 'rgba(255,255,255,0.2)' : 'rgba(16,185,129,0.1)',
+                    border: isPopular ? '1px solid rgba(255,255,255,0.3)' : '1px solid rgba(16,185,129,0.2)',
+                    color: isPopular ? 'white' : '#10B981',
+                    padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                  }}>
+                    {pkg.savings}
+                  </span>
+                )}
+              </div>
+
+              <p style={{ fontSize: '44px', fontWeight: 900, color: isPopular ? 'white' : pkg.color, margin: '16px 0 4px', letterSpacing: '-1px' }}>
+                {fmtTokens(pkg.tokens)}
+              </p>
+              <p style={{ fontSize: '13px', color: isPopular ? 'rgba(255,255,255,0.6)' : 'var(--color-text-muted)', marginBottom: '4px' }}>tokens</p>
+
+              <p style={{ fontSize: '28px', fontWeight: 800, color: isPopular ? 'white' : 'var(--color-text-primary)', margin: '8px 0 4px' }}>
+                ${pkg.price.toFixed(2)}
+              </p>
+              <p style={{ fontSize: '12px', color: isPopular ? 'rgba(255,255,255,0.5)' : 'var(--color-text-muted)', marginBottom: '8px' }}>
+                ${pkg.pricePerMillion.toFixed(2)} per 1M tokens
+              </p>
+
+              <p style={{ fontSize: '13px', color: isPopular ? 'rgba(255,255,255,0.7)' : 'var(--color-text-secondary)', marginBottom: '20px' }}>
+                {pkg.description}
+              </p>
+
+              <button
+                onClick={() => handleBuy(pkg.id)}
+                disabled={buyingId === pkg.id}
+                style={{
+                  width: '100%', padding: '12px', borderRadius: '12px', fontSize: '14px', fontWeight: 700,
+                  cursor: buyingId === pkg.id ? 'not-allowed' : 'pointer', transition: 'all 200ms',
+                  background: isPopular ? 'white' : 'linear-gradient(135deg, var(--color-accent-start), var(--color-accent-mid))',
+                  border: 'none',
+                  color: isPopular ? 'var(--color-accent-start)' : 'white',
+                  boxShadow: isPopular ? '0 2px 12px rgba(255,255,255,0.3)' : '0 2px 12px rgba(124,58,237,0.25)',
+                }}
+              >
+                {buyingId === pkg.id ? 'Processing...' : `Buy ${fmtTokens(pkg.tokens)} Tokens`}
+              </button>
+            </div>
+          )
+        })}
       </div>
 
       {/* Info section */}
-      <div style={{ backgroundColor: '#0D0D15', border: '1px solid #1E1E2E', borderRadius: '16px', padding: '24px' }}>
-        <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#ECECEC', marginBottom: '16px' }}>
+      <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '16px', padding: '24px' }}>
+        <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: '16px' }}>
           Frequently Asked Questions
         </h3>
         <div className="space-y-4">
           {[
             { q: 'Do tokens expire?', a: 'Never. Your tokens stay in your account forever.' },
             { q: 'What counts as a token?', a: 'Roughly 4 characters of text. A typical message uses 200-500 tokens.' },
-            { q: 'Can I use tokens on all models?', a: 'Yes — all 16 AI models draw from the same token balance.' },
+            { q: 'Can I use tokens on all models?', a: 'Yes — all 35 AI models draw from the same token balance.' },
             { q: 'Can org owners share tokens?', a: 'Yes. Owners can allocate tokens to managers, who can then allocate to employees.' },
           ].map(faq => (
             <div key={faq.q}>
-              <p style={{ fontSize: '13px', fontWeight: 600, color: '#ECECEC', marginBottom: '4px' }}>{faq.q}</p>
-              <p style={{ fontSize: '13px', color: '#8E8E8E' }}>{faq.a}</p>
+              <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '4px' }}>{faq.q}</p>
+              <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>{faq.a}</p>
             </div>
           ))}
         </div>
-
-        <div className="flex items-center gap-2 mt-6 pt-4" style={{ borderTop: '1px solid #1E1E2E' }}>
-          <Shield size={14} style={{ color: '#8E8E8E' }} />
-          <p style={{ fontSize: '12px', color: '#8E8E8E' }}>Secured by Stripe. We never store your card details.</p>
+        <div className="flex items-center gap-2 mt-6 pt-4" style={{ borderTop: '1px solid var(--color-border)' }}>
+          <Shield size={14} style={{ color: 'var(--color-text-muted)' }} />
+          <p style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Secured by Stripe. We never store your card details.</p>
         </div>
       </div>
 
