@@ -18,12 +18,12 @@ const features = [
 ]
 
 const providers = [
-  { name: 'OpenAI', models: 'GPT-4o, GPT-4o-mini', color: '#10B981' },
-  { name: 'Anthropic', models: 'Claude 4 Sonnet, Claude 3.5 Haiku', color: '#D97706' },
-  { name: 'Google', models: 'Gemini 2.0 Flash, Gemini Pro', color: '#3B82F6' },
-  { name: 'DeepSeek', models: 'DeepSeek V3, DeepSeek R1', color: '#8B5CF6' },
+  { name: 'OpenAI', models: 'GPT-5.4, GPT-4.1, o3, o4', color: '#10B981' },
+  { name: 'Anthropic', models: 'Claude Opus 4.6, Sonnet 4.6, Haiku 4.5', color: '#D97706' },
+  { name: 'Google', models: 'Gemini 3.1 Pro, 2.5 Flash, Image Gen', color: '#3B82F6' },
+  { name: 'DeepSeek', models: 'DeepSeek Chat, Reasoner', color: '#8B5CF6' },
   { name: 'Mistral', models: 'Mistral Large, Mistral Small', color: '#EF4444' },
-  { name: 'Groq', models: 'Llama 3.3 70B', color: '#F97316' },
+  { name: 'Groq', models: 'Llama 3.3 70B, Mixtral 8x7B', color: '#F97316' },
 ]
 
 // ── Token packages (pay-as-you-go, no subscriptions) ──────────────────
@@ -234,7 +234,7 @@ export function LandingPage() {
             className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium mb-8"
           >
             <Sparkles size={14} />
-            Now with 16 AI models
+            Now with 35+ AI models
           </motion.div>
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
@@ -306,7 +306,7 @@ export function LandingPage() {
       <section className="py-8 border-y border-border/50 bg-surface/30 backdrop-blur-sm">
         <div className="max-w-4xl mx-auto px-4 flex flex-wrap justify-center gap-16">
           {[
-            { value: '16', label: 'AI Models' },
+            { value: '35+', label: 'AI Models' },
             { value: '6', label: 'Providers' },
             { value: '99.9%', label: 'Uptime' },
           ].map((stat) => (

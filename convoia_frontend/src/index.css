@@ -595,3 +595,61 @@ html.light .stat-card {
   border-top: 3px solid transparent !important;
   border-image: linear-gradient(90deg, #7C3AED, #A78BFA, #C4B5FD) 1 !important;
 }
+
+/* ══════════════════════════════════════════════════
+   LIGHT MODE — GLOBAL TEXT & SURFACE OVERRIDES
+   Fix: Tailwind @theme sets dark mode values.
+   These force light mode colors everywhere.
+   ══════════════════════════════════════════════════ */
+
+/* Text colors — strong contrast in light mode */
+html.light .text-text-primary { color: #1E1B4B !important; }
+html.light .text-text-secondary { color: #4C4578 !important; }
+html.light .text-text-muted { color: #7C7599 !important; }
+html.light .text-text-meta { color: #7C7599 !important; }
+html.light .text-text-dim { color: #A89EC4 !important; }
+
+/* Primary/accent text */
+html.light .text-primary { color: #6D28D9 !important; }
+html.light .text-primary-hover { color: #5B21B6 !important; }
+
+/* Backgrounds */
+html.light .bg-background { background-color: #FAFBFF !important; }
+html.light .bg-surface { background-color: #FFFFFF !important; box-shadow: 0 1px 3px rgba(124,58,237,0.06) !important; }
+html.light .bg-surface-2 { background-color: #F5F3FF !important; }
+html.light .bg-surface-3 { background-color: #EDE9FE !important; }
+html.light .bg-surface\/80 { background-color: rgba(255,255,255,0.9) !important; }
+html.light .bg-surface\/30 { background-color: rgba(245,243,255,0.5) !important; }
+
+/* Borders */
+html.light .border-border { border-color: #E5E1F5 !important; }
+html.light .border-border\/50 { border-color: rgba(229,225,245,0.5) !important; }
+html.light .border-border-subtle { border-color: #F0EDFF !important; }
+html.light .border-primary\/20 { border-color: rgba(109,40,217,0.2) !important; }
+html.light .border-primary\/30 { border-color: rgba(109,40,217,0.3) !important; }
+html.light .border-primary\/40 { border-color: rgba(109,40,217,0.4) !important; }
+
+/* Gradient text — ensure contrast */
+html.light .from-accent-start { --tw-gradient-from: #7C3AED !important; }
+html.light .via-accent-mid { --tw-gradient-via: #8B5CF6 !important; }
+html.light .to-accent-end { --tw-gradient-to: #A78BFA !important; }
+html.light .to-accent-mid { --tw-gradient-to: #8B5CF6 !important; }
+html.light .from-accent-start.to-accent-mid { --tw-gradient-from: #7C3AED !important; --tw-gradient-to: #8B5CF6 !important; }
+
+/* Primary backgrounds */
+html.light .bg-primary { background-color: #6D28D9 !important; }
+html.light .bg-primary\/10 { background-color: rgba(109,40,217,0.1) !important; }
+html.light .bg-primary\/12 { background-color: rgba(109,40,217,0.12) !important; }
+html.light .bg-primary\/20 { background-color: rgba(109,40,217,0.2) !important; }
+
+/* Hover states */
+html.light .hover\:text-text-primary:hover { color: #1E1B4B !important; }
+html.light .hover\:border-primary\/40:hover { border-color: rgba(109,40,217,0.4) !important; }
+
+/* Glass effect in light mode */
+html.light .bg-background\/70 { background-color: rgba(250,251,255,0.85) !important; }
+
+/* Shadow overrides */
+html.light .shadow-primary\/20 { --tw-shadow-color: rgba(109,40,217,0.15) !important; }
+html.light .shadow-primary\/25 { --tw-shadow-color: rgba(109,40,217,0.2) !important; }
+html.light .shadow-primary\/5 { --tw-shadow-color: rgba(109,40,217,0.05) !important; }
