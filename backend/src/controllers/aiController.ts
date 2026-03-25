@@ -7,6 +7,8 @@ import { getOrCreatePersonalOrg } from '../utils/orgHelper.js';
 import { TokenWalletService } from '../services/tokenWalletService.js';
 import { NotificationService } from '../services/notificationService.js';
 import { needsWebSearch, searchWeb } from '../services/webSearchService.js';
+import { detectImageIntent, enhanceImagePrompt } from '../services/imageIntentService.js';
+import { FileProcessingService } from '../services/fileProcessingService.js';
 import logger from '../config/logger.js';
 
 // Image-only models that cannot handle chat/streaming
@@ -270,6 +272,90 @@ export const queryAIStream = async (req: Request, res: Response) => {
         res.status(402).json({ success: false, message: 'Monthly budget cap reached' });
         return;
       }
+    }
+
+    // ── IMAGE INTENT DETECTION ──────────────────────────────────
+    // Check if the latest user message is requesting image generation.
+    // If so, route to image pipeline instead of chat model.
+    const lastUserMessage = [...messages].reverse().find((m: any) => m.role === 'user');
+    const lastUserText = typeof lastUserMessage?.content === 'string' ? lastUserMessage.content : '';
+    const imageIntent = detectImageIntent(lastUserText);
+
+    if (imageIntent.isImageRequest) {
+      logger.info(`Image intent detected (${imageIntent.confidence}): "${lastUserText.substring(0, 80)}"`);
+
+      // Set up SSE for image generation
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.flushHeaders();
+
+      try {
+        // Send generating status
+        res.write(`data: ${JSON.stringify({ type: 'status', content: 'Generating image...' })}\n\n`);
+
+        // Enhance prompt with conversation context
+        const enhancedPrompt = enhanceImagePrompt(imageIntent.extractedSubject, {
+          conversationContext: messages,
+        });
+
+        res.write(`data: ${JSON.stringify({ type: 'chunk', content: `**Generating image:** "${enhancedPrompt.substring(0, 100)}..."\n\n` })}\n\n`);
+
+        // Generate image (Gemini first, DALL-E fallback)
+        const result = await FileProcessingService.generateImage(enhancedPrompt);
+
+        // Deduct tokens (flat cost for image gen)
+        const imageTokenCost = result.provider === 'gemini' ? 1300 : 1000;
+        await TokenWalletService.deductTokens({
+          userId: user.id,
+          tokens: imageTokenCost,
+          reference: `image-gen-${Date.now()}`,
+          description: `Image generation (${result.provider === 'gemini' ? 'Gemini' : 'DALL-E'})`,
+        });
+
+        // Send image result via SSE
+        const imageContent = [
+          `\n\n![Generated Image](${result.imageUrl})`,
+          `\n\n*"${result.revisedPrompt}"*`,
+          `\n\n[Download image](${result.imageUrl})`,
+        ].join('');
+
+        res.write(`data: ${JSON.stringify({ type: 'chunk', content: imageContent })}\n\n`);
+
+        // Send done event with metadata
+        res.write(`data: ${JSON.stringify({
+          type: 'done',
+          inputTokens: 0,
+          outputTokens: imageTokenCost,
+          totalTokens: imageTokenCost,
+          model: result.provider === 'gemini' ? 'Gemini Flash Image' : 'DALL-E 3',
+          imageGenerated: true,
+          imageUrl: result.imageUrl,
+        })}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+
+        // Log usage
+        await prisma.usageLog.create({
+          data: {
+            userId: user.id, organizationId,
+            modelId: finalModelId,
+            prompt: lastUserText.substring(0, 500),
+            tokensInput: 0, tokensOutput: imageTokenCost, totalTokens: imageTokenCost,
+            providerCost: 0, markupPercentage: 0, customerPrice: 0,
+          },
+        });
+
+        logger.info(`Image generated via ${result.provider} for user ${user.id}`);
+      } catch (err: any) {
+        logger.error(`Image generation failed: ${err.message}`);
+        res.write(`data: ${JSON.stringify({ type: 'chunk', content: `\n\nImage generation failed: ${err.message}. Try rephrasing your request.` })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'done', inputTokens: 0, outputTokens: 0, totalTokens: 0, model: 'Image Gen' })}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+      }
+      return;
     }
 
     const estimate = await estimateCost(finalModelId, inputText);

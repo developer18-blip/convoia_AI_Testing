@@ -296,6 +296,17 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
               td: ({ children }) => (
                 <td style={{ padding: '10px 14px', borderBottom: '1px solid var(--chat-surface)', color: 'var(--chat-text-secondary)' }}>{children}</td>
               ),
+              img: ({ src, alt }) => (
+                <div style={{ margin: '16px 0' }}>
+                  <img src={src} alt={alt || 'Generated image'}
+                    style={{ maxWidth: '100%', maxHeight: '512px', borderRadius: '12px', border: '1px solid var(--chat-border)', objectFit: 'contain', cursor: 'pointer' }}
+                    onClick={() => { if (src) window.open(src, '_blank') }}
+                  />
+                  {alt && alt !== 'Generated image' && alt !== 'Generated Image' && (
+                    <p style={{ fontSize: '12px', color: 'var(--chat-text-muted)', marginTop: '6px', fontStyle: 'italic' }}>{alt}</p>
+                  )}
+                </div>
+              ),
               code(props: ComponentPropsWithoutRef<'code'> & { inline?: boolean; className?: string }) {
                 const { inline, className, children, ...rest } = props
                 const match = /language-(\w+)/.exec(className || '')

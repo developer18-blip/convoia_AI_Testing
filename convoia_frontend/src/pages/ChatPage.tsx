@@ -40,8 +40,7 @@ export function ChatPage() {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
   const [lastResponseModel, setLastResponseModel] = useState<string | null>(null)
   const prevStreaming = useRef(false)
-  const [isGeneratingImage, setIsGeneratingImage] = useState(false)
-  const imageGenLock = useRef(false)
+  // Image generation is handled by backend intent detection
   const [industry, setIndustry] = useState('')
   const [leftOpen, setLeftOpen] = useState(true)
   const [mobileLeftOpen, setMobileLeftOpen] = useState(false)
@@ -111,36 +110,6 @@ export function ChatPage() {
 
   const selectedModel = models.find((m) => m.id === selectedModelId) || null
 
-  // Detect if message is an image generation request and extract the prompt
-  const isImageRequest = (text: string): string | null => {
-    const t = text.trim()
-    // /imagine or /image shorthand
-    if (/^\/(?:imagine|image)\s+/i.test(t)) return t.replace(/^\/(?:imagine|image)\s+/i, '').trim()
-    // "image: ..." / "picture: ..." shorthand
-    if (/^(?:image|picture|photo)\s*:\s*/i.test(t)) return t.replace(/^(?:image|picture|photo)\s*:\s*/i, '').trim()
-
-    // Broad verb + noun pattern: covers most natural phrasings
-    // "generate/create/make/draw [me] [a/an/the] [animated/realistic/...] image/picture/... [of/about/showing/...] ..."
-    const verbNounMatch = t.match(
-      /^(?:please\s+)?(?:can\s+you\s+)?(?:generate|create|make|draw|design|paint|render|produce|craft|build)\s+(?:me\s+)?(?:an?\s+|the\s+)?(?:\w+\s+)?(?:image|picture|photo|photograph|illustration|artwork|painting|poster|banner|icon|logo|graphic|visual|wallpaper|thumbnail)(?:\s+(?:of|about|showing|depicting|with|for|that|where|featuring|based on))?\s+(.+)/i
-    )
-    if (verbNounMatch?.[1]) return verbNounMatch[1].trim()
-
-    // "I want/need/would like [a/an] image/picture of ..."
-    const wantMatch = t.match(
-      /^(?:i\s+(?:want|need|would like|'d like)\s+(?:an?\s+)?(?:image|picture|photo|illustration)\s+(?:of|about|showing|for|depicting)\s+)(.+)/i
-    )
-    if (wantMatch?.[1]) return wantMatch[1].trim()
-
-    // "show me [a/an] image/picture of..."
-    const showMatch = t.match(
-      /^(?:show\s+me\s+(?:an?\s+)?(?:image|picture|photo|illustration)\s+(?:of|about|showing|for)\s+)(.+)/i
-    )
-    if (showMatch?.[1]) return showMatch[1].trim()
-
-    return null
-  }
-
   const handleSend = async (content: string) => {
     // Ensure a model is selected
     if (!selectedModelId) {
@@ -160,49 +129,8 @@ export function ChatPage() {
       return
     }
 
-    // Auto-detect image generation requests
-    const imagePrompt = isImageRequest(content)
-    if (imagePrompt) {
-      // Guard: ref-based lock prevents double-fire from React batching
-      if (imageGenLock.current) return
-      imageGenLock.current = true
-      setIsGeneratingImage(true)
-
-      if (!activeConversationId) {
-        createConversation(selectedModelId, selectedModel?.name || 'AI', industry || undefined)
-      }
-      const userMsg: Message = {
-        id: uuidv4(), role: 'user', content, timestamp: new Date().toISOString(),
-      }
-      addMessages([userMsg])
-
-      try {
-        const res = await api.post('/files/generate-image', { prompt: imagePrompt, size: '1024x1024', quality: 'standard' })
-        const data = res.data.data
-        const providerName = data.provider || 'Gemini Flash'
-        addMessages([{
-          id: uuidv4(), role: 'assistant',
-          content: `Here's the generated image for: "${imagePrompt}"`,
-          imageUrl: data.imageUrl, imagePrompt: data.revisedPrompt || imagePrompt,
-          model: providerName, provider: data.provider?.includes('Gemini') ? 'google' : 'openai',
-          timestamp: new Date().toISOString(),
-        }])
-        refresh()
-      } catch (err: any) {
-        const errMsg = err?.response?.data?.message || 'Image generation failed. Try again.'
-        addMessages([{
-          id: uuidv4(), role: 'assistant',
-          content: `Image generation failed: ${errMsg}`,
-          model: 'Image Gen', provider: 'system',
-          timestamp: new Date().toISOString(),
-        }])
-        toast.error(errMsg)
-      } finally {
-        setIsGeneratingImage(false)
-        imageGenLock.current = false
-      }
-      return // STOP — do NOT proceed to sendMessage
-    }
+    // Image generation is now handled automatically by the backend
+    // via intent detection in the streaming endpoint. No frontend detection needed.
 
     const estimated = Math.ceil(content.length / 4) + 500
     if (tokenBalance < estimated) {
@@ -550,7 +478,7 @@ export function ChatPage() {
         {/* Input */}
         <MessageInput
           onSend={handleSend}
-          isLoading={isStreaming || isGeneratingImage}
+          isLoading={isStreaming}
           onStop={stopStreaming}
           selectedModelId={selectedModelId}
           onFileProcessed={handleFileProcessed}
