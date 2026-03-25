@@ -78,6 +78,7 @@ interface SendMessageParams {
   industry?: string;
   agentConfig?: AgentConfig;
   maxOutputTokens?: number; // Cap output to user's available token balance
+  memoryContext?: string; // Persistent user memory to inject into system prompt
 }
 
 interface SendVisionParams {
@@ -808,7 +809,7 @@ async function routeToProviderStream(
 export class AIGatewayService {
   // ─── Text message routing ───
   static async sendMessage(params: SendMessageParams): Promise<AIResponse> {
-    const { modelId, messages, industry, agentConfig, maxOutputTokens } = params;
+    const { modelId, messages, industry, agentConfig, maxOutputTokens, memoryContext } = params;
 
     const aiModel = await prisma.aIModel.findUnique({
       where: { id: modelId },
@@ -823,7 +824,9 @@ export class AIGatewayService {
     }
 
     // Use agent's system prompt if available, otherwise default
-    const systemPrompt = agentConfig?.systemPrompt || getSystemPrompt(industry);
+    // Append persistent user memory to all prompts
+    const basePrompt = agentConfig?.systemPrompt || getSystemPrompt(industry);
+    const systemPrompt = memoryContext ? basePrompt + memoryContext : basePrompt;
 
     // Determine max output tokens: smallest of agent config, user's balance cap, and provider limit
     let effectiveMaxTokens = agentConfig?.maxTokens;

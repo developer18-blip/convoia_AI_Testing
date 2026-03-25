@@ -92,6 +92,7 @@ model User {
   tokenTransactions        TokenTransaction[]
   reviews                  Review[]
   conversations            Conversation[]
+  memories                 UserMemory[]
 
   @@index([organizationId])
   @@index([managerId])
@@ -587,4 +588,19 @@ model ChatMessage {
 
   @@index([conversationId])
   @@index([conversationId, createdAt])
+}
+
+model UserMemory {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category  String   // name, preference, fact, instruction, context
+  key       String   // "user_name", "nickname", "language", etc.
+  value     String   // The actual memory content
+  source    String?  // "user_explicit" | "extracted" — how it was created
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, key])
+  @@index([userId])
 }
