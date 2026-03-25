@@ -198,7 +198,7 @@ export function LandingPage() {
               <div className="absolute inset-0 bg-primary/20 rounded-lg blur-md" />
               <Zap size={24} className="text-primary relative" />
             </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-accent-start to-accent-end bg-clip-text text-transparent">ConvoiaAI</span>
+            <span className="text-xl font-bold bg-clip-text text-transparent" style={{ backgroundImage: 'linear-gradient(135deg, var(--color-accent-start), var(--color-accent-end))' }}>ConvoiaAI</span>
           </Link>
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="text-sm text-text-secondary hover:text-text-primary transition-colors">Features</a>
@@ -210,7 +210,7 @@ export function LandingPage() {
             <Link to="/login" className="text-sm text-text-secondary hover:text-text-primary transition-colors px-4 py-2">
               Login
             </Link>
-            <Link to="/register" className="bg-gradient-to-r from-accent-start to-accent-mid hover:brightness-110 text-white text-sm font-semibold px-5 py-2 rounded-xl transition-all shadow-lg shadow-primary/20">
+            <Link to="/register" className="hover:brightness-110 text-white text-sm font-semibold px-5 py-2 rounded-xl transition-all" style={{ background: 'linear-gradient(135deg, var(--color-accent-start), var(--color-accent-mid))', boxShadow: '0 4px 14px rgba(37,99,235,0.25)' }}>
               Get Started
             </Link>
           </div>
@@ -244,7 +244,7 @@ export function LandingPage() {
           >
             One platform.
             <br />
-            <span className="bg-gradient-to-r from-accent-start via-accent-mid to-accent-end bg-clip-text text-transparent">
+            <span className="bg-clip-text text-transparent" style={{ backgroundImage: 'linear-gradient(135deg, var(--color-accent-start), var(--color-accent-mid), var(--color-accent-end))' }}>
               Every AI model.
             </span>
             <br />
@@ -265,7 +265,7 @@ export function LandingPage() {
             transition={{ duration: 0.5, delay: 0.3 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
-            <Link to="/register" className="inline-flex items-center gap-2 bg-gradient-to-r from-accent-start to-accent-mid hover:brightness-110 text-white font-semibold px-7 py-3.5 rounded-xl transition-all shadow-lg shadow-primary/25">
+            <Link to="/register" className="inline-flex items-center gap-2 hover:brightness-110 text-white font-semibold px-7 py-3.5 rounded-xl transition-all" style={{ background: 'linear-gradient(135deg, var(--color-accent-start), var(--color-accent-mid))', boxShadow: '0 4px 20px rgba(37,99,235,0.3)' }}>
               Start for free
               <ArrowRight size={18} />
             </Link>
@@ -311,7 +311,7 @@ export function LandingPage() {
             { value: '99.9%', label: 'Uptime' },
           ].map((stat) => (
             <div key={stat.label} className="text-center">
-              <p className="text-3xl font-bold bg-gradient-to-r from-accent-start to-accent-end bg-clip-text text-transparent">{stat.value}</p>
+              <p className="text-3xl font-bold bg-clip-text text-transparent" style={{ backgroundImage: 'linear-gradient(135deg, var(--color-accent-start), var(--color-accent-end))' }}>{stat.value}</p>
               <p className="text-sm text-text-muted mt-1">{stat.label}</p>
             </div>
           ))}
@@ -615,7 +615,7 @@ export function LandingPage() {
             <div className="relative">
               <h2 className="text-3xl sm:text-4xl font-bold text-text-primary mb-4">Ready to take control of your AI spend?</h2>
               <p className="text-text-secondary mb-8 max-w-lg mx-auto">Join teams who manage their AI costs without sacrificing capability.</p>
-              <Link to="/register" className="inline-flex items-center gap-2 bg-gradient-to-r from-accent-start to-accent-mid hover:brightness-110 text-white font-semibold px-8 py-3.5 rounded-xl transition-all shadow-lg shadow-primary/25 text-lg">
+              <Link to="/register" className="inline-flex items-center gap-2 hover:brightness-110 text-white font-semibold px-8 py-3.5 rounded-xl transition-all text-lg" style={{ background: 'linear-gradient(135deg, var(--color-accent-start), var(--color-accent-mid))', boxShadow: '0 4px 20px rgba(37,99,235,0.3)' }}>
                 Start for free
                 <ArrowRight size={20} />
               </Link>
@@ -633,7 +633,7 @@ export function LandingPage() {
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2.5">
               <Zap size={20} className="text-primary" />
-              <span className="font-bold bg-gradient-to-r from-accent-start to-accent-end bg-clip-text text-transparent">ConvoiaAI</span>
+              <span className="font-bold bg-clip-text text-transparent" style={{ backgroundImage: 'linear-gradient(135deg, var(--color-accent-start), var(--color-accent-end))' }}>ConvoiaAI</span>
             </div>
             <p className="text-sm text-text-muted">&copy; {new Date().getFullYear()} ConvoiaAI. All rights reserved.</p>
           </div>
@@ -702,7 +702,8 @@ function ReviewsSection() {
           <p className="text-text-secondary max-w-2xl mx-auto mb-8">Real feedback from teams and individuals using ConvoiaAI every day.</p>
           <button
             onClick={() => setShowForm(true)}
-            className="inline-flex items-center gap-2 bg-gradient-to-r from-accent-start to-accent-mid hover:brightness-110 text-white font-semibold px-6 py-2.5 rounded-xl transition-all text-sm"
+            className="inline-flex items-center gap-2 hover:brightness-110 text-white font-semibold px-6 py-2.5 rounded-xl transition-all text-sm"
+            style={{ background: 'linear-gradient(135deg, var(--color-accent-start), var(--color-accent-mid))' }}
           >
             <Send size={16} />
             Write a Review
@@ -844,7 +845,8 @@ function ReviewsSection() {
                     <button
                       onClick={handleSubmit}
                       disabled={submitting || !form.title.trim() || !form.content.trim()}
-                      className="w-full bg-gradient-to-r from-accent-start to-accent-mid hover:brightness-110 text-white font-semibold py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      className="w-full hover:brightness-110 text-white font-semibold py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      style={{ background: 'linear-gradient(135deg, var(--color-accent-start), var(--color-accent-mid))' }}
                     >
                       {submitting ? 'Submitting...' : <><Send size={16} /> Submit Review</>}
                     </button>
