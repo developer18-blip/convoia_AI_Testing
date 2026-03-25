@@ -210,7 +210,7 @@ export function LandingPage() {
             <Link to="/login" className="text-sm text-text-secondary hover:text-text-primary transition-colors px-4 py-2">
               Login
             </Link>
-            <Link to="/register" className="hover:brightness-110 text-white text-sm font-semibold px-5 py-2 rounded-xl transition-all" style={{ background: 'linear-gradient(135deg, var(--color-accent-start), var(--color-accent-mid))', boxShadow: '0 4px 14px rgba(37,99,235,0.25)' }}>
+            <Link to="/register" className="hover:brightness-110 text-sm font-semibold px-5 py-2 rounded-xl transition-all" style={{ background: '#2563EB', color: '#FFFFFF', boxShadow: '0 4px 14px rgba(37,99,235,0.25)' }}>
               Get Started
             </Link>
           </div>
@@ -265,9 +265,9 @@ export function LandingPage() {
             transition={{ duration: 0.5, delay: 0.3 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
-            <Link to="/register" className="inline-flex items-center gap-2 hover:brightness-110 text-white font-semibold px-7 py-3.5 rounded-xl transition-all" style={{ background: 'linear-gradient(135deg, var(--color-accent-start), var(--color-accent-mid))', boxShadow: '0 4px 20px rgba(37,99,235,0.3)' }}>
+            <Link to="/register" className="inline-flex items-center gap-2 hover:brightness-110 font-semibold px-7 py-3.5 rounded-xl transition-all" style={{ background: '#2563EB', color: '#FFFFFF', boxShadow: '0 4px 20px rgba(37,99,235,0.3)' }}>
               Start for free
-              <ArrowRight size={18} />
+              <ArrowRight size={18} style={{ color: '#FFFFFF' }} />
             </Link>
             <a href="#how-it-works" className="inline-flex items-center gap-2 text-text-secondary hover:text-text-primary font-medium px-6 py-3.5 rounded-xl border border-border hover:border-primary/40 transition-all">
               See how it works
@@ -616,7 +616,7 @@ export function LandingPage() {
             <div className="relative">
               <h2 className="text-3xl sm:text-4xl font-bold text-text-primary mb-4">Ready to take control of your AI spend?</h2>
               <p className="text-text-secondary mb-8 max-w-lg mx-auto">Join teams who manage their AI costs without sacrificing capability.</p>
-              <Link to="/register" className="inline-flex items-center gap-2 hover:brightness-110 text-white font-semibold px-8 py-3.5 rounded-xl transition-all text-lg" style={{ background: 'linear-gradient(135deg, var(--color-accent-start), var(--color-accent-mid))', boxShadow: '0 4px 20px rgba(37,99,235,0.3)' }}>
+              <Link to="/register" className="inline-flex items-center gap-2 hover:brightness-110 font-semibold px-8 py-3.5 rounded-xl transition-all text-lg" style={{ background: '#2563EB', color: '#FFFFFF', boxShadow: '0 4px 20px rgba(37,99,235,0.3)' }}>
                 Start for free
                 <ArrowRight size={20} />
               </Link>
@@ -703,8 +703,8 @@ function ReviewsSection() {
           <p className="text-text-secondary max-w-2xl mx-auto mb-8">Real feedback from teams and individuals using ConvoiaAI every day.</p>
           <button
             onClick={() => setShowForm(true)}
-            className="inline-flex items-center gap-2 hover:brightness-110 text-white font-semibold px-6 py-2.5 rounded-xl transition-all text-sm"
-            style={{ background: 'linear-gradient(135deg, var(--color-accent-start), var(--color-accent-mid))' }}
+            className="inline-flex items-center gap-2 hover:brightness-110 font-semibold px-6 py-2.5 rounded-xl transition-all text-sm"
+            style={{ background: '#2563EB', color: '#FFFFFF' }}
           >
             <Send size={16} />
             Write a Review
@@ -846,8 +846,8 @@ function ReviewsSection() {
                     <button
                       onClick={handleSubmit}
                       disabled={submitting || !form.title.trim() || !form.content.trim()}
-                      className="w-full hover:brightness-110 text-white font-semibold py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                      style={{ background: 'linear-gradient(135deg, var(--color-accent-start), var(--color-accent-mid))' }}
+                      className="w-full hover:brightness-110 font-semibold py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      style={{ background: '#2563EB', color: '#FFFFFF' }}
                     >
                       {submitting ? 'Submitting...' : <><Send size={16} /> Submit Review</>}
                     </button>
