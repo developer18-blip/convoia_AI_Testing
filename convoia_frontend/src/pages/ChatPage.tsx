@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { v4 as uuidv4 } from 'uuid'
-import api from '../lib/api'
 import { ConversationList } from '../components/chat/ConversationList'
 import { MessageArea } from '../components/chat/MessageArea'
 import { MessageInput } from '../components/chat/MessageInput'
@@ -26,7 +25,7 @@ export function ChatPage() {
   const { models } = useModels()
   const { agents, createAgent } = useAgents()
   const { user: authUser } = useAuth()
-  const { tokenBalance, formattedBalance, refresh } = useTokens()
+  const { tokenBalance, formattedBalance } = useTokens()
   const toast = useToast()
   const {
     conversations, folders, activeConversationId, activeConversation, messages, isStreaming, stopStreaming,
