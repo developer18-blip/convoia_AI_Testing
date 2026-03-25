@@ -226,7 +226,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     if (id && userId) {
       // Try local first (instant)
       const localConv = conversations.find((c) => c.id === id)
-      if (localConv?.messages?.length > 0) {
+      if (localConv && localConv.messages && localConv.messages.length > 0) {
         setMessages(localConv.messages)
       } else {
         setMessages([])
