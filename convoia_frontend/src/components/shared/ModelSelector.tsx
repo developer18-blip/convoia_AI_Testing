@@ -83,7 +83,7 @@ export function ModelSelector({ models, selectedId, onChange, className }: Model
           display: 'flex', alignItems: 'center', gap: '6px',
           backgroundColor: 'transparent', border: 'none', cursor: 'pointer',
           padding: '6px 8px', borderRadius: '8px',
-          fontSize: '16px', fontWeight: 600, color: '#ECECEC',
+          fontSize: '16px', fontWeight: 600, color: 'var(--chat-text)',
           transition: 'background-color 150ms',
         }}
         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2F2F2F'}
@@ -93,32 +93,32 @@ export function ModelSelector({ models, selectedId, onChange, className }: Model
           <ImageIcon size={14} style={{ color: '#F59E0B' }} />
         )}
         {selected?.name ?? 'Select model'}
-        <ChevronDown size={16} style={{ color: '#8E8E8E' }} />
+        <ChevronDown size={16} style={{ color: 'var(--chat-text-muted)' }} />
       </button>
 
       {/* Dropdown */}
       {isOpen && (
         <div className="absolute top-full left-0 z-50" style={{
           marginTop: '4px', minWidth: '300px',
-          backgroundColor: '#2F2F2F', border: '1px solid #383838',
+          backgroundColor: 'var(--chat-surface)', border: '1px solid #383838',
           borderRadius: '12px', padding: '6px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
         }}>
           {/* Search */}
           <div className="relative" style={{ marginBottom: '6px' }}>
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: '#676767' }} />
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--chat-text-dim)' }} />
             <input
               autoFocus
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search models..."
               style={{
-                width: '100%', padding: '8px 10px 8px 32px', backgroundColor: '#383838',
-                border: '1px solid #4A4A4A', borderRadius: '8px', color: '#ECECEC',
+                width: '100%', padding: '8px 10px 8px 32px', backgroundColor: 'var(--chat-hover)',
+                border: '1px solid #4A4A4A', borderRadius: '8px', color: 'var(--chat-text)',
                 fontSize: '13px', outline: 'none',
               }}
               onFocus={(e) => e.currentTarget.style.borderColor = 'var(--color-primary)'}
-              onBlur={(e) => e.currentTarget.style.borderColor = '#4A4A4A'}
+              onBlur={(e) => e.currentTarget.style.borderColor = 'var(--chat-border)'}
             />
           </div>
 
@@ -127,7 +127,7 @@ export function ModelSelector({ models, selectedId, onChange, className }: Model
             {groupedChat.map((group) => (
               <div key={group.provider}>
                 <div style={{
-                  padding: '6px 12px 2px', fontSize: '11px', color: '#8E8E8E',
+                  padding: '6px 12px 2px', fontSize: '11px', color: 'var(--chat-text-muted)',
                   fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em',
                 }}>
                   {group.provider}
@@ -170,7 +170,7 @@ export function ModelSelector({ models, selectedId, onChange, className }: Model
             )}
 
             {groupedChat.length === 0 && filteredImage.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '16px', fontSize: '13px', color: '#8E8E8E' }}>No models found</div>
+              <div style={{ textAlign: 'center', padding: '16px', fontSize: '13px', color: 'var(--chat-text-muted)' }}>No models found</div>
             )}
           </div>
         </div>
@@ -195,7 +195,7 @@ function ModelOption({ model, isSelected, onSelect, isImage }: {
         border: 'none', backgroundColor: 'transparent',
         transition: 'background-color 150ms',
       }}
-      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#383838'}
+      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--chat-hover)'}
       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
     >
       {/* Provider dot */}
@@ -205,7 +205,7 @@ function ModelOption({ model, isSelected, onSelect, isImage }: {
       }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '14px', color: '#ECECEC', fontWeight: 500 }}>{model.name}</span>
+          <span style={{ fontSize: '14px', color: 'var(--chat-text)', fontWeight: 500 }}>{model.name}</span>
           {isImage && (
             <span style={{
               fontSize: '9px', fontWeight: 600, padding: '1px 5px', borderRadius: '4px',
@@ -215,7 +215,7 @@ function ModelOption({ model, isSelected, onSelect, isImage }: {
             </span>
           )}
         </div>
-        <div style={{ fontSize: '12px', color: '#8E8E8E', marginTop: '1px' }}>
+        <div style={{ fontSize: '12px', color: 'var(--chat-text-muted)', marginTop: '1px' }}>
           {isImage
             ? model.description
             : `${(model.contextWindow / 1000).toFixed(0)}K ctx \u00B7 $${model.inputTokenPrice.toFixed(2)}/$${model.outputTokenPrice.toFixed(2)} per 1M`
