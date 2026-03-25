@@ -31,6 +31,7 @@ import agentRoutes from './routes/agentRoutes.js';
 import teamRoutes from './routes/teamRoutes.js';
 import activityRoutes from './routes/activityRoutes.js';
 import tokenWalletRoutes from './routes/tokenWalletRoutes.js';
+import reviewRoutes from './routes/reviewRoutes.js';
 
 const app: Express = express();
 
@@ -241,6 +242,7 @@ app.use('/api/team', teamRoutes);
 app.use('/api/activity', activityRoutes);
 app.use('/api/token-wallet', tokenWalletRoutes);
 app.use('/api/stripe', stripeRoutes);
+app.use('/api/reviews', reviewRoutes);
 
 // ============== 404 HANDLER ==============
 app.use('*', (req: Request, res: Response) => {

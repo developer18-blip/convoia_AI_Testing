@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Zap, ArrowRight, Globe, DollarSign, Building2, Clock, Shield, Brain,
-  Check, ChevronRight, ChevronDown, Bot, Sparkles, Calculator,
+  Check, ChevronRight, ChevronDown, Bot, Sparkles, Calculator, Star, Quote, Send, X,
 } from 'lucide-react'
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { ThemeToggle } from '../../components/shared/ThemeToggle'
+import api from '../../lib/api'
 
 const features = [
   { icon: <Globe size={24} />, title: 'Universal Gateway', description: 'Access GPT-4o, Claude, Gemini, DeepSeek, Mistral, and Llama through a single API.' },
@@ -623,6 +624,9 @@ export function LandingPage() {
         </div>
       </section>
 
+      {/* Reviews Section */}
+      <ReviewsSection />
+
       {/* Footer */}
       <footer className="border-t border-border/50 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -636,6 +640,223 @@ export function LandingPage() {
         </div>
       </footer>
     </div>
+  )
+}
+
+// ============== REVIEWS SECTION ==============
+function ReviewsSection() {
+  const [reviews, setReviews] = useState<any[]>([])
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ rating: 5, title: '', content: '', role: '', company: '' })
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+
+  useEffect(() => {
+    api.get('/reviews').then(r => setReviews(r.data?.data || [])).catch(() => {})
+  }, [])
+
+  const handleSubmit = async () => {
+    if (!form.title.trim() || !form.content.trim()) return
+    setSubmitting(true)
+    try {
+      await api.post('/reviews', form)
+      setSubmitted(true)
+      setShowForm(false)
+      setForm({ rating: 5, title: '', content: '', role: '', company: '' })
+      api.get('/reviews').then(r => setReviews(r.data?.data || []))
+    } catch { /* user not logged in */ }
+    setSubmitting(false)
+  }
+
+  const StarRating = ({ rating, interactive, onChange }: { rating: number; interactive?: boolean; onChange?: (r: number) => void }) => (
+    <div className="flex gap-0.5">
+      {[1, 2, 3, 4, 5].map(i => (
+        <Star
+          key={i}
+          size={interactive ? 24 : 14}
+          className={`transition-colors ${i <= rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-600'} ${interactive ? 'cursor-pointer hover:scale-110' : ''}`}
+          onClick={() => interactive && onChange?.(i)}
+        />
+      ))}
+    </div>
+  )
+
+  const avgRating = reviews.length > 0 ? (reviews.reduce((a, r) => a + r.rating, 0) / reviews.length).toFixed(1) : '5.0'
+
+  return (
+    <section className="py-24 relative overflow-hidden">
+      <div className="absolute inset-0 opacity-[0.02]" style={{
+        backgroundImage: `radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)`,
+        backgroundSize: '32px 32px',
+      }} />
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 relative">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-16">
+          <div className="inline-flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/20 rounded-full px-4 py-1.5 mb-6">
+            <Star size={14} className="text-yellow-400 fill-yellow-400" />
+            <span className="text-sm font-medium text-yellow-400">
+              {reviews.length > 0 ? `${avgRating} average from ${reviews.length} review${reviews.length !== 1 ? 's' : ''}` : 'Be the first to review'}
+            </span>
+          </div>
+          <h2 className="text-3xl sm:text-4xl font-bold text-text-primary mb-4">What our users say</h2>
+          <p className="text-text-secondary max-w-2xl mx-auto mb-8">Real feedback from teams and individuals using ConvoiaAI every day.</p>
+          <button
+            onClick={() => setShowForm(true)}
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-accent-start to-accent-mid hover:brightness-110 text-white font-semibold px-6 py-2.5 rounded-xl transition-all text-sm"
+          >
+            <Send size={16} />
+            Write a Review
+          </button>
+        </motion.div>
+
+        {/* Review Cards */}
+        {reviews.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+            {reviews.map((review, i) => (
+              <motion.div
+                key={review.id}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                className="relative group"
+              >
+                <div className={`h-full rounded-2xl p-6 border transition-all duration-300 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 ${
+                  review.isFeatured
+                    ? 'bg-gradient-to-br from-primary/10 to-accent-end/5 border-primary/20'
+                    : 'bg-surface border-border'
+                }`}>
+                  {review.isFeatured && (
+                    <div className="absolute -top-3 left-6 bg-gradient-to-r from-accent-start to-accent-mid text-white text-xs font-bold px-3 py-1 rounded-full">
+                      Featured
+                    </div>
+                  )}
+                  <Quote size={24} className="text-primary/20 mb-3" />
+                  <h4 className="font-semibold text-text-primary text-lg mb-2">{review.title}</h4>
+                  <p className="text-text-secondary text-sm leading-relaxed mb-4">{review.content}</p>
+                  <div className="flex items-center justify-between mt-auto pt-4 border-t border-border/50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-accent-end flex items-center justify-center text-white font-bold text-sm">
+                        {review.name?.charAt(0)?.toUpperCase() || '?'}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-text-primary">{review.name}</p>
+                        {(review.role || review.company) && (
+                          <p className="text-xs text-text-muted">{[review.role, review.company].filter(Boolean).join(' at ')}</p>
+                        )}
+                      </div>
+                    </div>
+                    <StarRating rating={review.rating} />
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-16">
+            <Quote size={48} className="text-primary/10 mx-auto mb-4" />
+            <p className="text-text-muted text-lg">No reviews yet. Be the first to share your experience!</p>
+          </div>
+        )}
+      </div>
+
+      {/* Review Form Modal */}
+      <AnimatePresence>
+        {showForm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowForm(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-surface border border-border rounded-2xl p-8 w-full max-w-lg shadow-2xl"
+            >
+              {submitted ? (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Check size={32} className="text-green-400" />
+                  </div>
+                  <h3 className="text-xl font-bold text-text-primary mb-2">Thank you!</h3>
+                  <p className="text-text-secondary">Your review has been submitted and is now visible on the homepage.</p>
+                  <button onClick={() => { setShowForm(false); setSubmitted(false) }} className="mt-6 px-6 py-2 bg-primary text-white rounded-xl font-medium">Done</button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xl font-bold text-text-primary">Write a Review</h3>
+                    <button onClick={() => setShowForm(false)} className="p-1.5 rounded-lg hover:bg-white/5 text-text-muted"><X size={20} /></button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium text-text-secondary mb-2 block">Rating</label>
+                      <StarRating rating={form.rating} interactive onChange={r => setForm(f => ({ ...f, rating: r }))} />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-text-secondary mb-1 block">Title *</label>
+                      <input
+                        value={form.title}
+                        onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                        placeholder="Great AI platform for our team"
+                        className="w-full bg-bg-primary border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-text-secondary mb-1 block">Review *</label>
+                      <textarea
+                        value={form.content}
+                        onChange={e => setForm(f => ({ ...f, content: e.target.value }))}
+                        placeholder="Tell us about your experience with ConvoiaAI..."
+                        rows={4}
+                        className="w-full bg-bg-primary border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none resize-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-sm font-medium text-text-secondary mb-1 block">Your Role</label>
+                        <input
+                          value={form.role}
+                          onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
+                          placeholder="CTO, Developer, etc."
+                          className="w-full bg-bg-primary border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-text-secondary mb-1 block">Company</label>
+                        <input
+                          value={form.company}
+                          onChange={e => setForm(f => ({ ...f, company: e.target.value }))}
+                          placeholder="Acme Corp"
+                          className="w-full bg-bg-primary border border-border rounded-xl px-4 py-2.5 text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleSubmit}
+                      disabled={submitting || !form.title.trim() || !form.content.trim()}
+                      className="w-full bg-gradient-to-r from-accent-start to-accent-mid hover:brightness-110 text-white font-semibold py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {submitting ? 'Submitting...' : <><Send size={16} /> Submit Review</>}
+                    </button>
+                    <p className="text-xs text-text-muted text-center">You need to be logged in to submit a review.</p>
+                  </div>
+                </>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
   )
 }
 

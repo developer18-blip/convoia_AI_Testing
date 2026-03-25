@@ -90,6 +90,7 @@ model User {
   tokenPurchases           TokenPurchase[]
   tokenWallet              TokenWallet?
   tokenTransactions        TokenTransaction[]
+  reviews                  Review[]
 
   @@index([organizationId])
   @@index([managerId])
@@ -521,5 +522,26 @@ model TokenTransaction {
 
   @@index([userId])
   @@index([type])
+  @@index([createdAt])
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name      String
+  role      String?
+  company   String?
+  avatar    String?
+  rating    Int      @default(5)
+  title     String
+  content   String
+  isPublic  Boolean  @default(true)
+  isFeatured Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isPublic])
+  @@index([isFeatured])
   @@index([createdAt])
 }
