@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { register, login, getProfile, updateProfile, changePassword, verifyToken, refreshToken, googleAuth, verifyEmail, resendVerification, uploadAvatar, selectAvatar } from '../controllers/authController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
-import { authLimiter } from '../middleware/rateLimiter.js';
+
 import { uploadSingle } from '../middleware/uploadMiddleware.js';
 
 const router = Router();
