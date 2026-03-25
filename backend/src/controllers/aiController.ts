@@ -10,7 +10,8 @@ import { needsWebSearch, searchWeb } from '../services/webSearchService.js';
 import { detectImageIntent, enhanceImagePrompt } from '../services/imageIntentService.js';
 import { FileProcessingService } from '../services/fileProcessingService.js';
 import { getCachedResponse, setCachedResponse } from '../services/modelRecommendationService.js';
-import { extractMemories, saveMemories, getUserMemoryPrompt } from '../services/userMemoryService.js';
+import { getUserMemoryPrompt } from '../services/userMemoryService.js';
+import { processMemoryForQuery } from '../services/vectorMemoryService.js';
 import logger from '../config/logger.js';
 
 // Image-only models that cannot handle chat/streaming
@@ -380,23 +381,22 @@ export const queryAIStream = async (req: Request, res: Response) => {
       }
     }
 
-    // ── USER MEMORY: Extract + Save ──────────────────────────
-    // Check if user is sharing personal info → save to memory
-    if (lastUserText) {
-      const memExtraction = extractMemories(lastUserText);
-      if (memExtraction.shouldSave) {
-        saveMemories(user.id, memExtraction.memories).catch(() => {}); // fire-and-forget
-      }
+    // ── INTELLIGENT MEMORY SYSTEM ──────────────────────────────
+    // 1. Retrieve relevant memories via semantic search (top 5)
+    // 2. Extract new memories from user message (background)
+    // 3. Build compact context string (max ~375 tokens)
+    let memoryPrompt = '';
+    try {
+      memoryPrompt = await processMemoryForQuery(user.id, lastUserText);
+    } catch {
+      // Fallback to simple memory if vector service fails
+      try { memoryPrompt = await getUserMemoryPrompt(user.id); } catch { /* silent */ }
     }
 
-    // ── USER MEMORY: Inject into system prompt ────────────────
-    // Load saved memories and append to agent/system prompt
-    const memoryPrompt = await getUserMemoryPrompt(user.id);
+    // Inject memory into agent/system prompt
     if (memoryPrompt && agentConfig) {
       agentConfig.systemPrompt += memoryPrompt;
     }
-    // If no agent, we'll pass memoryPrompt via the industry/systemPrompt path
-    // (handled in aiGatewayService where getSystemPrompt is called)
 
     // Set up SSE headers
     res.setHeader('Content-Type', 'text/event-stream');
