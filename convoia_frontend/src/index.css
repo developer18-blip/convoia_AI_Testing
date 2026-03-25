@@ -80,15 +80,12 @@ html.light #root {
   color-scheme: light !important;
 }
 
-/* Force all headings and paragraphs readable in light mode */
-html.light h1, html.light h2, html.light h3, html.light h4, html.light h5, html.light h6 {
+/* Force readable text in light mode — but NOT inside buttons/links with explicit white text */
+html.light h1:not(.text-transparent), html.light h2, html.light h3, html.light h4, html.light h5, html.light h6 {
   color: #0F172A;
 }
-html.light p {
+html.light p:not([style]) {
   color: #475569;
-}
-html.light span, html.light a, html.light label, html.light li {
-  color: inherit;
 }
 
 html.light input,
