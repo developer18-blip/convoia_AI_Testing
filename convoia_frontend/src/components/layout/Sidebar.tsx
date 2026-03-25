@@ -107,7 +107,7 @@ function SidebarBottomWidget({ role, hasOrg, collapsed }: { role: string; hasOrg
       <div style={{ padding: '10px 12px', borderTop: '1px solid var(--chat-border)' }}>
         <div style={{ background: 'var(--chat-bg)', borderRadius: '14px', padding: '12px', border: '1px solid var(--chat-border)' }}>
           <div className="flex items-center gap-2" style={{ marginBottom: '6px' }}>
-            <Target size={14} style={{ color: tokenBalance < 1000 ? '#F59E0B' : '#A78BFA' }} />
+            <Target size={14} style={{ color: tokenBalance < 1000 ? 'var(--color-warning)' : 'var(--color-accent-end)' }} />
             <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
               {formattedBalance} tokens
             </span>
@@ -124,7 +124,7 @@ function SidebarBottomWidget({ role, hasOrg, collapsed }: { role: string; hasOrg
       <div style={{ padding: '10px 12px', borderTop: '1px solid var(--chat-border)' }}>
         <div style={{ background: 'var(--chat-bg)', borderRadius: '14px', padding: '12px', border: '1px solid var(--chat-border)' }}>
           <div className="flex items-center gap-2">
-            <Users size={14} style={{ color: '#A78BFA' }} />
+            <Users size={14} style={{ color: 'var(--color-accent-end)' }} />
             <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
               {formattedBalance} tokens
             </span>
@@ -155,8 +155,8 @@ function SidebarBottomWidget({ role, hasOrg, collapsed }: { role: string; hasOrg
     <div style={{ padding: '10px 12px', borderTop: '1px solid var(--chat-border)' }}>
       <div style={{ background: 'var(--chat-bg)', borderRadius: '14px', padding: '12px', border: '1px solid var(--chat-border)' }}>
         <div className="flex items-center gap-2" style={{ marginBottom: '8px' }}>
-          <Zap size={14} style={{ color: '#A78BFA' }} />
-          <span style={{ fontSize: '13px', fontFamily: 'monospace', fontWeight: 700, color: '#A78BFA' }}>
+          <Zap size={14} style={{ color: 'var(--color-accent-end)' }} />
+          <span style={{ fontSize: '13px', fontFamily: 'monospace', fontWeight: 700, color: 'var(--color-accent-end)' }}>
             {formattedBalance} tokens
           </span>
         </div>
@@ -207,7 +207,7 @@ export function Sidebar({ collapsed, onToggle, onClose }: SidebarProps) {
             <Zap size={22} style={{ color: 'var(--color-primary)', position: 'relative' }} />
           </div>
           {!collapsed && (
-            <span style={{ fontWeight: 800, fontSize: '17px', background: 'linear-gradient(135deg, var(--color-primary), #A78BFA)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+            <span style={{ fontWeight: 800, fontSize: '17px', background: 'linear-gradient(135deg, var(--color-primary), var(--color-accent-end))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               ConvoiaAI
             </span>
           )}

@@ -26,7 +26,7 @@ interface Member { id: string; name: string; email: string; role: string; avatar
 
 // ─── Constants ───
 const STATUSES = [
-  { key: 'pending', label: 'To Do', icon: Circle, color: '#8E8E8E', bg: '#8E8E8E15' },
+  { key: 'pending', label: 'To Do', icon: Circle, color: 'var(--color-text-muted)', bg: 'rgba(142,142,142,0.08)' },
   { key: 'in_progress', label: 'In Progress', icon: Clock, color: '#3B82F6', bg: '#3B82F615' },
   { key: 'review', label: 'In Review', icon: Eye, color: '#A855F7', bg: '#A855F715' },
   { key: 'completed', label: 'Done', icon: CheckCircle2, color: '#10B981', bg: '#10B98115' },
@@ -51,7 +51,7 @@ const formatDate = (d?: string) => {
 }
 const isOverdue = (d?: string) => d ? new Date(d) < new Date() : false
 const dueDateColor = (d?: string) => {
-  if (!d) return '#8E8E8E'
+  if (!d) return 'var(--color-text-muted)'
   const diff = Math.floor((new Date(d).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
   if (diff < 0) return '#EF4444'
   if (diff <= 2) return '#F59E0B'

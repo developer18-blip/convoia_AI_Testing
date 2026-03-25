@@ -92,11 +92,19 @@ export function OwnerView({ stats, userName, orgName }: OwnerViewProps) {
   return (
     <div className="space-y-6">
       {/* Greeting */}
-      <div>
-        <h2 className="text-2xl font-semibold text-text-primary">
+      <div
+        style={{
+          background: 'linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-2) 100%)',
+          border: '1px solid var(--color-border)',
+          borderLeft: '4px solid var(--color-accent-start)',
+          borderRadius: '12px',
+          padding: '20px 24px',
+        }}
+      >
+        <h2 className="text-2xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>
           {getGreeting()}, {userName.split(' ')[0]}
         </h2>
-        <p className="text-sm text-text-muted mt-1">
+        <p className="text-sm mt-1 flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
           {orgName} <Badge size="sm" variant="primary">Owner</Badge>
         </p>
       </div>
@@ -133,28 +141,37 @@ export function OwnerView({ stats, userName, orgName }: OwnerViewProps) {
       {/* Token Balance Section */}
       <div
         style={{
-          backgroundColor: 'var(--color-surface)',
+          background: 'linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-2) 100%)',
           border: '1px solid var(--color-border)',
+          borderTop: '3px solid var(--color-accent-start)',
           borderRadius: '12px',
           padding: '20px',
         }}
       >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-medium text-text-secondary">My Token Balance</h3>
+          <h3 className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>My Token Balance</h3>
           <div className="flex items-center gap-2">
             {members.length > 0 && tokenBalance > 0 && (
               <button
                 onClick={() => setShowAssignModal(true)}
-                className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1 px-2 py-1 rounded-lg"
-                style={{ border: '1px solid rgba(52,211,153,0.3)' }}
+                className="text-xs flex items-center gap-1 px-2 py-1 rounded-lg transition-colors"
+                style={{
+                  color: 'var(--color-success)',
+                  border: '1px solid rgba(16,185,129,0.3)',
+                  background: 'transparent',
+                }}
               >
                 <Send size={11} /> Assign Tokens
               </button>
             )}
             <button
               onClick={() => navigate('/tokens/buy')}
-              className="text-xs text-primary hover:text-primary-hover flex items-center gap-1 px-2 py-1 rounded-lg"
-              style={{ border: '1px solid rgba(124,58,237,0.3)' }}
+              className="text-xs flex items-center gap-1 px-2 py-1 rounded-lg transition-colors"
+              style={{
+                color: 'var(--color-primary)',
+                border: '1px solid var(--color-border)',
+                background: 'transparent',
+              }}
             >
               <ShoppingCart size={11} /> Buy Tokens
             </button>
@@ -166,23 +183,23 @@ export function OwnerView({ stats, userName, orgName }: OwnerViewProps) {
             <ProgressBar value={totalUsed} max={totalPurchased || 1} size="lg" />
             <div className="grid grid-cols-3 gap-4 mt-4 text-center">
               <div>
-                <p className="text-lg font-semibold font-mono text-text-primary">{fmtTokens(totalUsed)}</p>
-                <p className="text-[10px] text-text-muted mt-1">Used</p>
+                <p className="text-lg font-semibold font-mono" style={{ color: 'var(--color-text-primary)' }}>{fmtTokens(totalUsed)}</p>
+                <p className="text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>Used</p>
               </div>
               <div>
-                <p className="text-lg font-semibold font-mono text-amber-400">{fmtTokens(totalPurchased)}</p>
-                <p className="text-[10px] text-text-muted mt-1">Purchased</p>
+                <p className="text-lg font-semibold font-mono" style={{ color: 'var(--color-warning)' }}>{fmtTokens(totalPurchased)}</p>
+                <p className="text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>Purchased</p>
               </div>
               <div>
-                <p className="text-lg font-semibold font-mono text-emerald-400">{formattedBalance}</p>
-                <p className="text-[10px] text-text-muted mt-1">Available</p>
+                <p className="text-lg font-semibold font-mono" style={{ color: 'var(--color-success)' }}>{formattedBalance}</p>
+                <p className="text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>Available</p>
               </div>
             </div>
           </>
         ) : (
           <div className="text-center py-8">
-            <Zap size={32} className="mx-auto mb-3 opacity-30" />
-            <p className="text-text-muted text-sm mb-3">No tokens yet</p>
+            <Zap size={32} className="mx-auto mb-3 opacity-30" style={{ color: 'var(--color-text-muted)' }} />
+            <p className="text-sm mb-3" style={{ color: 'var(--color-text-muted)' }}>No tokens yet</p>
             <Button onClick={() => navigate('/tokens/buy')}>
               <ShoppingCart size={14} /> Buy Your First Tokens
             </Button>
@@ -192,34 +209,50 @@ export function OwnerView({ stats, userName, orgName }: OwnerViewProps) {
 
       {/* Team Overview */}
       <Card padding="none">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h3 className="text-sm font-medium text-text-secondary">Top Members by Usage</h3>
-          <button onClick={() => navigate('/team')} className="text-xs text-primary hover:text-primary-hover flex items-center gap-1">
+        <div
+          className="flex items-center justify-between px-5 py-4"
+          style={{ borderBottom: '1px solid var(--color-border)' }}
+        >
+          <h3 className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Top Members by Usage</h3>
+          <button
+            onClick={() => navigate('/team')}
+            className="text-xs flex items-center gap-1 transition-colors"
+            style={{ color: 'var(--color-primary)' }}
+          >
             View Full Team <ArrowRight size={12} />
           </button>
         </div>
-        <div className="divide-y divide-border/50">
+        <div>
           {isLoading ? (
             <div className="space-y-1 animate-pulse p-5">
-              {[...Array(4)].map((_, i) => <div key={i} className="h-12 bg-surface-2 rounded" />)}
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="h-12 rounded" style={{ background: 'var(--color-surface-2)' }} />
+              ))}
             </div>
           ) : members.length === 0 ? (
-            <div className="px-5 py-8 text-center text-text-muted text-sm">No members found</div>
+            <div className="px-5 py-8 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>No members found</div>
           ) : (
             [...members]
               .sort((a, b) => (Number(b.cost) || 0) - (Number(a.cost) || 0))
               .slice(0, 5)
               .map((m, i) => (
-                <div key={m.id} onClick={() => navigate(`/team/${m.id}`)} className="px-5 py-3 flex items-center gap-4 hover:bg-surface-2 transition-colors cursor-pointer">
-                  <span className="text-sm font-mono text-text-muted w-6">#{i + 1}</span>
+                <div
+                  key={m.id}
+                  onClick={() => navigate(`/team/${m.id}`)}
+                  className="px-5 py-3 flex items-center gap-4 transition-colors cursor-pointer"
+                  style={{ borderBottom: '1px solid var(--color-border-subtle)' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-2)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
+                  <span className="text-sm font-mono w-6" style={{ color: 'var(--color-text-muted)' }}>#{i + 1}</span>
                   <Avatar name={m.name} src={m.avatar} size="sm" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-text-primary">{m.name}</p>
+                    <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>{m.name}</p>
                     <Badge size="sm">{m.role?.replace('_', ' ')}</Badge>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-mono text-text-primary">{formatTokens(Number(m.queries) || 0)} queries</p>
-                    <p className="text-xs font-mono text-primary">{formatCurrency(Number(m.cost) || 0)}</p>
+                    <p className="text-sm font-mono" style={{ color: 'var(--color-text-primary)' }}>{formatTokens(Number(m.queries) || 0)} queries</p>
+                    <p className="text-xs font-mono" style={{ color: 'var(--color-primary)' }}>{formatCurrency(Number(m.cost) || 0)}</p>
                   </div>
                 </div>
               ))
@@ -229,7 +262,7 @@ export function OwnerView({ stats, userName, orgName }: OwnerViewProps) {
 
       {/* 30-Day Spend Chart */}
       <Card padding="lg">
-        <h3 className="text-sm font-medium text-text-secondary mb-4">30-Day Organization Spend</h3>
+        <h3 className="text-sm font-medium mb-4" style={{ color: 'var(--color-text-secondary)' }}>30-Day Organization Spend</h3>
         <AreaChart
           data={stats?.dailyUsage ?? []}
           xKey="date"
@@ -241,29 +274,53 @@ export function OwnerView({ stats, userName, orgName }: OwnerViewProps) {
 
       {/* Quick Actions */}
       <div className="flex flex-wrap gap-3">
-        <button onClick={() => navigate('/tokens/buy')}
+        <button
+          onClick={() => navigate('/tokens/buy')}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:scale-[1.02]"
-          style={{ background: 'rgba(124,58,237,0.15)', color: '#A78BFA', border: '1px solid rgba(124,58,237,0.3)' }}>
+          style={{
+            background: 'var(--color-primary-light)',
+            color: 'var(--color-primary)',
+            border: '1px solid var(--color-border)',
+          }}
+        >
           <ShoppingCart size={16} /> Buy Tokens
         </button>
-        <button onClick={() => setShowAssignModal(true)}
+        <button
+          onClick={() => setShowAssignModal(true)}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:scale-[1.02]"
-          style={{ background: 'rgba(52,211,153,0.15)', color: '#34D399', border: '1px solid rgba(52,211,153,0.3)' }}>
+          style={{
+            background: 'rgba(16,185,129,0.12)',
+            color: 'var(--color-success)',
+            border: '1px solid rgba(16,185,129,0.25)',
+          }}
+        >
           <Send size={16} /> Assign Tokens
         </button>
-        <button onClick={() => navigate('/team')}
+        <button
+          onClick={() => navigate('/team')}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:scale-[1.02]"
-          style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)/20' }}>
+          style={{
+            background: 'var(--color-primary-light)',
+            color: 'var(--color-primary)',
+            border: '1px solid var(--color-border)',
+          }}
+        >
           <UserPlus size={16} /> Invite Member
         </button>
-        <button onClick={() => navigate('/org/analytics')}
+        <button
+          onClick={() => navigate('/org/analytics')}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:scale-[1.02]"
-          style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)/20' }}>
+          style={{
+            background: 'var(--color-primary-light)',
+            color: 'var(--color-primary)',
+            border: '1px solid var(--color-border)',
+          }}
+        >
           <BarChart3 size={16} /> View Analytics
         </button>
       </div>
 
-      {/* ─── ASSIGN TOKENS MODAL ─── */}
+      {/* ASSIGN TOKENS MODAL */}
       {showAssignModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
           <div style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '440px' }}>
@@ -273,9 +330,9 @@ export function OwnerView({ stats, userName, orgName }: OwnerViewProps) {
             </div>
 
             {/* Available info */}
-            <div style={{ background: 'var(--color-surface-2)', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px', display: 'flex', justifyContent: 'space-between' }}>
+            <div style={{ background: 'var(--color-surface-2)', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px', display: 'flex', justifyContent: 'space-between', border: '1px solid var(--color-border)' }}>
               <span style={{ color: 'var(--color-text-muted)' }}>Available in pool</span>
-              <span style={{ color: '#34D399', fontWeight: 600, fontFamily: 'monospace' }}>{fmtTokens(poolAvailable)}</span>
+              <span style={{ color: 'var(--color-success)', fontWeight: 600, fontFamily: 'monospace' }}>{fmtTokens(poolAvailable)}</span>
             </div>
 
             {/* Select member */}
@@ -317,9 +374,9 @@ export function OwnerView({ stats, userName, orgName }: OwnerViewProps) {
                   onClick={() => setAssignAmount(String(amt))}
                   style={{
                     padding: '8px 4px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer',
-                    border: assignAmount === String(amt) ? '2px solid #34D399' : '1px solid var(--color-border)',
-                    backgroundColor: assignAmount === String(amt) ? 'rgba(52,211,153,0.15)' : 'transparent',
-                    color: assignAmount === String(amt) ? '#34D399' : 'var(--color-text-muted)',
+                    border: assignAmount === String(amt) ? '2px solid var(--color-success)' : '1px solid var(--color-border)',
+                    backgroundColor: assignAmount === String(amt) ? 'rgba(16,185,129,0.12)' : 'transparent',
+                    color: assignAmount === String(amt) ? 'var(--color-success)' : 'var(--color-text-muted)',
                   }}
                 >
                   {fmtTokens(amt)}
@@ -332,7 +389,7 @@ export function OwnerView({ stats, userName, orgName }: OwnerViewProps) {
               onClick={handleAssignTokens}
               isLoading={assignLoading}
               disabled={!assignTo || !assignAmount || parseInt(assignAmount) <= 0 || parseInt(assignAmount) > poolAvailable}
-              style={{ backgroundColor: '#059669' }}
+              style={{ backgroundColor: 'var(--color-success)' }}
             >
               <Send size={14} /> Assign {assignAmount ? fmtTokens(parseInt(assignAmount) || 0) : '0'} Tokens
             </Button>

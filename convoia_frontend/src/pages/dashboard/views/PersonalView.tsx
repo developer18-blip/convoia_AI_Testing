@@ -37,11 +37,19 @@ export function PersonalView({ stats, wallet: _wallet, sessions, recentUsage, in
   return (
     <div className="space-y-6">
       {/* Greeting */}
-      <div>
-        <h2 className="text-2xl font-semibold text-text-primary">
+      <div
+        style={{
+          background: 'linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-2) 100%)',
+          border: '1px solid var(--color-border)',
+          borderLeft: '4px solid var(--color-accent-start)',
+          borderRadius: '12px',
+          padding: '20px 24px',
+        }}
+      >
+        <h2 className="text-2xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>
           {getGreeting()}, {userName.split(' ')[0]}
         </h2>
-        <p className="text-sm text-text-muted mt-1">Your personal AI workspace</p>
+        <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>Your personal AI workspace</p>
       </div>
 
       {/* 4 Stat Cards — Token-based */}
@@ -87,7 +95,7 @@ export function PersonalView({ stats, wallet: _wallet, sessions, recentUsage, in
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         <Card className="lg:col-span-3" padding="lg">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium text-text-secondary">Usage Over Time</h3>
+            <h3 className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Usage Over Time</h3>
             <Tabs
               tabs={[
                 { id: 'queries', label: 'Queries' },
@@ -101,17 +109,17 @@ export function PersonalView({ stats, wallet: _wallet, sessions, recentUsage, in
             data={stats?.dailyUsage ?? []}
             xKey="date"
             yKey={chartMode}
-            color="#7C3AED"
+            color="var(--color-accent-start)"
             height={280}
             formatY={chartMode === 'cost' ? (v: number) => `$${v.toFixed(2)}` : undefined}
           />
         </Card>
         <Card className="lg:col-span-2" padding="lg">
-          <h3 className="text-sm font-medium text-text-secondary mb-4">Model Breakdown</h3>
+          <h3 className="text-sm font-medium mb-4" style={{ color: 'var(--color-text-secondary)' }}>Model Breakdown</h3>
           {modelBreakdown.length > 0 ? (
             <DonutChart data={modelBreakdown} height={280} />
           ) : (
-            <div className="flex items-center justify-center h-[280px] text-text-muted text-sm">No usage data</div>
+            <div className="flex items-center justify-center h-[280px] text-sm" style={{ color: 'var(--color-text-muted)' }}>No usage data</div>
           )}
         </Card>
       </div>
@@ -120,24 +128,37 @@ export function PersonalView({ stats, wallet: _wallet, sessions, recentUsage, in
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         {/* Recent Queries */}
         <Card className="lg:col-span-3" padding="none">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-            <h3 className="text-sm font-medium text-text-secondary">Recent Queries</h3>
-            <button onClick={() => navigate('/usage?tab=history')} className="text-xs text-primary hover:text-primary-hover flex items-center gap-1">
+          <div
+            className="flex items-center justify-between px-5 py-4"
+            style={{ borderBottom: '1px solid var(--color-border)' }}
+          >
+            <h3 className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Recent Queries</h3>
+            <button
+              onClick={() => navigate('/usage?tab=history')}
+              className="text-xs flex items-center gap-1 transition-colors"
+              style={{ color: 'var(--color-primary)' }}
+            >
               View all <ArrowRight size={12} />
             </button>
           </div>
-          <div className="divide-y divide-border/50">
+          <div style={{ borderTop: 'none' }}>
             {recentUsage.length === 0 ? (
-              <div className="px-5 py-8 text-center text-text-muted text-sm">No recent queries</div>
+              <div className="px-5 py-8 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>No recent queries</div>
             ) : (
               recentUsage.slice(0, 5).map((log) => (
-                <div key={log.id} className="px-5 py-3 flex items-center gap-4 hover:bg-surface-2 transition-colors cursor-pointer">
+                <div
+                  key={log.id}
+                  className="px-5 py-3 flex items-center gap-4 transition-colors cursor-pointer"
+                  style={{ borderBottom: '1px solid var(--color-border-subtle)' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-2)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-text-primary truncate">{truncate(log.prompt || '', 60)}</p>
-                    <p className="text-xs text-text-muted">{log.model?.name || 'Unknown'} &middot; {log.createdAt ? formatDateTime(log.createdAt) : ''}</p>
+                    <p className="text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>{truncate(log.prompt || '', 60)}</p>
+                    <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{log.model?.name || 'Unknown'} &middot; {log.createdAt ? formatDateTime(log.createdAt) : ''}</p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-xs font-mono text-text-secondary">{formatTokens(log.totalTokens)} tokens</p>
+                    <p className="text-xs font-mono" style={{ color: 'var(--color-text-secondary)' }}>{formatTokens(log.totalTokens)} tokens</p>
                   </div>
                 </div>
               ))
@@ -148,39 +169,62 @@ export function PersonalView({ stats, wallet: _wallet, sessions, recentUsage, in
         {/* Right Column: Token Balance + Sessions */}
         <div className="lg:col-span-2 space-y-4">
           {/* Token Balance Card */}
-          <Card padding="lg">
+          <div
+            style={{
+              background: 'linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-2) 100%)',
+              border: '1px solid var(--color-border)',
+              borderTop: '3px solid var(--color-accent-start)',
+              borderRadius: '12px',
+              padding: '20px',
+            }}
+          >
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium text-text-secondary">My Tokens</h3>
+              <h3 className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>My Tokens</h3>
             </div>
             <p className="text-2xl font-semibold font-mono mb-1" style={{ color: 'var(--color-primary)' }}>
               {formattedBalance}
             </p>
-            <p className="text-xs text-text-muted mb-3">
+            <p className="text-xs mb-3" style={{ color: 'var(--color-text-muted)' }}>
               {formatTokens(totalUsed)} used &middot; {formatTokens(totalPurchased)} purchased
             </p>
             <button
               onClick={() => navigate('/tokens/buy')}
               className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-colors"
               style={{
-                background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-hover))',
-                color: 'white', border: 'none', cursor: 'pointer',
+                background: 'linear-gradient(135deg, var(--color-accent-start), var(--color-accent-end))',
+                color: 'white',
+                border: 'none',
+                cursor: 'pointer',
               }}
             >
               <Plus size={14} /> Buy Tokens
             </button>
-          </Card>
+          </div>
 
           {/* Active Sessions Card */}
-          <Card padding="lg">
+          <div
+            style={{
+              background: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              borderRadius: '12px',
+              padding: '20px',
+            }}
+          >
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium text-text-secondary">Active Sessions</h3>
-              <button onClick={() => navigate('/sessions')} className="text-xs text-primary hover:text-primary-hover">Manage</button>
+              <h3 className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Active Sessions</h3>
+              <button
+                onClick={() => navigate('/sessions')}
+                className="text-xs transition-colors"
+                style={{ color: 'var(--color-primary)' }}
+              >
+                Manage
+              </button>
             </div>
             {(sessions ?? []).length === 0 ? (
               <div className="text-center py-2">
-                <Zap size={24} className="mx-auto text-text-muted mb-2" />
-                <p className="text-sm text-text-muted mb-1">No active sessions</p>
-                <p className="text-xs text-text-muted">Start a chat to begin</p>
+                <Zap size={24} className="mx-auto mb-2" style={{ color: 'var(--color-text-muted)' }} />
+                <p className="text-sm mb-1" style={{ color: 'var(--color-text-muted)' }}>No active sessions</p>
+                <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Start a chat to begin</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -189,7 +233,7 @@ export function PersonalView({ stats, wallet: _wallet, sessions, recentUsage, in
                 ))}
               </div>
             )}
-          </Card>
+          </div>
         </div>
       </div>
 
@@ -198,21 +242,21 @@ export function PersonalView({ stats, wallet: _wallet, sessions, recentUsage, in
         <button
           onClick={() => navigate('/tokens/buy')}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:scale-[1.02]"
-          style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)/20' }}
+          style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)', border: '1px solid var(--color-border)' }}
         >
           <Plus size={16} /> Buy Tokens
         </button>
         <button
           onClick={() => navigate('/chat')}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:scale-[1.02]"
-          style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)/20' }}
+          style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)', border: '1px solid var(--color-border)' }}
         >
           <MessageSquare size={16} /> Start Chat
         </button>
         <button
           onClick={() => navigate('/models')}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:scale-[1.02]"
-          style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)/20' }}
+          style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)', border: '1px solid var(--color-border)' }}
         >
           <Bot size={16} /> Browse Models
         </button>
@@ -243,17 +287,31 @@ function ActiveSessionRow({ session }: { session: HourlySession }) {
   const total = new Date(session.endTime).getTime() - new Date(session.startTime).getTime()
   const elapsed = Date.now() - new Date(session.startTime).getTime()
   const pct = Math.min((elapsed / total) * 100, 100)
-  const barColor = pct > 95 ? '#EF4444' : pct > 80 ? '#F59E0B' : '#10B981'
+
+  // Bar uses CSS variables for the gradient, falls back to semantic color tokens for warning states
+  const barStyle: React.CSSProperties =
+    pct > 95
+      ? { background: 'var(--color-danger)', width: `${pct}%` }
+      : pct > 80
+      ? { background: 'var(--color-warning)', width: `${pct}%` }
+      : { background: 'linear-gradient(90deg, var(--color-accent-start), var(--color-accent-end))', width: `${pct}%` }
 
   return (
-    <div className="bg-surface-2 rounded-lg p-3">
+    <div
+      style={{
+        background: 'var(--color-surface-2)',
+        borderRadius: '8px',
+        padding: '12px',
+        border: '1px solid var(--color-border-subtle)',
+      }}
+    >
       <div className="flex items-center justify-between mb-1">
-        <p className="text-sm font-medium text-text-primary">{session.model?.name || 'Session'}</p>
+        <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>{session.model?.name || 'Session'}</p>
         <Badge variant="success" size="sm">Active</Badge>
       </div>
-      <p className="text-xs font-mono text-primary mb-2">{timeLeft}</p>
-      <div className="w-full h-1.5 bg-border rounded-full overflow-hidden">
-        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: barColor }} />
+      <p className="text-xs font-mono mb-2" style={{ color: 'var(--color-primary)' }}>{timeLeft}</p>
+      <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
+        <div className="h-full rounded-full transition-all" style={barStyle} />
       </div>
     </div>
   )

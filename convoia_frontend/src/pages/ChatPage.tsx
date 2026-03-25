@@ -424,7 +424,7 @@ export function ChatPage() {
           {models.length > 0 ? (
             <ModelSelector models={models} selectedId={selectedModelId} onChange={handleModelChange} />
           ) : (
-            <span style={{ fontSize: '14px', color: '#8E8E8E', padding: '6px 8px' }}>
+            <span style={{ fontSize: '14px', color: 'var(--chat-text-muted)', padding: '6px 8px' }}>
               Loading models...
             </span>
           )}

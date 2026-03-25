@@ -179,7 +179,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                 style={{
                   position: 'absolute', top: '110%', left: 0, right: 0, zIndex: 50,
                   background: 'var(--chat-bg)', border: '1px solid var(--chat-border)',
-                  borderRadius: '12px', overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                  borderRadius: '12px', overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
                 }}
               >
                 {filteredSearch.length === 0 ? (
@@ -224,7 +224,7 @@ export function Header({ onMenuClick }: HeaderProps) {
             color: 'var(--color-text-primary)', cursor: 'pointer', transition: 'border-color 150ms',
           }}
         >
-          <Zap size={13} style={{ color: '#A78BFA' }} />
+          <Zap size={13} style={{ color: 'var(--color-accent-end)' }} />
           {formattedBalance}
         </motion.button>
 
@@ -235,7 +235,7 @@ export function Header({ onMenuClick }: HeaderProps) {
           aria-label="Toggle theme"
           style={{ padding: '8px', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '10px' }}
         >
-          {theme === 'dark' ? <Sun size={18} style={{ color: '#F59E0B' }} /> : <Moon size={18} style={{ color: '#818CF8' }} />}
+          {theme === 'dark' ? <Sun size={18} style={{ color: 'var(--color-warning)' }} /> : <Moon size={18} style={{ color: 'var(--color-accent-end)' }} />}
         </motion.button>
 
         {/* Notification Bell */}
@@ -249,7 +249,7 @@ export function Header({ onMenuClick }: HeaderProps) {
             {unreadCount > 0 && (
               <span className="absolute flex items-center justify-center" style={{
                 top: '4px', right: '4px', minWidth: '16px', height: '16px',
-                background: '#EF4444', borderRadius: '8px', fontSize: '9px',
+                background: 'var(--color-danger)', borderRadius: '8px', fontSize: '9px',
                 fontWeight: 700, color: 'white', padding: '0 4px',
               }}>
                 {unreadCount > 9 ? '9+' : unreadCount}
@@ -266,7 +266,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                 style={{
                   position: 'absolute', top: '110%', right: 0, width: '340px', zIndex: 50,
                   background: 'var(--chat-bg)', border: '1px solid var(--chat-border)',
-                  borderRadius: '14px', overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                  borderRadius: '14px', overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
                 }}
               >
                 {/* Header */}
@@ -308,15 +308,15 @@ export function Header({ onMenuClick }: HeaderProps) {
                         style={{
                           padding: '12px 14px', cursor: 'pointer',
                           borderBottom: '1px solid var(--chat-border)',
-                          background: notif.isRead ? 'transparent' : 'rgba(124, 58, 237, 0.05)',
+                          background: notif.isRead ? 'transparent' : 'var(--color-primary-glow)',
                           transition: 'background 150ms',
                         }}
                         onMouseEnter={(e) => e.currentTarget.style.background = 'var(--chat-hover)'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = notif.isRead ? 'transparent' : 'rgba(124, 58, 237, 0.05)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = notif.isRead ? 'transparent' : 'var(--color-primary-glow)'}
                       >
                         <div className="flex items-start gap-2">
                           {!notif.isRead && (
-                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#7C3AED', marginTop: '6px', flexShrink: 0 }} />
+                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--color-primary)', marginTop: '6px', flexShrink: 0 }} />
                           )}
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', margin: 0 }}>

@@ -71,11 +71,19 @@ export function ManagerView({ stats, userName, orgName }: ManagerViewProps) {
   return (
     <div className="space-y-6">
       {/* Greeting */}
-      <div>
-        <h2 className="text-2xl font-semibold text-text-primary">
+      <div
+        style={{
+          background: 'linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-2) 100%)',
+          border: '1px solid var(--color-border)',
+          borderLeft: '4px solid var(--color-accent-start)',
+          borderRadius: '12px',
+          padding: '20px 24px',
+        }}
+      >
+        <h2 className="text-2xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>
           {getGreeting()}, {userName.split(' ')[0]}
         </h2>
-        <p className="text-sm text-text-muted mt-1">
+        <p className="text-sm mt-1 flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
           {orgName} <Badge size="sm" variant="primary">Manager</Badge>
         </p>
       </div>
@@ -111,15 +119,25 @@ export function ManagerView({ stats, userName, orgName }: ManagerViewProps) {
 
       {/* Team Members Table (compact) — NO DOLLAR AMOUNTS */}
       <Card padding="none">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h3 className="text-sm font-medium text-text-secondary">Team Members</h3>
-          <button onClick={() => navigate('/team')} className="text-xs text-primary hover:text-primary-hover flex items-center gap-1">
+        <div
+          className="flex items-center justify-between px-5 py-4"
+          style={{ borderBottom: '1px solid var(--color-border)' }}
+        >
+          <h3 className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Team Members</h3>
+          <button
+            onClick={() => navigate('/team')}
+            className="text-xs flex items-center gap-1 transition-colors"
+            style={{ color: 'var(--color-primary)' }}
+          >
             View full team <ArrowRight size={12} />
           </button>
         </div>
 
         {/* Table header */}
-        <div className="hidden sm:grid grid-cols-12 gap-2 px-5 py-2 text-[10px] font-semibold text-text-dim uppercase tracking-wider border-b border-border/50">
+        <div
+          className="hidden sm:grid grid-cols-12 gap-2 px-5 py-2 text-[10px] font-semibold uppercase tracking-wider"
+          style={{ borderBottom: '1px solid var(--color-border-subtle)', color: 'var(--color-text-dim)' }}
+        >
           <div className="col-span-4">Member</div>
           <div className="col-span-2 text-right">Tokens Used</div>
           <div className="col-span-3">Budget %</div>
@@ -127,13 +145,15 @@ export function ManagerView({ stats, userName, orgName }: ManagerViewProps) {
           <div className="col-span-1 text-right">Status</div>
         </div>
 
-        <div className="divide-y divide-border/50">
+        <div>
           {isLoading ? (
             <div className="space-y-1 animate-pulse p-5">
-              {[...Array(4)].map((_, i) => <div key={i} className="h-12 bg-surface-2 rounded" />)}
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="h-12 rounded" style={{ background: 'var(--color-surface-2)' }} />
+              ))}
             </div>
           ) : members.length === 0 ? (
-            <div className="px-5 py-8 text-center text-text-muted text-sm">No team members found</div>
+            <div className="px-5 py-8 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>No team members found</div>
           ) : (
             members.slice(0, 8).map((m) => {
               const cap = Number(m.budgetCap) || 0
@@ -142,30 +162,37 @@ export function ManagerView({ stats, userName, orgName }: ManagerViewProps) {
               const isNearLimit = pct > 80
 
               return (
-                <div key={m.id} onClick={() => navigate(`/team/${m.id}`)} className="px-5 py-3 grid grid-cols-12 gap-2 items-center hover:bg-surface-2 transition-colors cursor-pointer">
+                <div
+                  key={m.id}
+                  onClick={() => navigate(`/team/${m.id}`)}
+                  className="px-5 py-3 grid grid-cols-12 gap-2 items-center transition-colors cursor-pointer"
+                  style={{ borderBottom: '1px solid var(--color-border-subtle)' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-2)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
                   <div className="col-span-4 flex items-center gap-2 min-w-0">
                     <Avatar name={m.name} src={m.avatar} size="sm" />
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-text-primary truncate">{m.name}</p>
-                      <p className="text-[10px] text-text-muted">{m.role?.replace('_', ' ')}</p>
+                      <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>{m.name}</p>
+                      <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{m.role?.replace('_', ' ')}</p>
                     </div>
                   </div>
                   <div className="col-span-2 text-right">
-                    <p className="text-xs font-mono text-text-secondary">{formatTokens(used)}</p>
+                    <p className="text-xs font-mono" style={{ color: 'var(--color-text-secondary)' }}>{formatTokens(used)}</p>
                   </div>
                   <div className="col-span-3">
                     {cap > 0 ? (
                       <div className="flex items-center gap-2">
                         <ProgressBar value={used} max={cap} size="sm" className="flex-1" />
-                        <span className="text-[10px] font-mono text-text-muted w-8 text-right">{pct}%</span>
-                        {isNearLimit && <span className="text-amber-400 text-xs">!</span>}
+                        <span className="text-[10px] font-mono w-8 text-right" style={{ color: 'var(--color-text-muted)' }}>{pct}%</span>
+                        {isNearLimit && <span className="text-xs" style={{ color: 'var(--color-warning)' }}>!</span>}
                       </div>
                     ) : (
-                      <span className="text-[10px] text-text-muted">No budget</span>
+                      <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>No budget</span>
                     )}
                   </div>
                   <div className="col-span-2 text-right">
-                    <p className="text-xs font-mono text-text-secondary">{formatNumber(Number(m.queries) || 0)}</p>
+                    <p className="text-xs font-mono" style={{ color: 'var(--color-text-secondary)' }}>{formatNumber(Number(m.queries) || 0)}</p>
                   </div>
                   <div className="col-span-1 text-right">
                     {m.lastActive ? (
@@ -182,43 +209,66 @@ export function ManagerView({ stats, userName, orgName }: ManagerViewProps) {
       </Card>
 
       {/* My Token Allocation Card */}
-      <Card padding="lg">
-        <h3 className="text-sm font-medium text-text-secondary mb-3">My Token Allocation</h3>
-        <p className="text-xs text-text-muted mb-4">Tokens allocated to your team to distribute</p>
+      <div
+        style={{
+          background: 'linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-2) 100%)',
+          border: '1px solid var(--color-border)',
+          borderTop: '3px solid var(--color-accent-start)',
+          borderRadius: '12px',
+          padding: '20px',
+        }}
+      >
+        <h3 className="text-sm font-medium mb-1" style={{ color: 'var(--color-text-secondary)' }}>My Token Allocation</h3>
+        <p className="text-xs mb-4" style={{ color: 'var(--color-text-muted)' }}>Tokens allocated to your team to distribute</p>
         <div className="grid grid-cols-3 gap-4 text-center">
           <div>
-            <p className="text-lg font-semibold font-mono text-text-primary">{formatTokens(membersWithBudget.reduce((s, m) => s + (Number(m.budgetCap) || 0), 0))}</p>
-            <p className="text-[10px] text-text-muted mt-1">Total Distributed</p>
+            <p className="text-lg font-semibold font-mono" style={{ color: 'var(--color-text-primary)' }}>
+              {formatTokens(membersWithBudget.reduce((s, m) => s + (Number(m.budgetCap) || 0), 0))}
+            </p>
+            <p className="text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>Total Distributed</p>
           </div>
           <div>
-            <p className="text-lg font-semibold font-mono text-text-primary">{formatTokens(membersWithBudget.reduce((s, m) => s + (Number(m.budgetUsed) || 0), 0))}</p>
-            <p className="text-[10px] text-text-muted mt-1">Used by Team</p>
+            <p className="text-lg font-semibold font-mono" style={{ color: 'var(--color-text-primary)' }}>
+              {formatTokens(membersWithBudget.reduce((s, m) => s + (Number(m.budgetUsed) || 0), 0))}
+            </p>
+            <p className="text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>Used by Team</p>
           </div>
           <div>
-            <p className="text-lg font-semibold font-mono text-primary">{formatTokens(membersWithBudget.reduce((s, m) => s + Math.max(0, (Number(m.budgetCap) || 0) - (Number(m.budgetUsed) || 0)), 0))}</p>
-            <p className="text-[10px] text-text-muted mt-1">Remaining</p>
+            <p className="text-lg font-semibold font-mono" style={{ color: 'var(--color-primary)' }}>
+              {formatTokens(membersWithBudget.reduce((s, m) => s + Math.max(0, (Number(m.budgetCap) || 0) - (Number(m.budgetUsed) || 0)), 0))}
+            </p>
+            <p className="text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>Remaining</p>
           </div>
         </div>
         <button
           onClick={() => navigate('/budgets')}
-          className="mt-4 w-full py-2 rounded-lg text-xs font-medium text-primary hover:bg-primary/5 transition-colors"
-          style={{ border: '1px solid var(--color-primary)', background: 'transparent', cursor: 'pointer' }}
+          className="mt-4 w-full py-2 rounded-lg text-xs font-medium transition-colors"
+          style={{
+            border: '1px solid var(--color-primary)',
+            background: 'transparent',
+            color: 'var(--color-primary)',
+            cursor: 'pointer',
+          }}
         >
           Assign to team
         </button>
-      </Card>
+      </div>
 
       {/* Tasks Section */}
       <Card padding="lg">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-medium text-text-secondary">Tasks</h3>
-          <button onClick={() => navigate('/tasks')} className="text-xs text-primary hover:text-primary-hover flex items-center gap-1">
+          <h3 className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Tasks</h3>
+          <button
+            onClick={() => navigate('/tasks')}
+            className="text-xs flex items-center gap-1 transition-colors"
+            style={{ color: 'var(--color-primary)' }}
+          >
             Manage Tasks <ArrowRight size={12} />
           </button>
         </div>
         <div className="text-center py-4">
-          <CheckSquare size={24} className="mx-auto text-text-muted mb-2" />
-          <p className="text-sm text-text-muted">Create and assign tasks to your team</p>
+          <CheckSquare size={24} className="mx-auto mb-2" style={{ color: 'var(--color-text-muted)' }} />
+          <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Create and assign tasks to your team</p>
         </div>
       </Card>
     </div>
