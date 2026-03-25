@@ -141,8 +141,8 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
           )}
 
           {/* User bubble */}
-          <div style={{
-            backgroundColor: 'var(--chat-surface)', borderRadius: '18px', padding: '12px 18px',
+          <div className="user-message-bubble" style={{
+            background: 'var(--chat-user-bubble)', borderRadius: '18px', padding: '12px 18px',
             fontSize: '15px', lineHeight: '1.6', color: 'var(--chat-text)', wordBreak: 'break-word',
           }}>
             {isEditing ? (

@@ -39,44 +39,44 @@
 
 /* ─── Light theme overrides: White + Blue ─── */
 html.light {
-  --color-primary: #3B5BDB;
-  --color-primary-hover: #2F4AC2;
-  --color-primary-light: rgba(59, 91, 219, 0.08);
-  --color-primary-glow: rgba(59, 91, 219, 0.06);
+  --color-primary: #6D28D9;
+  --color-primary-hover: #5B21B6;
+  --color-primary-light: rgba(109, 40, 217, 0.08);
+  --color-primary-glow: rgba(109, 40, 217, 0.06);
 
-  --color-accent-start: #3B5BDB;
-  --color-accent-mid: #4C6EF5;
-  --color-accent-end: #748FFC;
+  --color-accent-start: #7C3AED;
+  --color-accent-mid: #8B5CF6;
+  --color-accent-end: #A78BFA;
 
-  --color-background: #FFFFFF;
-  --color-surface: #F8F9FF;
-  --color-surface-2: #EEF2FF;
-  --color-surface-3: #E0E4FF;
-  --color-border: #E0E4FF;
-  --color-border-subtle: #EEF2FF;
-  --color-border-hover: #C7D2FE;
-  --color-border-strong: #A5B4FC;
-  --color-text-primary: #0F0F2E;
-  --color-text-secondary: #4B5380;
-  --color-text-muted: #8B92B8;
-  --color-text-meta: #8B92B8;
-  --color-text-dim: #C7D2FE;
+  --color-background: #FAFBFF;
+  --color-surface: #FFFFFF;
+  --color-surface-2: #F5F3FF;
+  --color-surface-3: #EDE9FE;
+  --color-border: #E5E1F5;
+  --color-border-subtle: #F0EDFF;
+  --color-border-hover: #C4B5FD;
+  --color-border-strong: #A78BFA;
+  --color-text-primary: #1E1B4B;
+  --color-text-secondary: #4C4578;
+  --color-text-muted: #8B83B0;
+  --color-text-meta: #8B83B0;
+  --color-text-dim: #C4B5FD;
 
-  --color-success: #0EA5E9;
+  --color-success: #10B981;
   --color-warning: #F59E0B;
   --color-danger: #EF4444;
   --color-info: #3B82F6;
 
-  --color-glass: rgba(255, 255, 255, 0.9);
-  --color-glass-border: rgba(59, 91, 219, 0.06);
-  --color-glass-hover: rgba(59, 91, 219, 0.03);
+  --color-glass: rgba(255, 255, 255, 0.95);
+  --color-glass-border: rgba(109, 40, 217, 0.08);
+  --color-glass-hover: rgba(109, 40, 217, 0.04);
 }
 
 html.light,
 html.light body,
 html.light #root {
-  background-color: #FFFFFF !important;
-  color: #0F0F2E !important;
+  background-color: #FAFBFF !important;
+  color: #1E1B4B !important;
   color-scheme: light !important;
 }
 
@@ -84,39 +84,39 @@ html.light input,
 html.light textarea,
 html.light select {
   color-scheme: light;
-  color: #0F0F2E;
+  color: #1E1B4B;
 }
 
 html.light input::placeholder,
 html.light textarea::placeholder {
-  color: #8B92B8;
+  color: #8B83B0;
 }
 
 html.light input:-webkit-autofill,
 html.light input:-webkit-autofill:hover,
 html.light input:-webkit-autofill:focus {
-  -webkit-box-shadow: 0 0 0px 1000px #F8F9FF inset;
-  -webkit-text-fill-color: #0F0F2E;
-  caret-color: #0F0F2E;
+  -webkit-box-shadow: 0 0 0px 1000px #F5F3FF inset;
+  -webkit-text-fill-color: #1E1B4B;
+  caret-color: #1E1B4B;
 }
 
 html.light * {
-  scrollbar-color: #C7D2FE transparent;
+  scrollbar-color: #C4B5FD transparent;
 }
-html.light ::-webkit-scrollbar-thumb { background: #C7D2FE; }
-html.light ::-webkit-scrollbar-thumb:hover { background: #A5B4FC; }
+html.light ::-webkit-scrollbar-thumb { background: #C4B5FD; }
+html.light ::-webkit-scrollbar-thumb:hover { background: #A78BFA; }
 
 html.light ::selection {
-  background: rgba(59, 91, 219, 0.2);
-  color: #0F0F2E;
+  background: rgba(124, 58, 237, 0.2);
+  color: #1E1B4B;
 }
 
 html.light .animate-pulse-glow {
   animation: pulse-glow-light 2s ease-in-out infinite;
 }
 @keyframes pulse-glow-light {
-  0%, 100% { box-shadow: 0 0 5px rgba(59, 91, 219, 0.3); }
-  50% { box-shadow: 0 0 15px rgba(59, 91, 219, 0.5); }
+  0%, 100% { box-shadow: 0 0 5px rgba(124, 58, 237, 0.3); }
+  50% { box-shadow: 0 0 15px rgba(124, 58, 237, 0.5); }
 }
 
 /* ─── Dark select/option styling ─── */
@@ -126,7 +126,7 @@ select option {
 }
 html.light select option {
   background: #FFFFFF;
-  color: #0F0F2E;
+  color: #1E1B4B;
 }
 
 /* ─── Chat-specific CSS variables (dark default) ─── */
@@ -147,19 +147,19 @@ html.light select option {
 }
 
 html.light {
-  --chat-bg: #FFFFFF;
-  --chat-sidebar-bg: #F8F9FF;
-  --chat-surface: #EEF2FF;
-  --chat-hover: #E0E4FF;
-  --chat-border: #E0E4FF;
-  --chat-text: #0F0F2E;
-  --chat-text-secondary: #4B5380;
-  --chat-text-muted: #8B92B8;
-  --chat-text-dim: #C7D2FE;
-  --chat-code-bg: #F8F9FF;
-  --chat-code-header: #EEF2FF;
-  --chat-input-bg: #EEF2FF;
-  --chat-user-bubble: #EEF2FF;
+  --chat-bg: #FAFBFF;
+  --chat-sidebar-bg: #FFFFFF;
+  --chat-surface: #F5F3FF;
+  --chat-hover: #EDE9FE;
+  --chat-border: #E5E1F5;
+  --chat-text: #1E1B4B;
+  --chat-text-secondary: #4C4578;
+  --chat-text-muted: #8B83B0;
+  --chat-text-dim: #C4B5FD;
+  --chat-code-bg: #F8F7FF;
+  --chat-code-header: #EDE9FE;
+  --chat-input-bg: #FFFFFF;
+  --chat-user-bubble: #7C3AED;
 }
 
 /* ─── Base box sizing ─── */
@@ -375,9 +375,223 @@ pre {
 .glow-primary-strong { box-shadow: 0 0 20px rgba(16, 163, 127, 0.3), 0 0 60px rgba(16, 163, 127, 0.1); }
 
 /* Light mode glow overrides */
-html.light .glow-primary { box-shadow: 0 0 20px rgba(59, 91, 219, 0.15), 0 0 60px rgba(59, 91, 219, 0.05); }
-html.light .glow-primary-strong { box-shadow: 0 0 20px rgba(59, 91, 219, 0.3), 0 0 60px rgba(59, 91, 219, 0.1); }
+html.light .glow-primary { box-shadow: 0 0 20px rgba(124, 58, 237, 0.12), 0 0 60px rgba(124, 58, 237, 0.04); }
+html.light .glow-primary-strong { box-shadow: 0 0 20px rgba(124, 58, 237, 0.25), 0 0 60px rgba(124, 58, 237, 0.08); }
 
 /* ─── Focus ring ─── */
 .focus-ring { outline: none; }
 .focus-ring:focus-visible { box-shadow: 0 0 0 2px var(--color-background), 0 0 0 4px var(--color-primary); }
+
+/* ══════════════════════════════════════════════════
+   VIBRANT LIGHT MODE STYLES
+   ══════════════════════════════════════════════════ */
+
+/* Light mode sidebar — subtle gradient */
+html.light .h-screen.flex.flex-col {
+  background: linear-gradient(180deg, #FFFFFF 0%, #F5F3FF 50%, #EDE9FE 100%) !important;
+  border-right: 1px solid #E5E1F5 !important;
+}
+
+/* Light mode cards — white with subtle shadow */
+html.light .bg-surface {
+  background: #FFFFFF !important;
+  box-shadow: 0 1px 3px rgba(124, 58, 237, 0.06), 0 4px 12px rgba(124, 58, 237, 0.04) !important;
+}
+
+/* Light mode stat cards — gradient borders */
+html.light .border.border-border.rounded-2xl {
+  border-color: transparent !important;
+  background: linear-gradient(white, white) padding-box,
+              linear-gradient(135deg, #E9D5FF, #C4B5FD, #A78BFA) border-box !important;
+  border: 1px solid transparent !important;
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.08);
+}
+
+/* Light mode header — glass effect */
+html.light header {
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  border-bottom: 1px solid rgba(124, 58, 237, 0.08) !important;
+}
+
+/* Light mode user message bubble — vibrant purple */
+html.light .bg-user-bubble,
+html.light [style*="chat-user-bubble"] {
+  background: linear-gradient(135deg, #7C3AED, #6D28D9) !important;
+  color: white !important;
+}
+
+/* Light mode code blocks — warm tinted */
+html.light pre {
+  background: #1E1B4B !important;
+  color: #E0D9FF !important;
+  border: 1px solid rgba(124, 58, 237, 0.15) !important;
+  border-radius: 12px !important;
+}
+
+/* Light mode tables — clean with purple accents */
+html.light table {
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(124, 58, 237, 0.06);
+}
+html.light th {
+  background: linear-gradient(135deg, #7C3AED, #6D28D9) !important;
+  color: white !important;
+  font-weight: 600 !important;
+  padding: 12px 16px !important;
+  border: none !important;
+}
+html.light td {
+  background: #FFFFFF !important;
+  padding: 10px 16px !important;
+  border-bottom: 1px solid #F0EDFF !important;
+}
+html.light tr:last-child td {
+  border-bottom: none !important;
+}
+html.light tr:hover td {
+  background: #F5F3FF !important;
+}
+
+/* Light mode badges — vibrant colors */
+html.light .bg-primary\/10 {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(167, 139, 250, 0.12)) !important;
+}
+
+/* Light mode input — clean with purple focus */
+html.light input:focus,
+html.light textarea:focus,
+html.light select:focus {
+  border-color: #A78BFA !important;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1) !important;
+}
+
+/* Light mode chat input area — elevated */
+html.light .chat-input-wrapper,
+html.light [style*="chat-input-bg"] {
+  background: #FFFFFF !important;
+  border: 1px solid #E5E1F5 !important;
+  box-shadow: 0 -4px 20px rgba(124, 58, 237, 0.06) !important;
+}
+
+/* Light mode buttons — gradient */
+html.light button[style*="primary"] {
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.25) !important;
+}
+
+/* Light mode nav items — hover glow */
+html.light .nav-item:hover,
+html.light a[style*="primary"]:hover {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.08), rgba(167, 139, 250, 0.05)) !important;
+}
+
+/* Light mode active nav — vibrant indicator */
+html.light .nav-active {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(167, 139, 250, 0.08)) !important;
+  border-left: 3px solid #7C3AED !important;
+}
+
+/* Light mode conversation list item hover */
+html.light .conversation-item:hover {
+  background: #F5F3FF !important;
+}
+
+/* Light mode token badge in header */
+html.light .token-badge {
+  background: linear-gradient(135deg, #7C3AED, #A78BFA) !important;
+  color: white !important;
+}
+
+/* Light mode model selector dropdown */
+html.light .model-dropdown {
+  background: #FFFFFF !important;
+  border: 1px solid #E5E1F5 !important;
+  box-shadow: 0 8px 30px rgba(124, 58, 237, 0.12) !important;
+}
+
+/* Light mode markdown links */
+html.light a[href] {
+  color: #7C3AED;
+}
+html.light a[href]:hover {
+  color: #6D28D9;
+}
+
+/* Light mode blockquotes — colored left border */
+html.light blockquote {
+  border-left: 3px solid #A78BFA !important;
+  background: rgba(124, 58, 237, 0.04) !important;
+  border-radius: 0 8px 8px 0 !important;
+  padding: 12px 16px !important;
+}
+
+/* Light mode search bar */
+html.light .search-bar {
+  background: #FFFFFF !important;
+  border: 1px solid #E5E1F5 !important;
+  box-shadow: 0 1px 4px rgba(124, 58, 237, 0.06) !important;
+}
+
+/* Light mode notification dropdown */
+html.light .notification-panel {
+  background: #FFFFFF !important;
+  border: 1px solid #E5E1F5 !important;
+  box-shadow: 0 8px 30px rgba(124, 58, 237, 0.12) !important;
+}
+
+/* Light mode message action buttons */
+html.light .message-actions button {
+  color: #8B83B0 !important;
+}
+html.light .message-actions button:hover {
+  color: #7C3AED !important;
+  background: rgba(124, 58, 237, 0.08) !important;
+}
+
+/* Light mode user message bubble — white text on purple */
+html.light .user-message-bubble {
+  background: linear-gradient(135deg, #7C3AED, #6D28D9) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 2px 12px rgba(124, 58, 237, 0.25) !important;
+}
+html.light .user-message-bubble * {
+  color: #FFFFFF !important;
+}
+
+/* Light mode assistant icon — gradient */
+html.light .assistant-icon {
+  background: linear-gradient(135deg, #7C3AED, #A78BFA) !important;
+}
+
+/* Light mode sidebar bottom widget */
+html.light .sidebar-widget {
+  background: linear-gradient(135deg, #F5F3FF, #EDE9FE) !important;
+  border: 1px solid #E5E1F5 !important;
+}
+
+/* Light mode tooltip */
+html.light [role="tooltip"] {
+  background: #1E1B4B !important;
+  color: white !important;
+}
+
+/* Light mode skeleton loading */
+html.light .animate-pulse {
+  background: linear-gradient(90deg, #F5F3FF 25%, #EDE9FE 50%, #F5F3FF 75%) !important;
+  background-size: 200% 100% !important;
+}
+
+/* Light mode agent selector */
+html.light .agent-badge {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.1), rgba(167, 139, 250, 0.08)) !important;
+  border: 1px solid rgba(124, 58, 237, 0.15) !important;
+}
+
+/* Light mode chart/stats cards gradient top border */
+html.light .stat-card {
+  border-top: 3px solid transparent !important;
+  border-image: linear-gradient(90deg, #7C3AED, #A78BFA, #C4B5FD) 1 !important;
+}
