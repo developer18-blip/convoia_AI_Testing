@@ -407,7 +407,7 @@ export function LandingPage() {
                   }`}
                 >
                   {plan.popular && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-accent-start to-accent-mid text-white text-xs font-bold rounded-full">
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 text-white text-xs font-bold rounded-full" style={{ background: 'var(--color-primary)' }}>
                       Most Popular
                     </div>
                   )}
@@ -446,10 +446,10 @@ export function LandingPage() {
                   )}
 
                   {/* Helper text */}
-                  <p style={{ fontSize: '11px', color: '#8E8E8E', marginTop: '4px' }}>
+                  <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
                     ~{plan.miniMsgs.toLocaleString()} messages with GPT-4o-mini
                   </p>
-                  <p style={{ fontSize: '11px', color: '#8E8E8E', marginTop: '2px' }} className="mb-4">
+                  <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }} className="mb-4">
                     ~{plan.proMsgs.toLocaleString()} messages with GPT-4o
                   </p>
 
@@ -469,11 +469,11 @@ export function LandingPage() {
                   {/* CTA */}
                   <Link
                     to="/register"
-                    className={`block text-center py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                      plan.popular
-                        ? 'bg-gradient-to-r from-accent-start to-accent-mid text-white shadow-lg shadow-primary/20 hover:brightness-110'
-                        : 'bg-surface-2 hover:bg-surface-3 text-text-primary border border-border'
-                    }`}
+                    className="block text-center py-2.5 rounded-xl text-sm font-semibold transition-all hover:brightness-110"
+                    style={plan.popular
+                      ? { background: 'var(--color-primary)', color: 'white', boxShadow: '0 4px 14px rgba(37,99,235,0.3)' }
+                      : { background: 'white', color: 'var(--color-primary)', border: '2px solid var(--color-primary)' }
+                    }
                   >
                     {plan.cta}
                   </Link>
@@ -606,7 +606,8 @@ export function LandingPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
           <motion.div
             {...fadeUp}
-            className="relative bg-gradient-to-br from-primary/15 via-accent-mid/10 to-accent-end/15 border border-primary/20 rounded-3xl p-12 overflow-hidden"
+            className="relative border rounded-3xl p-12 overflow-hidden"
+            style={{ background: 'linear-gradient(135deg, rgba(37,99,235,0.08), rgba(96,165,250,0.06))', borderColor: 'rgba(37,99,235,0.15)' }}
           >
             <div className="absolute inset-0 opacity-[0.03]" style={{
               backgroundImage: `radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)`,
@@ -728,7 +729,7 @@ function ReviewsSection() {
                     : 'bg-surface border-border'
                 }`}>
                   {review.isFeatured && (
-                    <div className="absolute -top-3 left-6 bg-gradient-to-r from-accent-start to-accent-mid text-white text-xs font-bold px-3 py-1 rounded-full">
+                    <div className="absolute -top-3 left-6 text-white text-xs font-bold px-3 py-1 rounded-full" style={{ background: 'var(--color-primary)' }}>
                       Featured
                     </div>
                   )}
@@ -737,7 +738,7 @@ function ReviewsSection() {
                   <p className="text-text-secondary text-sm leading-relaxed mb-4">{review.content}</p>
                   <div className="flex items-center justify-between mt-auto pt-4 border-t border-border/50">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-accent-end flex items-center justify-center text-white font-bold text-sm">
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm" style={{ background: 'var(--color-primary)' }}>
                         {review.name?.charAt(0)?.toUpperCase() || '?'}
                       </div>
                       <div>
