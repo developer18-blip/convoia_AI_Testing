@@ -1,6 +1,7 @@
 import { createContext, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { useAuth } from '../hooks/useAuth'
+import api from '../lib/api'
 import type { Conversation, Message, ChatFolder } from '../types'
 
 const MAX_CONVERSATIONS = 100
@@ -28,6 +29,53 @@ function loadConversations(userId: string | undefined): Conversation[] {
   } catch {
     return []
   }
+}
+
+// Backend sync helpers (fire-and-forget, don't block UI)
+async function syncConversationToBackend(conv: Conversation) {
+  try {
+    await api.post('/conversations', {
+      id: conv.id, title: conv.title, modelName: conv.modelName,
+    }).catch(() => {}) // ignore if already exists
+  } catch { /* silent */ }
+}
+
+async function syncMessagesToBackend(convId: string, messages: Message[]) {
+  try {
+    const newMsgs = messages.filter(m => m.content && m.role !== 'system').slice(-10) // sync last 10
+    if (newMsgs.length === 0) return
+    await api.post(`/conversations/${convId}/messages`, { messages: newMsgs }).catch(() => {})
+  } catch { /* silent */ }
+}
+
+async function loadConversationsFromBackend(): Promise<Conversation[]> {
+  try {
+    const res = await api.get('/conversations')
+    const data = res.data?.data
+    if (!Array.isArray(data)) return []
+    return data.map((c: any) => ({
+      id: c.id, title: c.title, modelId: c.modelId, modelName: c.modelName,
+      agentId: c.agentId, industry: c.industry, isPinned: c.isPinned || false,
+      folderId: c.folderId, totalCost: c.totalCost || 0, totalTokens: c.totalTokens || 0,
+      messages: [], // loaded lazily when conversation is opened
+      createdAt: c.createdAt, updatedAt: c.updatedAt,
+    }))
+  } catch { return [] }
+}
+
+async function loadConversationMessages(convId: string): Promise<Message[]> {
+  try {
+    const res = await api.get(`/conversations/${convId}`)
+    const msgs = res.data?.data?.messages
+    if (!Array.isArray(msgs)) return []
+    return msgs.map((m: any) => ({
+      id: m.id, role: m.role, content: m.content,
+      model: m.model, provider: m.provider,
+      tokensInput: m.tokensInput, tokensOutput: m.tokensOutput,
+      cost: m.cost, imageUrl: m.imageUrl, imagePrompt: m.imagePrompt,
+      timestamp: m.createdAt,
+    }))
+  } catch { return [] }
 }
 
 function loadFolders(userId: string | undefined): ChatFolder[] {
@@ -93,12 +141,37 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setMessages((prev) => prev.map((m) => m.isLoading ? { ...m, isLoading: false, content: m.content || '*(Generation stopped)*' } : m))
   }, [])
 
-  // Reload conversations when user changes
+  // Reload conversations when user changes — try backend first, fallback to localStorage
   useEffect(() => {
-    setConversations(loadConversations(userId))
-    setFolders(loadFolders(userId))
     setActiveId(null)
     setMessages([])
+
+    if (!userId) {
+      setConversations([])
+      setFolders([])
+      return
+    }
+
+    // Load from localStorage immediately (fast)
+    const local = loadConversations(userId)
+    setConversations(local)
+    setFolders(loadFolders(userId))
+
+    // Then load from backend (authoritative) and merge
+    loadConversationsFromBackend().then(backendConvs => {
+      if (backendConvs.length === 0 && local.length > 0) {
+        // First time: migrate localStorage to backend
+        api.post('/conversations/sync', { conversations: local.slice(0, 50) }).catch(() => {})
+      } else if (backendConvs.length > 0) {
+        // Merge: backend is authoritative, add any local-only convs
+        const backendIds = new Set(backendConvs.map(c => c.id))
+        const merged = [
+          ...backendConvs,
+          ...local.filter(c => !backendIds.has(c.id)),
+        ].sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime())
+        setConversations(merged)
+      }
+    })
   }, [userId])
 
   // Persist conversations to user-namespaced key
@@ -125,7 +198,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const activeConversation = conversations.find((c) => c.id === activeId) || null
 
-  // Sync messages to conversation
+  // Sync messages to conversation (local + backend)
+  const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
     if (activeId && messages.length > 0) {
       setConversations((prev) =>
@@ -138,18 +212,39 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           return { ...c, messages, totalCost, totalTokens, title, updatedAt: new Date().toISOString() }
         })
       )
+
+      // Debounced sync to backend (don't send on every keystroke/chunk)
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current)
+      syncTimeoutRef.current = setTimeout(() => {
+        syncMessagesToBackend(activeId, messages)
+      }, 2000)
     }
   }, [messages, activeId])
 
   const setActiveConversation = useCallback((id: string | null) => {
     setActiveId(id)
     if (id && userId) {
-      const conv = loadConversations(userId).find((c) => c.id === id)
-      if (conv) setMessages(conv.messages)
+      // Try local first (instant)
+      const localConv = conversations.find((c) => c.id === id)
+      if (localConv?.messages?.length > 0) {
+        setMessages(localConv.messages)
+      } else {
+        setMessages([])
+        // Load from backend
+        loadConversationMessages(id).then(msgs => {
+          if (msgs.length > 0) {
+            setMessages(msgs)
+            // Update local cache
+            setConversations(prev => prev.map(c =>
+              c.id === id ? { ...c, messages: msgs } : c
+            ))
+          }
+        })
+      }
     } else {
       setMessages([])
     }
-  }, [userId])
+  }, [userId, conversations])
 
   const createConversation = useCallback((modelId: string, modelName: string, industry?: string) => {
     const conv: Conversation = {
@@ -167,11 +262,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setConversations((prev) => [conv, ...prev])
     setActiveId(conv.id)
     setMessages([])
+    syncConversationToBackend(conv)
     return conv
   }, [])
 
   const deleteConversation = useCallback((id: string) => {
     setConversations((prev) => prev.filter((c) => c.id !== id))
+    api.delete(`/conversations/${id}`).catch(() => {})
     if (activeId === id) { setActiveId(null); setMessages([]) }
   }, [activeId])
 

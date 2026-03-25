@@ -91,6 +91,7 @@ model User {
   tokenWallet              TokenWallet?
   tokenTransactions        TokenTransaction[]
   reviews                  Review[]
+  conversations            Conversation[]
 
   @@index([organizationId])
   @@index([managerId])
@@ -544,4 +545,46 @@ model Review {
   @@index([isPublic])
   @@index([isFeatured])
   @@index([createdAt])
+}
+
+model Conversation {
+  id             String          @id @default(uuid())
+  userId         String
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title          String          @default("New Chat")
+  modelId        String?
+  modelName      String?
+  agentId        String?
+  industry       String?
+  isPinned       Boolean         @default(false)
+  folderId       String?
+  totalCost      Float           @default(0)
+  totalTokens    Int             @default(0)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  messages       ChatMessage[]
+
+  @@index([userId])
+  @@index([userId, updatedAt])
+  @@index([createdAt])
+}
+
+model ChatMessage {
+  id              String       @id @default(uuid())
+  conversationId  String
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role            String       // user, assistant, system
+  content         String
+  model           String?
+  provider        String?
+  tokensInput     Int?
+  tokensOutput    Int?
+  cost            Float?
+  imageUrl        String?
+  imagePrompt     String?
+  webSearchData   String?      // JSON string of search results
+  createdAt       DateTime     @default(now())
+
+  @@index([conversationId])
+  @@index([conversationId, createdAt])
 }
