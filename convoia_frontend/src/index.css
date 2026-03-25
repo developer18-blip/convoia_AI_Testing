@@ -37,39 +37,39 @@
   --font-sans: 'Inter', -apple-system, system-ui, sans-serif;
 }
 
-/* ─── Light theme overrides: White + Blue ─── */
+/* ─── Light theme overrides: Vibrant Purple ─── */
 html.light {
-  --color-primary: #6D28D9;
-  --color-primary-hover: #5B21B6;
-  --color-primary-light: rgba(109, 40, 217, 0.08);
-  --color-primary-glow: rgba(109, 40, 217, 0.06);
+  --color-primary: #6D28D9 !important;
+  --color-primary-hover: #5B21B6 !important;
+  --color-primary-light: rgba(109, 40, 217, 0.08) !important;
+  --color-primary-glow: rgba(109, 40, 217, 0.06) !important;
 
-  --color-accent-start: #7C3AED;
-  --color-accent-mid: #8B5CF6;
-  --color-accent-end: #A78BFA;
+  --color-accent-start: #7C3AED !important;
+  --color-accent-mid: #8B5CF6 !important;
+  --color-accent-end: #A78BFA !important;
 
-  --color-background: #FAFBFF;
-  --color-surface: #FFFFFF;
-  --color-surface-2: #F5F3FF;
-  --color-surface-3: #EDE9FE;
-  --color-border: #E5E1F5;
-  --color-border-subtle: #F0EDFF;
-  --color-border-hover: #C4B5FD;
-  --color-border-strong: #A78BFA;
-  --color-text-primary: #1E1B4B;
-  --color-text-secondary: #4C4578;
-  --color-text-muted: #8B83B0;
-  --color-text-meta: #8B83B0;
-  --color-text-dim: #C4B5FD;
+  --color-background: #FAFBFF !important;
+  --color-surface: #FFFFFF !important;
+  --color-surface-2: #F5F3FF !important;
+  --color-surface-3: #EDE9FE !important;
+  --color-border: #E5E1F5 !important;
+  --color-border-subtle: #F0EDFF !important;
+  --color-border-hover: #C4B5FD !important;
+  --color-border-strong: #A78BFA !important;
+  --color-text-primary: #1E1B4B !important;
+  --color-text-secondary: #4C4578 !important;
+  --color-text-muted: #7C7599 !important;
+  --color-text-meta: #7C7599 !important;
+  --color-text-dim: #A89EC4 !important;
 
-  --color-success: #10B981;
-  --color-warning: #F59E0B;
-  --color-danger: #EF4444;
-  --color-info: #3B82F6;
+  --color-success: #10B981 !important;
+  --color-warning: #F59E0B !important;
+  --color-danger: #EF4444 !important;
+  --color-info: #3B82F6 !important;
 
-  --color-glass: rgba(255, 255, 255, 0.95);
-  --color-glass-border: rgba(109, 40, 217, 0.08);
-  --color-glass-hover: rgba(109, 40, 217, 0.04);
+  --color-glass: rgba(255, 255, 255, 0.95) !important;
+  --color-glass-border: rgba(109, 40, 217, 0.08) !important;
+  --color-glass-hover: rgba(109, 40, 217, 0.04) !important;
 }
 
 html.light,
@@ -78,6 +78,17 @@ html.light #root {
   background-color: #FAFBFF !important;
   color: #1E1B4B !important;
   color-scheme: light !important;
+}
+
+/* Force all headings and paragraphs readable in light mode */
+html.light h1, html.light h2, html.light h3, html.light h4, html.light h5, html.light h6 {
+  color: #1E1B4B;
+}
+html.light p {
+  color: #4C4578;
+}
+html.light span, html.light a, html.light label, html.light li {
+  color: inherit;
 }
 
 html.light input,
