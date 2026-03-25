@@ -3,8 +3,8 @@ import { v4 as uuidv4 } from 'uuid'
 import { useAuth } from '../hooks/useAuth'
 import type { Conversation, Message, ChatFolder } from '../types'
 
-const MAX_CONVERSATIONS = 50
-const MAX_MESSAGES_PER_CONV = 100
+const MAX_CONVERSATIONS = 100
+const MAX_MESSAGES_PER_CONV = 500
 
 function storageKey(userId: string) { return `convoia_chats_${userId}` }
 function foldersKey(userId: string) { return `convoia_folders_${userId}` }

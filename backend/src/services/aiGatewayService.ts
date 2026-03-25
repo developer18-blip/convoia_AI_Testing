@@ -4,6 +4,64 @@ import logger from '../config/logger.js';
 import { AppError } from '../middleware/errorHandler.js';
 import prisma from '../config/db.js';
 
+// Smart context windowing — keeps conversation within model limits
+// Always keeps: first 2 messages (for context) + system prompt + last N messages
+function trimToContextWindow(messages: Array<{ role: string; content: string }>, maxTokens: number): Array<{ role: string; content: string }> {
+  // Estimate ~4 chars per token, reserve 30% for output
+  const maxInputTokens = Math.floor(maxTokens * 0.7);
+
+  let totalChars = 0;
+  for (const m of messages) totalChars += m.content.length;
+  const estimatedTokens = Math.ceil(totalChars / 4);
+
+  // If within limits, send everything
+  if (estimatedTokens <= maxInputTokens) return messages;
+
+  // Keep first 2 messages (context anchor) + as many recent messages as fit
+  const first = messages.slice(0, 2);
+  const rest = messages.slice(2);
+  const firstChars = first.reduce((s, m) => s + m.content.length, 0);
+  const budget = (maxInputTokens * 4) - firstChars - 200; // 200 char buffer
+
+  // Walk backwards through remaining messages
+  const kept: Array<{ role: string; content: string }> = [];
+  let used = 0;
+  for (let i = rest.length - 1; i >= 0; i--) {
+    const msgChars = rest[i].content.length;
+    if (used + msgChars > budget) break;
+    kept.unshift(rest[i]);
+    used += msgChars;
+  }
+
+  // Add summary marker if we trimmed
+  if (kept.length < rest.length) {
+    const trimmed = rest.length - kept.length;
+    const summaryMsg = { role: 'system' as const, content: `[${trimmed} earlier messages omitted to fit context window. The conversation continues below.]` };
+    return [...first, summaryMsg, ...kept];
+  }
+
+  return [...first, ...kept];
+}
+
+// Model context window sizes (in tokens)
+const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
+  'gpt-4o': 128000, 'gpt-4o-mini': 128000,
+  'gpt-4.1': 1000000, 'gpt-4.1-mini': 1000000, 'gpt-4.1-nano': 1000000,
+  'gpt-5': 1000000, 'gpt-5-mini': 1000000,
+  'gpt-5.4': 1000000, 'gpt-5.4-mini': 1000000, 'gpt-5.4-nano': 1000000,
+  'o3': 200000, 'o3-mini': 200000, 'o4-mini': 200000,
+  'claude-opus-4-6': 1000000, 'claude-opus-4-5-20250514': 200000,
+  'claude-sonnet-4-6': 1000000, 'claude-sonnet-4-5-20241022': 200000,
+  'claude-haiku-4-5-20251001': 200000,
+  'gemini-3.1-pro': 2000000, 'gemini-3-pro': 1000000,
+  'gemini-2.5-pro-preview-05-06': 1000000, 'gemini-2.5-flash-preview-05-20': 1000000,
+  'gemini-2.5-flash-lite': 1000000, 'gemini-2.0-flash': 1000000,
+  'deepseek-chat': 128000, 'deepseek-reasoner': 128000,
+  'mistral-large-latest': 128000, 'mistral-small-latest': 128000,
+  'llama-3.3-70b-versatile': 128000, 'llama-3.1-8b-instant': 128000,
+  'mixtral-8x7b-32768': 32768,
+};
+
 interface AgentConfig {
   systemPrompt: string;
   temperature: number;
@@ -692,10 +750,12 @@ function callOpenAICompatibleStream(
 }
 
 async function routeToProviderStream(
-  aiModel: any, messages: any[], systemPrompt: string,
+  aiModel: any, rawMessages: any[], systemPrompt: string,
   callbacks: StreamCallbacks, overrides?: ProviderOverrides
 ) {
   const { provider, modelId } = aiModel;
+  const contextWindow = MODEL_CONTEXT_WINDOWS[modelId] || 128000;
+  const messages = trimToContextWindow(rawMessages, contextWindow);
 
   switch (provider) {
     case 'openai':
