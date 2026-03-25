@@ -328,9 +328,11 @@ export function MessageInput({
         {/* Input pill container */}
         <div className="chat-input-box" style={{
           display: 'flex', flexDirection: 'column',
-          backgroundColor: 'var(--chat-surface)', borderRadius: '24px',
-          border: inputFocused ? '1px solid rgba(124,58,237,0.5)' : '1px solid var(--chat-border)',
-          boxShadow: inputFocused ? '0 0 0 2px rgba(124,58,237,0.1)' : '0 1px 3px rgba(0,0,0,0.1)',
+          backgroundColor: 'var(--chat-input-bg)', borderRadius: '24px',
+          border: inputFocused ? '1px solid var(--color-primary)' : '1px solid var(--chat-border)',
+          boxShadow: inputFocused
+            ? '0 0 0 2px color-mix(in srgb, var(--color-primary) 15%, transparent), 0 2px 12px rgba(0,0,0,0.08)'
+            : '0 2px 8px rgba(0,0,0,0.04)',
           transition: 'all 200ms ease',
           cursor: 'text', overflow: 'hidden', maxWidth: '100%',
         }}
@@ -464,7 +466,7 @@ export function MessageInput({
                 disabled={!canSend && !isLoading}
                 style={{
                   width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
-                  backgroundColor: isLoading ? '#EF4444' : canSend ? 'var(--chat-text)' : 'var(--chat-text-dim)',
+                  backgroundColor: isLoading ? '#EF4444' : canSend ? 'var(--color-primary)' : 'var(--chat-text-dim)',
                   border: 'none',
                   cursor: (canSend || isLoading) ? 'pointer' : 'not-allowed',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -475,7 +477,7 @@ export function MessageInput({
                 {isLoading || fileLoading ? (
                   <Square size={14} style={{ color: 'white', fill: 'white' }} />
                 ) : (
-                  <ArrowUp size={18} style={{ color: 'var(--color-background)' }} />
+                  <ArrowUp size={18} style={{ color: '#FFFFFF' }} />
                 )}
               </button>
             </div>
