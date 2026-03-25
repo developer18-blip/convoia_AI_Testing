@@ -27,8 +27,8 @@ export function DonutChart({ data, height = 250 }: DonutChartProps) {
           </Pie>
           <Tooltip
             contentStyle={{
-              backgroundColor: '#111118',
-              border: '1px solid #2D2D3F',
+              backgroundColor: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
               borderRadius: '8px',
               color: '#F8F8FF',
               fontSize: '13px',

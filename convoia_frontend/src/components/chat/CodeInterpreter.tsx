@@ -89,7 +89,7 @@ export function CodeInterpreter({ code: initialCode, language: initialLang, onCl
         <textarea
           value={code}
           onChange={(e) => setCode(e.target.value)}
-          className="w-full bg-[#1E1E2E] p-4 text-sm font-mono text-text-secondary focus:outline-none resize-none min-h-[120px]"
+          className="w-full bg-border p-4 text-sm font-mono text-text-secondary focus:outline-none resize-none min-h-[120px]"
           spellCheck={false}
         />
       </div>

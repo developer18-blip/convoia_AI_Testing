@@ -28,13 +28,13 @@ export function BarChart({
   return (
     <ResponsiveContainer width="100%" height={height}>
       <RechartsBarChart data={data} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#2D2D3F" />
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
         <XAxis dataKey={xKey} stroke="#64748B" tick={{ fontSize: 12 }} />
         <YAxis stroke="#64748B" tick={{ fontSize: 12 }} tickFormatter={formatY} />
         <Tooltip
           contentStyle={{
-            backgroundColor: '#111118',
-            border: '1px solid #2D2D3F',
+            backgroundColor: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
             borderRadius: '8px',
             color: '#F8F8FF',
             fontSize: '13px',

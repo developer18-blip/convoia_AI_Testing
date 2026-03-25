@@ -161,8 +161,8 @@ export function CanvasPanel({
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        backgroundColor: '#0d0d12',
-        borderLeft: '1px solid #1e1e2e',
+        backgroundColor: 'var(--color-surface-2)',
+        borderLeft: '1px solid var(--color-border)',
         position: 'relative',
         transition: isExpanded ? 'width 200ms ease' : undefined,
       }}
@@ -196,7 +196,7 @@ export function CanvasPanel({
         alignItems: 'center',
         gap: '8px',
         padding: '10px 14px',
-        borderBottom: '1px solid #1e1e2e',
+        borderBottom: '1px solid var(--color-border)',
         flexShrink: 0,
       }}>
         {/* Icon */}
@@ -214,7 +214,7 @@ export function CanvasPanel({
         {/* Title */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <h3 style={{
-            fontSize: '13px', fontWeight: 600, color: '#ECECEC', margin: 0,
+            fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', margin: 0,
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
             {activeItem.title}
@@ -253,13 +253,13 @@ export function CanvasPanel({
         <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
           <button onClick={() => setIsExpanded(!isExpanded)} title={isExpanded ? 'Collapse' : 'Expand'}
             style={{ padding: '5px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#888', cursor: 'pointer' }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#1e1e2e'; e.currentTarget.style.color = '#ccc' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-border)'; e.currentTarget.style.color = '#ccc' }}
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#888' }}>
             {isExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
           <button onClick={onClose} title="Close canvas"
             style={{ padding: '5px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#888', cursor: 'pointer' }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#1e1e2e'; e.currentTarget.style.color = '#ccc' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-border)'; e.currentTarget.style.color = '#ccc' }}
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#888' }}>
             <X size={14} />
           </button>
@@ -272,7 +272,7 @@ export function CanvasPanel({
         alignItems: 'center',
         gap: '4px',
         padding: '6px 14px',
-        borderBottom: '1px solid #1a1a26',
+        borderBottom: '1px solid var(--color-border)',
         flexShrink: 0,
         flexWrap: 'wrap',
       }}>
@@ -391,7 +391,7 @@ export function CanvasPanel({
               width: '100%',
               height: '100%',
               padding: '16px 18px',
-              backgroundColor: '#111118',
+              backgroundColor: 'var(--color-surface)',
               color: '#d4d4d8',
               border: 'none',
               outline: 'none',
@@ -435,7 +435,7 @@ export function CanvasPanel({
             customStyle={{
               margin: 0,
               padding: '16px 18px',
-              backgroundColor: '#111118',
+              backgroundColor: 'var(--color-surface)',
               fontSize: '13px',
               lineHeight: '1.65',
               fontFamily: "'Fira Code', 'Cascadia Code', Consolas, monospace",
@@ -454,16 +454,16 @@ export function CanvasPanel({
               <ReactMarkdown remarkPlugins={[remarkGfm]}
                 components={{
                   p: ({ children }) => <p style={{ marginBottom: '14px', lineHeight: '1.75', color: '#d4d4d8' }}>{children}</p>,
-                  h1: ({ children }) => <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#ECECEC', marginBottom: '12px', marginTop: '24px', borderBottom: '1px solid #1e1e2e', paddingBottom: '8px' }}>{children}</h1>,
-                  h2: ({ children }) => <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#ECECEC', marginBottom: '10px', marginTop: '20px' }}>{children}</h2>,
-                  h3: ({ children }) => <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#ECECEC', marginBottom: '8px', marginTop: '16px' }}>{children}</h3>,
+                  h1: ({ children }) => <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: '12px', marginTop: '24px', borderBottom: '1px solid var(--color-border)', paddingBottom: '8px' }}>{children}</h1>,
+                  h2: ({ children }) => <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '10px', marginTop: '20px' }}>{children}</h2>,
+                  h3: ({ children }) => <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '8px', marginTop: '16px' }}>{children}</h3>,
                   ul: ({ children }) => <ul style={{ paddingLeft: '24px', marginBottom: '14px', listStyleType: 'disc' }}>{children}</ul>,
                   ol: ({ children }) => <ol style={{ paddingLeft: '24px', marginBottom: '14px', listStyleType: 'decimal' }}>{children}</ol>,
                   li: ({ children }) => <li style={{ marginBottom: '4px', lineHeight: '1.65', color: '#d4d4d8' }}>{children}</li>,
-                  strong: ({ children }) => <strong style={{ fontWeight: 600, color: '#ECECEC' }}>{children}</strong>,
+                  strong: ({ children }) => <strong style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{children}</strong>,
                   code: ({ children }) => (
                     <code style={{
-                      backgroundColor: '#1e1e2e', color: '#A78BFA',
+                      backgroundColor: 'var(--color-border)', color: '#A78BFA',
                       padding: '1px 6px', borderRadius: '4px', fontSize: '13px',
                       fontFamily: "'Fira Code', monospace",
                     }}>{children}</code>
@@ -475,15 +475,15 @@ export function CanvasPanel({
                     }}>{children}</blockquote>
                   ),
                   table: ({ children }) => (
-                    <div style={{ overflow: 'auto', margin: '14px 0', borderRadius: '8px', border: '1px solid #1e1e2e' }}>
+                    <div style={{ overflow: 'auto', margin: '14px 0', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>{children}</table>
                     </div>
                   ),
                   th: ({ children }) => (
-                    <th style={{ backgroundColor: '#1a1a26', padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: '#ECECEC', borderBottom: '1px solid #1e1e2e' }}>{children}</th>
+                    <th style={{ backgroundColor: 'var(--color-surface)', padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--color-text-primary)', borderBottom: '1px solid var(--color-border)' }}>{children}</th>
                   ),
                   td: ({ children }) => (
-                    <td style={{ padding: '10px 14px', borderBottom: '1px solid #1a1a26', color: '#aaa' }}>{children}</td>
+                    <td style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-border)', color: '#aaa' }}>{children}</td>
                   ),
                 }}
               >
@@ -500,7 +500,7 @@ export function CanvasPanel({
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '6px 14px',
-        borderTop: '1px solid #1a1a26',
+        borderTop: '1px solid var(--color-border)',
         flexShrink: 0,
         fontSize: '11px',
         color: '#555',

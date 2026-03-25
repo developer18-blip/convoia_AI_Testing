@@ -94,8 +94,8 @@ export function EmployeeView({ stats, recentUsage, userName, orgName, budget }: 
       {hasBudget && (
         <div
           style={{
-            backgroundColor: '#111118',
-            border: '1px solid #1E1E2E',
+            backgroundColor: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
             borderRadius: '12px',
             padding: '20px',
           }}

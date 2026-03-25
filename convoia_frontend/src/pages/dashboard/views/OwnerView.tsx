@@ -133,8 +133,8 @@ export function OwnerView({ stats, userName, orgName }: OwnerViewProps) {
       {/* Token Balance Section */}
       <div
         style={{
-          backgroundColor: '#111118',
-          border: '1px solid #1E1E2E',
+          backgroundColor: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
           borderRadius: '12px',
           padding: '20px',
         }}
@@ -266,15 +266,15 @@ export function OwnerView({ stats, userName, orgName }: OwnerViewProps) {
       {/* ─── ASSIGN TOKENS MODAL ─── */}
       {showAssignModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-          <div style={{ backgroundColor: '#111118', border: '1px solid #1E1E2E', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '440px' }}>
+          <div style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '440px' }}>
             <div className="flex items-center justify-between mb-5">
-              <h2 style={{ color: '#ECECEC', fontSize: '18px', fontWeight: 600, margin: 0 }}>Assign Tokens</h2>
-              <button onClick={() => setShowAssignModal(false)} style={{ background: 'none', border: 'none', color: '#8E8E8E', cursor: 'pointer' }}><X size={18} /></button>
+              <h2 style={{ color: 'var(--color-text-primary)', fontSize: '18px', fontWeight: 600, margin: 0 }}>Assign Tokens</h2>
+              <button onClick={() => setShowAssignModal(false)} style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer' }}><X size={18} /></button>
             </div>
 
             {/* Available info */}
-            <div style={{ background: '#0D0D15', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px', display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#8E8E8E' }}>Available in pool</span>
+            <div style={{ background: 'var(--color-surface-2)', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px', display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--color-text-muted)' }}>Available in pool</span>
               <span style={{ color: '#34D399', fontWeight: 600, fontFamily: 'monospace' }}>{fmtTokens(poolAvailable)}</span>
             </div>
 
@@ -283,8 +283,8 @@ export function OwnerView({ stats, userName, orgName }: OwnerViewProps) {
               value={assignTo}
               onChange={(e) => setAssignTo(e.target.value)}
               style={{
-                width: '100%', padding: '10px 14px', backgroundColor: '#0D0D15', border: '1px solid #2D2D3F',
-                borderRadius: '8px', color: '#ECECEC', fontSize: '14px', outline: 'none', marginBottom: '12px',
+                width: '100%', padding: '10px 14px', backgroundColor: 'var(--color-surface-2)', border: '1px solid var(--color-border)',
+                borderRadius: '8px', color: 'var(--color-text-primary)', fontSize: '14px', outline: 'none', marginBottom: '12px',
                 boxSizing: 'border-box',
               }}
             >
@@ -303,8 +303,8 @@ export function OwnerView({ stats, userName, orgName }: OwnerViewProps) {
               min={1000}
               max={poolAvailable}
               style={{
-                width: '100%', padding: '10px 14px', backgroundColor: '#0D0D15', border: '1px solid #2D2D3F',
-                borderRadius: '8px', color: '#ECECEC', fontSize: '14px', outline: 'none', marginBottom: '20px',
+                width: '100%', padding: '10px 14px', backgroundColor: 'var(--color-surface-2)', border: '1px solid var(--color-border)',
+                borderRadius: '8px', color: 'var(--color-text-primary)', fontSize: '14px', outline: 'none', marginBottom: '20px',
                 boxSizing: 'border-box',
               }}
             />
@@ -317,9 +317,9 @@ export function OwnerView({ stats, userName, orgName }: OwnerViewProps) {
                   onClick={() => setAssignAmount(String(amt))}
                   style={{
                     padding: '8px 4px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer',
-                    border: assignAmount === String(amt) ? '2px solid #34D399' : '1px solid #2D2D3F',
+                    border: assignAmount === String(amt) ? '2px solid #34D399' : '1px solid var(--color-border)',
                     backgroundColor: assignAmount === String(amt) ? 'rgba(52,211,153,0.15)' : 'transparent',
-                    color: assignAmount === String(amt) ? '#34D399' : '#8E8E8E',
+                    color: assignAmount === String(amt) ? '#34D399' : 'var(--color-text-muted)',
                   }}
                 >
                   {fmtTokens(amt)}

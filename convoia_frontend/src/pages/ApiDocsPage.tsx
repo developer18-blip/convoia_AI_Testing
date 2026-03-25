@@ -27,7 +27,7 @@ function CodeSnippet({ code, language }: { code: string; language: string }) {
     setTimeout(() => setCopied(false), 2000)
   }
   return (
-    <div className="relative group bg-[#1E1E2E] rounded-lg overflow-hidden">
+    <div className="relative group bg-border rounded-lg overflow-hidden">
       <div className="flex items-center justify-between px-4 py-2 bg-surface-3/50 border-b border-border/30">
         <span className="text-xs text-text-muted font-mono">{language}</span>
         <button onClick={handleCopy} className="text-text-muted hover:text-text-primary transition-colors">
