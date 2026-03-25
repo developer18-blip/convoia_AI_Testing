@@ -210,7 +210,7 @@ export function LandingPage() {
             <Link to="/login" className="text-sm text-text-secondary hover:text-text-primary transition-colors px-4 py-2">
               Login
             </Link>
-            <Link to="/register" className="hover:brightness-110 text-sm font-semibold px-5 py-2 rounded-xl transition-all" style={{ background: '#2563EB', color: '#FFFFFF', boxShadow: '0 4px 14px rgba(37,99,235,0.25)' }}>
+            <Link to="/register" className="hover:brightness-110 text-sm font-semibold px-5 py-2 rounded-xl transition-all" style={{ background: 'var(--color-primary)', color: '#FFFFFF', boxShadow: '0 4px 14px color-mix(in srgb, var(--color-primary) 25%, transparent)' }}>
               Get Started
             </Link>
           </div>
@@ -265,7 +265,7 @@ export function LandingPage() {
             transition={{ duration: 0.5, delay: 0.3 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
-            <Link to="/register" className="inline-flex items-center gap-2 hover:brightness-110 font-semibold px-7 py-3.5 rounded-xl transition-all" style={{ background: '#2563EB', color: '#FFFFFF', boxShadow: '0 4px 20px rgba(37,99,235,0.3)' }}>
+            <Link to="/register" className="inline-flex items-center gap-2 hover:brightness-110 font-semibold px-7 py-3.5 rounded-xl transition-all" style={{ background: 'var(--color-primary)', color: '#FFFFFF', boxShadow: '0 4px 20px color-mix(in srgb, var(--color-primary) 30%, transparent)' }}>
               Start for free
               <ArrowRight size={18} style={{ color: '#FFFFFF' }} />
             </Link>
@@ -471,8 +471,8 @@ export function LandingPage() {
                     to="/register"
                     className="block text-center py-2.5 rounded-xl text-sm font-semibold transition-all hover:brightness-110"
                     style={plan.popular
-                      ? { background: 'var(--color-primary)', color: 'white', boxShadow: '0 4px 14px rgba(37,99,235,0.3)' }
-                      : { background: 'white', color: 'var(--color-primary)', border: '2px solid var(--color-primary)' }
+                      ? { background: 'var(--color-primary)', color: 'white', boxShadow: '0 4px 14px color-mix(in srgb, var(--color-primary) 30%, transparent)' }
+                      : { background: 'var(--color-surface)', color: 'var(--color-primary)', border: '2px solid var(--color-border-strong)' }
                     }
                   >
                     {plan.cta}
@@ -607,7 +607,7 @@ export function LandingPage() {
           <motion.div
             {...fadeUp}
             className="relative border rounded-3xl p-12 overflow-hidden"
-            style={{ background: 'linear-gradient(135deg, rgba(37,99,235,0.08), rgba(96,165,250,0.06))', borderColor: 'rgba(37,99,235,0.15)' }}
+            style={{ background: 'linear-gradient(135deg, var(--color-primary-light), var(--color-primary-glow))', borderColor: 'var(--color-border)' }}
           >
             <div className="absolute inset-0 opacity-[0.03]" style={{
               backgroundImage: `radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)`,
@@ -616,7 +616,7 @@ export function LandingPage() {
             <div className="relative">
               <h2 className="text-3xl sm:text-4xl font-bold text-text-primary mb-4">Ready to take control of your AI spend?</h2>
               <p className="text-text-secondary mb-8 max-w-lg mx-auto">Join teams who manage their AI costs without sacrificing capability.</p>
-              <Link to="/register" className="inline-flex items-center gap-2 hover:brightness-110 font-semibold px-8 py-3.5 rounded-xl transition-all text-lg" style={{ background: '#2563EB', color: '#FFFFFF', boxShadow: '0 4px 20px rgba(37,99,235,0.3)' }}>
+              <Link to="/register" className="inline-flex items-center gap-2 hover:brightness-110 font-semibold px-8 py-3.5 rounded-xl transition-all text-lg" style={{ background: 'var(--color-primary)', color: '#FFFFFF', boxShadow: '0 4px 20px color-mix(in srgb, var(--color-primary) 30%, transparent)' }}>
                 Start for free
                 <ArrowRight size={20} />
               </Link>
@@ -704,7 +704,7 @@ function ReviewsSection() {
           <button
             onClick={() => setShowForm(true)}
             className="inline-flex items-center gap-2 hover:brightness-110 font-semibold px-6 py-2.5 rounded-xl transition-all text-sm"
-            style={{ background: '#2563EB', color: '#FFFFFF' }}
+            style={{ background: 'var(--color-primary)', color: '#FFFFFF' }}
           >
             <Send size={16} />
             Write a Review
@@ -847,7 +847,7 @@ function ReviewsSection() {
                       onClick={handleSubmit}
                       disabled={submitting || !form.title.trim() || !form.content.trim()}
                       className="w-full hover:brightness-110 font-semibold py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                      style={{ background: '#2563EB', color: '#FFFFFF' }}
+                      style={{ background: 'var(--color-primary)', color: '#FFFFFF' }}
                     >
                       {submitting ? 'Submitting...' : <><Send size={16} /> Submit Review</>}
                     </button>
