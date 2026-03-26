@@ -39,13 +39,13 @@ export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, o
   const lastScrollTime = useRef(0)
   useEffect(() => {
     if (!isLoading) return
-    const content = messages[messages.length - 1]?.content || ''
     const now = Date.now()
     if (now - lastScrollTime.current > 300) {
       lastScrollTime.current = now
       bottomRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior })
     }
-  }, [isLoading, messages[messages.length - 1]?.content])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, messages.length, messages[messages.length - 1]?.content?.length])
 
   if (messages.length === 0) {
     return (
