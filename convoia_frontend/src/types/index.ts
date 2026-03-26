@@ -2,7 +2,7 @@ export interface User {
   id: string
   email: string
   name: string
-  role: 'platform_admin' | 'org_owner' | 'manager' | 'employee'
+  role: 'platform_admin' | 'org_owner' | 'manager' | 'employee' | 'user'
   avatar?: string | null
   organizationId?: string
   organization?: Organization
