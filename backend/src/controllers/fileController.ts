@@ -292,6 +292,26 @@ export const generateImage = asyncHandler(async (req: Request, res: Response): P
   const providerLabel = result.provider === 'gemini' ? 'Gemini Flash' : 'DALL-E 3'
   logger.info(`Image generated via ${providerLabel} for user ${user.id}, tokens: ${imageTokenCost}`)
 
+  // Log usage for image generation
+  try {
+    const imgModelName = result.provider === 'gemini' ? 'gemini-2.5-flash-image' : 'dall-e-3'
+    const imgModel = await prisma.aIModel.findFirst({ where: { modelId: imgModelName } })
+    if (imgModel) {
+      await prisma.usageLog.create({
+        data: {
+          userId: user.id,
+          organizationId: user.organizationId || undefined,
+          modelId: imgModel.id,
+          prompt: prompt.substring(0, 500),
+          response: `[Image generated: ${result.revisedPrompt?.substring(0, 200) || prompt.substring(0, 200)}]`,
+          tokensInput: 0, tokensOutput: imageTokenCost, totalTokens: imageTokenCost,
+          providerCost: 0, markupPercentage: 0, customerPrice: 0,
+          status: 'completed',
+        },
+      })
+    }
+  } catch { /* silent — don't fail image gen if logging fails */ }
+
   res.json({
     success: true,
     data: {

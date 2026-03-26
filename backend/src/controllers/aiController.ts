@@ -339,14 +339,23 @@ export const queryAIStream = async (req: Request, res: Response) => {
         res.write('data: [DONE]\n\n');
         res.end();
 
-        // Log usage
+        // Log usage — find the actual image model ID
+        let imageModelId = finalModelId;
+        try {
+          const imgModelName = result.provider === 'gemini' ? 'gemini-2.5-flash-image' : 'dall-e-3';
+          const imgModel = await prisma.aIModel.findFirst({ where: { modelId: imgModelName } });
+          if (imgModel) imageModelId = imgModel.id;
+        } catch { /* use chat model as fallback */ }
+
         await prisma.usageLog.create({
           data: {
             userId: user.id, organizationId,
-            modelId: finalModelId,
+            modelId: imageModelId,
             prompt: lastUserText.substring(0, 500),
+            response: `[Image generated: ${result.revisedPrompt?.substring(0, 200) || enhancedPrompt.substring(0, 200)}]`,
             tokensInput: 0, tokensOutput: imageTokenCost, totalTokens: imageTokenCost,
             providerCost: 0, markupPercentage: 0, customerPrice: 0,
+            status: 'completed',
           },
         });
 
