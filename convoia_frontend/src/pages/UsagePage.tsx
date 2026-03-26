@@ -116,7 +116,7 @@ export function UsagePage() {
 
       const res = await api.get(`/usage/my?${params.toString()}`)
       const data = res.data?.data
-      const items = data?.data ?? data?.transactions ?? data?.usageLogs ?? (Array.isArray(data) ? data : [])
+      const items = data?.queries ?? data?.data ?? data?.transactions ?? data?.usageLogs ?? (Array.isArray(data) ? data : [])
       setQueries(items)
       setPagination(data?.pagination ?? { page: filters.page, limit: filters.limit, total: items.length, pages: 1 })
     } catch {
