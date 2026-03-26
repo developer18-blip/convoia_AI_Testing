@@ -1,9 +1,31 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
-  ResponsiveContainer, LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
+  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from 'recharts'
 import { BarChart3, TrendingUp, PieChart as PieIcon, Maximize2, Minimize2 } from 'lucide-react'
+
+/**
+ * Hook to measure container width. Fixes Recharts ResponsiveContainer mobile bug.
+ */
+function useContainerWidth(defaultWidth = 400) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(defaultWidth)
+  useEffect(() => {
+    const measure = () => {
+      if (ref.current) {
+        const w = ref.current.getBoundingClientRect().width - 24 // subtract padding
+        if (w > 50) setWidth(w)
+      }
+    }
+    measure()
+    const t1 = setTimeout(measure, 100)
+    const t2 = setTimeout(measure, 500)
+    window.addEventListener('resize', measure)
+    return () => { clearTimeout(t1); clearTimeout(t2); window.removeEventListener('resize', measure) }
+  }, [])
+  return { ref, width }
+}
 
 interface ChartData {
   type: 'line' | 'bar' | 'area' | 'pie'
@@ -101,6 +123,7 @@ function CustomTooltip({ active, payload, label }: any) {
 export function InlineChart({ chart }: { chart: ChartData }) {
   const [expanded, setExpanded] = useState(false)
   const height = expanded ? 400 : 280
+  const { ref: containerRef, width: chartWidth } = useContainerWidth(400)
 
   // Always log chart data for debugging
   console.log('[InlineChart] Rendering:', chart.title, 'Type:', chart.type, 'Data:', JSON.stringify(chart.data), 'yKeys:', JSON.stringify(chart.yKeys))
@@ -150,11 +173,10 @@ export function InlineChart({ chart }: { chart: ChartData }) {
         </button>
       </div>
 
-      {/* Chart */}
-      <div style={{ padding: '16px', transition: 'height 0.3s ease' }}>
-        <ResponsiveContainer width="100%" height={height}>
+      {/* Chart - use explicit dimensions to fix mobile rendering */}
+      <div ref={containerRef} style={{ padding: '12px 8px', width: '100%' }}>
           {chart.type === 'pie' ? (
-            <PieChart>
+            <PieChart width={chartWidth} height={height}>
               <Pie
                 data={chart.data}
                 dataKey={chart.yKeys[0]?.key || 'value'}
@@ -176,7 +198,7 @@ export function InlineChart({ chart }: { chart: ChartData }) {
               />
             </PieChart>
           ) : chart.type === 'bar' ? (
-            <BarChart data={chart.data} barCategoryGap="20%">
+            <BarChart width={chartWidth} height={height} data={chart.data} barCategoryGap="20%">
               <CartesianGrid strokeDasharray="3 3" stroke="var(--chat-border)" vertical={false} />
               <XAxis dataKey={chart.xKey} tick={axisStyle} axisLine={{ stroke: 'var(--chat-border)' }} tickLine={false} />
               <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={60} tickFormatter={(v: number) => v >= 1000 ? `${(v/1000).toFixed(0)}K` : v >= 1 ? v.toFixed(0) : v.toString()} />
@@ -187,7 +209,7 @@ export function InlineChart({ chart }: { chart: ChartData }) {
               ))}
             </BarChart>
           ) : chart.type === 'area' ? (
-            <AreaChart data={chart.data}>
+            <AreaChart width={chartWidth} height={height} data={chart.data}>
               <defs>
                 {chart.yKeys.map((yk) => (
                   <linearGradient key={yk.key} id={`gradient-${yk.key}`} x1="0" y1="0" x2="0" y2="1">
@@ -207,7 +229,7 @@ export function InlineChart({ chart }: { chart: ChartData }) {
               ))}
             </AreaChart>
           ) : (
-            <LineChart data={chart.data}>
+            <LineChart width={chartWidth} height={height} data={chart.data}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--chat-border)" vertical={false} />
               <XAxis dataKey={chart.xKey} tick={axisStyle} axisLine={{ stroke: 'var(--chat-border)' }} tickLine={false} />
               <YAxis tick={axisStyle} axisLine={false} tickLine={false} />
@@ -220,7 +242,6 @@ export function InlineChart({ chart }: { chart: ChartData }) {
               ))}
             </LineChart>
           )}
-        </ResponsiveContainer>
       </div>
     </div>
   )
