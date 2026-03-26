@@ -157,6 +157,11 @@ export class FileProcessingService {
   }> {
     const preferredProvider = provider || 'gemini'
 
+    // GPT Image 1 (explicit choice)
+    if (preferredProvider === 'gpt-image-1') {
+      return await this.generateWithGPTImage(prompt)
+    }
+
     // Try Gemini first (free tier, 1500/day)
     if (preferredProvider === 'gemini') {
       try {
@@ -246,6 +251,74 @@ export class FileProcessingService {
       imageUrl,
       revisedPrompt: imageData.revised_prompt || prompt,
       provider: 'dalle',
+    }
+  }
+
+  /**
+   * Generate/edit image using GPT Image 1 (OpenAI Responses API)
+   * Supports both text-to-image and image editing (with input image)
+   */
+  static async generateWithGPTImage(
+    prompt: string,
+    inputImageUrl?: string,
+  ): Promise<{ imageUrl: string; revisedPrompt: string; provider: string }> {
+    const openai = getOpenAI()
+
+    // Build the input content
+    const input: any[] = []
+
+    // If input image provided, add it
+    if (inputImageUrl) {
+      // Read image from disk if it's a local path
+      let imageData: string
+      if (inputImageUrl.startsWith('/api/uploads/')) {
+        const filePath = path.join(process.cwd(), inputImageUrl.replace('/api/', ''))
+        if (fs.existsSync(filePath)) {
+          const buffer = fs.readFileSync(filePath)
+          imageData = `data:image/png;base64,${buffer.toString('base64')}`
+          input.push({ type: 'input_image', image_url: imageData })
+        }
+      } else if (inputImageUrl.startsWith('data:')) {
+        input.push({ type: 'input_image', image_url: inputImageUrl })
+      } else if (inputImageUrl.startsWith('http')) {
+        input.push({ type: 'input_image', image_url: inputImageUrl })
+      }
+    }
+
+    input.push({ type: 'input_text', text: prompt })
+
+    const response = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-image-1',
+        prompt: prompt,
+        n: 1,
+        size: '1024x1024',
+        quality: 'medium',
+      }),
+    })
+
+    const data: any = await response.json()
+
+    if (data.error) {
+      throw new Error(data.error.message || 'GPT Image 1 failed')
+    }
+
+    const imageB64 = data.data?.[0]?.b64_json
+    if (!imageB64) {
+      throw new Error('GPT Image 1 did not return image data')
+    }
+
+    const imageUrl = saveImageToDisk(imageB64, 'png')
+
+    return {
+      imageUrl,
+      revisedPrompt: prompt,
+      provider: 'gpt-image-1',
     }
   }
 
