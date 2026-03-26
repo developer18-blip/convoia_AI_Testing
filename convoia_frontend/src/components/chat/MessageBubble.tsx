@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { AlertCircle, RefreshCw, Copy, Check, Pencil, Trash2, ThumbsUp, ThumbsDown, Download, FileText, Music, PanelRight } from 'lucide-react'
@@ -39,6 +39,27 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState(message.content)
   const [showActions, setShowActions] = useState(false)
+
+  // Debounce markdown rendering during streaming to prevent jitter
+  const [renderedContent, setRenderedContent] = useState(message.content)
+  const renderTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (message.isLoading) {
+      // During streaming: batch updates every 150ms
+      if (renderTimer.current) clearTimeout(renderTimer.current)
+      renderTimer.current = setTimeout(() => {
+        setRenderedContent(message.content)
+      }, 150)
+    } else {
+      // Not streaming: render immediately
+      if (renderTimer.current) clearTimeout(renderTimer.current)
+      setRenderedContent(message.content)
+    }
+    return () => { if (renderTimer.current) clearTimeout(renderTimer.current) }
+  }, [message.content, message.isLoading])
+
+  // Memoize chart extraction so it doesn't run on every render
+  const { cleanText, charts } = useMemo(() => extractCharts(renderedContent), [renderedContent])
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content)
@@ -327,11 +348,11 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
               },
             }}
           >
-            {(() => { const { cleanText } = extractCharts(message.content); return cleanText || message.content; })()}
+            {cleanText || renderedContent}
           </ReactMarkdown>
 
           {/* Inline Charts */}
-          {(() => { const { charts } = extractCharts(message.content); return charts.map((chart, i) => <InlineChart key={i} chart={chart} />); })()}
+          {charts.map((chart, i) => <InlineChart key={i} chart={chart} />)}
         </div>
 
         {/* Generated image */}
