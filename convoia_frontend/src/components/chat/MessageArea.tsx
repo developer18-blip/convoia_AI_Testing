@@ -24,25 +24,51 @@ const suggestions = [
 export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, onEditMessage, onDeleteMessage, onRunCode, onOpenInCanvas }: MessageAreaProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const userScrolledUp = useRef(false)
+  const lastScrollTime = useRef(0)
 
-  // Scroll to bottom when new message is ADDED (not on every chunk)
+  // Detect if user scrolled away from bottom
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight
+      // User is "at bottom" if within 150px
+      userScrolledUp.current = distanceFromBottom > 150
+    }
+
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    return () => container.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  // Reset scroll lock when streaming ends or new message sent
+  useEffect(() => {
+    if (!isLoading) userScrolledUp.current = false
+  }, [isLoading])
+
+  // Scroll to bottom when new message is ADDED
   const prevMsgCount = useRef(messages.length)
   useEffect(() => {
     if (messages.length !== prevMsgCount.current) {
       prevMsgCount.current = messages.length
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+      userScrolledUp.current = false
+      requestAnimationFrame(() => {
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+      })
     }
   }, [messages.length])
 
-  // During streaming: use instant scroll (no smooth animation = no jitter)
-  // Throttled to max once per 300ms to prevent layout thrashing
-  const lastScrollTime = useRef(0)
+  // During streaming: auto-scroll ONLY if user hasn't scrolled up
   useEffect(() => {
-    if (!isLoading) return
+    if (!isLoading || userScrolledUp.current) return
     const now = Date.now()
-    if (now - lastScrollTime.current > 300) {
+    if (now - lastScrollTime.current > 250) {
       lastScrollTime.current = now
-      bottomRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior })
+      requestAnimationFrame(() => {
+        bottomRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior })
+      })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, messages.length, messages[messages.length - 1]?.content?.length])
