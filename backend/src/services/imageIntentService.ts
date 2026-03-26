@@ -20,6 +20,20 @@ const IMAGE_TRIGGER_PATTERNS = [
   /\b(dall-?e|dalle|midjourney|stable diffusion|image gen)\b/i,
 ];
 
+// Patterns that indicate image MODIFICATION (only valid when previous message had an image)
+const IMAGE_MODIFY_PATTERNS = [
+  /\b(change|modify|edit|update|alter|adjust|tweak|refine|improve|redo|redo)\b.{0,20}\b(it|this|that|the image|the logo|the design|the poster)\b/i,
+  /\b(make|do)\b.{0,10}\b(it|this|that|changes?)\b/i,
+  /\b(can we|can you|could you|please)\b.{0,15}\b(change|modify|edit|update|adjust|tweak|make changes?)\b/i,
+  /\b(different|another)\b.{0,15}\b(angle|version|style|color|variation|look)\b/i,
+  /\b(more|less)\b.{0,10}\b(minimal|colorful|dark|bright|modern|professional|vibrant|abstract|detailed)\b/i,
+  /\b(add|remove|replace)\b.{0,20}\b(gradient|shadow|text|color|background|border|element)\b/i,
+  /\b(try|regenerate|redo|again)\b.{0,15}\b(with|in|using|but)\b/i,
+  /\bwith (different|another|more|less)\b/i,
+  /^(darker|brighter|bigger|smaller|simpler|bolder|cleaner|sharper|softer|warmer|cooler)\b/i,
+  /\bnot (professional|good|right|what i wanted)\b/i,
+];
+
 // Patterns that should NOT trigger image gen (code, analysis, text)
 const ANTI_PATTERNS = [
   /\b(explain|analyze|compare|describe|tell me about|what is|how does|write code|implement|debug|fix)\b.*\b(image|design|poster)\b/i,
@@ -36,9 +50,14 @@ export interface ImageIntent {
 
 /**
  * Detect if a message is requesting image generation.
- * Returns the intent with confidence level.
+ * Supports both direct requests and follow-up modifications.
+ * @param message The user's latest message
+ * @param conversationContext Optional conversation history to detect modifications
  */
-export function detectImageIntent(message: string): ImageIntent {
+export function detectImageIntent(
+  message: string,
+  conversationContext?: Array<{ role: string; content: string }>
+): ImageIntent {
   const trimmed = message.trim();
 
   // Quick exit for very short messages or code
@@ -53,11 +72,38 @@ export function detectImageIntent(message: string): ImageIntent {
     }
   }
 
-  // Check trigger patterns
+  // Check direct trigger patterns
   for (const pattern of IMAGE_TRIGGER_PATTERNS) {
     if (pattern.test(trimmed)) {
       const subject = extractSubject(trimmed);
       return { isImageRequest: true, confidence: 'high', extractedSubject: subject, originalMessage: message };
+    }
+  }
+
+  // Check modification patterns — only if previous conversation had an image
+  if (conversationContext && conversationContext.length > 1) {
+    const hadRecentImage = conversationContext.some((msg, i) =>
+      msg.role === 'assistant' && (
+        msg.content.includes('Generated Image') ||
+        msg.content.includes('generated image') ||
+        msg.content.includes('Download image') ||
+        msg.content.includes('/api/uploads/images/') ||
+        msg.content.includes('Generating image')
+      )
+    );
+
+    if (hadRecentImage) {
+      for (const pattern of IMAGE_MODIFY_PATTERNS) {
+        if (pattern.test(trimmed)) {
+          // Build a contextual subject from previous image + modification request
+          const prevImageContext = getRecentImageContext(conversationContext);
+          const subject = prevImageContext
+            ? `${prevImageContext}. Modification: ${trimmed}`
+            : trimmed;
+          logger.info(`Image modification detected: "${trimmed}" → "${subject.substring(0, 80)}"`);
+          return { isImageRequest: true, confidence: 'medium', extractedSubject: subject, originalMessage: message };
+        }
+      }
     }
   }
 

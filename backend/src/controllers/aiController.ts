@@ -325,7 +325,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
     // If so, route to image pipeline instead of chat model.
     const lastUserMessage = [...messages].reverse().find((m: any) => m.role === 'user');
     const lastUserText = typeof lastUserMessage?.content === 'string' ? lastUserMessage.content : '';
-    const imageIntent = detectImageIntent(lastUserText);
+    const imageIntent = detectImageIntent(lastUserText, messages);
 
     if (imageIntent.isImageRequest) {
       logger.info(`Image intent detected (${imageIntent.confidence}): "${lastUserText.substring(0, 80)}"`);
