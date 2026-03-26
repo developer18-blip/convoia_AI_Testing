@@ -82,7 +82,7 @@ function TokenBuyGuard() {
   const { user } = useAuth()
   const toast = useToast()
 
-  const canBuy = !user?.organizationId || user?.role === 'org_owner' || user?.role === 'platform_admin'
+  const canBuy = !user?.organizationId || user?.role === 'user' || user?.role === 'org_owner' || user?.role === 'platform_admin'
   if (!canBuy) {
     toast.error('Ask your organization owner to allocate tokens.')
     return <Navigate to="/dashboard" replace />
