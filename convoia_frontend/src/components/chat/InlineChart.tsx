@@ -35,7 +35,7 @@ interface ChartData {
   yKeys: { key: string; color: string; label: string }[]
 }
 
-const COLORS = ['#7C3AED', '#10B981', '#F59E0B', '#EF4444', '#3B82F6', '#EC4899', '#06B6D4', '#8B5CF6']
+const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#F97316']
 
 /**
  * Parse chart blocks from AI response text.
@@ -141,7 +141,7 @@ export function InlineChart({ chart }: { chart: ChartData }) {
     : chart.type === 'pie' ? <PieIcon size={14} />
     : <TrendingUp size={14} />
 
-  const axisStyle = { fontSize: '11px', fill: 'var(--color-text-dim)' }
+  const axisStyle = { fontSize: '12px', fill: 'var(--color-text-secondary)', fontWeight: 500 }
 
   return (
     <div style={{
@@ -200,10 +200,10 @@ export function InlineChart({ chart }: { chart: ChartData }) {
           ) : chart.type === 'bar' ? (
             <BarChart width={chartWidth} height={height} data={chart.data} barCategoryGap="20%">
               <CartesianGrid strokeDasharray="3 3" stroke="var(--chat-border)" vertical={false} />
-              <XAxis dataKey={chart.xKey} tick={axisStyle} axisLine={{ stroke: 'var(--chat-border)' }} tickLine={false} />
+              <XAxis dataKey={chart.xKey} tick={{ ...axisStyle, fontSize: '11px' }} axisLine={{ stroke: 'var(--chat-border)' }} tickLine={false} interval={0} angle={chart.data.length > 5 ? -30 : 0} textAnchor={chart.data.length > 5 ? 'end' : 'middle'} height={chart.data.length > 5 ? 60 : 30} />
               <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={60} tickFormatter={(v: number) => v >= 1000 ? `${(v/1000).toFixed(0)}K` : v >= 1 ? v.toFixed(0) : v.toString()} />
               <Tooltip content={<CustomTooltip />} />
-              <Legend formatter={(value: string) => <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>{value}</span>} />
+              <Legend formatter={(value: string) => <span style={{ fontSize: '12px', color: 'var(--color-text-primary)', fontWeight: 500 }}>{value}</span>} />
               {chart.yKeys.map((yk) => (
                 <Bar key={yk.key} dataKey={yk.key} name={yk.label} fill={yk.color} radius={[6, 6, 0, 0]} maxBarSize={60} />
               ))}
@@ -219,10 +219,10 @@ export function InlineChart({ chart }: { chart: ChartData }) {
                 ))}
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--chat-border)" vertical={false} />
-              <XAxis dataKey={chart.xKey} tick={axisStyle} axisLine={{ stroke: 'var(--chat-border)' }} tickLine={false} />
+              <XAxis dataKey={chart.xKey} tick={{ ...axisStyle, fontSize: '11px' }} axisLine={{ stroke: 'var(--chat-border)' }} tickLine={false} interval={0} angle={chart.data.length > 5 ? -30 : 0} textAnchor={chart.data.length > 5 ? 'end' : 'middle'} height={chart.data.length > 5 ? 60 : 30} />
               <YAxis tick={axisStyle} axisLine={false} tickLine={false} />
               <Tooltip content={<CustomTooltip />} />
-              <Legend formatter={(value: string) => <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>{value}</span>} />
+              <Legend formatter={(value: string) => <span style={{ fontSize: '12px', color: 'var(--color-text-primary)', fontWeight: 500 }}>{value}</span>} />
               {chart.yKeys.map((yk) => (
                 <Area key={yk.key} type="monotone" dataKey={yk.key} name={yk.label}
                   stroke={yk.color} strokeWidth={2} fill={`url(#gradient-${yk.key})`} />
@@ -231,10 +231,10 @@ export function InlineChart({ chart }: { chart: ChartData }) {
           ) : (
             <LineChart width={chartWidth} height={height} data={chart.data}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--chat-border)" vertical={false} />
-              <XAxis dataKey={chart.xKey} tick={axisStyle} axisLine={{ stroke: 'var(--chat-border)' }} tickLine={false} />
+              <XAxis dataKey={chart.xKey} tick={{ ...axisStyle, fontSize: '11px' }} axisLine={{ stroke: 'var(--chat-border)' }} tickLine={false} interval={0} angle={chart.data.length > 5 ? -30 : 0} textAnchor={chart.data.length > 5 ? 'end' : 'middle'} height={chart.data.length > 5 ? 60 : 30} />
               <YAxis tick={axisStyle} axisLine={false} tickLine={false} />
               <Tooltip content={<CustomTooltip />} />
-              <Legend formatter={(value: string) => <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>{value}</span>} />
+              <Legend formatter={(value: string) => <span style={{ fontSize: '12px', color: 'var(--color-text-primary)', fontWeight: 500 }}>{value}</span>} />
               {chart.yKeys.map((yk) => (
                 <Line key={yk.key} type="monotone" dataKey={yk.key} name={yk.label}
                   stroke={yk.color} strokeWidth={2.5} dot={{ fill: yk.color, r: 3 }}

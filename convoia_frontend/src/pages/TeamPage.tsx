@@ -357,16 +357,16 @@ export function TeamPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-border">
-                  <th className="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase">Member</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase">Role</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-text-muted uppercase">Queries</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-text-muted uppercase">Tokens</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase">Budget</th>
+                <tr style={{ background: 'var(--color-primary)', color: 'white' }}>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ borderRadius: '8px 0 0 0' }}>Member</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Role</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">Queries</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">Tokens</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Budget</th>
                   {isOwner && (
-                    <th className="px-4 py-3 text-right text-xs font-medium text-text-muted uppercase">Cost</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">Cost</th>
                   )}
-                  <th className="px-4 py-3 text-right text-xs font-medium text-text-muted uppercase w-12"></th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider w-12" style={{ borderRadius: '0 8px 0 0' }}></th>
                 </tr>
               </thead>
               <tbody>
