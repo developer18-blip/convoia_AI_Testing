@@ -25,17 +25,27 @@ export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, o
   const bottomRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Scroll to bottom when new message arrives
+  // Scroll to bottom when new message is ADDED (not on every chunk)
+  const prevMsgCount = useRef(messages.length)
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages.length, messages[messages.length - 1]?.content])
-
-  // Also scroll when AI is streaming/typing
-  useEffect(() => {
-    if (isLoading) {
+    if (messages.length !== prevMsgCount.current) {
+      prevMsgCount.current = messages.length
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
-  }, [isLoading])
+  }, [messages.length])
+
+  // During streaming: use instant scroll (no smooth animation = no jitter)
+  // Throttled to max once per 300ms to prevent layout thrashing
+  const lastScrollTime = useRef(0)
+  useEffect(() => {
+    if (!isLoading) return
+    const content = messages[messages.length - 1]?.content || ''
+    const now = Date.now()
+    if (now - lastScrollTime.current > 300) {
+      lastScrollTime.current = now
+      bottomRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior })
+    }
+  }, [isLoading, messages[messages.length - 1]?.content])
 
   if (messages.length === 0) {
     return (
