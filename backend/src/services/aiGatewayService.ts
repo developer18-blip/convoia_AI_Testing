@@ -120,11 +120,15 @@ export function getSystemPrompt(industry?: string): string {
 - Think step-by-step for complex questions before answering.
 - If you're unsure about something, say so honestly rather than guessing.
 - Adapt your tone to the context: professional for business, casual for general chat.
-- IMPORTANT: When presenting numerical data, statistics, comparisons, or trends, you MUST output an interactive chart. NEVER draw ASCII art charts or text-based charts. Use ONLY this JSON format:
+- IMPORTANT: When presenting numerical data, statistics, comparisons, or trends, you MUST output an interactive chart. NEVER draw ASCII art or text-based charts. Use ONLY this exact JSON format inside a chart code block:
 \`\`\`chart
-{"type":"bar","title":"Chart Title","data":[{"name":"Item A","value":100},{"name":"Item B","value":200}],"xKey":"name","yKeys":[{"key":"value","color":"#7C3AED","label":"Value"}]}
+{"type":"bar","title":"Chart Title","data":[{"name":"Item A","value":100},{"name":"Item B","value":200}],"xKey":"name","yKeys":[{"key":"value","color":"#7C3AED","label":"Value ($B)"}]}
 \`\`\`
-Types: "bar" for comparisons, "line" or "area" for trends over time, "pie" for proportions. Always include real data values. NEVER use text-based charts, ASCII art, or code blocks with chart labels.`;
+CRITICAL RULES for chart data:
+- ALL values MUST be pure numbers (e.g., 574.8 not "$574.8B"). Put units in the yKeys label instead.
+- The "data" array must have objects with string keys for xKey and number values for yKeys.
+- Types: "bar" for comparisons, "line"/"area" for trends, "pie" for proportions.
+- Example: {"name":"Amazon","revenue":574.8} NOT {"name":"Amazon","revenue":"$574.8B"}`;
 
   const industryPrompts: Record<string, string> = {
     legal: '\nYou specialize in legal topics. Be precise, cite relevant legal considerations, and always recommend consulting a licensed attorney for specific legal advice.',

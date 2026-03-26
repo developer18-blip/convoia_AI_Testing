@@ -19,20 +19,54 @@ const COLORS = ['#7C3AED', '#10B981', '#F59E0B', '#EF4444', '#3B82F6', '#EC4899'
  * Parse chart blocks from AI response text.
  * Format: ```chart\n{json}\n```
  */
+/**
+ * Sanitize chart data — convert string values to numbers.
+ * Handles: "$574.8B" → 574.8, "1,234" → 1234, "45%" → 45, "~$116B+" → 116
+ */
+function sanitizeChartData(data: Record<string, any>[], yKeys: { key: string }[]): Record<string, any>[] {
+  const numericKeys = new Set(yKeys.map(yk => yk.key))
+  return data.map(row => {
+    const clean: Record<string, any> = { ...row }
+    for (const key of numericKeys) {
+      if (key in clean && typeof clean[key] !== 'number') {
+        const str = String(clean[key])
+        // Strip $, ~, +, commas, spaces
+        let num = str.replace(/[$~+,\s]/g, '')
+        // Handle B (billions), M (millions), K (thousands), T (trillions)
+        let multiplier = 1
+        if (/[Tt]$/i.test(num)) { multiplier = 1000; num = num.replace(/[Tt]$/i, '') }
+        else if (/[Bb]$/i.test(num)) { multiplier = 1; num = num.replace(/[Bb]$/i, '') }
+        else if (/[Mm]$/i.test(num)) { multiplier = 1; num = num.replace(/[Mm]$/i, '') }
+        else if (/[Kk]$/i.test(num)) { multiplier = 0.001; num = num.replace(/[Kk]$/i, '') }
+        // Remove % sign
+        num = num.replace(/%$/, '')
+        const parsed = parseFloat(num)
+        if (!isNaN(parsed)) {
+          clean[key] = parsed * multiplier
+        } else {
+          clean[key] = 0
+        }
+      }
+    }
+    return clean
+  })
+}
+
 export function extractCharts(text: string): { cleanText: string; charts: ChartData[] } {
   const charts: ChartData[] = []
   const cleanText = text.replace(/```chart\n([\s\S]*?)```/g, (_match, json) => {
     try {
       const parsed = JSON.parse(json.trim())
       if (parsed.type && parsed.data && Array.isArray(parsed.data)) {
+        const yKeys = parsed.yKeys || Object.keys(parsed.data[0] || {}).slice(1).map((k: string, i: number) => ({
+          key: k, color: COLORS[i % COLORS.length], label: k,
+        }))
         charts.push({
           type: parsed.type || 'line',
           title: parsed.title || 'Chart',
-          data: parsed.data,
+          data: sanitizeChartData(parsed.data, yKeys),
           xKey: parsed.xKey || Object.keys(parsed.data[0] || {})[0] || 'name',
-          yKeys: parsed.yKeys || Object.keys(parsed.data[0] || {}).slice(1).map((k: string, i: number) => ({
-            key: k, color: COLORS[i % COLORS.length], label: k,
-          })),
+          yKeys,
         })
         return '' // Remove chart block from text
       }
