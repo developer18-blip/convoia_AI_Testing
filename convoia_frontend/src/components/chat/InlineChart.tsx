@@ -100,7 +100,21 @@ function CustomTooltip({ active, payload, label }: any) {
 
 export function InlineChart({ chart }: { chart: ChartData }) {
   const [expanded, setExpanded] = useState(false)
-  const height = expanded ? 400 : 240
+  const height = expanded ? 400 : 280
+
+  // Debug: log chart data in development
+  if (typeof window !== 'undefined' && (window as any).__DEV_CHART_DEBUG) {
+    console.log('Chart render:', chart.title, chart.data)
+  }
+
+  // Validate: ensure we have at least 1 row with numeric data
+  const hasNumericData = chart.data.some(row =>
+    chart.yKeys.some(yk => typeof row[yk.key] === 'number' && row[yk.key] > 0)
+  )
+  if (!hasNumericData && chart.data.length > 0) {
+    // Try re-sanitizing as last resort
+    chart.data = sanitizeChartData(chart.data, chart.yKeys)
+  }
 
   const chartIcon = chart.type === 'bar' ? <BarChart3 size={14} />
     : chart.type === 'pie' ? <PieIcon size={14} />
@@ -167,11 +181,11 @@ export function InlineChart({ chart }: { chart: ChartData }) {
             <BarChart data={chart.data} barCategoryGap="20%">
               <CartesianGrid strokeDasharray="3 3" stroke="var(--chat-border)" vertical={false} />
               <XAxis dataKey={chart.xKey} tick={axisStyle} axisLine={{ stroke: 'var(--chat-border)' }} tickLine={false} />
-              <YAxis tick={axisStyle} axisLine={false} tickLine={false} />
+              <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={60} tickFormatter={(v: number) => v >= 1000 ? `${(v/1000).toFixed(0)}K` : v >= 1 ? v.toFixed(0) : v.toString()} />
               <Tooltip content={<CustomTooltip />} />
               <Legend formatter={(value: string) => <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>{value}</span>} />
               {chart.yKeys.map((yk) => (
-                <Bar key={yk.key} dataKey={yk.key} name={yk.label} fill={yk.color} radius={[6, 6, 0, 0]} />
+                <Bar key={yk.key} dataKey={yk.key} name={yk.label} fill={yk.color} radius={[6, 6, 0, 0]} maxBarSize={60} />
               ))}
             </BarChart>
           ) : chart.type === 'area' ? (
