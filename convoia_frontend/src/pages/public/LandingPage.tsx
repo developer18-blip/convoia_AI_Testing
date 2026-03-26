@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Zap, ArrowRight, Globe, DollarSign, Building2, Clock, Shield, Brain,
+  ArrowRight, Globe, DollarSign, Building2, Clock, Shield, Brain,
   Check, ChevronRight, ChevronDown, Bot, Sparkles, Calculator, Star, Quote, Send, X,
 } from 'lucide-react'
 import { useState, useMemo, useRef, useEffect } from 'react'
