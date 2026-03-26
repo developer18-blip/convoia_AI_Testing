@@ -393,9 +393,12 @@ export const queryAIStream = async (req: Request, res: Response) => {
       try { memoryPrompt = await getUserMemoryPrompt(user.id); } catch { /* silent */ }
     }
 
-    // Inject memory into agent/system prompt
+    // Inject memory into agent's system prompt (if agent selected)
     if (memoryPrompt && agentConfig) {
       agentConfig.systemPrompt += memoryPrompt;
+    }
+    if (memoryPrompt) {
+      logger.info(`Memory injected for user ${user.id}: ${memoryPrompt.substring(0, 100)}...`);
     }
 
     // Set up SSE headers

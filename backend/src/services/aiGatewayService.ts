@@ -941,13 +941,16 @@ export class AIGatewayService {
     params: SendMessageParams,
     callbacks: StreamCallbacks
   ): Promise<{ aiModel: any; overrides?: ProviderOverrides }> {
-    const { modelId, messages, industry, agentConfig, maxOutputTokens } = params;
+    const { modelId, messages, industry, agentConfig, maxOutputTokens, memoryContext } = params;
 
     const aiModel = await prisma.aIModel.findUnique({ where: { id: modelId } });
     if (!aiModel) throw new AppError('AI Model not found', 404);
     if (!aiModel.isActive) throw new AppError('This model is currently unavailable', 400);
 
-    const systemPrompt = agentConfig?.systemPrompt || getSystemPrompt(industry);
+    // Use agent's system prompt if available, otherwise default
+    // Append persistent user memory to all prompts
+    const basePrompt = agentConfig?.systemPrompt || getSystemPrompt(industry);
+    const systemPrompt = memoryContext ? basePrompt + memoryContext : basePrompt;
 
     // Cap output tokens to user's balance AND provider's hard limit
     let effectiveMaxTokens = agentConfig?.maxTokens;
