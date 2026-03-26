@@ -216,6 +216,20 @@ export const queryAIStream = async (req: Request, res: Response) => {
     const streamModelCheck = await prisma.aIModel.findUnique({ where: { id: modelId }, select: { id: true, modelId: true, name: true } });
     if (streamModelCheck && IMAGE_ONLY_MODELS.has(streamModelCheck.modelId)) {
       const lastMsg = messages[messages.length - 1]?.content || '';
+      // Build contextual prompt from conversation history
+      // If the latest message is a short follow-up (e.g., "with different angle", "make it darker"),
+      // combine it with previous messages to give the image model full context
+      let imagePrompt = lastMsg;
+      if (lastMsg.length < 60 && messages.length > 1) {
+        // Find the most recent substantial message (likely the original image request)
+        const contextMessages = messages
+          .filter((m: any) => m.role === 'user' && m.content && m.content.length > 10)
+          .map((m: any) => m.content)
+          .slice(-3); // Last 3 user messages for context
+        if (contextMessages.length > 1) {
+          imagePrompt = `Based on: "${contextMessages.slice(0, -1).join('. ')}". Now: ${lastMsg}`;
+        }
+      }
       // Set up SSE and generate image
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
@@ -228,7 +242,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
         // Route to correct provider based on selected model
         const providerMap: Record<string, 'gemini' | 'dalle' | 'gpt-image-1'> = { 'gpt-image-1': 'gpt-image-1', 'dall-e-3': 'dalle', 'gemini-2.5-flash-image': 'gemini', 'gemini-3-pro-image-preview': 'gemini' };
         const imageProvider = providerMap[streamModelCheck.modelId] || 'gemini';
-        const result = await FileProcessingService.generateImage(lastMsg, '1024x1024', 'standard', imageProvider);
+        const result = await FileProcessingService.generateImage(imagePrompt, '1024x1024', 'standard', imageProvider);
         const imageTokenCost = result.provider === 'gemini' ? 1300 : 1000;
         await TokenWalletService.deductTokens({ userId: req.user.userId, tokens: imageTokenCost, reference: `image-gen-${Date.now()}`, description: `Image generation (${streamModelCheck.name})` });
         const imageContent = `\n\n![Generated Image](${result.imageUrl})\n\n*"${result.revisedPrompt}"*\n\n[Download image](${result.imageUrl})`;
