@@ -125,7 +125,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [folders, setFolders] = useState<ChatFolder[]>([])
-  const [activeId, setActiveId] = useState<string | null>(null)
+  const [activeId, setActiveIdRaw] = useState<string | null>(() => {
+    try { return localStorage.getItem('convoia_activeConvId') || null } catch { return null }
+  })
+  const setActiveId = useCallback((id: string | null) => {
+    setActiveIdRaw(id)
+    try {
+      if (id) localStorage.setItem('convoia_activeConvId', id)
+      else localStorage.removeItem('convoia_activeConvId')
+    } catch { /* silent */ }
+  }, [])
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const [agentMode, setAgentMode] = useState(false)

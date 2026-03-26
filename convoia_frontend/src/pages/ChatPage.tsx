@@ -91,12 +91,8 @@ export function ChatPage() {
     if (agent?.industry) {
       setIndustry(agent.industry)
     }
-    // When switching between different agents (or agent ↔ no-agent),
-    // start a fresh conversation so the new agent isn't confused by
-    // the previous agent's persona in the message history.
-    if (messages.length > 0 && wasAgent?.id !== agent?.id) {
-      setActiveConversation(null)
-    }
+    // Keep the current conversation — agent switch just changes the system prompt
+    // for the next message, not the conversation itself
   }
 
   useEffect(() => {
