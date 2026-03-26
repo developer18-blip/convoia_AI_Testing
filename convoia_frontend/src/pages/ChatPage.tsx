@@ -82,7 +82,6 @@ export function ChatPage() {
   }, [activeConversationId])
 
   const handleAgentChange = (agent: Agent | null) => {
-    const wasAgent = selectedAgent
     setSelectedAgent(agent)
     setAgentMode(!!agent)
     if (agent?.defaultModelId) {
