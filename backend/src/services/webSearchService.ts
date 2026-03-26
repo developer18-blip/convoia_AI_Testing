@@ -119,54 +119,132 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000);
 
-// ── DuckDuckGo Search (FREE) ────────────────────────────────────────
+// ── Free Search (Multiple fallback sources) ─────────────────────────
 
-const DDG_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+const SEARCH_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
   'Accept-Language': 'en-US,en;q=0.9',
+  'Accept-Encoding': 'gzip, deflate',
 };
 
-async function searchDuckDuckGo(query: string, maxResults = 5): Promise<SearchResult[]> {
+/**
+ * Try multiple free search sources in order:
+ * 1. DuckDuckGo Lite (less blocking than full HTML)
+ * 2. DuckDuckGo HTML (fallback)
+ * 3. If both fail → return empty (Tavily will handle)
+ */
+async function searchFree(query: string, maxResults = 5): Promise<SearchResult[]> {
+  // Try DuckDuckGo Lite first (simpler page, less blocking)
+  let results = await searchDDGLite(query, maxResults);
+  if (results.length >= 2) return results;
+
+  // Fallback: DuckDuckGo full HTML
+  results = await searchDDGHTML(query, maxResults);
+  if (results.length >= 2) return results;
+
+  logger.info(`Free search returned ${results.length} results for: "${query}"`);
+  return results;
+}
+
+async function searchDDGLite(query: string, maxResults = 5): Promise<SearchResult[]> {
   try {
-    // Use DuckDuckGo HTML search
-    const encodedQuery = encodeURIComponent(query);
-    const response = await axios.get(
-      `https://html.duckduckgo.com/html/?q=${encodedQuery}`,
-      { headers: DDG_HEADERS, timeout: 8000 }
+    const response = await axios.post(
+      'https://lite.duckduckgo.com/lite/',
+      `q=${encodeURIComponent(query)}`,
+      {
+        headers: {
+          ...SEARCH_HEADERS,
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Referer': 'https://lite.duckduckgo.com/',
+        },
+        timeout: 8000,
+      }
     );
 
     const $ = cheerio.load(response.data);
     const results: SearchResult[] = [];
 
-    // Parse DuckDuckGo results
+    // DDG Lite uses table rows for results
+    $('table.t a.result-link').each((_i, el) => {
+      if (results.length >= maxResults) return;
+      const title = $(el).text().trim();
+      let url = $(el).attr('href') || '';
+      if (url.includes('uddg=')) {
+        try { url = decodeURIComponent(new URL(url, 'https://lite.duckduckgo.com').searchParams.get('uddg') || url); } catch {}
+      }
+      // Get snippet from next sibling td
+      const snippet = $(el).closest('tr').next('tr').find('td.result-snippet').text().trim();
+      if (title && url && url.startsWith('http') && !url.includes('duckduckgo.com')) {
+        results.push({ title, url, content: snippet || title, score: 0 });
+      }
+    });
+
+    // Alternative parsing — DDG Lite sometimes uses different structure
+    if (results.length === 0) {
+      const links: Array<{ title: string; url: string }> = [];
+      const snippets: string[] = [];
+
+      $('a.result-link').each((_i, el) => {
+        const title = $(el).text().trim();
+        let url = $(el).attr('href') || '';
+        if (url.includes('uddg=')) {
+          try { url = decodeURIComponent(new URL(url, 'https://lite.duckduckgo.com').searchParams.get('uddg') || url); } catch {}
+        }
+        if (title && url.startsWith('http')) links.push({ title, url });
+      });
+
+      $('td.result-snippet').each((_i, el) => {
+        snippets.push($(el).text().trim());
+      });
+
+      for (let i = 0; i < Math.min(links.length, maxResults); i++) {
+        results.push({
+          title: links[i].title,
+          url: links[i].url,
+          content: snippets[i] || links[i].title,
+          score: 0,
+        });
+      }
+    }
+
+    if (results.length > 0) logger.info(`DDG Lite: ${results.length} results for "${query}"`);
+    return results;
+  } catch (err: any) {
+    logger.debug(`DDG Lite failed: ${err.message}`);
+    return [];
+  }
+}
+
+async function searchDDGHTML(query: string, maxResults = 5): Promise<SearchResult[]> {
+  try {
+    const response = await axios.get(
+      `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
+      { headers: SEARCH_HEADERS, timeout: 8000 }
+    );
+
+    const $ = cheerio.load(response.data);
+    const results: SearchResult[] = [];
+
     $('.result').each((_i, el) => {
       if (results.length >= maxResults) return;
-
       const titleEl = $(el).find('.result__a');
       const snippetEl = $(el).find('.result__snippet');
-      const urlEl = $(el).find('.result__url');
-
       const title = titleEl.text().trim();
       const content = snippetEl.text().trim();
-      let url = urlEl.attr('href') || titleEl.attr('href') || '';
-
-      // DuckDuckGo wraps URLs in redirects
+      let url = titleEl.attr('href') || '';
       if (url.includes('uddg=')) {
-        try {
-          const parsed = new URL(url, 'https://duckduckgo.com');
-          url = decodeURIComponent(parsed.searchParams.get('uddg') || url);
-        } catch { /* keep original */ }
+        try { url = decodeURIComponent(new URL(url, 'https://duckduckgo.com').searchParams.get('uddg') || url); } catch {}
       }
-
-      if (title && content && url && !url.includes('duckduckgo.com')) {
+      if (title && content && url && url.startsWith('http') && !url.includes('duckduckgo.com')) {
         results.push({ title, url, content, score: 0 });
       }
     });
 
+    if (results.length > 0) logger.info(`DDG HTML: ${results.length} results for "${query}"`);
     return results;
   } catch (err: any) {
-    logger.warn(`DuckDuckGo search failed: ${err.message}`);
+    logger.debug(`DDG HTML failed: ${err.message}`);
     return [];
   }
 }
@@ -176,7 +254,7 @@ async function searchDuckDuckGo(query: string, maxResults = 5): Promise<SearchRe
 async function crawlUrl(url: string): Promise<string> {
   try {
     const response = await axios.get(url, {
-      headers: DDG_HEADERS,
+      headers: SEARCH_HEADERS,
       timeout: 6000,
       maxRedirects: 3,
       validateStatus: (s) => s < 400,
@@ -345,8 +423,8 @@ export async function searchWeb(query: string, maxResults = 5): Promise<WebSearc
     return cached;
   }
 
-  // 2. Try DuckDuckGo (FREE)
-  let results = await searchDuckDuckGo(query, maxResults);
+  // 2. Try free search (DuckDuckGo Lite → DuckDuckGo HTML)
+  let results = await searchFree(query, maxResults);
   let source: 'duckduckgo' | 'tavily' = 'duckduckgo';
 
   // Enrich top results with crawled content (parallel, fast)
