@@ -149,7 +149,7 @@ export class FileProcessingService {
     prompt: string,
     size: '1024x1024' | '1792x1024' | '1024x1792' = '1024x1024',
     quality: 'standard' | 'hd' = 'standard',
-    provider?: 'gemini' | 'dalle'
+    provider?: 'gemini' | 'dalle' | 'gpt-image-1'
   ): Promise<{
     imageUrl: string
     revisedPrompt: string
@@ -262,8 +262,6 @@ export class FileProcessingService {
     prompt: string,
     inputImageUrl?: string,
   ): Promise<{ imageUrl: string; revisedPrompt: string; provider: string }> {
-    const openai = getOpenAI()
-
     // Build the input content
     const input: any[] = []
 

@@ -226,7 +226,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
         const imgUser = await prisma.user.findUnique({ where: { id: req.user.userId } });
         res.write(`data: ${JSON.stringify({ type: 'status', content: 'Generating image...' })}\n\n`);
         // Route to correct provider based on selected model
-        const providerMap: Record<string, string> = { 'gpt-image-1': 'gpt-image-1', 'dall-e-3': 'dalle', 'gemini-2.5-flash-image': 'gemini', 'gemini-3-pro-image-preview': 'gemini' };
+        const providerMap: Record<string, 'gemini' | 'dalle' | 'gpt-image-1'> = { 'gpt-image-1': 'gpt-image-1', 'dall-e-3': 'dalle', 'gemini-2.5-flash-image': 'gemini', 'gemini-3-pro-image-preview': 'gemini' };
         const imageProvider = providerMap[streamModelCheck.modelId] || 'gemini';
         const result = await FileProcessingService.generateImage(lastMsg, '1024x1024', 'standard', imageProvider);
         const imageTokenCost = result.provider === 'gemini' ? 1300 : 1000;
