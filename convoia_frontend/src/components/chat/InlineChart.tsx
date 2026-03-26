@@ -74,9 +74,52 @@ function sanitizeChartData(data: Record<string, any>[], yKeys: { key: string }[]
   })
 }
 
+/**
+ * Try to extract chart data from ASCII/text tables inside code blocks.
+ * Matches patterns like "1. Apple     $383.3B" or "Apple | $383.3B"
+ */
+function extractChartFromTextTable(codeBlock: string): ChartData | null {
+  const lines = codeBlock.trim().split('\n').filter(l => l.trim())
+  if (lines.length < 2) return null
+
+  // Try to find lines with name + dollar/number pattern
+  const dataRows: { name: string; value: number }[] = []
+  let title = ''
+
+  for (const line of lines) {
+    // Match: "1. Apple     $383.3B" or "Apple  $383.3B" or "Apple | $383.3B"
+    const match = line.match(/^\s*\d*\.?\s*([A-Za-z][\w\s/&.]+?)\s+[\|]?\s*\$?([\d,.]+)\s*([BMKTbmkt]?)/)
+    if (match) {
+      const name = match[1].trim()
+      let val = parseFloat(match[2].replace(/,/g, ''))
+      if (isNaN(val)) continue
+      const suffix = match[3].toUpperCase()
+      if (suffix === 'T') val *= 1000
+      // B, M, K just keep as is for display
+      dataRows.push({ name, value: val })
+    } else if (!title && line.trim().length > 5 && !line.includes('$')) {
+      title = line.trim().replace(/^[─═\-\|]+$/, '').trim()
+    }
+  }
+
+  if (dataRows.length >= 2) {
+    return {
+      type: 'bar',
+      title: title || 'Comparison',
+      data: dataRows,
+      xKey: 'name',
+      yKeys: [{ key: 'value', color: COLORS[0], label: 'Value ($B)' }],
+    }
+  }
+  return null
+}
+
 export function extractCharts(text: string): { cleanText: string; charts: ChartData[] } {
   const charts: ChartData[] = []
-  const cleanText = text.replace(/```chart\s*\n([\s\S]*?)```/g, (_match, json) => {
+  let cleanText = text
+
+  // 1. Try structured chart JSON blocks first
+  cleanText = cleanText.replace(/```chart\s*\n([\s\S]*?)```/g, (_match, json) => {
     try {
       const parsed = JSON.parse(json.trim())
       if (parsed.type && parsed.data && Array.isArray(parsed.data)) {
@@ -90,11 +133,26 @@ export function extractCharts(text: string): { cleanText: string; charts: ChartD
           xKey: parsed.xKey || Object.keys(parsed.data[0] || {})[0] || 'name',
           yKeys,
         })
-        return '' // Remove chart block from text
+        return ''
       }
-    } catch { /* invalid json, leave as-is */ }
+    } catch { /* not valid JSON */ }
     return _match
   })
+
+  // 2. Fallback: detect ASCII tables with $ values inside code blocks
+  if (charts.length === 0) {
+    cleanText = cleanText.replace(/```\w*\n([\s\S]*?)```/g, (_match, content) => {
+      // Only try if content has $ signs and multiple lines
+      if (content.includes('$') && content.split('\n').length >= 3) {
+        const chart = extractChartFromTextTable(content)
+        if (chart) {
+          charts.push(chart)
+          return '' // Remove the code block, chart replaces it
+        }
+      }
+      return _match
+    })
+  }
 
   return { cleanText: cleanText.trim(), charts }
 }
