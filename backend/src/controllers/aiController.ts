@@ -212,10 +212,36 @@ export const queryAIStream = async (req: Request, res: Response) => {
       return;
     }
 
-    // Block image-only models from streaming chat
-    const streamModelCheck = await prisma.aIModel.findUnique({ where: { id: modelId }, select: { modelId: true, name: true } });
+    // If user selected an image-only model, route to image generation automatically
+    const streamModelCheck = await prisma.aIModel.findUnique({ where: { id: modelId }, select: { id: true, modelId: true, name: true } });
     if (streamModelCheck && IMAGE_ONLY_MODELS.has(streamModelCheck.modelId)) {
-      res.status(400).json({ success: false, message: `${streamModelCheck.name} is an image generation model. Please select a chat model.` });
+      const lastMsg = messages[messages.length - 1]?.content || '';
+      // Set up SSE and generate image
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.flushHeaders();
+      try {
+        const imgUser = await prisma.user.findUnique({ where: { id: req.user.userId } });
+        res.write(`data: ${JSON.stringify({ type: 'status', content: 'Generating image...' })}\n\n`);
+        const result = await FileProcessingService.generateImage(lastMsg);
+        const imageTokenCost = result.provider === 'gemini' ? 1300 : 1000;
+        await TokenWalletService.deductTokens({ userId: req.user.userId, tokens: imageTokenCost, reference: `image-gen-${Date.now()}`, description: `Image generation (${streamModelCheck.name})` });
+        const imageContent = `\n\n![Generated Image](${result.imageUrl})\n\n*"${result.revisedPrompt}"*\n\n[Download image](${result.imageUrl})`;
+        res.write(`data: ${JSON.stringify({ type: 'chunk', content: imageContent })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'done', inputTokens: 0, outputTokens: imageTokenCost, totalTokens: imageTokenCost, model: streamModelCheck.name, imageGenerated: true, imageUrl: result.imageUrl })}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+        // Log usage
+        const orgId = imgUser?.organizationId || undefined;
+        await prisma.usageLog.create({ data: { userId: req.user.userId, organizationId: orgId, modelId: streamModelCheck.id, prompt: lastMsg.substring(0, 500), response: `[Image: ${result.revisedPrompt?.substring(0, 200)}]`, tokensInput: 0, tokensOutput: imageTokenCost, totalTokens: imageTokenCost, providerCost: 0, markupPercentage: 0, customerPrice: 0, status: 'completed' } });
+      } catch (err: any) {
+        res.write(`data: ${JSON.stringify({ type: 'chunk', content: `\n\nImage generation failed: ${err.message}` })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'done', inputTokens: 0, outputTokens: 0, totalTokens: 0, model: streamModelCheck.name })}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+      }
       return;
     }
 
