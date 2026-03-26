@@ -54,7 +54,7 @@ function sanitizeChartData(data: Record<string, any>[], yKeys: { key: string }[]
 
 export function extractCharts(text: string): { cleanText: string; charts: ChartData[] } {
   const charts: ChartData[] = []
-  const cleanText = text.replace(/```chart\n([\s\S]*?)```/g, (_match, json) => {
+  const cleanText = text.replace(/```chart\s*\n([\s\S]*?)```/g, (_match, json) => {
     try {
       const parsed = JSON.parse(json.trim())
       if (parsed.type && parsed.data && Array.isArray(parsed.data)) {
@@ -102,10 +102,8 @@ export function InlineChart({ chart }: { chart: ChartData }) {
   const [expanded, setExpanded] = useState(false)
   const height = expanded ? 400 : 280
 
-  // Debug: log chart data in development
-  if (typeof window !== 'undefined' && (window as any).__DEV_CHART_DEBUG) {
-    console.log('Chart render:', chart.title, chart.data)
-  }
+  // Always log chart data for debugging
+  console.log('[InlineChart] Rendering:', chart.title, 'Type:', chart.type, 'Data:', JSON.stringify(chart.data), 'yKeys:', JSON.stringify(chart.yKeys))
 
   // Validate: ensure we have at least 1 row with numeric data
   const hasNumericData = chart.data.some(row =>
