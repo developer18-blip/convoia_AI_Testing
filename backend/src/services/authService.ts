@@ -143,27 +143,29 @@ export class AuthService {
         };
       }
 
-      // Email verification disabled — auto-verify and issue token immediately
+      // Generate 6-digit verification code and send via email
+      const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const verificationExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
       await prisma.user.update({
         where: { id: finalUser.id },
-        data: { isVerified: true },
+        data: {
+          verificationToken: verificationCode,
+          verificationExpiry,
+        },
       });
 
-      const token = generateToken({
-        userId: finalUser.id,
-        organizationId: finalUser.organizationId || undefined,
-        role: finalUser.role,
-      });
-      const refreshToken = generateRefreshToken({
-        userId: finalUser.id,
-        organizationId: finalUser.organizationId || undefined,
-        role: finalUser.role,
-      });
+      // Send verification email
+      try {
+        await EmailService.sendVerificationCode({ recipientEmail: finalUser.email, name: finalUser.name, code: verificationCode });
+        logger.info(`Verification code sent to ${finalUser.email}`);
+      } catch (err: any) {
+        logger.warn(`Failed to send verification email to ${finalUser.email}: ${err.message}`);
+        // Log code to terminal as fallback
+        logger.info(`[VERIFICATION] Code for ${finalUser.email}: ${verificationCode}`);
+      }
 
-      // Send welcome notification (fire and forget)
-      NotificationService.onWelcome(finalUser.id, finalUser.name).catch(() => {});
-
-      // Return with JWT — skip verification
+      // Return requiresVerification — frontend will show OTP page
       return {
         user: {
           id: finalUser.id,
@@ -172,10 +174,11 @@ export class AuthService {
           avatar: finalUser.avatar || null,
           role: finalUser.role,
           organizationId: finalUser.organizationId || undefined,
-          isVerified: true,
+          isVerified: false,
         },
-        token,
-        refreshToken,
+        token: '',
+        refreshToken: '',
+        requiresVerification: true,
       };
     } catch (error) {
       if (error instanceof AppError) {
