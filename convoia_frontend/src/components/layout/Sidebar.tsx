@@ -202,10 +202,7 @@ export function Sidebar({ collapsed, onToggle, onClose }: SidebarProps) {
           className="flex items-center gap-2.5"
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-primary)' }}
         >
-          <div className="relative">
-            <div className="absolute inset-0" style={{ background: 'var(--color-primary-light)', borderRadius: '8px', filter: 'blur(8px)' }} />
-            <Zap size={22} style={{ color: 'var(--color-primary)', position: 'relative' }} />
-          </div>
+          <img src="/logo.png" alt="ConvoiaAI" style={{ height: collapsed ? '28px' : '32px', objectFit: 'contain' }} />
           {!collapsed && (
             <span style={{ fontWeight: 800, fontSize: '17px', background: 'linear-gradient(135deg, var(--color-primary), var(--color-accent-end))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               ConvoiaAI

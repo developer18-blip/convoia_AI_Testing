@@ -193,12 +193,8 @@ export function LandingPage() {
       {/* Navbar */}
       <nav className="sticky top-0 z-50 bg-background/70 backdrop-blur-2xl border-b border-border/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2.5">
-            <div className="relative">
-              <div className="absolute inset-0 bg-primary/20 rounded-lg blur-md" />
-              <Zap size={24} className="text-primary relative" />
-            </div>
-            <span className="text-xl font-bold bg-clip-text text-transparent" style={{ backgroundImage: 'linear-gradient(135deg, var(--color-accent-start), var(--color-accent-end))' }}>ConvoiaAI</span>
+          <Link to="/" className="flex items-center gap-2">
+            <img src="/logo.png" alt="ConvoiaAI" style={{ height: '36px', objectFit: 'contain' }} />
           </Link>
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="text-sm text-text-secondary hover:text-text-primary transition-colors">Features</a>
@@ -632,9 +628,8 @@ export function LandingPage() {
       <footer className="border-t border-border/50 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2.5">
-              <Zap size={20} className="text-primary" />
-              <span className="font-bold bg-clip-text text-transparent" style={{ backgroundImage: 'linear-gradient(135deg, var(--color-accent-start), var(--color-accent-end))' }}>ConvoiaAI</span>
+            <div className="flex items-center gap-2">
+              <img src="/logo.png" alt="ConvoiaAI" style={{ height: '28px', objectFit: 'contain' }} />
             </div>
             <p className="text-sm text-text-muted">&copy; {new Date().getFullYear()} ConvoiaAI. All rights reserved.</p>
           </div>
