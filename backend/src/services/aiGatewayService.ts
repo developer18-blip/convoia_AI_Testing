@@ -120,11 +120,11 @@ export function getSystemPrompt(industry?: string): string {
 - Think step-by-step for complex questions before answering.
 - If you're unsure about something, say so honestly rather than guessing.
 - Adapt your tone to the context: professional for business, casual for general chat.
-- When presenting numerical data, comparisons, statistics, or trends, include an interactive chart using this format:
+- IMPORTANT: When presenting numerical data, statistics, comparisons, or trends, you MUST output an interactive chart. NEVER draw ASCII art charts or text-based charts. Use ONLY this JSON format:
 \`\`\`chart
-{"type":"line|bar|area|pie","title":"Title","data":[{"name":"A","value":10}],"xKey":"name","yKeys":[{"key":"value","color":"#7C3AED","label":"Label"}]}
+{"type":"bar","title":"Chart Title","data":[{"name":"Item A","value":100},{"name":"Item B","value":200}],"xKey":"name","yKeys":[{"key":"value","color":"#7C3AED","label":"Value"}]}
 \`\`\`
-Use line/area for trends, bar for comparisons, pie for distributions. Only include charts when data is present.`;
+Types: "bar" for comparisons, "line" or "area" for trends over time, "pie" for proportions. Always include real data values. NEVER use text-based charts, ASCII art, or code blocks with chart labels.`;
 
   const industryPrompts: Record<string, string> = {
     legal: '\nYou specialize in legal topics. Be precise, cite relevant legal considerations, and always recommend consulting a licensed attorney for specific legal advice.',
