@@ -1,45 +1,66 @@
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+import { Resend } from 'resend';
 import { config } from '../config/env.js';
 import logger from '../config/logger.js';
 
-// ── AWS SES Client ───────────────────────────────────────────────────
+// ── Email Providers ──────────────────────────────────────────────────
 
-const ses = new SESClient({
-  region: process.env.AWS_SES_REGION || 'us-east-1',
-  credentials: {
-    accessKeyId: process.env.AWS_SES_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.AWS_SES_SECRET_ACCESS_KEY || '',
-  },
-});
+const ses = (process.env.AWS_SES_ACCESS_KEY_ID && process.env.AWS_SES_SECRET_ACCESS_KEY)
+  ? new SESClient({
+      region: process.env.AWS_SES_REGION || 'us-east-1',
+      credentials: {
+        accessKeyId: process.env.AWS_SES_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SES_SECRET_ACCESS_KEY,
+      },
+    })
+  : null;
 
-const FROM = 'ConvoiaAI <noreply@convoia.com>';
+const resend = config.resendApiKey ? new Resend(config.resendApiKey) : null;
+
+const SES_FROM = 'ConvoiaAI <noreply@convoia.com>';
+const RESEND_FROM = 'ConvoiaAI <noreply@updates.convoia.com>';
 const BRAND_COLOR = '#7C3AED';
 const FRONTEND_URL = config.frontendUrl;
 
-const isSESConfigured = !!(process.env.AWS_SES_ACCESS_KEY_ID && process.env.AWS_SES_SECRET_ACCESS_KEY);
-
-// ── Send Email via SES ───────────────────────────────────────────────
+// ── Send Email (SES primary, Resend fallback) ────────────────────────
 
 async function sendEmail(to: string, subject: string, html: string): Promise<void> {
-  if (!isSESConfigured) {
-    logger.warn('AWS SES not configured — email not sent');
-    return;
+  // Try SES first
+  if (ses) {
+    try {
+      await ses.send(new SendEmailCommand({
+        Source: SES_FROM,
+        Destination: { ToAddresses: [to] },
+        Message: {
+          Subject: { Data: subject, Charset: 'UTF-8' },
+          Body: { Html: { Data: html, Charset: 'UTF-8' } },
+        },
+      }));
+      logger.info(`Email sent via SES to ${to}: ${subject}`);
+      return;
+    } catch (err: any) {
+      logger.warn(`SES failed for ${to}: ${err.message} — trying Resend`);
+    }
   }
 
-  try {
-    await ses.send(new SendEmailCommand({
-      Source: FROM,
-      Destination: { ToAddresses: [to] },
-      Message: {
-        Subject: { Data: subject, Charset: 'UTF-8' },
-        Body: { Html: { Data: html, Charset: 'UTF-8' } },
-      },
-    }));
-    logger.info(`Email sent to ${to}: ${subject}`);
-  } catch (err: any) {
-    logger.error(`SES email failed to ${to}: ${err.message}`);
-    throw err;
+  // Fallback to Resend
+  if (resend) {
+    try {
+      await resend.emails.send({
+        from: RESEND_FROM,
+        to,
+        subject,
+        html,
+      });
+      logger.info(`Email sent via Resend to ${to}: ${subject}`);
+      return;
+    } catch (err: any) {
+      logger.error(`Resend also failed for ${to}: ${err.message}`);
+      throw err;
+    }
   }
+
+  logger.warn(`No email provider configured — email to ${to} not sent`);
 }
 
 // ── HTML Template ────────────────────────────────────────────────────
