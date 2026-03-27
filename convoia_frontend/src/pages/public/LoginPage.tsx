@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Mail, Lock, Sparkles, Shield, Zap, Globe, Brain } from 'lucide-react'
@@ -22,6 +22,13 @@ export function LoginPage() {
   const toast = useToast()
   const [searchParams] = useSearchParams()
   const inviteToken = searchParams.get('inviteToken')
+  const [isDark, setIsDark] = useState(document.documentElement.classList.contains('dark'))
+  useEffect(() => {
+    const obs = new MutationObserver(() => setIsDark(document.documentElement.classList.contains('dark')))
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => obs.disconnect()
+  }, [])
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -76,7 +83,7 @@ export function LoginPage() {
         >
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2.5 mb-10">
-            <img src="/logo.png" alt="ConvoiaAI" style={{ height: '36px', objectFit: 'contain' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+            <img src="/logo.png" alt="ConvoiaAI" style={{ height: '48px', objectFit: 'contain' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
           </Link>
 
           <h1 className="text-3xl font-bold text-text-primary tracking-tight">Welcome back</h1>
@@ -155,7 +162,7 @@ export function LoginPage() {
       </div>
 
       {/* Right — Feature Panel (hidden on mobile) */}
-      <div className="hidden lg:flex flex-1 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #7C3AED 0%, #4F46E5 50%, #2563EB 100%)' }}>
+      <div className="hidden lg:flex flex-1 relative overflow-hidden" style={{ background: isDark ? 'linear-gradient(135deg, #1a1033 0%, #110d24 50%, #0c1425 100%)' : 'linear-gradient(135deg, #7C3AED 0%, #4F46E5 50%, #2563EB 100%)' }}>
         {/* Decorative elements */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-20 left-20 w-72 h-72 bg-white rounded-full blur-3xl" />

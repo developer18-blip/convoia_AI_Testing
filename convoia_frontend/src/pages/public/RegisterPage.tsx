@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { User, Building2, Mail, Lock, ArrowLeft, ArrowRight, Sparkles, Check } from 'lucide-react'
@@ -45,6 +45,13 @@ export function RegisterPage() {
   const inviteToken = searchParams.get('token')
   const inviteOrg = searchParams.get('org')
   const inviteRole = searchParams.get('role')
+
+  const [isDark, setIsDark] = useState(document.documentElement.classList.contains('dark'))
+  useEffect(() => {
+    const obs = new MutationObserver(() => setIsDark(document.documentElement.classList.contains('dark')))
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => obs.disconnect()
+  }, [])
 
   const [step, setStep] = useState(inviteToken ? 2 : 1)
   const [accountType, setAccountType] = useState<'individual' | 'business' | null>(inviteToken ? 'individual' : null)
@@ -106,7 +113,7 @@ export function RegisterPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left — Feature Panel (hidden on mobile) */}
-      <div className="hidden lg:flex flex-1 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, #2563EB 0%, #4F46E5 40%, #7C3AED 100%)' }}>
+      <div className="hidden lg:flex flex-1 relative overflow-hidden" style={{ background: isDark ? 'linear-gradient(160deg, #0c1425 0%, #110d24 40%, #1a1033 100%)' : 'linear-gradient(160deg, #2563EB 0%, #4F46E5 40%, #7C3AED 100%)' }}>
         {/* Decorative */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-32 left-10 w-80 h-80 bg-white rounded-full blur-3xl" />
@@ -186,7 +193,7 @@ export function RegisterPage() {
         >
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2.5 mb-8">
-            <img src="/logo.png" alt="ConvoiaAI" style={{ height: '36px', objectFit: 'contain' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+            <img src="/logo.png" alt="ConvoiaAI" style={{ height: '48px', objectFit: 'contain' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
           </Link>
 
           <h1 className="text-3xl font-bold text-text-primary tracking-tight">Create your account</h1>
