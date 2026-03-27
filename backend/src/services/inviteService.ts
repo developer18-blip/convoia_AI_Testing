@@ -109,7 +109,7 @@ export class InviteService {
       },
     });
 
-    // Send invite email (fire-and-forget)
+    // Send invite email (fire-and-forget but log errors)
     EmailService.sendInviteEmail({
       recipientEmail: email,
       inviterName: invite.invitedBy.name,
@@ -118,7 +118,7 @@ export class InviteService {
       inviteToken: token,
       tokensAllocated,
       expiresAt,
-    }).catch(() => {});
+    }).catch((err) => { logger.error(`Failed to send invite email to ${email}: ${err.message}`); });
 
     // Log activity
     try {
