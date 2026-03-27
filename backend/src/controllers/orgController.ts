@@ -312,7 +312,7 @@ export const getUserDetails = asyncHandler(async (req: Request, res: Response) =
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const [usageAgg, budget, dailyLogs] = await Promise.all([
+  const [usageAgg, budget, dailyLogs, tokenWallet] = await Promise.all([
     prisma.usageLog.aggregate({
       where: { userId, createdAt: { gte: thirtyDaysAgo } },
       _count: { id: true },
@@ -324,6 +324,7 @@ export const getUserDetails = asyncHandler(async (req: Request, res: Response) =
       select: { customerPrice: true, createdAt: true },
       orderBy: { createdAt: 'asc' },
     }),
+    prisma.tokenWallet.findUnique({ where: { userId } }),
   ]);
 
   // Build daily chart
@@ -354,6 +355,11 @@ export const getUserDetails = asyncHandler(async (req: Request, res: Response) =
         monthlyCap: budget.monthlyCap,
         currentUsage: budget.currentUsage,
         alertThreshold: budget.alertThreshold,
+      } : null,
+      tokenBalance: tokenWallet ? {
+        total: tokenWallet.totalTokensPurchased + tokenWallet.allocatedTokens,
+        used: tokenWallet.totalTokensUsed,
+        remaining: tokenWallet.tokenBalance,
       } : null,
       dailyUsage,
     },

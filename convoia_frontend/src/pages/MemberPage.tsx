@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Activity, DollarSign, Coins } from 'lucide-react'
+import { ArrowLeft, Activity, DollarSign, Coins, Wallet } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { StatCard } from '../components/shared/StatCard'
 import { Avatar } from '../components/ui/Avatar'
@@ -60,11 +60,34 @@ export function MemberPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         <StatCard title="Queries" value={formatNumber(member.queries || 0)} icon={<Activity size={20} />} />
         <StatCard title="Cost" value={formatCurrency(member.cost || 0)} icon={<DollarSign size={20} />} />
-        <StatCard title="Tokens" value={formatTokens(member.tokens || 0)} icon={<Coins size={20} />} />
+        <StatCard title="Tokens Used" value={formatTokens(member.tokenBalance?.used || member.tokens || 0)} icon={<Coins size={20} />} />
+        <StatCard title="Tokens Assigned" value={formatTokens(member.tokenBalance?.total || 0)} icon={<Wallet size={20} />} />
+        <StatCard title="Tokens Remaining" value={formatTokens(member.tokenBalance?.remaining || 0)} icon={<Coins size={20} />} trend={member.tokenBalance?.remaining > 0 ? 'up' : undefined} />
       </div>
+
+      {/* Token usage progress */}
+      {member.tokenBalance && member.tokenBalance.total > 0 && (
+        <Card padding="lg">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-text-secondary">Token Usage</h3>
+            <span className="text-xs text-text-muted">
+              {formatTokens(member.tokenBalance.used)} / {formatTokens(member.tokenBalance.total)} used
+            </span>
+          </div>
+          <ProgressBar
+            value={member.tokenBalance.used}
+            max={member.tokenBalance.total}
+            size="md"
+            showLabel
+          />
+          <p className="text-xs text-text-muted mt-2">
+            {((member.tokenBalance.used / member.tokenBalance.total) * 100).toFixed(1)}% consumed — {formatTokens(member.tokenBalance.remaining)} remaining
+          </p>
+        </Card>
+      )}
 
       <Card padding="lg">
         <h3 className="text-sm font-medium text-text-secondary mb-3">Budget</h3>
