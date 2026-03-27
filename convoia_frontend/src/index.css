@@ -170,6 +170,21 @@ html.light {
   --chat-user-bubble: #F4F4F4;
 }
 
+/* ─── Chat textarea scrollbar (visible, thin, ChatGPT-style) ─── */
+.chat-input-box textarea::-webkit-scrollbar {
+  width: 6px;
+}
+.chat-input-box textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+.chat-input-box textarea::-webkit-scrollbar-thumb {
+  background: var(--chat-border);
+  border-radius: 3px;
+}
+.chat-input-box textarea::-webkit-scrollbar-thumb:hover {
+  background: var(--chat-text-dim);
+}
+
 /* ─── Base box sizing ─── */
 *, *::before, *::after {
   box-sizing: border-box;

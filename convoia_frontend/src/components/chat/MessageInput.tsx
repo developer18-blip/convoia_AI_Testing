@@ -292,7 +292,7 @@ export function MessageInput({
     const el = textareaRef.current
     if (el) {
       el.style.height = 'auto'
-      el.style.height = Math.min(el.scrollHeight, 200) + 'px'
+      el.style.height = Math.min(el.scrollHeight, 300) + 'px'
     }
   }
 
@@ -408,9 +408,9 @@ export function MessageInput({
             style={{
               flex: 1, backgroundColor: 'transparent', border: 'none', outline: 'none',
               color: 'var(--chat-text)', fontSize: '15px', lineHeight: '1.6', resize: 'none',
-              minHeight: '28px', maxHeight: '200px', fontFamily: 'Inter, system-ui, sans-serif',
+              minHeight: '28px', maxHeight: '300px', fontFamily: 'Inter, system-ui, sans-serif',
               padding: '16px 20px 6px', overflowWrap: 'break-word', wordBreak: 'break-word',
-              overflowY: 'auto',
+              overflowY: 'auto', scrollbarWidth: 'thin', scrollbarColor: 'var(--chat-border) transparent',
             }}
           />
 
