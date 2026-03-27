@@ -6,7 +6,7 @@ import logger from '../config/logger.js';
 
 const resend = config.resendApiKey ? new Resend(config.resendApiKey) : null;
 
-const FROM = 'ConvoiaAI <noreply@ai.convoia.com>';
+const FROM = 'ConvoiaAI <noreply@convoia.com>';
 const BRAND_COLOR = '#7C3AED';
 const FRONTEND_URL = config.frontendUrl;
 
