@@ -144,7 +144,7 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
             <div style={{
               position: 'absolute', top: '-32px', right: 0,
               display: 'flex', alignItems: 'center', gap: '2px', borderRadius: '8px', padding: '2px',
-              background: 'var(--chat-surface)', border: '1px solid var(--chat-border)', boxShadow: '0 4px 16px rgba(0,0,0,0.3)', zIndex: 10,
+              background: 'var(--chat-surface)', border: '1px solid var(--chat-border)', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', zIndex: 10,
             }}>
               {([
                 { show: true, action: handleCopy, icon: copied ? <Check size={13} style={{ color: 'var(--color-primary)' }} /> : <Copy size={13} />, title: 'Copy' },

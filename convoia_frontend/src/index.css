@@ -129,7 +129,7 @@ html.light .animate-pulse-glow {
 
 /* ─── Dark select/option styling ─── */
 select option {
-  background: #171717;
+  background: #2F2F2F;
   color: #ECECEC;
 }
 html.light select option {
@@ -137,37 +137,37 @@ html.light select option {
   color: #0F172A;
 }
 
-/* ─── Chat-specific CSS variables (dark default) ─── */
+/* ─── Chat-specific CSS variables (dark default — inspired by ChatGPT) ─── */
 :root {
-  --chat-bg: #0D0D0D;
-  --chat-sidebar-bg: #0A0A0A;
-  --chat-surface: #171717;
-  --chat-hover: #1E1E1E;
-  --chat-border: #2F2F2F;
+  --chat-bg: #212121;
+  --chat-sidebar-bg: #171717;
+  --chat-surface: #2F2F2F;
+  --chat-hover: #383838;
+  --chat-border: #3A3A3A;
   --chat-text: #ECECEC;
-  --chat-text-secondary: #B4B4B4;
-  --chat-text-muted: #8E8E8E;
-  --chat-text-dim: #676767;
-  --chat-code-bg: #0A0A0A;
-  --chat-code-header: #171717;
-  --chat-input-bg: #171717;
-  --chat-user-bubble: #1E1E1E;
+  --chat-text-secondary: #C4C4C4;
+  --chat-text-muted: #9B9B9B;
+  --chat-text-dim: #6B6B6B;
+  --chat-code-bg: #1E1E1E;
+  --chat-code-header: #2A2A2A;
+  --chat-input-bg: #2F2F2F;
+  --chat-user-bubble: #303030;
 }
 
 html.light {
-  --chat-bg: #F8FAFC;
-  --chat-sidebar-bg: #FFFFFF;
-  --chat-surface: #F1F5F9;
-  --chat-hover: #E2E8F0;
-  --chat-border: #E2E8F0;
-  --chat-text: #0F172A;
-  --chat-text-secondary: #475569;
-  --chat-text-muted: #64748B;
-  --chat-text-dim: #94A3B8;
-  --chat-code-bg: #F8FAFC;
-  --chat-code-header: #E2E8F0;
-  --chat-input-bg: #FFFFFF;
-  --chat-user-bubble: #2563EB;
+  --chat-bg: #FFFFFF;
+  --chat-sidebar-bg: #F9F9F9;
+  --chat-surface: #F4F4F4;
+  --chat-hover: #EBEBEB;
+  --chat-border: #E5E5E5;
+  --chat-text: #0D0D0D;
+  --chat-text-secondary: #4A4A4A;
+  --chat-text-muted: #6E6E6E;
+  --chat-text-dim: #999999;
+  --chat-code-bg: #F7F7F8;
+  --chat-code-header: #ECECEC;
+  --chat-input-bg: #F4F4F4;
+  --chat-user-bubble: #F4F4F4;
 }
 
 /* ─── Base box sizing ─── */
@@ -177,16 +177,21 @@ html.light {
 
 /* ─── Full dark everywhere (default) ─── */
 html, body, #root {
-  background-color: #0D0D0D !important;
+  background-color: #212121 !important;
   color: #ECECEC !important;
   color-scheme: dark !important;
+}
+html.light, html.light body, html.light #root {
+  background-color: #FFFFFF !important;
+  color: #0D0D0D !important;
+  color-scheme: light !important;
 }
 
 /* ─── Base ─── */
 body {
   font-family: var(--font-sans);
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-  background-color: #0D0D0D;
+  background-color: #212121;
   color: #ECECEC;
   margin: 0;
   padding: 0;

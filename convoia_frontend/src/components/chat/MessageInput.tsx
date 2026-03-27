@@ -328,11 +328,11 @@ export function MessageInput({
         {/* Input pill container */}
         <div className="chat-input-box" style={{
           display: 'flex', flexDirection: 'column',
-          backgroundColor: 'var(--chat-input-bg)', borderRadius: '24px',
-          border: inputFocused ? '1px solid var(--color-primary)' : '1px solid var(--chat-border)',
+          backgroundColor: 'var(--chat-input-bg)', borderRadius: '26px',
+          border: '1px solid var(--chat-border)',
           boxShadow: inputFocused
-            ? '0 0 0 2px color-mix(in srgb, var(--color-primary) 15%, transparent), 0 2px 12px rgba(0,0,0,0.08)'
-            : '0 2px 8px rgba(0,0,0,0.04)',
+            ? '0 0 0 1px var(--chat-border), 0 2px 8px rgba(0,0,0,0.06)'
+            : '0 1px 4px rgba(0,0,0,0.03)',
           transition: 'all 200ms ease',
           cursor: 'text', overflow: 'hidden', maxWidth: '100%',
         }}
