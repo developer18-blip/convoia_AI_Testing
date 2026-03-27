@@ -18,7 +18,7 @@ const ses = (process.env.AWS_SES_ACCESS_KEY_ID && process.env.AWS_SES_SECRET_ACC
 const resend = config.resendApiKey ? new Resend(config.resendApiKey) : null;
 
 const SES_FROM = 'ConvoiaAI <noreply@convoia.com>';
-const RESEND_FROM = 'ConvoiaAI <ai@convoia.com>';
+const RESEND_FROM = 'ConvoiaAI <noreply@ai.convoia.com>';
 const BRAND_COLOR = '#7C3AED';
 const FRONTEND_URL = config.frontendUrl;
 
