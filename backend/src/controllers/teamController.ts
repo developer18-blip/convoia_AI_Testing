@@ -270,6 +270,7 @@ export const getTeamMembers = asyncHandler(async (req: Request, res: Response) =
       name: true,
       email: true,
       role: true,
+      avatar: true,
       isActive: true,
       createdAt: true,
       managerId: true,
