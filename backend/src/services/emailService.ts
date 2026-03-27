@@ -1,66 +1,30 @@
-import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { Resend } from 'resend';
 import { config } from '../config/env.js';
 import logger from '../config/logger.js';
 
-// ── Email Providers ──────────────────────────────────────────────────
-
-const ses = (process.env.AWS_SES_ACCESS_KEY_ID && process.env.AWS_SES_SECRET_ACCESS_KEY)
-  ? new SESClient({
-      region: process.env.AWS_SES_REGION || 'us-east-1',
-      credentials: {
-        accessKeyId: process.env.AWS_SES_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SES_SECRET_ACCESS_KEY,
-      },
-    })
-  : null;
+// ── Resend Email Client ──────────────────────────────────────────────
 
 const resend = config.resendApiKey ? new Resend(config.resendApiKey) : null;
 
-const SES_FROM = 'ConvoiaAI <noreply@convoia.com>';
-const RESEND_FROM = 'ConvoiaAI <noreply@ai.convoia.com>';
+const FROM = 'ConvoiaAI <noreply@ai.convoia.com>';
 const BRAND_COLOR = '#7C3AED';
 const FRONTEND_URL = config.frontendUrl;
 
-// ── Send Email (SES primary, Resend fallback) ────────────────────────
+// ── Send Email via Resend ────────────────────────────────────────────
 
 async function sendEmail(to: string, subject: string, html: string): Promise<void> {
-  // Try SES first
-  if (ses) {
-    try {
-      await ses.send(new SendEmailCommand({
-        Source: SES_FROM,
-        Destination: { ToAddresses: [to] },
-        Message: {
-          Subject: { Data: subject, Charset: 'UTF-8' },
-          Body: { Html: { Data: html, Charset: 'UTF-8' } },
-        },
-      }));
-      logger.info(`Email sent via SES to ${to}: ${subject}`);
-      return;
-    } catch (err: any) {
-      logger.warn(`SES failed for ${to}: ${err.message} — trying Resend`);
-    }
+  if (!resend) {
+    logger.warn('Resend not configured — email not sent');
+    return;
   }
 
-  // Fallback to Resend
-  if (resend) {
-    try {
-      await resend.emails.send({
-        from: RESEND_FROM,
-        to,
-        subject,
-        html,
-      });
-      logger.info(`Email sent via Resend to ${to}: ${subject}`);
-      return;
-    } catch (err: any) {
-      logger.error(`Resend also failed for ${to}: ${err.message}`);
-      throw err;
-    }
+  try {
+    await resend.emails.send({ from: FROM, to, subject, html });
+    logger.info(`Email sent to ${to}: ${subject}`);
+  } catch (err: any) {
+    logger.error(`Email failed to ${to}: ${err.message}`);
+    throw err;
   }
-
-  logger.warn(`No email provider configured — email to ${to} not sent`);
 }
 
 // ── HTML Template ────────────────────────────────────────────────────
