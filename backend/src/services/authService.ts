@@ -143,29 +143,26 @@ export class AuthService {
         };
       }
 
-      // Generate 6-digit verification code and send via email
-      const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-      const verificationExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
+      // Auto-verify and issue token immediately (no OTP required)
       await prisma.user.update({
         where: { id: finalUser.id },
-        data: {
-          verificationToken: verificationCode,
-          verificationExpiry,
-        },
+        data: { isVerified: true },
       });
 
-      // Send verification email
-      try {
-        await EmailService.sendVerificationCode({ recipientEmail: finalUser.email, name: finalUser.name, code: verificationCode });
-        logger.info(`Verification code sent to ${finalUser.email}`);
-      } catch (err: any) {
-        logger.warn(`Failed to send verification email to ${finalUser.email}: ${err.message}`);
-        // Log code to terminal as fallback
-        logger.info(`[VERIFICATION] Code for ${finalUser.email}: ${verificationCode}`);
-      }
+      const token = generateToken({
+        userId: finalUser.id,
+        organizationId: finalUser.organizationId || undefined,
+        role: finalUser.role,
+      });
+      const refreshToken = generateRefreshToken({
+        userId: finalUser.id,
+        organizationId: finalUser.organizationId || undefined,
+        role: finalUser.role,
+      });
 
-      // Return requiresVerification — frontend will show OTP page
+      // Send welcome notification (fire and forget)
+      NotificationService.onWelcome(finalUser.id, finalUser.name).catch(() => {});
+
       return {
         user: {
           id: finalUser.id,
@@ -174,11 +171,10 @@ export class AuthService {
           avatar: finalUser.avatar || null,
           role: finalUser.role,
           organizationId: finalUser.organizationId || undefined,
-          isVerified: false,
+          isVerified: true,
         },
-        token: '',
-        refreshToken: '',
-        requiresVerification: true,
+        token,
+        refreshToken,
       };
     } catch (error) {
       if (error instanceof AppError) {
@@ -404,21 +400,9 @@ export class AuthService {
         throw new AppError('Invalid credentials', 401);
       }
 
-      // Block unverified users — resend code and tell them to verify
+      // Auto-verify on login if somehow not verified
       if (!user.isVerified) {
-        // Auto-resend a fresh code
-        const code = Math.floor(100000 + Math.random() * 900000).toString();
-        const expiry = new Date(Date.now() + 10 * 60 * 1000);
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { verificationToken: code, verificationExpiry: expiry },
-        });
-        await EmailService.sendVerificationCode({
-          recipientEmail: user.email,
-          name: user.name,
-          code,
-        });
-        throw new AppError('EMAIL_NOT_VERIFIED', 403);
+        await prisma.user.update({ where: { id: user.id }, data: { isVerified: true } });
       }
 
       logger.info(`User logged in: ${user.email}`);
