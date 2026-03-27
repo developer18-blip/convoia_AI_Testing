@@ -1,14 +1,48 @@
-import { Resend } from 'resend';
+import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { config } from '../config/env.js';
 import logger from '../config/logger.js';
 
-const resend = config.resendApiKey
-  ? new Resend(config.resendApiKey)
-  : null;
+// ── AWS SES Client ───────────────────────────────────────────────────
 
-const FROM = 'ConvoiaAI <onboarding@resend.dev>';
+const ses = new SESClient({
+  region: process.env.AWS_SES_REGION || 'us-east-1',
+  credentials: {
+    accessKeyId: process.env.AWS_SES_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.AWS_SES_SECRET_ACCESS_KEY || '',
+  },
+});
+
+const FROM = 'ConvoiaAI <noreply@convoia.com>';
 const BRAND_COLOR = '#7C3AED';
 const FRONTEND_URL = config.frontendUrl;
+
+const isSESConfigured = !!(process.env.AWS_SES_ACCESS_KEY_ID && process.env.AWS_SES_SECRET_ACCESS_KEY);
+
+// ── Send Email via SES ───────────────────────────────────────────────
+
+async function sendEmail(to: string, subject: string, html: string): Promise<void> {
+  if (!isSESConfigured) {
+    logger.warn('AWS SES not configured — email not sent');
+    return;
+  }
+
+  try {
+    await ses.send(new SendEmailCommand({
+      Source: FROM,
+      Destination: { ToAddresses: [to] },
+      Message: {
+        Subject: { Data: subject, Charset: 'UTF-8' },
+        Body: { Html: { Data: html, Charset: 'UTF-8' } },
+      },
+    }));
+    logger.info(`Email sent to ${to}: ${subject}`);
+  } catch (err: any) {
+    logger.error(`SES email failed to ${to}: ${err.message}`);
+    throw err;
+  }
+}
+
+// ── HTML Template ────────────────────────────────────────────────────
 
 function baseTemplate(title: string, body: string): string {
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
@@ -35,6 +69,8 @@ function baseTemplate(title: string, body: string): string {
 </body></html>`;
 }
 
+// ── Email Service ────────────────────────────────────────────────────
+
 export class EmailService {
   /**
    * Send email verification OTP code.
@@ -45,14 +81,7 @@ export class EmailService {
     code: string;
   }) {
     const { recipientEmail, name, code } = params;
-
-    // Always log code in dev for testing without real email
     logger.info(`[VERIFICATION] Code for ${recipientEmail}: ${code}`);
-
-    if (!resend) {
-      logger.warn('Resend not configured — verification code logged above');
-      return;
-    }
 
     const body = `
       <p style="color:#3f3f46; margin:0 0 16px;">Hi <strong>${name}</strong>,</p>
@@ -66,17 +95,7 @@ export class EmailService {
       <p class="muted" style="margin-top:20px;">If you didn't create an account on ConvoiaAI, please ignore this email.</p>
     `;
 
-    try {
-      await resend.emails.send({
-        from: FROM,
-        to: recipientEmail,
-        subject: `${code} is your ConvoiaAI verification code`,
-        html: baseTemplate('Verify Your Email', body),
-      });
-      logger.info(`Verification email sent to ${recipientEmail}`);
-    } catch (err) {
-      logger.error('Failed to send verification email:', err);
-    }
+    await sendEmail(recipientEmail, `${code} is your ConvoiaAI verification code`, baseTemplate('Verify Your Email', body));
   }
 
   /**
@@ -91,8 +110,6 @@ export class EmailService {
     tokensAllocated?: number;
     expiresAt: Date;
   }) {
-    if (!resend) { logger.warn('Resend not configured — skipping invite email'); return; }
-
     const { recipientEmail, inviterName, orgName, role, inviteToken, tokensAllocated, expiresAt } = params;
     const joinUrl = `${FRONTEND_URL}/join?token=${inviteToken}`;
     const roleLabel = role.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -117,17 +134,7 @@ export class EmailService {
       <p class="muted" style="text-align:center;">Or paste this link: ${joinUrl}</p>
     `;
 
-    try {
-      await resend.emails.send({
-        from: FROM,
-        to: recipientEmail,
-        subject: `${inviterName} invited you to join ${orgName} on ConvoiaAI`,
-        html: baseTemplate('You\'re Invited!', body),
-      });
-      logger.info(`Invite email sent to ${recipientEmail} for org ${orgName}`);
-    } catch (err) {
-      logger.error('Failed to send invite email:', err);
-    }
+    await sendEmail(recipientEmail, `${inviterName} invited you to join ${orgName} on ConvoiaAI`, baseTemplate("You're Invited!", body));
   }
 
   /**
@@ -141,8 +148,6 @@ export class EmailService {
     newMemberRole: string;
     orgName: string;
   }) {
-    if (!resend) { logger.warn('Resend not configured — skipping join notification'); return; }
-
     const { ownerEmail, ownerName, newMemberName, newMemberEmail, newMemberRole, orgName } = params;
     const roleLabel = newMemberRole.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
 
@@ -159,17 +164,7 @@ export class EmailService {
       </div>
     `;
 
-    try {
-      await resend.emails.send({
-        from: FROM,
-        to: ownerEmail,
-        subject: `${newMemberName} joined ${orgName}`,
-        html: baseTemplate('New Member Joined', body),
-      });
-      logger.info(`Join notification sent to owner ${ownerEmail}`);
-    } catch (err) {
-      logger.error('Failed to send join notification:', err);
-    }
+    await sendEmail(ownerEmail, `${newMemberName} joined ${orgName}`, baseTemplate('New Member Joined', body));
   }
 
   /**
@@ -182,8 +177,6 @@ export class EmailService {
     tokensAllocated: number;
     orgName: string;
   }) {
-    if (!resend) { logger.warn('Resend not configured — skipping token email'); return; }
-
     const { recipientEmail, recipientName, assignerName, tokensAllocated, orgName } = params;
     const tokenLabel = tokensAllocated >= 1_000_000
       ? `${(tokensAllocated / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
@@ -199,17 +192,7 @@ export class EmailService {
       </div>
     `;
 
-    try {
-      await resend.emails.send({
-        from: FROM,
-        to: recipientEmail,
-        subject: `You received ${tokenLabel} tokens on ConvoiaAI`,
-        html: baseTemplate('Tokens Assigned', body),
-      });
-      logger.info(`Token assigned email sent to ${recipientEmail}`);
-    } catch (err) {
-      logger.error('Failed to send token assigned email:', err);
-    }
+    await sendEmail(recipientEmail, `You received ${tokenLabel} tokens on ConvoiaAI`, baseTemplate('Tokens Assigned', body));
   }
 
   /**
@@ -223,8 +206,6 @@ export class EmailService {
     tokensReceived: number;
     transactionId: string;
   }) {
-    if (!resend) { logger.warn('Resend not configured — skipping purchase receipt'); return; }
-
     const { ownerEmail, ownerName, orgName, amount, tokensReceived, transactionId } = params;
     const tokenLabel = tokensReceived >= 1_000_000
       ? `${(tokensReceived / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
@@ -245,16 +226,6 @@ export class EmailService {
       </div>
     `;
 
-    try {
-      await resend.emails.send({
-        from: FROM,
-        to: ownerEmail,
-        subject: `Token purchase confirmed — ${tokenLabel} tokens added`,
-        html: baseTemplate('Purchase Confirmed', body),
-      });
-      logger.info(`Token purchase receipt sent to ${ownerEmail}`);
-    } catch (err) {
-      logger.error('Failed to send purchase receipt:', err);
-    }
+    await sendEmail(ownerEmail, `Token purchase confirmed — ${tokenLabel} tokens added`, baseTemplate('Purchase Confirmed', body));
   }
 }
