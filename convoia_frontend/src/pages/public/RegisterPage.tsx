@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Zap, User, Building2, Mail, Lock, ArrowLeft, ArrowRight } from 'lucide-react'
+import { User, Building2, Mail, Lock, ArrowLeft, ArrowRight, Sparkles, Check } from 'lucide-react'
 import { GoogleLogin } from '@react-oauth/google'
 import { ThemeToggle } from '../../components/shared/ThemeToggle'
 import { Input } from '../../components/ui/Input'
@@ -18,12 +18,24 @@ const industries = [
   { value: 'finance', label: 'Finance' },
   { value: 'hr', label: 'HR' },
   { value: 'marketing', label: 'Marketing' },
+  { value: 'education', label: 'Education' },
+  { value: 'technology', label: 'Technology' },
+  { value: 'ecommerce', label: 'E-Commerce' },
   { value: 'other', label: 'Other' },
 ]
 
 const roleOptions = [
   { value: 'org_owner', label: 'Organization Owner' },
   { value: 'manager', label: 'Manager' },
+]
+
+const benefits = [
+  'Access to 35+ AI models including GPT-5, Claude, Gemini',
+  'Built-in web search for real-time information',
+  'Image generation with DALL-E, Gemini & GPT Image',
+  'Team management with token budgets',
+  'Interactive charts & data visualization',
+  'Persistent memory across conversations',
 ]
 
 export function RegisterPage() {
@@ -34,7 +46,6 @@ export function RegisterPage() {
   const inviteOrg = searchParams.get('org')
   const inviteRole = searchParams.get('role')
 
-  // If invite token present, skip step 1 (account type selection)
   const [step, setStep] = useState(inviteToken ? 2 : 1)
   const [accountType, setAccountType] = useState<'individual' | 'business' | null>(inviteToken ? 'individual' : null)
   const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '', organizationName: '', industry: '', role: 'org_owner' })
@@ -69,16 +80,10 @@ export function RegisterPage() {
   const handleSubmit = async (ev: FormEvent) => {
     ev.preventDefault()
     if (!validate()) return
-
     try {
       setIsLoading(true)
-      const data: Record<string, string> = {
-        name: form.name,
-        email: form.email,
-        password: form.password,
-      }
+      const data: Record<string, string> = { name: form.name, email: form.email, password: form.password }
       if (inviteToken) {
-        // Invite flow — role and org are set server-side via invite
         data.role = 'employee'
         data.inviteToken = inviteToken
       } else if (accountType === 'individual') {
@@ -99,97 +104,156 @@ export function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background effects */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-1/2 -right-1/4 w-full h-full bg-gradient-to-bl from-accent-end/8 via-transparent to-transparent rounded-full blur-3xl" />
-        <div className="absolute -bottom-1/2 -left-1/4 w-full h-full bg-gradient-to-tr from-primary/8 via-transparent to-transparent rounded-full blur-3xl" />
-      </div>
-      <div className="absolute inset-0 opacity-[0.02]" style={{
-        backgroundImage: `radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)`,
-        backgroundSize: '32px 32px',
-      }} />
+    <div className="min-h-screen flex">
+      {/* Left — Feature Panel (hidden on mobile) */}
+      <div className="hidden lg:flex flex-1 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, #2563EB 0%, #4F46E5 40%, #7C3AED 100%)' }}>
+        {/* Decorative */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-32 left-10 w-80 h-80 bg-white rounded-full blur-3xl" />
+          <div className="absolute bottom-10 right-10 w-64 h-64 bg-white rounded-full blur-3xl" />
+        </div>
+        <div className="absolute inset-0 opacity-5" style={{
+          backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
+          backgroundSize: '40px 40px',
+        }} />
 
-      <div className="absolute top-4 right-4 z-10">
-        <ThemeToggle />
-      </div>
+        <div className="relative z-10 flex flex-col justify-center px-16 xl:px-20 text-white w-full">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8 }}
+          >
+            <div className="flex items-center gap-2 mb-6">
+              <Sparkles size={20} />
+              <span className="text-sm font-medium text-white/80 uppercase tracking-wider">Get Started Free</span>
+            </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="w-full max-w-lg relative z-10"
-      >
-        <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center gap-3 mb-6 group">
-            <motion.div whileHover={{ rotate: 15 }} className="relative">
-              <div className="absolute inset-0 bg-primary/30 rounded-xl blur-lg" />
-              <div className="relative bg-gradient-to-br from-accent-start to-accent-end p-2.5 rounded-xl">
-                <Zap size={24} className="text-white" />
+            <h2 className="text-4xl xl:text-5xl font-bold leading-tight mb-4">
+              Build with the<br />
+              best AI models.<br />
+              <span className="text-white/70">Pay only for what you use.</span>
+            </h2>
+
+            <p className="text-lg text-white/60 mb-10 max-w-md">
+              No subscriptions. No commitments. Start with free tokens and scale as you grow.
+            </p>
+
+            <div className="space-y-4">
+              {benefits.map((b, i) => (
+                <motion.div
+                  key={b}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.4, delay: 0.3 + i * 0.08 }}
+                  className="flex items-center gap-3"
+                >
+                  <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                    <Check size={14} />
+                  </div>
+                  <span className="text-sm text-white/85">{b}</span>
+                </motion.div>
+              ))}
+            </div>
+
+            {/* Testimonial */}
+            <div className="mt-14 bg-white/10 backdrop-blur-sm rounded-2xl px-6 py-5">
+              <p className="text-sm text-white/80 italic leading-relaxed">
+                "ConvoiaAI replaced 4 separate AI subscriptions for our team. The token system is brilliant — we only pay for what we actually use."
+              </p>
+              <div className="flex items-center gap-3 mt-4">
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500" />
+                <div>
+                  <p className="text-sm font-semibold">Sarah Chen</p>
+                  <p className="text-xs text-white/50">CTO, TechForward Inc.</p>
+                </div>
               </div>
-            </motion.div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-accent-start to-accent-end bg-clip-text text-transparent">ConvoiaAI</span>
-          </Link>
-          <h1 className="text-2xl font-bold text-text-primary">Get started free</h1>
-          <p className="text-xs text-text-dim mt-1">Access 30+ AI models in under 2 minutes</p>
-          <div className="flex items-center justify-center gap-2 mt-3">
-            <div className={cn('h-1 w-16 rounded-full transition-all duration-300', step >= 1 ? 'bg-gradient-to-r from-accent-start to-accent-mid' : 'bg-surface-2')} />
-            <div className={cn('h-1 w-16 rounded-full transition-all duration-300', step >= 2 ? 'bg-gradient-to-r from-accent-start to-accent-mid' : 'bg-surface-2')} />
-          </div>
-          <p className="text-xs text-text-muted mt-2">Step {step} of 2</p>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+
+      {/* Right — Form Side */}
+      <div className="flex-1 flex flex-col justify-center px-6 sm:px-12 lg:px-16 xl:px-20 bg-background relative overflow-y-auto">
+        <div className="absolute top-5 right-5 z-10">
+          <ThemeToggle />
         </div>
 
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="bg-surface/80 backdrop-blur-xl border border-border/50 rounded-2xl p-6 shadow-2xl shadow-black/10"
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6 }}
+          className="w-full max-w-[440px] mx-auto py-10"
         >
+          {/* Logo */}
+          <Link to="/" className="flex items-center gap-2.5 mb-8">
+            <img src="/logo.png" alt="ConvoiaAI" style={{ height: '36px', objectFit: 'contain' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+          </Link>
+
+          <h1 className="text-3xl font-bold text-text-primary tracking-tight">Create your account</h1>
+          <p className="text-text-muted mt-2 mb-2">Start using AI in under 2 minutes</p>
+
+          {/* Step indicator */}
+          <div className="flex items-center gap-2 mb-8">
+            <div className={cn('h-1.5 flex-1 rounded-full transition-all duration-500', step >= 1 ? 'bg-primary' : 'bg-surface-2')} />
+            <div className={cn('h-1.5 flex-1 rounded-full transition-all duration-500', step >= 2 ? 'bg-primary' : 'bg-surface-2')} />
+            <span className="text-xs text-text-muted ml-2">Step {step}/2</span>
+          </div>
+
+          {/* Step 1: Account Type */}
           {step === 1 && (
-            <div className="space-y-4">
-              <p className="text-sm text-text-secondary text-center mb-4">How will you use Convoia?</p>
+            <motion.div
+              key="step1"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-5"
+            >
+              <p className="text-sm text-text-secondary font-medium">How will you use ConvoiaAI?</p>
+
               <div className="grid grid-cols-2 gap-4">
                 <motion.button
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.98 }}
+                  whileHover={{ y: -3, boxShadow: '0 12px 40px -12px rgba(124,58,237,0.3)' }}
+                  whileTap={{ scale: 0.97 }}
                   onClick={() => { setAccountType('individual'); setStep(2) }}
                   className={cn(
-                    'p-6 rounded-2xl border-2 text-center transition-all',
+                    'p-6 rounded-2xl border-2 text-left transition-all group',
                     accountType === 'individual' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
                   )}
                 >
-                  <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-primary/15 to-accent-end/10 flex items-center justify-center">
-                    <User size={28} className="text-primary" />
+                  <div className="w-12 h-12 mb-4 rounded-xl bg-gradient-to-br from-primary/15 to-accent-end/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <User size={24} className="text-primary" />
                   </div>
-                  <p className="font-bold text-text-primary text-sm">Individual / Freelancer</p>
-                  <p className="text-xs text-text-muted mt-1">Personal AI access, pay as you go</p>
+                  <p className="font-bold text-text-primary text-sm">Individual</p>
+                  <p className="text-xs text-text-muted mt-1 leading-relaxed">Personal AI access with pay-as-you-go tokens</p>
                 </motion.button>
+
                 <motion.button
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.98 }}
+                  whileHover={{ y: -3, boxShadow: '0 12px 40px -12px rgba(124,58,237,0.3)' }}
+                  whileTap={{ scale: 0.97 }}
                   onClick={() => { setAccountType('business'); setStep(2) }}
                   className={cn(
-                    'p-6 rounded-2xl border-2 text-center transition-all',
+                    'p-6 rounded-2xl border-2 text-left transition-all group',
                     accountType === 'business' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
                   )}
                 >
-                  <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-primary/15 to-accent-end/10 flex items-center justify-center">
-                    <Building2 size={28} className="text-primary" />
+                  <div className="w-12 h-12 mb-4 rounded-xl bg-gradient-to-br from-primary/15 to-accent-end/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Building2 size={24} className="text-primary" />
                   </div>
                   <p className="font-bold text-text-primary text-sm">Team / Business</p>
-                  <p className="text-xs text-text-muted mt-1">For companies and teams</p>
+                  <p className="text-xs text-text-muted mt-1 leading-relaxed">Manage AI access for your entire organization</p>
                 </motion.button>
               </div>
 
-              <div className="relative mt-6">
+              <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-border/50" />
+                  <div className="w-full border-t border-border" />
                 </div>
-                <div className="relative flex justify-center text-xs">
-                  <span className="bg-surface/80 px-3 text-text-muted">or sign up instantly with</span>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-3 text-text-muted tracking-wider">or sign up instantly</span>
                 </div>
               </div>
-              <div className="flex justify-center mt-4">
+
+              <div className="flex justify-center">
                 <GoogleLogin
                   onSuccess={async (credentialResponse) => {
                     if (!credentialResponse.credential) return
@@ -201,39 +265,46 @@ export function RegisterPage() {
                     }
                   }}
                   onError={() => toast.error('Google sign-up failed')}
-                  theme="filled_black"
-                  shape="pill"
+                  theme="outline"
+                  shape="rectangular"
                   size="large"
-                  width="320"
+                  width="420"
                   text="signup_with"
                 />
               </div>
-            </div>
+            </motion.div>
           )}
 
+          {/* Step 2: Registration Form */}
           {step === 2 && (
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <motion.form
+              key="step2"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              onSubmit={handleSubmit}
+              className="space-y-4"
+            >
               {!inviteToken && (
-                <button type="button" onClick={() => setStep(1)} className="flex items-center gap-1 text-sm text-text-muted hover:text-text-primary mb-2 transition-colors">
-                  <ArrowLeft size={14} /> Back
+                <button type="button" onClick={() => setStep(1)} className="flex items-center gap-1.5 text-sm text-text-muted hover:text-primary mb-1 transition-colors font-medium">
+                  <ArrowLeft size={14} /> Change account type
                 </button>
               )}
 
               {inviteToken && inviteOrg && (
-                <div className="bg-primary/10 border border-primary/20 rounded-xl px-4 py-3 mb-2 flex items-center gap-3">
-                  <span className="text-lg">&#127881;</span>
+                <div className="bg-primary/8 border border-primary/20 rounded-xl px-4 py-3 mb-3 flex items-center gap-3">
+                  <span className="text-lg">🎉</span>
                   <div>
-                    <p className="text-sm font-medium text-text-primary">Joining {decodeURIComponent(inviteOrg)}</p>
+                    <p className="text-sm font-semibold text-text-primary">Joining {decodeURIComponent(inviteOrg)}</p>
                     <p className="text-xs text-text-muted">You'll be added as {inviteRole}</p>
                   </div>
                 </div>
               )}
 
               <Input label="Full name" placeholder="John Doe" value={form.name} onChange={(e) => updateField('name', e.target.value)} error={errors.name} icon={<User size={16} />} />
-              <Input label="Email" type="email" placeholder="you@example.com" value={form.email} onChange={(e) => updateField('email', e.target.value)} error={errors.email} icon={<Mail size={16} />} />
+              <Input label="Work email" type="email" placeholder="name@company.com" value={form.email} onChange={(e) => updateField('email', e.target.value)} error={errors.email} icon={<Mail size={16} />} />
 
               <div>
-                <Input label="Password" type="password" placeholder="Create a password" value={form.password} onChange={(e) => updateField('password', e.target.value)} error={errors.password} icon={<Lock size={16} />} />
+                <Input label="Password" type="password" placeholder="Min 8 characters" value={form.password} onChange={(e) => updateField('password', e.target.value)} error={errors.password} icon={<Lock size={16} />} />
                 {form.password && (
                   <div className="mt-2">
                     <div className="flex gap-1">
@@ -258,29 +329,29 @@ export function RegisterPage() {
                 </>
               )}
 
-              <label className="flex items-start gap-2 cursor-pointer">
-                <input type="checkbox" checked={agreed} onChange={(e) => { setAgreed(e.target.checked); setErrors((p) => ({ ...p, terms: '' })) }} className="mt-1 rounded border-border bg-surface text-primary focus:ring-primary" />
-                <span className="text-sm text-text-secondary">
-                  I agree to the <Link to="/terms" target="_blank" className="text-primary hover:underline">Terms of Service</Link> and <Link to="/privacy" target="_blank" className="text-primary hover:underline">Privacy Policy</Link>
+              <label className="flex items-start gap-2.5 cursor-pointer pt-1">
+                <input type="checkbox" checked={agreed} onChange={(e) => { setAgreed(e.target.checked); setErrors((p) => ({ ...p, terms: '' })) }} className="mt-0.5 rounded border-border bg-surface text-primary focus:ring-primary w-4 h-4" />
+                <span className="text-sm text-text-secondary leading-relaxed">
+                  I agree to the <Link to="/terms" target="_blank" className="text-primary hover:underline">Terms</Link> and <Link to="/privacy" target="_blank" className="text-primary hover:underline">Privacy Policy</Link>
                 </span>
               </label>
               {errors.terms && <p className="text-xs text-danger">{errors.terms}</p>}
 
-              <Button type="submit" isLoading={isLoading} className="w-full">
+              <Button type="submit" isLoading={isLoading} className="w-full !py-3 !text-base !font-semibold">
                 Create Account
                 <ArrowRight size={16} />
               </Button>
-            </form>
+            </motion.form>
           )}
-        </motion.div>
 
-        <p className="text-center text-sm text-text-muted mt-6">
-          Already have an account?{' '}
-          <Link to="/login" className="text-primary hover:text-primary-hover font-semibold transition-colors">Sign in</Link>
-        </p>
-      </motion.div>
+          <p className="text-center text-sm text-text-muted mt-8">
+            Already have an account?{' '}
+            <Link to="/login" className="text-primary hover:text-primary-hover font-semibold transition-colors">Sign in</Link>
+          </p>
+        </motion.div>
+      </div>
     </div>
   )
 }
 
-export default RegisterPage;
+export default RegisterPage
