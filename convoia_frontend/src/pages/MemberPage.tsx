@@ -65,7 +65,7 @@ export function MemberPage() {
         <StatCard title="Cost" value={formatCurrency(member.cost || 0)} icon={<DollarSign size={20} />} />
         <StatCard title="Tokens Used" value={formatTokens(member.tokenBalance?.used || member.tokens || 0)} icon={<Coins size={20} />} />
         <StatCard title="Tokens Assigned" value={formatTokens(member.tokenBalance?.total || 0)} icon={<Wallet size={20} />} />
-        <StatCard title="Tokens Remaining" value={formatTokens(member.tokenBalance?.remaining || 0)} icon={<Coins size={20} />} trend={member.tokenBalance?.remaining > 0 ? 'up' : undefined} />
+        <StatCard title="Tokens Remaining" value={formatTokens(member.tokenBalance?.remaining || 0)} icon={<Coins size={20} />} />
       </div>
 
       {/* Token usage progress */}
