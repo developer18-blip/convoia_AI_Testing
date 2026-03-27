@@ -299,7 +299,7 @@ export const getUserDetails = asyncHandler(async (req: Request, res: Response) =
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
-      id: true, name: true, email: true, role: true, organizationId: true, createdAt: true,
+      id: true, name: true, email: true, role: true, avatar: true, organizationId: true, createdAt: true,
     },
   });
   if (!user) throw new AppError('User not found', 404);
