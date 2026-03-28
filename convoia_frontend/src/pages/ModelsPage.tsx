@@ -135,12 +135,12 @@ function ModelDrawer({ model, onClose, allModels }: { model: AIModel; onClose: (
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-surface-2 rounded-lg p-4">
                   <p className="text-xs text-text-muted mb-1">Input Price</p>
-                  <p className="text-lg font-mono font-semibold text-text-primary">${model.inputTokenPrice.toFixed(2)}</p>
+                  <p className="text-lg font-mono font-semibold text-text-primary">${(model.inputTokenPrice * 1_000_000).toFixed(2)}</p>
                   <p className="text-xs text-text-muted">per 1M tokens</p>
                 </div>
                 <div className="bg-surface-2 rounded-lg p-4">
                   <p className="text-xs text-text-muted mb-1">Output Price</p>
-                  <p className="text-lg font-mono font-semibold text-text-primary">${model.outputTokenPrice.toFixed(2)}</p>
+                  <p className="text-lg font-mono font-semibold text-text-primary">${(model.outputTokenPrice * 1_000_000).toFixed(2)}</p>
                   <p className="text-xs text-text-muted">per 1M tokens</p>
                 </div>
               </div>
@@ -242,8 +242,8 @@ function ModelDrawer({ model, onClose, allModels }: { model: AIModel; onClose: (
                       {([
                         ['Provider', model.provider, compareModel.provider],
                         ['Context', formatNumber(model.contextWindow), formatNumber(compareModel.contextWindow)],
-                        ['Input $/1M', `$${model.inputTokenPrice.toFixed(2)}`, `$${compareModel.inputTokenPrice.toFixed(2)}`],
-                        ['Output $/1M', `$${model.outputTokenPrice.toFixed(2)}`, `$${compareModel.outputTokenPrice.toFixed(2)}`],
+                        ['Input $/1M', `$${(model.inputTokenPrice * 1_000_000).toFixed(2)}`, `$${(compareModel.inputTokenPrice * 1_000_000).toFixed(2)}`],
+                        ['Output $/1M', `$${(model.outputTokenPrice * 1_000_000).toFixed(2)}`, `$${(compareModel.outputTokenPrice * 1_000_000).toFixed(2)}`],
                         ['Capabilities', String(model.capabilities.length), String(compareModel.capabilities.length)],
                       ] as [string, string, string][]).map(([label, a, b]) => (
                         <tr key={label} className="border-b border-border/30">
@@ -343,11 +343,11 @@ export function ModelsPage() {
                   <div className="grid grid-cols-2 gap-2 text-xs mb-4">
                     <div className="bg-surface-2 rounded-lg px-3 py-2">
                       <p className="text-text-muted">Input</p>
-                      <p className="font-mono text-text-primary">${model.inputTokenPrice.toFixed(2)}/1M</p>
+                      <p className="font-mono text-text-primary">${(model.inputTokenPrice * 1_000_000).toFixed(2)}/1M</p>
                     </div>
                     <div className="bg-surface-2 rounded-lg px-3 py-2">
                       <p className="text-text-muted">Output</p>
-                      <p className="font-mono text-text-primary">${model.outputTokenPrice.toFixed(2)}/1M</p>
+                      <p className="font-mono text-text-primary">${(model.outputTokenPrice * 1_000_000).toFixed(2)}/1M</p>
                     </div>
                   </div>
 
