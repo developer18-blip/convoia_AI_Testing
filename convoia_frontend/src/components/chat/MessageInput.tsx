@@ -337,6 +337,14 @@ export function MessageInput({
           cursor: 'text', overflow: 'hidden', maxWidth: '100%',
         }}
         onClick={() => textareaRef.current?.focus()}
+        onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
+        onDrop={(e) => {
+          e.preventDefault(); e.stopPropagation()
+          const file = e.dataTransfer.files?.[0]
+          if (file && (file.type.startsWith('image/') || file.type.startsWith('audio/') || file.type.includes('pdf') || file.type.includes('document'))) {
+            handleFileSelect(file)
+          }
+        }}
         >
 
           {/* File preview */}
@@ -400,6 +408,18 @@ export function MessageInput({
             value={value}
             onChange={(e) => { setValue(e.target.value); handleInput() }}
             onKeyDown={handleKeyDown}
+            onPaste={(e) => {
+              const items = e.clipboardData?.items
+              if (!items) return
+              for (const item of Array.from(items)) {
+                if (item.type.startsWith('image/')) {
+                  e.preventDefault()
+                  const file = item.getAsFile()
+                  if (file) handleFileSelect(file)
+                  return
+                }
+              }
+            }}
             onFocus={() => setInputFocused(true)}
             onBlur={() => setInputFocused(false)}
             placeholder="Ask anything"
