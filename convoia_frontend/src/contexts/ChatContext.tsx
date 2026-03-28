@@ -108,8 +108,8 @@ export interface ChatContextType {
   moveToFolder: (convId: string, folderId: string | undefined) => void
   createFolder: (name: string) => void
   deleteFolder: (id: string) => void
-  sendMessage: (content: string, modelId: string, industry?: string, agentId?: string) => Promise<void>
-  sendWithContext: (content: string, modelId: string, systemContext: string | null, messageExtras?: Partial<Message>, industry?: string, agentId?: string) => Promise<void>
+  sendMessage: (content: string, modelId: string, industry?: string, agentId?: string, thinkingEnabled?: boolean) => Promise<void>
+  sendWithContext: (content: string, modelId: string, systemContext: string | null, messageExtras?: Partial<Message>, industry?: string, agentId?: string, thinkingEnabled?: boolean) => Promise<void>
   editAndResend: (messageId: string, newContent: string, modelId: string, industry?: string, agentId?: string) => Promise<void>
   deleteMessage: (messageId: string) => void
   clearMessages: () => void
