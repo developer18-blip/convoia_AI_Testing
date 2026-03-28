@@ -20,8 +20,9 @@ const providerTabs = [
   { id: 'anthropic', label: 'Anthropic' },
   { id: 'google', label: 'Google' },
   { id: 'deepseek', label: 'DeepSeek' },
-  { id: 'mistral', label: 'Mistral' },
-  { id: 'groq', label: 'Groq' },
+  // TODO: Re-enable when API keys are added
+  // { id: 'mistral', label: 'Mistral' },
+  // { id: 'groq', label: 'Groq' },
 ]
 
 function getTier(model: { name: string }): 'capable' | 'balanced' | 'value' {

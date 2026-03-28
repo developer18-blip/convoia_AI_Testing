@@ -12,7 +12,10 @@ export function useModels() {
       setIsLoading(true)
       setError(null)
       const res = await api.get('/models')
-      setModels(res.data.data || [])
+      // TODO: Re-enable mistral and groq when API keys are added
+      const HIDDEN_PROVIDERS = ['mistral', 'groq']
+      const all = (res.data.data || []) as AIModel[]
+      setModels(all.filter(m => !HIDDEN_PROVIDERS.includes(m.provider.toLowerCase())))
     } catch (err: unknown) {
       const errObj = err as { response?: { status?: number } }
       const msg = errObj?.response?.status === 429
