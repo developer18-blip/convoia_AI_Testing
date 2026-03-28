@@ -206,7 +206,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
       res.status(401).json({ success: false, message: 'Unauthorized' });
       return;
     }
-    const { modelId, messages, industry, agentId } = req.body;
+    const { modelId, messages, industry, agentId, thinkingEnabled } = req.body;
     if (!modelId || !messages || messages.length === 0) {
       res.status(400).json({ success: false, message: 'modelId and messages are required' });
       return;
@@ -537,6 +537,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
         agentConfig,
         maxOutputTokens: streamMaxOutput,
         memoryContext: memoryPrompt || undefined,
+        thinkingEnabled: !!thinkingEnabled,
       },
       {
         onChunk: (text: string) => {

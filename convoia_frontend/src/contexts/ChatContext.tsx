@@ -302,7 +302,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setConversations((prev) => prev.map((c) => c.folderId === id ? { ...c, folderId: undefined } : c))
   }, [])
 
-  const sendMessage = useCallback(async (content: string, modelId: string, industry?: string, agentId?: string) => {
+  const sendMessage = useCallback(async (content: string, modelId: string, industry?: string, agentId?: string, thinkingEnabled?: boolean) => {
     const userMsg: Message = { id: uuidv4(), role: 'user', content, timestamp: new Date().toISOString() }
     const assistantId = uuidv4()
     const streamingMsg: Message = { id: assistantId, role: 'assistant', content: '', timestamp: new Date().toISOString(), isLoading: true }
@@ -325,7 +325,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ modelId, messages: allMsgs, industry, agentId }),
+        body: JSON.stringify({ modelId, messages: allMsgs, industry, agentId, thinkingEnabled }),
         signal: controller.signal,
       })
 
@@ -415,7 +415,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   }, [messages])
 
-  const sendWithContext = useCallback(async (content: string, modelId: string, systemContext: string | null, messageExtras?: Partial<Message>, industry?: string, agentId?: string) => {
+  const sendWithContext = useCallback(async (content: string, modelId: string, systemContext: string | null, messageExtras?: Partial<Message>, industry?: string, agentId?: string, thinkingEnabled?: boolean) => {
     const userMsg: Message = {
       id: uuidv4(),
       role: 'user',
@@ -444,7 +444,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ modelId, messages: messagesForAPI, industry, agentId }),
+        body: JSON.stringify({ modelId, messages: messagesForAPI, industry, agentId, thinkingEnabled }),
       })
 
       if (!response.ok) {

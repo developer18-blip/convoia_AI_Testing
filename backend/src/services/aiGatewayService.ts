@@ -79,6 +79,7 @@ interface SendMessageParams {
   agentConfig?: AgentConfig;
   maxOutputTokens?: number; // Cap output to user's available token balance
   memoryContext?: string; // Persistent user memory to inject into system prompt
+  thinkingEnabled?: boolean; // Enable extended thinking (Claude only)
 }
 
 interface SendVisionParams {
@@ -186,6 +187,7 @@ interface ProviderOverrides {
   temperature?: number;
   maxTokens?: number;
   topP?: number;
+  thinkingEnabled?: boolean;
 }
 
 // Reasoning models (o-series) reject temperature, top_p, max_tokens, and system role
@@ -637,13 +639,23 @@ function callAnthropicStream(
     messages,
     stream: true,
   };
-  // Anthropic rejects requests with BOTH temperature AND top_p — use only one
-  if (overrides?.temperature != null) {
-    body.temperature = overrides.temperature;
-  } else if (overrides?.topP != null) {
-    body.top_p = overrides.topP;
+
+  // Extended thinking mode (Claude only)
+  if (overrides?.thinkingEnabled) {
+    body.thinking = { type: 'enabled', budget_tokens: 10000 };
+    // Extended thinking requires higher max_tokens and no temperature
+    body.max_tokens = Math.max(body.max_tokens, 16384);
+    delete body.temperature;
+    delete body.top_p;
   } else {
-    body.temperature = 0.7;
+    // Anthropic rejects requests with BOTH temperature AND top_p — use only one
+    if (overrides?.temperature != null) {
+      body.temperature = overrides.temperature;
+    } else if (overrides?.topP != null) {
+      body.top_p = overrides.topP;
+    } else {
+      body.temperature = 0.7;
+    }
   }
 
   return new Promise(async (resolve, reject) => {
@@ -664,6 +676,8 @@ function callAnthropicStream(
 
       let inputTokens = 0, outputTokens = 0;
       let buffer = '';
+      let currentBlockType = 'text'; // Track whether current block is 'thinking' or 'text'
+      let isThinking = false;
 
       response.data.on('data', (chunk: Buffer) => {
         buffer += chunk.toString();
@@ -675,9 +689,31 @@ function callAnthropicStream(
           if (!trimmed.startsWith('data: ')) continue;
           try {
             const json = JSON.parse(trimmed.slice(6));
-            if (json.type === 'content_block_delta' && json.delta?.text) {
-              callbacks.onChunk(json.delta.text);
+
+            // Track content block type (thinking vs text)
+            if (json.type === 'content_block_start') {
+              currentBlockType = json.content_block?.type || 'text';
+              if (currentBlockType === 'thinking' && !isThinking) {
+                isThinking = true;
+                callbacks.onChunk('\n\n> **Thinking...**\n> ');
+              }
             }
+            if (json.type === 'content_block_stop' && currentBlockType === 'thinking') {
+              callbacks.onChunk('\n\n');
+              currentBlockType = 'text';
+            }
+
+            // Stream text deltas
+            if (json.type === 'content_block_delta') {
+              if (json.delta?.type === 'thinking_delta' && json.delta?.thinking) {
+                // Stream thinking text with blockquote formatting
+                const thinkText = json.delta.thinking.replace(/\n/g, '\n> ');
+                callbacks.onChunk(thinkText);
+              } else if (json.delta?.text) {
+                callbacks.onChunk(json.delta.text);
+              }
+            }
+
             if (json.type === 'message_start' && json.message?.usage) {
               inputTokens = json.message.usage.input_tokens || 0;
             }
@@ -980,6 +1016,7 @@ export class AIGatewayService {
       temperature: agentConfig?.temperature,
       maxTokens: effectiveMaxTokens,
       topP: agentConfig?.topP,
+      thinkingEnabled: params.thinkingEnabled,
     };
 
     await routeToProviderStream(aiModel, messages, systemPrompt, callbacks, overrides);

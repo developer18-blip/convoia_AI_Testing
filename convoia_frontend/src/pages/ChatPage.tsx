@@ -41,6 +41,7 @@ export function ChatPage() {
   const prevStreaming = useRef(false)
   // Image generation is handled by backend intent detection
   const [industry, setIndustry] = useState('')
+  const [thinkingEnabled, setThinkingEnabled] = useState(false)
   const [leftOpen, setLeftOpen] = useState(true)
   const [mobileLeftOpen, setMobileLeftOpen] = useState(false)
   const [showMoreMenu, setShowMoreMenu] = useState(false)
@@ -137,7 +138,7 @@ export function ChatPage() {
       const conv = createConversation(selectedModelId, selectedModel?.name || 'AI', industry || undefined)
       convId = conv.id
     }
-    await sendMessage(content, selectedModelId, industry || undefined, selectedAgent?.id)
+    await sendMessage(content, selectedModelId, industry || undefined, selectedAgent?.id, thinkingEnabled)
   }
 
   const handleNew = () => setActiveConversation(null)
@@ -251,7 +252,7 @@ export function ChatPage() {
     }
     const messageExtras: Partial<Message> = {}
     if (extras?.fileAttachment) messageExtras.fileAttachment = extras.fileAttachment
-    sendWithContext(text, selectedModelId, systemContext, messageExtras, industry || undefined, selectedAgent?.id)
+    sendWithContext(text, selectedModelId, systemContext, messageExtras, industry || undefined, selectedAgent?.id, thinkingEnabled)
   }
 
   const handleExport = () => {
@@ -371,6 +372,27 @@ export function ChatPage() {
             onChange={handleAgentChange}
             onCreateAgent={createAgent}
           />
+
+          {/* Think toggle */}
+          <button
+            onClick={() => setThinkingEnabled(!thinkingEnabled)}
+            title={thinkingEnabled ? 'Extended thinking ON — deeper reasoning' : 'Enable extended thinking'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '5px',
+              padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
+              cursor: 'pointer', transition: 'all 200ms',
+              background: thinkingEnabled ? 'var(--color-primary)' : 'var(--chat-surface)',
+              color: thinkingEnabled ? 'white' : 'var(--chat-text-muted)',
+              border: thinkingEnabled ? '1px solid var(--color-primary)' : '1px solid var(--chat-border)',
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2a8 8 0 0 0-8 8c0 3.5 2 6 4 7.5V20h8v-2.5c2-1.5 4-4 4-7.5a8 8 0 0 0-8-8z"/>
+              <path d="M9 20h6v1a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-1z"/>
+              {thinkingEnabled && <path d="M12 6v4l2 2" stroke="currentColor" strokeWidth="1.5"/>}
+            </svg>
+            Think
+          </button>
 
           <div className="ml-auto flex items-center gap-2 shrink-0">
             <CostEstimator model={selectedModel} />
