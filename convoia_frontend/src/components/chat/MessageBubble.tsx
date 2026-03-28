@@ -162,10 +162,20 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
           )}
 
           {/* User bubble */}
-          <div className="user-message-bubble" style={{
-            background: 'var(--chat-user-bubble)', borderRadius: '18px', padding: '12px 18px',
-            fontSize: '15px', lineHeight: '1.6', color: 'var(--chat-text)', wordBreak: 'break-word',
-          }}>
+          <div className="user-message-bubble" style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
+            {/* Image preview — shown OUTSIDE the text bubble, clean with rounded corners */}
+            {message.imagePreview && !isEditing && (
+              <div style={{ borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                <img src={message.imagePreview} alt="Uploaded" style={{ maxWidth: '320px', maxHeight: '280px', display: 'block', objectFit: 'cover' }} />
+              </div>
+            )}
+
+            {/* Text bubble */}
+            <div style={{
+              background: 'var(--chat-user-bubble)', borderRadius: '18px', padding: '10px 16px',
+              fontSize: '15px', lineHeight: '1.6', color: 'var(--chat-text)', wordBreak: 'break-word',
+              maxWidth: '100%',
+            }}>
             {isEditing ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <textarea value={editValue} onChange={(e) => setEditValue(e.target.value)} autoFocus
@@ -178,12 +188,6 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
               </div>
             ) : (
               <>
-                {/* Image preview */}
-                {message.imagePreview && (
-                  <div style={{ marginBottom: '8px' }}>
-                    <img src={message.imagePreview} alt="Uploaded" style={{ maxWidth: '320px', maxHeight: '256px', borderRadius: '12px', border: '1px solid var(--chat-border)', objectFit: 'cover' }} />
-                  </div>
-                )}
                 {/* File chips */}
                 {message.fileAttachment && message.fileAttachment.type === 'document' && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--chat-border)', borderRadius: '8px', padding: '8px 12px', marginBottom: '8px', fontSize: '13px', color: 'var(--chat-text)' }}>
@@ -199,6 +203,7 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
                 {message.content}
               </>
             )}
+            </div>
           </div>
         </div>
       </div>
