@@ -163,10 +163,18 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
 
           {/* User bubble */}
           <div className="user-message-bubble" style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
-            {/* Image preview — shown OUTSIDE the text bubble, clean with rounded corners */}
+            {/* Image preview — compact thumbnail like ChatGPT */}
             {message.imagePreview && !isEditing && (
-              <div style={{ borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-                <img src={message.imagePreview} alt="Uploaded" style={{ maxWidth: '320px', maxHeight: '280px', display: 'block', objectFit: 'cover' }} />
+              <div style={{
+                borderRadius: '12px', overflow: 'hidden',
+                border: '1px solid var(--chat-border)',
+                background: 'var(--chat-surface)',
+                width: 'fit-content',
+              }}>
+                <img src={message.imagePreview} alt="Uploaded" style={{
+                  maxWidth: '200px', maxHeight: '200px', display: 'block',
+                  objectFit: 'contain', borderRadius: '12px',
+                }} />
               </div>
             )}
 
