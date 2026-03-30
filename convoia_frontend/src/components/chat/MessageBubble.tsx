@@ -139,12 +139,16 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
       }}
       onMouseEnter={() => setShowActions(true)} onMouseLeave={() => setShowActions(false)}>
         <div style={{ position: 'relative', maxWidth: '60%' }}>
-          {/* Hover actions */}
+          {/* Hover actions — paddingBottom bridges the gap so mouse doesn't lose hover */}
           {showActions && !isEditing && (
             <div style={{
-              position: 'absolute', top: '-32px', right: 0,
+              position: 'absolute', bottom: '100%', right: 0,
+              paddingBottom: '8px', /* invisible bridge to prevent hover gap */
+              zIndex: 10,
+            }}>
+            <div style={{
               display: 'flex', alignItems: 'center', gap: '2px', borderRadius: '8px', padding: '2px',
-              background: 'var(--chat-surface)', border: '1px solid var(--chat-border)', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', zIndex: 10,
+              background: 'var(--chat-surface)', border: '1px solid var(--chat-border)', boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
             }}>
               {([
                 { show: true, action: handleCopy, icon: copied ? <Check size={13} style={{ color: 'var(--color-primary)' }} /> : <Copy size={13} />, title: 'Copy' },
@@ -158,6 +162,7 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
                   {btn.icon}
                 </button>
               ))}
+            </div>
             </div>
           )}
 
