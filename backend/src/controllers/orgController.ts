@@ -197,20 +197,35 @@ export const getOrgAnalytics = asyncHandler(async (req: Request, res: Response) 
   if (!['manager', 'org_owner', 'platform_admin'].includes(req.user.role)) {
     throw new AppError('Insufficient permissions', 403);
   }
-  if (!req.user.organizationId) {
-    throw new AppError('You do not belong to an organization', 400);
-  }
-
   // Support date range from query params
   const { from, to } = req.query;
   const startDate = from ? new Date(from as string) : new Date(Date.now() - 30 * 86400000);
   const endDate = to ? new Date(to as string) : new Date();
   endDate.setHours(23, 59, 59, 999);
 
-  const orgId = req.user.organizationId;
+  // Resolve org ID — try user's org first, then find all orgs they own
+  let orgId = req.user.organizationId;
+  if (!orgId) {
+    // Find org owned by this user
+    const ownedOrg = await prisma.organization.findFirst({ where: { ownerId: req.user.userId } });
+    orgId = ownedOrg?.id || undefined;
+  }
+
+  if (!orgId) {
+    throw new AppError('You do not belong to an organization', 400);
+  }
+
+  // Query by org ID OR by user ID (fallback for logs before org was set)
+  const orgMembers = await prisma.user.findMany({ where: { organizationId: orgId }, select: { id: true } });
+  const memberIds = orgMembers.map(m => m.id);
 
   const logs = await prisma.usageLog.findMany({
-    where: { organizationId: orgId, createdAt: { gte: startDate, lte: endDate } },
+    where: {
+      OR: [
+        { organizationId: orgId, createdAt: { gte: startDate, lte: endDate } },
+        { userId: { in: memberIds }, createdAt: { gte: startDate, lte: endDate } },
+      ],
+    },
     select: {
       userId: true,
       customerPrice: true,

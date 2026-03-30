@@ -52,95 +52,82 @@ export async function afterQueryMiddleware(
     // Ensure organizationId is valid — resolve or create personal org
     const finalOrgId = await getOrCreatePersonalOrg(userId);
 
-    await prisma.$transaction(async (tx) => {
-      // 1. Create usage log
-      await tx.usageLog.create({
-        data: {
-          userId,
-          organizationId: finalOrgId,
-          modelId,
-          prompt,
-          response,
-          tokensInput: inputTokens,
-          tokensOutput: outputTokens,
-          totalTokens,
-          providerCost,
-          markupPercentage,
-          customerPrice,
-          estimatedCostShown,
-          sessionId,
-          status: 'completed',
-        },
-      });
-
-      // 2. Deduct from wallet and get wallet in one query
-      const wallet = await tx.wallet.update({
-        where: { userId },
-        data: {
-          balance: { decrement: customerPrice },
-          totalSpent: { increment: customerPrice },
-        },
-      });
-
-      // 3. Create wallet transaction (using wallet.id from step 2)
-      await tx.walletTransaction.create({
-        data: {
-          walletId: wallet.id,
-          amount: customerPrice,
-          type: 'debit',
-          description: `AI query cost`,
-          reference: modelId,
-        },
-      });
-
-      // 4. Update budget usage if exists
-      const budget = await tx.budget.findFirst({
-        where: { userId },
-      });
-
-      if (budget) {
-        const newUsage = budget.currentUsage + customerPrice;
-        const usagePercent = (newUsage / budget.monthlyCap) * 100;
-        const shouldAlert =
-          usagePercent >= budget.alertThreshold && !budget.alertSent;
-
-        await tx.budget.update({
-          where: { id: budget.id },
-          data: {
-            currentUsage: newUsage,
-            ...(shouldAlert ? { alertSent: true } : {}),
-          },
-        });
-
-        if (shouldAlert) {
-          logger.warn(
-            `BUDGET ALERT: User ${userId} reached ${usagePercent.toFixed(1)}% of monthly budget`
-          );
-        }
-      }
-
-      // 5. Update subscription token usage if exists
-      const subscription = await tx.subscription.findFirst({
-        where: { userId, status: 'active' },
-      });
-
-      if (subscription) {
-        const newTokenUsage = subscription.tokensUsedThisMonth + totalTokens;
-        const quotaExceeded = newTokenUsage >= subscription.monthlyTokenQuota;
-
-        await tx.subscription.update({
-          where: { id: subscription.id },
-          data: {
-            tokensUsedThisMonth: newTokenUsage,
-            ...(quotaExceeded ? { status: 'quota_exceeded' } : {}),
-          },
-        });
-
-        if (quotaExceeded) {
-          logger.warn(`QUOTA EXCEEDED: User ${userId} exceeded monthly token quota`);
-        }
-      }
+    // 1. ALWAYS create usage log (outside transaction so it's never rolled back)
+    await prisma.usageLog.create({
+      data: {
+        userId,
+        organizationId: finalOrgId,
+        modelId,
+        prompt,
+        response,
+        tokensInput: inputTokens,
+        tokensOutput: outputTokens,
+        totalTokens,
+        providerCost,
+        markupPercentage,
+        customerPrice,
+        estimatedCostShown,
+        sessionId,
+        status: 'completed',
+      },
     });
+
+    // 2. Try wallet/budget updates (non-critical — don't lose usage log if these fail)
+    try {
+      await prisma.$transaction(async (tx) => {
+        // Deduct from wallet (may not exist for all users)
+        const wallet = await tx.wallet.findUnique({ where: { userId } });
+        if (wallet) {
+          await tx.wallet.update({
+            where: { userId },
+            data: {
+              balance: { decrement: customerPrice },
+              totalSpent: { increment: customerPrice },
+            },
+          });
+          await tx.walletTransaction.create({
+            data: {
+              walletId: wallet.id,
+              amount: customerPrice,
+              type: 'debit',
+              description: `AI query cost`,
+              reference: modelId,
+            },
+          });
+        }
+
+        // Update budget usage if exists
+        const budget = await tx.budget.findFirst({ where: { userId } });
+        if (budget) {
+          const newUsage = budget.currentUsage + customerPrice;
+          const usagePercent = (newUsage / budget.monthlyCap) * 100;
+          const shouldAlert = usagePercent >= budget.alertThreshold && !budget.alertSent;
+          await tx.budget.update({
+            where: { id: budget.id },
+            data: { currentUsage: newUsage, ...(shouldAlert ? { alertSent: true } : {}) },
+          });
+          if (shouldAlert) {
+            logger.warn(`BUDGET ALERT: User ${userId} reached ${usagePercent.toFixed(1)}% of monthly budget`);
+          }
+        }
+
+        // Update subscription token usage if exists
+        const subscription = await tx.subscription.findFirst({ where: { userId, status: 'active' } });
+        if (subscription) {
+          const newTokenUsage = subscription.tokensUsedThisMonth + totalTokens;
+          const quotaExceeded = newTokenUsage >= subscription.monthlyTokenQuota;
+          await tx.subscription.update({
+            where: { id: subscription.id },
+            data: { tokensUsedThisMonth: newTokenUsage, ...(quotaExceeded ? { status: 'quota_exceeded' } : {}) },
+          });
+          if (quotaExceeded) {
+            logger.warn(`QUOTA EXCEEDED: User ${userId} exceeded monthly token quota`);
+          }
+        }
+      });
+    } catch (walletErr) {
+      logger.warn(`Wallet/budget update failed (usage log still saved): ${walletErr}`);
+    }
 
     logger.info(
       `Query tracked — User: ${userId}, Cost: $${customerPrice.toFixed(6)}, Profit: $${profit.toFixed(6)}`
