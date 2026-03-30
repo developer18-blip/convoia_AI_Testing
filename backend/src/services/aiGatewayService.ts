@@ -557,6 +557,7 @@ function callOpenAIStream(
 ): Promise<void> {
   const reasoning = isReasoningModel(modelId);
   const systemRole = reasoning ? 'developer' : 'system';
+  const thinkingEnabled = !!overrides?.thinkingEnabled;
 
   const body: Record<string, any> = {
     model: modelId,
@@ -567,6 +568,11 @@ function callOpenAIStream(
 
   if (reasoning) {
     body.max_completion_tokens = overrides?.maxTokens ?? 16384;
+    // GPT-5 and o-series support reasoning_effort
+    if (thinkingEnabled) {
+      body.reasoning = { effort: 'high' };
+      body.max_completion_tokens = Math.max(body.max_completion_tokens, 32768);
+    }
   } else if (usesCompletionTokens(modelId)) {
     body.max_completion_tokens = overrides?.maxTokens ?? 16384;
     body.temperature = overrides?.temperature ?? 0.7;
@@ -577,11 +583,27 @@ function callOpenAIStream(
     if (overrides?.topP != null) body.top_p = overrides.topP;
   }
 
-  // Extended thinking for OpenAI: use higher tokens + reasoning instruction
-  if (overrides?.thinkingEnabled && !reasoning) {
-    body.max_completion_tokens = Math.max(body.max_completion_tokens || 16384, 32768);
-    // Prepend thinking instruction to system prompt
-    body.messages[0].content = `IMPORTANT: Think step by step through this problem carefully before answering. Show your reasoning process wrapped in a blockquote (lines starting with > ), then provide your final answer.\n\n${systemPrompt}`;
+  // For non-reasoning models with thinking enabled: use structured prompt
+  if (thinkingEnabled && !reasoning) {
+    body.max_completion_tokens = Math.max(body.max_completion_tokens || body.max_tokens || 16384, 32768);
+    const thinkPrompt = `You MUST structure your response in two parts:
+
+PART 1 — THINKING: Start with <think> tag. Show your detailed step-by-step reasoning, analysis, and thought process inside this block. Consider multiple angles, evaluate trade-offs, and work through the problem methodically. End with </think> tag.
+
+PART 2 — ANSWER: After </think>, provide your clear, concise final answer.
+
+Example format:
+<think>
+Let me analyze this step by step...
+1. First consideration...
+2. Second consideration...
+3. Therefore...
+</think>
+
+[Your clear final answer here]
+
+${systemPrompt}`;
+    body.messages[0].content = thinkPrompt;
   }
 
   return new Promise(async (resolve, reject) => {
@@ -598,6 +620,8 @@ function callOpenAIStream(
 
       let inputTokens = 0, outputTokens = 0;
       let buffer = '';
+      let isThinking = false;
+      let contentBuffer = ''; // Buffer to detect <think> tags
 
       response.data.on('data', (chunk: Buffer) => {
         buffer += chunk.toString();
@@ -610,14 +634,101 @@ function callOpenAIStream(
           if (!trimmed.startsWith('data: ')) continue;
           try {
             const json = JSON.parse(trimmed.slice(6));
-            const delta = json.choices?.[0]?.delta?.content;
-            if (delta) callbacks.onChunk(delta);
+            const delta = json.choices?.[0]?.delta;
+
+            // GPT-5/o-series: native reasoning summary
+            if (delta?.reasoning) {
+              if (!isThinking) {
+                isThinking = true;
+                callbacks.onChunk('\n> 🧠 **Thinking...**\n>\n> ');
+              }
+              const thinkText = String(delta.reasoning).replace(/\n/g, '\n> ');
+              callbacks.onChunk(thinkText);
+            }
+
+            if (delta?.content) {
+              let text = delta.content;
+
+              // Parse <think> tags for non-reasoning models
+              if (thinkingEnabled && !reasoning) {
+                contentBuffer += text;
+
+                // Detect <think> opening
+                if (!isThinking && contentBuffer.includes('<think>')) {
+                  isThinking = true;
+                  const afterTag = contentBuffer.split('<think>').pop() || '';
+                  callbacks.onChunk('\n> 🧠 **Thinking...**\n>\n> ');
+                  if (afterTag) {
+                    callbacks.onChunk(afterTag.replace(/\n/g, '\n> '));
+                  }
+                  contentBuffer = '';
+                  continue;
+                }
+
+                // Detect </think> closing
+                if (isThinking && contentBuffer.includes('</think>')) {
+                  const beforeTag = contentBuffer.split('</think>')[0];
+                  if (beforeTag) {
+                    callbacks.onChunk(beforeTag.replace(/\n/g, '\n> '));
+                  }
+                  isThinking = false;
+                  callbacks.onChunk('\n\n---\n\n**Answer:**\n\n');
+                  const afterTag = contentBuffer.split('</think>').slice(1).join('');
+                  if (afterTag) callbacks.onChunk(afterTag);
+                  contentBuffer = '';
+                  continue;
+                }
+
+                // Stream thinking content as blockquote
+                if (isThinking) {
+                  // Only flush if buffer is long enough (avoid partial tag detection)
+                  if (contentBuffer.length > 10) {
+                    const toFlush = contentBuffer.slice(0, -8); // Keep last 8 chars for tag detection
+                    contentBuffer = contentBuffer.slice(-8);
+                    callbacks.onChunk(toFlush.replace(/\n/g, '\n> '));
+                  }
+                  continue;
+                }
+
+                // Regular content (not in thinking mode)
+                if (contentBuffer.length > 10) {
+                  const toFlush = contentBuffer.slice(0, -8);
+                  contentBuffer = contentBuffer.slice(-8);
+                  callbacks.onChunk(toFlush);
+                }
+                continue;
+              }
+
+              // No thinking mode or reasoning model — pass through directly
+              if (isThinking && !delta.reasoning) {
+                isThinking = false;
+                callbacks.onChunk('\n\n---\n\n**Answer:**\n\n');
+              }
+              callbacks.onChunk(text);
+            }
+
             if (json.usage) {
               inputTokens = json.usage.prompt_tokens || 0;
               outputTokens = json.usage.completion_tokens || 0;
             }
           } catch { /* skip malformed chunks */ }
         }
+      });
+
+      response.data.on('end', () => {
+        // Flush remaining content buffer
+        if (contentBuffer) {
+          if (isThinking) {
+            callbacks.onChunk(contentBuffer.replace(/\n/g, '\n> '));
+            callbacks.onChunk('\n\n---\n\n**Answer:**\n\n');
+          } else {
+            // Clean up any remaining tags
+            const cleaned = contentBuffer.replace(/<\/?think>/g, '');
+            if (cleaned) callbacks.onChunk(cleaned);
+          }
+        }
+        callbacks.onDone(inputTokens, outputTokens);
+        resolve();
       });
 
       response.data.on('end', () => {
