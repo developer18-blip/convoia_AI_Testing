@@ -206,7 +206,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
       res.status(401).json({ success: false, message: 'Unauthorized' });
       return;
     }
-    const { modelId, messages, industry, agentId, thinkingEnabled } = req.body;
+    const { modelId, messages, industry, agentId, thinkingEnabled, referenceImage } = req.body;
     if (!modelId || !messages || messages.length === 0) {
       res.status(400).json({ success: false, message: 'modelId and messages are required' });
       return;
@@ -242,7 +242,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
         // Route to correct provider based on selected model
         const providerMap: Record<string, 'gemini' | 'dalle' | 'gpt-image-1'> = { 'gpt-image-1': 'gpt-image-1', 'dall-e-3': 'dalle', 'gemini-2.5-flash-image': 'gemini', 'gemini-3-pro-image-preview': 'gemini' };
         const imageProvider = providerMap[streamModelCheck.modelId] || 'gemini';
-        const result = await FileProcessingService.generateImage(imagePrompt, '1024x1024', 'standard', imageProvider);
+        const result = await FileProcessingService.generateImage(imagePrompt, '1024x1024', 'standard', imageProvider, referenceImage);
         const imageTokenCost = result.provider === 'gemini' ? 1300 : 1000;
         await TokenWalletService.deductTokens({ userId: req.user.userId, tokens: imageTokenCost, reference: `image-gen-${Date.now()}`, description: `Image generation (${streamModelCheck.name})` });
         const imageContent = `\n\n![Generated Image](${result.imageUrl})\n\n*"${result.revisedPrompt}"*\n\n[Download image](${result.imageUrl})`;
@@ -348,8 +348,8 @@ export const queryAIStream = async (req: Request, res: Response) => {
 
         res.write(`data: ${JSON.stringify({ type: 'chunk', content: `**Generating image:** "${enhancedPrompt.substring(0, 100)}..."\n\n` })}\n\n`);
 
-        // Generate image (Gemini first, DALL-E fallback)
-        const result = await FileProcessingService.generateImage(enhancedPrompt);
+        // Generate image (Gemini first, DALL-E fallback) — pass reference image if available
+        const result = await FileProcessingService.generateImage(enhancedPrompt, '1024x1024', 'standard', undefined, referenceImage);
 
         // Deduct tokens (flat cost for image gen)
         const imageTokenCost = result.provider === 'gemini' ? 1300 : 1000;

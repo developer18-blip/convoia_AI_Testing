@@ -149,13 +149,25 @@ export class FileProcessingService {
     prompt: string,
     size: '1024x1024' | '1792x1024' | '1024x1792' = '1024x1024',
     quality: 'standard' | 'hd' = 'standard',
-    provider?: 'gemini' | 'dalle' | 'gpt-image-1'
+    provider?: 'gemini' | 'dalle' | 'gpt-image-1',
+    referenceImage?: string,
   ): Promise<{
     imageUrl: string
     revisedPrompt: string
     provider: string
   }> {
     const preferredProvider = provider || 'gemini'
+
+    // If reference image provided, use GPT Image 1 (supports image editing)
+    if (referenceImage) {
+      logger.info('Reference image provided — routing to GPT Image 1 for image editing')
+      try {
+        return await this.generateWithGPTImage(prompt, referenceImage)
+      } catch (err: any) {
+        logger.warn(`GPT Image 1 edit failed, falling back to Gemini with text-only: ${err.message}`)
+        // Fall through to normal generation without reference
+      }
+    }
 
     // GPT Image 1 (explicit choice)
     if (preferredProvider === 'gpt-image-1') {
@@ -165,28 +177,43 @@ export class FileProcessingService {
     // Try Gemini first (free tier, 1500/day)
     if (preferredProvider === 'gemini') {
       try {
-        return await this.generateImageGemini(prompt)
+        return await this.generateImageGemini(prompt, referenceImage)
       } catch (err: any) {
         logger.warn(`Gemini image generation failed, falling back to DALL-E: ${err.message}`)
         // Fall through to DALL-E
       }
     }
 
-    // DALL-E fallback (or explicit choice)
+    // DALL-E fallback (or explicit choice) — no reference image support
     return await this.generateImageDallE(prompt, size, quality)
   }
 
   // Generate image with Gemini 2.5 Flash Image
-  private static async generateImageGemini(prompt: string): Promise<{
+  private static async generateImageGemini(prompt: string, referenceImage?: string): Promise<{
     imageUrl: string
     revisedPrompt: string
     provider: string
   }> {
     const apiKey = getGoogleKey()
+
+    // Build input parts — include reference image if provided
+    const inputParts: any[] = []
+    if (referenceImage) {
+      const match = referenceImage.match(/^data:(image\/\w+);base64,(.+)$/)
+      if (match) {
+        inputParts.push({ inlineData: { mimeType: match[1], data: match[2] } })
+        inputParts.push({ text: `Edit/modify this image based on the following instructions: ${prompt}` })
+      } else {
+        inputParts.push({ text: `Generate an image: ${prompt}` })
+      }
+    } else {
+      inputParts.push({ text: `Generate an image: ${prompt}` })
+    }
+
     const response = await axios.post(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent`,
       {
-        contents: [{ parts: [{ text: `Generate an image: ${prompt}` }] }],
+        contents: [{ parts: inputParts }],
         generationConfig: {
           responseModalities: ['TEXT', 'IMAGE'],
         },
@@ -285,30 +312,60 @@ export class FileProcessingService {
 
     input.push({ type: 'input_text', text: prompt })
 
-    const response = await fetch('https://api.openai.com/v1/images/generations', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-image-1',
-        prompt: prompt,
-        n: 1,
-        size: '1024x1024',
-        quality: 'medium',
-      }),
-    })
+    let imageB64: string | undefined
 
-    const data: any = await response.json()
+    if (inputImageUrl && input.length > 1) {
+      // Use Responses API for image editing (supports reference images)
+      const response = await fetch('https://api.openai.com/v1/responses', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-image-1',
+          input,
+          tools: [{ type: 'image_generation', size: '1024x1024', quality: 'medium' }],
+        }),
+      })
 
-    if (data.error) {
-      throw new Error(data.error.message || 'GPT Image 1 failed')
-    }
+      const data: any = await response.json()
+      if (data.error) {
+        throw new Error(data.error.message || 'GPT Image 1 edit failed')
+      }
 
-    const imageB64 = data.data?.[0]?.b64_json
-    if (!imageB64) {
-      throw new Error('GPT Image 1 did not return image data')
+      // Extract image from responses API output
+      const outputImages = data.output?.filter((o: any) => o.type === 'image_generation_call') || []
+      imageB64 = outputImages[0]?.result
+      if (!imageB64) {
+        throw new Error('GPT Image 1 did not return edited image')
+      }
+    } else {
+      // Text-to-image: use standard generations endpoint
+      const response = await fetch('https://api.openai.com/v1/images/generations', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-image-1',
+          prompt,
+          n: 1,
+          size: '1024x1024',
+          quality: 'medium',
+        }),
+      })
+
+      const data: any = await response.json()
+      if (data.error) {
+        throw new Error(data.error.message || 'GPT Image 1 failed')
+      }
+
+      imageB64 = data.data?.[0]?.b64_json
+      if (!imageB64) {
+        throw new Error('GPT Image 1 did not return image data')
+      }
     }
 
     const imageUrl = saveImageToDisk(imageB64, 'png')

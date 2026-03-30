@@ -319,13 +319,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const token = localStorage.getItem('convoia_token')
       const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
+      // Find the most recent image from conversation (for reference-based image generation)
+      const lastImage = [...messages].reverse().find((m) => m.imagePreview)?.imagePreview
+
       const response = await fetch(`${baseUrl}/ai/query/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ modelId, messages: allMsgs, industry, agentId, thinkingEnabled }),
+        body: JSON.stringify({ modelId, messages: allMsgs, industry, agentId, thinkingEnabled, ...(lastImage ? { referenceImage: lastImage } : {}) }),
         signal: controller.signal,
       })
 
@@ -438,13 +441,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const token = localStorage.getItem('convoia_token')
       const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
+      // Find the most recent image from conversation (for reference-based image generation)
+      const lastImage = [...messages].reverse().find((m) => m.imagePreview)?.imagePreview
+
       const response = await fetch(`${baseUrl}/ai/query/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ modelId, messages: messagesForAPI, industry, agentId, thinkingEnabled }),
+        body: JSON.stringify({ modelId, messages: messagesForAPI, industry, agentId, thinkingEnabled, ...(lastImage ? { referenceImage: lastImage } : {}) }),
       })
 
       if (!response.ok) {
