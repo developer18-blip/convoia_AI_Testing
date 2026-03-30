@@ -41,7 +41,7 @@ interface MessageInputProps {
   onStop?: () => void
   onFileProcessed?: (data: FileProcessedData) => void
   onImageGenerated?: (data: ImageGeneratedData) => void
-  onSendWithContext?: (text: string, systemContext: string | null, extras?: { fileAttachment?: { name: string; type: 'image' | 'document' | 'audio' | 'video'; size: number } }) => void
+  onSendWithContext?: (text: string, systemContext: string | null, extras?: { fileAttachment?: { name: string; type: 'image' | 'document' | 'audio' | 'video'; size: number }; imagePreview?: string }) => void
   onError?: (message: string) => void
 }
 
@@ -173,7 +173,39 @@ export function MessageInput({
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
   }
 
+  // Detect if the user wants to generate/edit an image (not analyze it)
+  const isImageGenIntent = (text: string): boolean => {
+    const lower = text.toLowerCase()
+    const genPatterns = [
+      /generate/i, /create/i, /make\s+(a|an|me|this|the|it)/i, /design/i, /draw/i,
+      /similar\s+to/i, /like\s+this/i, /modify/i, /change/i, /edit/i, /transform/i,
+      /convert/i, /remake/i, /redo/i, /zoomed/i, /zoom/i, /resize/i, /crop/i,
+      /add\s+\w+\s+to/i, /remove\s+\w+\s+from/i, /replace/i, /swap/i,
+      /make\s+it/i, /turn\s+(this|it)/i, /improve/i, /enhance/i, /upscale/i,
+    ]
+    return genPatterns.some((p) => p.test(lower))
+  }
+
   const sendWithImage = async (question: string, attached: AttachedFile): Promise<boolean> => {
+    // If the user wants to generate/edit based on this image, send the text
+    // through the normal chat flow. The image preview (base64) is passed via
+    // onSendWithContext so ChatContext includes it as referenceImage.
+    if (question && isImageGenIntent(question)) {
+      setAttachedFile(null)
+      setFileLoading(false)
+      if (onSendWithContext) {
+        // Pass image as system context so the backend gets it as referenceImage
+        onSendWithContext(
+          question,
+          null,
+          { fileAttachment: { name: attached.file.name, type: 'image', size: attached.file.size }, imagePreview: attached.preview },
+        )
+      } else {
+        onSend(question)
+      }
+      return true
+    }
+
     setFileLoading(true)
     setFileError(null)
     try {

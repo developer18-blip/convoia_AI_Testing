@@ -319,8 +319,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const token = localStorage.getItem('convoia_token')
       const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
-      // Find the most recent image from conversation (for reference-based image generation)
-      const lastImage = [...messages].reverse().find((m) => m.imagePreview)?.imagePreview
+      // Find the most recent image from conversation including current message
+      const lastImage = [...messages, userMsg].reverse().find((m) => m.imagePreview)?.imagePreview
 
       const response = await fetch(`${baseUrl}/ai/query/stream`, {
         method: 'POST',
@@ -441,8 +441,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const token = localStorage.getItem('convoia_token')
       const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
-      // Find the most recent image from conversation (for reference-based image generation)
-      const lastImage = [...messages].reverse().find((m) => m.imagePreview)?.imagePreview
+      // Find the most recent image from conversation (including current message)
+      const lastImage = [...messages, userMsg].reverse().find((m) => m.imagePreview)?.imagePreview
 
       const response = await fetch(`${baseUrl}/ai/query/stream`, {
         method: 'POST',
