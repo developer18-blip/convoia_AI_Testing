@@ -138,34 +138,7 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
         animation: 'fadeSlideIn 200ms ease-out',
       }}
       onMouseEnter={() => setShowActions(true)} onMouseLeave={() => setShowActions(false)}>
-        <div style={{ position: 'relative', maxWidth: '60%' }}>
-          {/* Hover actions — paddingBottom bridges the gap so mouse doesn't lose hover */}
-          {showActions && !isEditing && (
-            <div style={{
-              position: 'absolute', bottom: '100%', right: 0,
-              paddingBottom: '8px', /* invisible bridge to prevent hover gap */
-              zIndex: 10,
-            }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '2px', borderRadius: '8px', padding: '2px',
-              background: 'var(--chat-surface)', border: '1px solid var(--chat-border)', boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-            }}>
-              {([
-                { show: true, action: handleCopy, icon: copied ? <Check size={13} style={{ color: 'var(--color-primary)' }} /> : <Copy size={13} />, title: 'Copy' },
-                { show: !!onEdit, action: () => setIsEditing(true), icon: <Pencil size={13} />, title: 'Edit' },
-                { show: !!onDelete, action: () => onDelete!(message.id), icon: <Trash2 size={13} />, title: 'Delete' },
-              ] as const).filter(b => b.show).map((btn, i) => (
-                <button key={i} onClick={btn.action} title={btn.title}
-                  style={{ padding: '4px 8px', borderRadius: '6px', backgroundColor: 'transparent', border: 'none', color: 'var(--chat-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', transition: 'all 150ms' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--chat-border)'; e.currentTarget.style.color = 'var(--chat-text)' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--chat-text-muted)' }}>
-                  {btn.icon}
-                </button>
-              ))}
-            </div>
-            </div>
-          )}
-
+        <div style={{ maxWidth: '60%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
           {/* User bubble */}
           <div className="user-message-bubble" style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
             {/* Image preview — compact thumbnail like ChatGPT */}
@@ -218,6 +191,27 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
             )}
             </div>
           </div>
+
+          {/* Action buttons — below bubble, never clipped */}
+          {showActions && !isEditing && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '2px', marginTop: '4px',
+              opacity: showActions ? 1 : 0, transition: 'opacity 150ms',
+            }}>
+              {([
+                { show: true, action: handleCopy, icon: copied ? <Check size={13} style={{ color: 'var(--color-primary)' }} /> : <Copy size={13} />, title: 'Copy' },
+                { show: !!onEdit, action: () => setIsEditing(true), icon: <Pencil size={13} />, title: 'Edit' },
+                { show: !!onDelete, action: () => onDelete!(message.id), icon: <Trash2 size={13} />, title: 'Delete' },
+              ] as const).filter(b => b.show).map((btn, i) => (
+                <button key={i} onClick={btn.action} title={btn.title}
+                  style={{ padding: '4px 8px', borderRadius: '6px', backgroundColor: 'transparent', border: 'none', color: 'var(--chat-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', transition: 'all 150ms' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--chat-border)'; e.currentTarget.style.color = 'var(--chat-text)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--chat-text-muted)' }}>
+                  {btn.icon}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     )
