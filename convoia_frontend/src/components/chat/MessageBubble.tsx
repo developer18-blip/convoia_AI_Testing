@@ -5,6 +5,8 @@ import { AlertCircle, RefreshCw, Copy, Check, Pencil, Trash2, ThumbsUp, ThumbsDo
 import { CodeBlock } from './CodeBlock'
 import { AgentPanel } from './AgentPanel'
 import { InlineChart, extractCharts } from './InlineChart'
+import { DocumentDownloadBar } from './DocumentDownloadBar'
+import { isDocumentWorthy } from '../../lib/documentDetector'
 import { formatCurrency, formatTokens } from '../../lib/utils'
 import type { Message } from '../../types'
 import type { ComponentPropsWithoutRef } from 'react'
@@ -60,6 +62,13 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
 
   // Memoize chart extraction so it doesn't run on every render
   const { cleanText, charts } = useMemo(() => extractCharts(renderedContent), [renderedContent])
+
+  // Detect if response is document-worthy (for download bar)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const documentInfo = useMemo(() => {
+    if (isUser || message.isLoading) return null
+    return isDocumentWorthy(message.content)
+  }, [message.content, isUser, message.isLoading])
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content)
@@ -303,7 +312,7 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
           </div>
         )}
 
-        <div className="prose prose-sm max-w-none message-content" style={{ fontSize: '15px', lineHeight: '1.75', color: 'var(--chat-text)' }}
+        <div ref={contentRef} className="prose prose-sm max-w-none message-content" style={{ fontSize: '15px', lineHeight: '1.75', color: 'var(--chat-text)' }}
           onCopy={(e) => {
             // Copy as plain text — strip background colors and formatting
             const selection = window.getSelection()?.toString()
@@ -382,6 +391,11 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
           {/* Inline Charts */}
           {charts.map((chart, i) => <InlineChart key={i} chart={chart} />)}
         </div>
+
+        {/* Document Download Bar */}
+        {documentInfo?.worthy && !message.isLoading && (
+          <DocumentDownloadBar content={message.content} contentRef={contentRef} title={documentInfo.title} />
+        )}
 
         {/* Generated image */}
         {message.imageUrl && (
