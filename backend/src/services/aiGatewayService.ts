@@ -568,9 +568,7 @@ function callOpenAIStream(
 
   if (reasoning) {
     body.max_completion_tokens = overrides?.maxTokens ?? 16384;
-    // GPT-5 and o-series support reasoning_effort
     if (thinkingEnabled) {
-      body.reasoning = { effort: 'high' };
       body.max_completion_tokens = Math.max(body.max_completion_tokens, 32768);
     }
   } else if (usesCompletionTokens(modelId)) {
@@ -583,8 +581,8 @@ function callOpenAIStream(
     if (overrides?.topP != null) body.top_p = overrides.topP;
   }
 
-  // For non-reasoning models with thinking enabled: use structured prompt
-  if (thinkingEnabled && !reasoning) {
+  // For OpenAI models with thinking enabled: use structured prompt with <think> tags
+  if (thinkingEnabled) {
     body.max_completion_tokens = Math.max(body.max_completion_tokens || body.max_tokens || 16384, 32768);
     const thinkPrompt = `You MUST structure your response in two parts:
 
@@ -636,21 +634,11 @@ ${systemPrompt}`;
             const json = JSON.parse(trimmed.slice(6));
             const delta = json.choices?.[0]?.delta;
 
-            // GPT-5/o-series: native reasoning summary
-            if (delta?.reasoning) {
-              if (!isThinking) {
-                isThinking = true;
-                callbacks.onChunk('\n> 🧠 **Thinking...**\n>\n> ');
-              }
-              const thinkText = String(delta.reasoning).replace(/\n/g, '\n> ');
-              callbacks.onChunk(thinkText);
-            }
-
             if (delta?.content) {
               let text = delta.content;
 
-              // Parse <think> tags for non-reasoning models
-              if (thinkingEnabled && !reasoning) {
+              // Parse <think> tags
+              if (thinkingEnabled) {
                 contentBuffer += text;
 
                 // Detect <think> opening
@@ -699,11 +687,7 @@ ${systemPrompt}`;
                 continue;
               }
 
-              // No thinking mode or reasoning model — pass through directly
-              if (isThinking && !delta.reasoning) {
-                isThinking = false;
-                callbacks.onChunk('\n\n---\n\n**Answer:**\n\n');
-              }
+              // No thinking mode — pass through directly
               callbacks.onChunk(text);
             }
 
