@@ -12,6 +12,7 @@ export const apiLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false }, // behind Nginx proxy
   skip: (req) => req.path === '/health',
   keyGenerator: (req) => {
     return req.user?.userId || req.ip || 'unknown';
@@ -31,6 +32,7 @@ export const authLimiter = rateLimit({
   skipFailedRequests: false,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
 });
 
 // AI query endpoints - per-user limit for paid features
@@ -44,6 +46,7 @@ export const queryLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
   keyGenerator: (req) => {
     return req.user?.userId || req.ip || 'unknown';
   },
@@ -60,6 +63,7 @@ export const strictLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
 });
 
 export default apiLimiter;
