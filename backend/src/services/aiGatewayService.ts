@@ -577,6 +577,13 @@ function callOpenAIStream(
     if (overrides?.topP != null) body.top_p = overrides.topP;
   }
 
+  // Extended thinking for OpenAI: use higher tokens + reasoning instruction
+  if (overrides?.thinkingEnabled && !reasoning) {
+    body.max_completion_tokens = Math.max(body.max_completion_tokens || 16384, 32768);
+    // Prepend thinking instruction to system prompt
+    body.messages[0].content = `IMPORTANT: Think step by step through this problem carefully before answering. Show your reasoning process wrapped in a blockquote (lines starting with > ), then provide your final answer.\n\n${systemPrompt}`;
+  }
+
   return new Promise(async (resolve, reject) => {
     try {
       const response = await axios.post(
@@ -622,6 +629,9 @@ function callOpenAIStream(
         reject(err);
       });
     } catch (err: any) {
+      // Log the actual error from OpenAI for debugging
+      const errMsg = err.response?.data ? JSON.stringify(err.response.data) : err.message;
+      logger.error(`OpenAI stream error for model ${modelId}: ${errMsg}`);
       callbacks.onError(err);
       reject(err);
     }
@@ -695,11 +705,11 @@ function callAnthropicStream(
               currentBlockType = json.content_block?.type || 'text';
               if (currentBlockType === 'thinking' && !isThinking) {
                 isThinking = true;
-                callbacks.onChunk('\n\n> **Thinking...**\n> ');
+                callbacks.onChunk('\n> 🧠 **Thinking...**\n>\n> ');
               }
             }
             if (json.type === 'content_block_stop' && currentBlockType === 'thinking') {
-              callbacks.onChunk('\n\n');
+              callbacks.onChunk('\n\n---\n\n**Answer:**\n\n');
               currentBlockType = 'text';
             }
 
