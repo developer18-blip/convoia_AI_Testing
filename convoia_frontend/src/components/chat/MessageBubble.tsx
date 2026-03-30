@@ -312,11 +312,6 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
           </div>
         )}
 
-        {/* Document Download Bar — shown at top for visibility */}
-        {documentInfo?.worthy && !message.isLoading && (
-          <DocumentDownloadBar content={message.content} contentRef={contentRef} title={documentInfo.title} />
-        )}
-
         <div ref={contentRef} className="prose prose-sm max-w-none message-content" style={{ fontSize: '15px', lineHeight: '1.75', color: 'var(--chat-text)' }}
           onCopy={(e) => {
             // Copy as plain text — strip background colors and formatting
@@ -422,6 +417,11 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
 
         {/* Agent run */}
         {message.agentRun && <div style={{ marginTop: '12px' }}><AgentPanel agentRun={message.agentRun} /></div>}
+
+        {/* Document Download Bar — at the end after all content */}
+        {documentInfo?.worthy && !message.isLoading && (
+          <DocumentDownloadBar content={message.content} contentRef={contentRef} title={documentInfo.title} />
+        )}
 
         {/* Try with another model — lazy execution */}
         {showActions && message.content.length > 20 && onRetry && (
