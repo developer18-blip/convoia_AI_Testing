@@ -629,11 +629,18 @@ function callOpenAIStream(
         reject(err);
       });
     } catch (err: any) {
-      // Log the actual error from OpenAI for debugging
-      const errMsg = err.response?.data ? JSON.stringify(err.response.data) : err.message;
+      // Log actual OpenAI error — response.data is a stream, read it safely
+      let errMsg = err.message || 'Unknown error';
+      try {
+        if (err.response?.data) {
+          let body = '';
+          for await (const chunk of err.response.data) body += String(chunk);
+          errMsg = body || errMsg;
+        }
+      } catch { /* ignore read errors */ }
       logger.error(`OpenAI stream error for model ${modelId}: ${errMsg}`);
-      callbacks.onError(err);
-      reject(err);
+      callbacks.onError(new Error(errMsg));
+      reject(new Error(errMsg));
     }
   });
 }
