@@ -5,6 +5,7 @@ import {
   updateOrgSettings,
   getOrgTeam,
   getOrgAnalytics,
+  getPersonalAnalytics,
   getUserDetails,
 } from '../controllers/orgController.js';
 
@@ -22,6 +23,9 @@ router.get('/team', getOrgTeam);
 
 // Organization analytics
 router.get('/analytics', requireRole('manager', 'org_owner', 'platform_admin'), getOrgAnalytics);
+
+// Personal analytics (any authenticated user)
+router.get('/analytics/personal', getPersonalAnalytics);
 
 // Individual user details (for member page)
 router.get('/user/:userId', getUserDetails);

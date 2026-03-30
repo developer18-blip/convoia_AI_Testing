@@ -201,16 +201,20 @@ export const getOrgAnalytics = asyncHandler(async (req: Request, res: Response) 
     throw new AppError('You do not belong to an organization', 400);
   }
 
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  // Support date range from query params
+  const { from, to } = req.query;
+  const startDate = from ? new Date(from as string) : new Date(Date.now() - 30 * 86400000);
+  const endDate = to ? new Date(to as string) : new Date();
+  endDate.setHours(23, 59, 59, 999);
 
   const orgId = req.user.organizationId;
 
   const logs = await prisma.usageLog.findMany({
-    where: { organizationId: orgId, createdAt: { gte: thirtyDaysAgo } },
+    where: { organizationId: orgId, createdAt: { gte: startDate, lte: endDate } },
     select: {
       userId: true,
       customerPrice: true,
+      totalTokens: true,
       createdAt: true,
       modelId: true,
       model: { select: { name: true } },
@@ -219,35 +223,39 @@ export const getOrgAnalytics = asyncHandler(async (req: Request, res: Response) 
     orderBy: { createdAt: 'asc' },
   });
 
-  // Daily usage
-  const dailyMap = new Map<string, { date: string; cost: number; queries: number }>();
-  const memberMap = new Map<string, { name: string; cost: number; queries: number }>();
-  const modelMap = new Map<string, { name: string; cost: number; queries: number }>();
+  const dailyMap = new Map<string, { date: string; cost: number; queries: number; tokens: number }>();
+  const memberMap = new Map<string, { name: string; cost: number; queries: number; tokens: number }>();
+  const modelMap = new Map<string, { name: string; cost: number; queries: number; tokens: number }>();
+
+  let totalCost = 0;
+  let totalQueries = 0;
+  let totalTokens = 0;
 
   for (const l of logs) {
     const dateKey = l.createdAt.toISOString().split('T')[0];
+    const tokens = l.totalTokens || 0;
+    totalCost += l.customerPrice;
+    totalQueries += 1;
+    totalTokens += tokens;
 
-    // Daily
     const daily = dailyMap.get(dateKey);
-    if (daily) { daily.cost += l.customerPrice; daily.queries += 1; }
-    else { dailyMap.set(dateKey, { date: dateKey, cost: l.customerPrice, queries: 1 }); }
+    if (daily) { daily.cost += l.customerPrice; daily.queries += 1; daily.tokens += tokens; }
+    else { dailyMap.set(dateKey, { date: dateKey, cost: l.customerPrice, queries: 1, tokens }); }
 
-    // Member
     const member = memberMap.get(l.userId);
-    if (member) { member.cost += l.customerPrice; member.queries += 1; }
-    else { memberMap.set(l.userId, { name: l.user.name, cost: l.customerPrice, queries: 1 }); }
+    if (member) { member.cost += l.customerPrice; member.queries += 1; member.tokens += tokens; }
+    else { memberMap.set(l.userId, { name: l.user.name, cost: l.customerPrice, queries: 1, tokens }); }
 
-    // Model
     const model = modelMap.get(l.modelId);
-    if (model) { model.cost += l.customerPrice; model.queries += 1; }
-    else { modelMap.set(l.modelId, { name: l.model.name, cost: l.customerPrice, queries: 1 }); }
+    if (model) { model.cost += l.customerPrice; model.queries += 1; model.tokens += tokens; }
+    else { modelMap.set(l.modelId, { name: l.model.name, cost: l.customerPrice, queries: 1, tokens }); }
   }
 
-  // Fill missing days
-  const now = new Date();
-  const dailyUsage: Array<{ date: string; cost: number; queries: number }> = [];
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(now);
+  // Fill missing days in range
+  const dailyUsage: Array<{ date: string; cost: number; queries: number; tokens: number }> = [];
+  const dayCount = Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000) + 1;
+  for (let i = dayCount - 1; i >= 0; i--) {
+    const d = new Date(endDate);
     d.setDate(d.getDate() - i);
     const key = d.toISOString().split('T')[0];
     const entry = dailyMap.get(key);
@@ -255,6 +263,7 @@ export const getOrgAnalytics = asyncHandler(async (req: Request, res: Response) 
       date: key,
       cost: parseFloat((entry?.cost ?? 0).toFixed(4)),
       queries: entry?.queries ?? 0,
+      tokens: entry?.tokens ?? 0,
     });
   }
 
@@ -271,8 +280,91 @@ export const getOrgAnalytics = asyncHandler(async (req: Request, res: Response) 
     statusCode: 200,
     message: 'Organization analytics retrieved',
     data: {
+      summary: {
+        totalCost: parseFloat(totalCost.toFixed(4)),
+        totalQueries,
+        totalTokens,
+        activeMembers: memberMap.size,
+        modelsUsed: modelMap.size,
+        avgCostPerQuery: totalQueries > 0 ? parseFloat((totalCost / totalQueries).toFixed(6)) : 0,
+      },
       dailyUsage,
       memberBreakdown,
+      modelBreakdown,
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// ============ GET /api/org/analytics/personal ============
+export const getPersonalAnalytics = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new AppError('Unauthorized', 401);
+
+  const { from, to } = req.query;
+  const startDate = from ? new Date(from as string) : new Date(Date.now() - 30 * 86400000);
+  const endDate = to ? new Date(to as string) : new Date();
+  endDate.setHours(23, 59, 59, 999);
+
+  const logs = await prisma.usageLog.findMany({
+    where: { userId: req.user.userId, createdAt: { gte: startDate, lte: endDate } },
+    select: {
+      customerPrice: true,
+      totalTokens: true,
+      createdAt: true,
+      modelId: true,
+      model: { select: { name: true } },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  const dailyMap = new Map<string, { date: string; cost: number; queries: number; tokens: number }>();
+  const modelMap = new Map<string, { name: string; cost: number; queries: number; tokens: number }>();
+  let totalCost = 0;
+  let totalQueries = 0;
+  let totalTokens = 0;
+
+  for (const l of logs) {
+    const dateKey = l.createdAt.toISOString().split('T')[0];
+    const tokens = l.totalTokens || 0;
+    totalCost += l.customerPrice;
+    totalQueries += 1;
+    totalTokens += tokens;
+
+    const daily = dailyMap.get(dateKey);
+    if (daily) { daily.cost += l.customerPrice; daily.queries += 1; daily.tokens += tokens; }
+    else { dailyMap.set(dateKey, { date: dateKey, cost: l.customerPrice, queries: 1, tokens }); }
+
+    const model = modelMap.get(l.modelId);
+    if (model) { model.cost += l.customerPrice; model.queries += 1; model.tokens += tokens; }
+    else { modelMap.set(l.modelId, { name: l.model.name, cost: l.customerPrice, queries: 1, tokens }); }
+  }
+
+  const dayCount = Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000) + 1;
+  const dailyUsage: Array<{ date: string; cost: number; queries: number; tokens: number }> = [];
+  for (let i = dayCount - 1; i >= 0; i--) {
+    const d = new Date(endDate);
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().split('T')[0];
+    const entry = dailyMap.get(key);
+    dailyUsage.push({
+      date: key,
+      cost: parseFloat((entry?.cost ?? 0).toFixed(4)),
+      queries: entry?.queries ?? 0,
+      tokens: entry?.tokens ?? 0,
+    });
+  }
+
+  const modelBreakdown = Array.from(modelMap.values())
+    .sort((a, b) => b.cost - a.cost)
+    .map((m) => ({ ...m, cost: parseFloat(m.cost.toFixed(4)) }));
+
+  res.json({
+    success: true,
+    statusCode: 200,
+    message: 'Personal analytics retrieved',
+    data: {
+      summary: { totalCost: parseFloat(totalCost.toFixed(4)), totalQueries, totalTokens, modelsUsed: modelMap.size, avgCostPerQuery: totalQueries > 0 ? parseFloat((totalCost / totalQueries).toFixed(6)) : 0 },
+      dailyUsage,
       modelBreakdown,
     },
     timestamp: new Date().toISOString(),
