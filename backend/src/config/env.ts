@@ -79,7 +79,7 @@ export const config = {
   openWebUIUrl: process.env.OPEN_WEBUI_URL || 'http://localhost:3001',
 
   // AI Gateway
-  aiRequestTimeout: parseInt(process.env.AI_REQUEST_TIMEOUT || '30000', 10),
+  aiRequestTimeout: parseInt(process.env.AI_REQUEST_TIMEOUT || '120000', 10),
 };
 
 export default config;
