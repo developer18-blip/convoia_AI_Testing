@@ -34,7 +34,10 @@ api.interceptors.response.use(
           return api(original)
         }
       } catch {
-        localStorage.clear()
+        // Only clear auth tokens — preserve chat history and other data
+        localStorage.removeItem('convoia_token')
+        localStorage.removeItem('convoia_refresh_token')
+        localStorage.removeItem('convoia_user')
         window.location.href = '/login'
       }
     }

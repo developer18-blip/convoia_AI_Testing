@@ -42,7 +42,7 @@ async function syncConversationToBackend(conv: Conversation) {
 
 async function syncMessagesToBackend(convId: string, messages: Message[]) {
   try {
-    const newMsgs = messages.filter(m => m.content && m.role !== 'system').slice(-10) // sync last 10
+    const newMsgs = messages.filter(m => m.content && m.role !== 'system').slice(-50) // sync last 50
     if (newMsgs.length === 0) return
     await api.post(`/conversations/${convId}/messages`, { messages: newMsgs }).catch(() => {})
   } catch { /* silent */ }
@@ -150,35 +150,50 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setMessages((prev) => prev.map((m) => m.isLoading ? { ...m, isLoading: false, content: m.content || '*(Generation stopped)*' } : m))
   }, [])
 
-  // Reload conversations when user changes — try backend first, fallback to localStorage
+  // Reload conversations when user changes — localStorage is primary, backend supplements
   useEffect(() => {
-    setActiveId(null)
-    setMessages([])
-
     if (!userId) {
+      setActiveId(null)
+      setMessages([])
       setConversations([])
       setFolders([])
       return
     }
 
-    // Load from localStorage immediately (fast)
+    // Load from localStorage immediately (fast) — this is the primary source
     const local = loadConversations(userId)
     setConversations(local)
     setFolders(loadFolders(userId))
 
-    // Then load from backend (authoritative) and merge
+    // Restore active conversation from localStorage
+    const savedActiveId = localStorage.getItem('convoia_activeConvId')
+    if (savedActiveId && local.find(c => c.id === savedActiveId)) {
+      setActiveId(savedActiveId)
+      const activeConv = local.find(c => c.id === savedActiveId)
+      if (activeConv?.messages?.length) {
+        setMessages(activeConv.messages)
+      }
+    }
+
+    // Then load from backend and merge — preserve local messages
     loadConversationsFromBackend().then(backendConvs => {
       if (backendConvs.length === 0 && local.length > 0) {
         // First time: migrate localStorage to backend
         api.post('/conversations/sync', { conversations: local.slice(0, 50) }).catch(() => {})
       } else if (backendConvs.length > 0) {
-        // Merge: backend is authoritative, add any local-only convs
+        // Merge: keep local messages, add backend-only conversations
+        const localById = new Map(local.map(c => [c.id, c]))
+        const merged = backendConvs.map(bc => {
+          const lc = localById.get(bc.id)
+          // If local has messages, keep them (localStorage is fresher)
+          return lc && lc.messages.length > 0 ? { ...bc, messages: lc.messages } : bc
+        })
+        // Add any local-only conversations not on backend
         const backendIds = new Set(backendConvs.map(c => c.id))
-        const merged = [
-          ...backendConvs,
-          ...local.filter(c => !backendIds.has(c.id)),
-        ].sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime())
-        setConversations(merged)
+        const localOnly = local.filter(c => !backendIds.has(c.id))
+        const all = [...merged, ...localOnly]
+          .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime())
+        setConversations(all)
       }
     })
   }, [userId])
