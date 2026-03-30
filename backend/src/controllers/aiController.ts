@@ -72,7 +72,7 @@ export const queryAI = asyncHandler(async (req: Request, res: Response) => {
       canBuyTokens: !isOrgMember || user.role === 'org_owner',
     });
   }
-  const activeSession = await prisma.hourlySession.findFirst({
+  void await prisma.hourlySession.findFirst({
     where: {
       userId: user.id,
       modelId,
@@ -102,7 +102,7 @@ export const queryAI = asyncHandler(async (req: Request, res: Response) => {
       });
     }
   }
-  const estimate = await estimateCost(finalModelId, inputText);
+  void await estimateCost(finalModelId, inputText);
   // Look up agent config if specified
   let agentConfig: { systemPrompt: string; temperature: number; maxTokens: number; topP: number; name: string } | undefined;
   if (agentId) {
@@ -135,20 +135,25 @@ export const queryAI = asyncHandler(async (req: Request, res: Response) => {
     maxOutputTokens: maxOutputForBalance,
   });
   const executionTime = Date.now() - startTime;
-  await afterQueryMiddleware(
-    user.id,
-    organizationId,
-    aiResponse.aiModel.id,
-    inputText,
-    aiResponse.response,
-    aiResponse.inputTokens,
-    aiResponse.outputTokens,
-    aiResponse.providerCost,
-    aiResponse.customerPrice,
-    aiResponse.markupPercentage,
-    estimate?.customerPrice,
-    activeSession?.id
-  );
+
+  // Create usage log directly
+  await prisma.usageLog.create({
+    data: {
+      userId: user.id,
+      organizationId,
+      modelId: aiResponse.aiModel.id,
+      prompt: inputText.substring(0, 500),
+      response: aiResponse.response.substring(0, 500),
+      tokensInput: aiResponse.inputTokens,
+      tokensOutput: aiResponse.outputTokens,
+      totalTokens: aiResponse.totalTokens,
+      providerCost: aiResponse.providerCost,
+      markupPercentage: aiResponse.markupPercentage,
+      customerPrice: aiResponse.customerPrice,
+      status: 'completed',
+    },
+  });
+
   // Deduct tokens from wallet
   await TokenWalletService.deductTokens({
     userId: user.id,
@@ -414,12 +419,15 @@ export const queryAIStream = async (req: Request, res: Response) => {
       return;
     }
 
-    const estimate = await estimateCost(finalModelId, inputText);
+    // Pre-query cost estimate (for logging/display)
+    const _estimate = await estimateCost(finalModelId, inputText);
+    void _estimate; // used for future budget pre-check
 
     // Active session check
-    const activeSession = await prisma.hourlySession.findFirst({
+    const _activeSession = await prisma.hourlySession.findFirst({
       where: { userId: user.id, modelId: finalModelId, isActive: true, isExpired: false, endTime: { gt: new Date() } },
     });
+    void _activeSession; // used for future session-based pricing
 
     // Agent config
     let agentConfig: { systemPrompt: string; temperature: number; maxTokens: number; topP: number; name: string } | undefined;
@@ -579,24 +587,39 @@ export const queryAIStream = async (req: Request, res: Response) => {
               const providerCost = inputTokens * aiModel.inputTokenPrice + outputTokens * aiModel.outputTokenPrice;
               const customerPrice = providerCost * (1 + aiModel.markupPercentage / 100);
 
-              // Track usage and deduct tokens — await both to ensure billing
-              await Promise.all([
-                afterQueryMiddleware(
-                  user.id, organizationId, aiModel.id,
-                  inputText, fullResponse,
-                  inputTokens, outputTokens,
-                  providerCost, customerPrice,
-                  aiModel.markupPercentage,
-                  estimate?.customerPrice,
-                  activeSession?.id
-                ).catch(err => logger.error('Usage tracking error:', err)),
-                TokenWalletService.deductTokens({
+              // 1. ALWAYS create usage log directly (bulletproof — no middleware dependency)
+              try {
+                await prisma.usageLog.create({
+                  data: {
+                    userId: user.id,
+                    organizationId,
+                    modelId: aiModel.id,
+                    prompt: inputText.substring(0, 500),
+                    response: fullResponse.substring(0, 500),
+                    tokensInput: inputTokens,
+                    tokensOutput: outputTokens,
+                    totalTokens: totalTokensUsed,
+                    providerCost,
+                    markupPercentage: aiModel.markupPercentage,
+                    customerPrice,
+                    status: 'completed',
+                  },
+                });
+              } catch (logErr) {
+                logger.error('Direct usageLog creation failed:', logErr);
+              }
+
+              // 2. Deduct tokens from TokenWallet
+              try {
+                await TokenWalletService.deductTokens({
                   userId: user.id,
                   tokens: totalTokensUsed,
                   reference: aiModel.id,
                   description: `Query: ${aiModel.name}`,
-                }).catch(err => logger.error('Token deduction error:', err)),
-              ]);
+                });
+              } catch (deductErr) {
+                logger.error('Token deduction failed:', deductErr);
+              }
 
               if (!streamEnded && !res.writableEnded) {
                 res.write(`data: ${JSON.stringify({

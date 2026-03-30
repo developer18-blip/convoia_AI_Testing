@@ -154,10 +154,19 @@ export function OrgAnalyticsPage() {
   useEffect(() => {
     setIsLoading(true)
     setError(null)
+    // Try org endpoint first, fall back to personal if forbidden
     const endpoint = isOrg ? '/org/analytics' : '/org/analytics/personal'
     api.get(endpoint, { params: { from: fromDate, to: toDate } })
       .then((res) => setData(res.data.data))
-      .catch(() => setError('Failed to load analytics'))
+      .catch((err) => {
+        // If org endpoint fails (403/400), try personal endpoint
+        if (isOrg && err?.response?.status && err.response.status >= 400) {
+          return api.get('/org/analytics/personal', { params: { from: fromDate, to: toDate } })
+            .then((res) => setData(res.data.data))
+        }
+        throw err
+      })
+      .catch((err) => setError(err?.response?.data?.message || 'Failed to load analytics'))
       .finally(() => setIsLoading(false))
   }, [fromDate, toDate, isOrg])
 
