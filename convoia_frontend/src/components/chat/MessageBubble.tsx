@@ -320,7 +320,18 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
           }}>
           <ReactMarkdown remarkPlugins={[remarkGfm]}
             components={{
-              p: ({ children }) => <p style={{ marginBottom: '16px', lineHeight: '1.75', color: 'var(--chat-text)' }} className="last:mb-0">{children}</p>,
+              p: ({ children }) => {
+                // Check if this paragraph is a chart placeholder
+                const text = typeof children === 'string' ? children :
+                  Array.isArray(children) ? children.map(c => typeof c === 'string' ? c : '').join('') :
+                  String(children || '')
+                const chartMatch = text.match(/\[CONVOIA_CHART_(\d+)\]/)
+                if (chartMatch) {
+                  const idx = parseInt(chartMatch[1])
+                  if (charts[idx]) return <InlineChart chart={charts[idx]} />
+                }
+                return <p style={{ marginBottom: '16px', lineHeight: '1.75', color: 'var(--chat-text)' }} className="last:mb-0">{children}</p>
+              },
               h1: ({ children }) => <h1 className="first:mt-0" style={{ fontSize: '20px', fontWeight: 700, color: 'var(--chat-text)', marginBottom: '12px', marginTop: '24px' }}>{children}</h1>,
               h2: ({ children }) => <h2 className="first:mt-0" style={{ fontSize: '17px', fontWeight: 600, color: 'var(--chat-text)', marginBottom: '10px', marginTop: '20px' }}>{children}</h2>,
               h3: ({ children }) => <h3 className="first:mt-0" style={{ fontSize: '15px', fontWeight: 600, color: 'var(--chat-text)', marginBottom: '8px', marginTop: '16px' }}>{children}</h3>,
@@ -388,8 +399,10 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
             {cleanText || renderedContent}
           </ReactMarkdown>
 
-          {/* Inline Charts */}
-          {charts.map((chart, i) => <InlineChart key={i} chart={chart} />)}
+          {/* Fallback: render any charts not matched by placeholders */}
+          {charts.length > 0 && !(cleanText || renderedContent).includes('[CONVOIA_CHART_') &&
+            charts.map((chart, i) => <InlineChart key={i} chart={chart} />)
+          }
         </div>
 
         {/* Generated image */}

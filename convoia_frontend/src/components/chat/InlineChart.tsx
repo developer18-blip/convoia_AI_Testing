@@ -118,7 +118,7 @@ export function extractCharts(text: string): { cleanText: string; charts: ChartD
   const charts: ChartData[] = []
   let cleanText = text
 
-  // 1. Try structured chart JSON blocks first
+  // 1. Try structured chart JSON blocks first — replace with inline placeholder
   cleanText = cleanText.replace(/```chart\s*\n([\s\S]*?)```/g, (_match, json) => {
     try {
       const parsed = JSON.parse(json.trim())
@@ -126,6 +126,7 @@ export function extractCharts(text: string): { cleanText: string; charts: ChartD
         const yKeys = parsed.yKeys || Object.keys(parsed.data[0] || {}).slice(1).map((k: string, i: number) => ({
           key: k, color: COLORS[i % COLORS.length], label: k,
         }))
+        const idx = charts.length
         charts.push({
           type: parsed.type || 'line',
           title: parsed.title || 'Chart',
@@ -133,7 +134,7 @@ export function extractCharts(text: string): { cleanText: string; charts: ChartD
           xKey: parsed.xKey || Object.keys(parsed.data[0] || {})[0] || 'name',
           yKeys,
         })
-        return ''
+        return `\n\n[CONVOIA_CHART_${idx}]\n\n`
       }
     } catch { /* not valid JSON */ }
     return _match
@@ -142,12 +143,12 @@ export function extractCharts(text: string): { cleanText: string; charts: ChartD
   // 2. Fallback: detect ASCII tables with $ values inside code blocks
   if (charts.length === 0) {
     cleanText = cleanText.replace(/```\w*\n([\s\S]*?)```/g, (_match, content) => {
-      // Only try if content has $ signs and multiple lines
       if (content.includes('$') && content.split('\n').length >= 3) {
         const chart = extractChartFromTextTable(content)
         if (chart) {
+          const idx = charts.length
           charts.push(chart)
-          return '' // Remove the code block, chart replaces it
+          return `\n\n[CONVOIA_CHART_${idx}]\n\n`
         }
       }
       return _match
