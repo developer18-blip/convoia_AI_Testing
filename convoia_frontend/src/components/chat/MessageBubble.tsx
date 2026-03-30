@@ -170,21 +170,17 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
               </div>
             </div>
           ) : (
-            /* ── Normal display — blue bubble ── */
-            <div className="user-message-bubble" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
-              {/* Image preview — tight thumbnail clipped to content */}
+            /* ── Normal display — image separate, text in bubble ── */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
+              {/* Image — standalone, no background, no border, just rounded corners */}
               {message.imagePreview && (
-                <div style={{
-                  borderRadius: '14px', overflow: 'hidden',
-                  width: 'fit-content', maxWidth: '160px',
-                }}>
-                  <img src={message.imagePreview} alt="Uploaded" style={{
-                    maxWidth: '160px', maxHeight: '120px', display: 'block',
-                    objectFit: 'cover', borderRadius: '14px',
-                  }} />
-                </div>
+                <img src={message.imagePreview} alt="Uploaded" style={{
+                  maxWidth: '280px', maxHeight: '240px', display: 'block',
+                  objectFit: 'cover', borderRadius: '16px',
+                }} />
               )}
 
+              {/* Text bubble — separate below image */}
               <div style={{
                 background: 'var(--chat-user-bubble)', borderRadius: '18px', padding: '10px 16px',
                 fontSize: '15px', lineHeight: '1.6', color: 'var(--chat-text)', wordBreak: 'break-word',
