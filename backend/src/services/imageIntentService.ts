@@ -34,11 +34,13 @@ const IMAGE_MODIFY_PATTERNS = [
   /\bnot (professional|good|right|what i wanted)\b/i,
 ];
 
-// Patterns that should NOT trigger image gen (code, analysis, text)
+// Patterns that should NOT trigger image gen (code, analysis, text, documents)
 const ANTI_PATTERNS = [
   /\b(explain|analyze|compare|describe|tell me about|what is|how does|write code|implement|debug|fix)\b.*\b(image|design|poster)\b/i,
   /\b(code|script|function|algorithm|api|endpoint)\b/i,
   /```/,  // Code blocks
+  /\b(doc|document|docx|pdf|report|essay|article|blog|paper|proposal|letter|resume|cv|email|memo|presentation|ppt|spreadsheet|excel|csv)\b/i,
+  /\b(write|create|make|draft|prepare)\b.{0,15}\b(doc|document|docx|pdf|report|essay|article|blog|paper|proposal|letter|file|resume|cv|content|text|email|memo)\b/i,
 ];
 
 export interface ImageIntent {
