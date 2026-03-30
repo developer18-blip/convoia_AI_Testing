@@ -141,7 +141,7 @@ export function OrgAnalyticsPage() {
   const [activeDays, setActiveDays] = useState(30)
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
-  const [chartMode, setChartMode] = useState<'cost' | 'queries'>('cost')
+  const [chartMode, setChartMode] = useState<'cost' | 'queries' | 'tokens'>('tokens')
 
   const fromDate = useMemo(() => {
     if (customFrom) return customFrom
@@ -167,7 +167,7 @@ export function OrgAnalyticsPage() {
   const summary = data?.summary || {}
   const dailyData = data?.dailyUsage || []
   const memberData = data?.memberBreakdown || []
-  const modelData = (data?.modelBreakdown || []).map((m: any) => ({ name: m.name, value: m.cost }))
+  const modelData = (data?.modelBreakdown || []).map((m: any) => ({ name: m.name, value: m.tokens || m.queries || m.cost }))
   const dateRangeLabel = `${fromDate} to ${toDate}`
 
   // Queries bar chart data (top 7 days)
@@ -241,14 +241,14 @@ export function OrgAnalyticsPage() {
         {/* Daily Spend / Queries chart — full width */}
         <Section title={chartMode === 'cost' ? 'Daily Spend' : 'Daily Queries'} icon={TrendingUp} full>
           <div style={{ display: 'flex', gap: '4px', marginBottom: '12px' }}>
-            {(['cost', 'queries'] as const).map(m => (
+            {(['tokens', 'queries', 'cost'] as const).map(m => (
               <button key={m} onClick={() => setChartMode(m)}
                 style={{
                   padding: '5px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 500, border: 'none', cursor: 'pointer',
                   background: chartMode === m ? 'var(--color-primary)' : 'transparent',
                   color: chartMode === m ? 'white' : 'var(--color-text-muted)',
                 }}>
-                {m === 'cost' ? 'Spend ($)' : 'Queries'}
+                {m === 'tokens' ? 'Tokens' : m === 'cost' ? 'Spend ($)' : 'Queries'}
               </button>
             ))}
           </div>
@@ -257,14 +257,14 @@ export function OrgAnalyticsPage() {
               data={dailyData} xKey="date"
               yKey={chartMode}
               height={280}
-              color={chartMode === 'cost' ? '#7C3AED' : '#3B82F6'}
+              color={chartMode === 'tokens' ? '#F59E0B' : chartMode === 'cost' ? '#7C3AED' : '#3B82F6'}
               formatY={chartMode === 'cost' ? (v: number) => fmt$(v) : (v: number) => fmtK(v)}
             />
           ) : <div style={{ height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', fontSize: '13px' }}>No data for this period</div>}
         </Section>
 
         {/* Model Breakdown */}
-        <Section title="Usage by Model" icon={Brain}>
+        <Section title="Tokens by Model" icon={Brain}>
           {modelData.length > 0 ? <DonutChart data={modelData} /> : <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '13px', padding: '32px 0' }}>No data</p>}
         </Section>
 
@@ -285,9 +285,9 @@ export function OrgAnalyticsPage() {
 
         {/* Member Breakdown (org only) or Model table (personal) */}
         {isOrg && (
-          <Section title="Usage by Member" icon={Users}>
+          <Section title="Tokens by Member" icon={Users}>
             {memberData.length > 0 ? (
-              <DonutChart data={memberData.map((m: any) => ({ name: m.name, value: m.cost }))} />
+              <DonutChart data={memberData.map((m: any) => ({ name: m.name, value: m.tokens || m.queries || m.cost }))} />
             ) : <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '13px', padding: '32px 0' }}>No data</p>}
           </Section>
         )}

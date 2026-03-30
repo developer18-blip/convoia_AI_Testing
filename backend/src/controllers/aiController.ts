@@ -252,7 +252,8 @@ export const queryAIStream = async (req: Request, res: Response) => {
         res.end();
         // Log usage
         const orgId = imgUser?.organizationId || undefined;
-        await prisma.usageLog.create({ data: { userId: req.user.userId, organizationId: orgId, modelId: streamModelCheck.id, prompt: lastMsg.substring(0, 500), response: `[Image: ${result.revisedPrompt?.substring(0, 200)}]`, tokensInput: 0, tokensOutput: imageTokenCost, totalTokens: imageTokenCost, providerCost: 0, markupPercentage: 0, customerPrice: 0, status: 'completed' } });
+        const imgCustomerPrice = imageTokenCost * 0.000002; // ~$0.002 per 1K tokens
+        await prisma.usageLog.create({ data: { userId: req.user.userId, organizationId: orgId, modelId: streamModelCheck.id, prompt: lastMsg.substring(0, 500), response: `[Image: ${result.revisedPrompt?.substring(0, 200)}]`, tokensInput: 0, tokensOutput: imageTokenCost, totalTokens: imageTokenCost, providerCost: 0, markupPercentage: 20, customerPrice: imgCustomerPrice, status: 'completed' } });
       } catch (err: any) {
         res.write(`data: ${JSON.stringify({ type: 'chunk', content: `\n\nImage generation failed: ${err.message}` })}\n\n`);
         res.write(`data: ${JSON.stringify({ type: 'done', inputTokens: 0, outputTokens: 0, totalTokens: 0, model: streamModelCheck.name })}\n\n`);
@@ -389,6 +390,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
           if (imgModel) imageModelId = imgModel.id;
         } catch { /* use chat model as fallback */ }
 
+        const imgCustomerPrice = imageTokenCost * 0.000002;
         await prisma.usageLog.create({
           data: {
             userId: user.id, organizationId,
@@ -396,7 +398,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
             prompt: lastUserText.substring(0, 500),
             response: `[Image generated: ${result.revisedPrompt?.substring(0, 200) || enhancedPrompt.substring(0, 200)}]`,
             tokensInput: 0, tokensOutput: imageTokenCost, totalTokens: imageTokenCost,
-            providerCost: 0, markupPercentage: 0, customerPrice: 0,
+            providerCost: 0, markupPercentage: 20, customerPrice: imgCustomerPrice,
             status: 'completed',
           },
         });
