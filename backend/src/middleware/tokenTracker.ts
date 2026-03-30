@@ -72,61 +72,40 @@ export async function afterQueryMiddleware(
       },
     });
 
-    // 2. Try wallet/budget updates (non-critical — don't lose usage log if these fail)
+    // 2. Update budget and subscription tracking (non-critical)
+    // NOTE: Token deduction is handled by TokenWalletService.deductTokens() in aiController.
+    // We do NOT deduct from the legacy Wallet table here to avoid double-billing.
     try {
-      await prisma.$transaction(async (tx) => {
-        // Deduct from wallet (may not exist for all users)
-        const wallet = await tx.wallet.findUnique({ where: { userId } });
-        if (wallet) {
-          await tx.wallet.update({
-            where: { userId },
-            data: {
-              balance: { decrement: customerPrice },
-              totalSpent: { increment: customerPrice },
-            },
-          });
-          await tx.walletTransaction.create({
-            data: {
-              walletId: wallet.id,
-              amount: customerPrice,
-              type: 'debit',
-              description: `AI query cost`,
-              reference: modelId,
-            },
-          });
+      // Update budget usage if exists
+      const budget = await prisma.budget.findFirst({ where: { userId } });
+      if (budget) {
+        const newUsage = budget.currentUsage + customerPrice;
+        const usagePercent = (newUsage / budget.monthlyCap) * 100;
+        const shouldAlert = usagePercent >= budget.alertThreshold && !budget.alertSent;
+        await prisma.budget.update({
+          where: { id: budget.id },
+          data: { currentUsage: newUsage, ...(shouldAlert ? { alertSent: true } : {}) },
+        });
+        if (shouldAlert) {
+          logger.warn(`BUDGET ALERT: User ${userId} reached ${usagePercent.toFixed(1)}% of monthly budget`);
         }
+      }
 
-        // Update budget usage if exists
-        const budget = await tx.budget.findFirst({ where: { userId } });
-        if (budget) {
-          const newUsage = budget.currentUsage + customerPrice;
-          const usagePercent = (newUsage / budget.monthlyCap) * 100;
-          const shouldAlert = usagePercent >= budget.alertThreshold && !budget.alertSent;
-          await tx.budget.update({
-            where: { id: budget.id },
-            data: { currentUsage: newUsage, ...(shouldAlert ? { alertSent: true } : {}) },
-          });
-          if (shouldAlert) {
-            logger.warn(`BUDGET ALERT: User ${userId} reached ${usagePercent.toFixed(1)}% of monthly budget`);
-          }
+      // Update subscription token usage if exists
+      const subscription = await prisma.subscription.findFirst({ where: { userId, status: 'active' } });
+      if (subscription) {
+        const newTokenUsage = subscription.tokensUsedThisMonth + totalTokens;
+        const quotaExceeded = newTokenUsage >= subscription.monthlyTokenQuota;
+        await prisma.subscription.update({
+          where: { id: subscription.id },
+          data: { tokensUsedThisMonth: newTokenUsage, ...(quotaExceeded ? { status: 'quota_exceeded' } : {}) },
+        });
+        if (quotaExceeded) {
+          logger.warn(`QUOTA EXCEEDED: User ${userId} exceeded monthly token quota`);
         }
-
-        // Update subscription token usage if exists
-        const subscription = await tx.subscription.findFirst({ where: { userId, status: 'active' } });
-        if (subscription) {
-          const newTokenUsage = subscription.tokensUsedThisMonth + totalTokens;
-          const quotaExceeded = newTokenUsage >= subscription.monthlyTokenQuota;
-          await tx.subscription.update({
-            where: { id: subscription.id },
-            data: { tokensUsedThisMonth: newTokenUsage, ...(quotaExceeded ? { status: 'quota_exceeded' } : {}) },
-          });
-          if (quotaExceeded) {
-            logger.warn(`QUOTA EXCEEDED: User ${userId} exceeded monthly token quota`);
-          }
-        }
-      });
-    } catch (walletErr) {
-      logger.warn(`Wallet/budget update failed (usage log still saved): ${walletErr}`);
+      }
+    } catch (trackingErr) {
+      logger.warn(`Budget/subscription tracking failed (usage log still saved): ${trackingErr}`);
     }
 
     logger.info(

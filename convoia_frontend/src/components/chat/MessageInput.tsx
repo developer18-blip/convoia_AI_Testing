@@ -260,6 +260,7 @@ export function MessageInput({
           provider: result.provider,
         })
         window.dispatchEvent(new Event('wallet:refresh'))
+        window.dispatchEvent(new Event('tokens:refresh'))
         setAttachedFile(null)
         return true
       } else {
@@ -331,6 +332,7 @@ export function MessageInput({
   const handleImageGenerated = (imageUrl: string, prompt: string) => {
     onImageGenerated?.({ url: imageUrl, prompt })
     window.dispatchEvent(new Event('wallet:refresh'))
+    window.dispatchEvent(new Event('tokens:refresh'))
   }
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

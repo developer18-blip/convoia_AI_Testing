@@ -305,7 +305,7 @@ export const generateImage = asyncHandler(async (req: Request, res: Response): P
           prompt: prompt.substring(0, 500),
           response: `[Image generated: ${result.revisedPrompt?.substring(0, 200) || prompt.substring(0, 200)}]`,
           tokensInput: 0, tokensOutput: imageTokenCost, totalTokens: imageTokenCost,
-          providerCost: 0, markupPercentage: 0, customerPrice: 0,
+          providerCost: 0, markupPercentage: 20, customerPrice: imageTokenCost * 0.000002,
           status: 'completed',
         },
       })

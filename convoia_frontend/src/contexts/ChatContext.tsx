@@ -421,7 +421,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       ))
 
       // Refresh wallet balance after tokens were used
-      window.dispatchEvent(new Event('wallet:refresh'))
+      window.dispatchEvent(new Event('tokens:refresh'))
     } catch (err: unknown) {
       // If user stopped, don't show error
       if (err instanceof DOMException && err.name === 'AbortError') {
@@ -544,7 +544,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       ))
 
       // Refresh wallet balance after tokens were used
-      window.dispatchEvent(new Event('wallet:refresh'))
+      window.dispatchEvent(new Event('tokens:refresh'))
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to get response'
       setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, isLoading: false, error: errorMsg, content: errorMsg } : m))
