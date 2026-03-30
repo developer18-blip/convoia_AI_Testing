@@ -303,7 +303,12 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
           </div>
         )}
 
-        <div className="prose prose-sm max-w-none message-content" style={{ fontSize: '15px', lineHeight: '1.75', color: 'var(--chat-text)' }}>
+        <div className="prose prose-sm max-w-none message-content" style={{ fontSize: '15px', lineHeight: '1.75', color: 'var(--chat-text)' }}
+          onCopy={(e) => {
+            // Copy as plain text — strip background colors and formatting
+            const selection = window.getSelection()?.toString()
+            if (selection) { e.preventDefault(); navigator.clipboard.writeText(selection) }
+          }}>
           <ReactMarkdown remarkPlugins={[remarkGfm]}
             components={{
               p: ({ children }) => <p style={{ marginBottom: '16px', lineHeight: '1.75', color: 'var(--chat-text)' }} className="last:mb-0">{children}</p>,

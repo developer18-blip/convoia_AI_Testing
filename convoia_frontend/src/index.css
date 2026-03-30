@@ -272,6 +272,23 @@ pre {
   word-break: break-word;
 }
 
+/* Copy text without background color — strip formatting on selection copy */
+.message-content ::selection {
+  background: rgba(124, 58, 237, 0.25);
+  color: inherit;
+  -webkit-text-fill-color: inherit;
+}
+.message-content *::selection {
+  background: rgba(124, 58, 237, 0.25);
+  color: inherit;
+}
+/* Override user bubble selection */
+.user-message-bubble ::selection,
+.user-message-bubble *::selection {
+  background: rgba(255, 255, 255, 0.3);
+  color: inherit;
+}
+
 /* Tables scroll within their container */
 .table-wrapper {
   overflow-x: auto;

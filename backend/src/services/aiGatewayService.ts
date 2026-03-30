@@ -761,15 +761,23 @@ function callOpenAICompatibleStream(
   url: string, modelId: string, messages: any[], systemPrompt: string,
   apiKey: string, callbacks: StreamCallbacks, overrides?: ProviderOverrides
 ): Promise<void> {
+  const isDeepSeekReasoner = modelId === 'deepseek-reasoner';
+
   const body: Record<string, any> = {
     model: modelId,
     messages: [{ role: 'system', content: systemPrompt }, ...messages],
-    temperature: overrides?.temperature ?? 0.7,
-    max_tokens: overrides?.maxTokens ?? 16384,
     stream: true,
     stream_options: { include_usage: true },
   };
-  if (overrides?.topP != null) body.top_p = overrides.topP;
+
+  // DeepSeek Reasoner doesn't support temperature/top_p
+  if (!isDeepSeekReasoner) {
+    body.temperature = overrides?.temperature ?? 0.7;
+    body.max_tokens = overrides?.maxTokens ?? 16384;
+    if (overrides?.topP != null) body.top_p = overrides.topP;
+  } else {
+    body.max_tokens = overrides?.maxTokens ?? 16384;
+  }
 
   return new Promise(async (resolve, reject) => {
     try {
@@ -781,6 +789,7 @@ function callOpenAICompatibleStream(
 
       let inputTokens = 0, outputTokens = 0;
       let buffer = '';
+      let isThinking = false;
 
       response.data.on('data', (chunk: Buffer) => {
         buffer += chunk.toString();
@@ -793,8 +802,27 @@ function callOpenAICompatibleStream(
           if (!trimmed.startsWith('data: ')) continue;
           try {
             const json = JSON.parse(trimmed.slice(6));
-            const delta = json.choices?.[0]?.delta?.content;
-            if (delta) callbacks.onChunk(delta);
+            const delta = json.choices?.[0]?.delta;
+
+            // DeepSeek Reasoner: stream reasoning_content as thinking blocks
+            if (delta?.reasoning_content) {
+              if (!isThinking) {
+                isThinking = true;
+                callbacks.onChunk('\n> 🧠 **Thinking...**\n>\n> ');
+              }
+              const thinkText = delta.reasoning_content.replace(/\n/g, '\n> ');
+              callbacks.onChunk(thinkText);
+            }
+
+            // Regular content — if we were thinking, close the block first
+            if (delta?.content) {
+              if (isThinking) {
+                isThinking = false;
+                callbacks.onChunk('\n\n---\n\n**Answer:**\n\n');
+              }
+              callbacks.onChunk(delta.content);
+            }
+
             if (json.usage) {
               inputTokens = json.usage.prompt_tokens || 0;
               outputTokens = json.usage.completion_tokens || 0;
