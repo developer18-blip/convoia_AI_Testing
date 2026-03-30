@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db.js';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
+import logger from '../config/logger.js';
 
 // ============ GET /api/org/settings ============
 export const getOrgSettings = asyncHandler(async (req: Request, res: Response) => {
@@ -197,35 +198,48 @@ export const getOrgAnalytics = asyncHandler(async (req: Request, res: Response) 
   if (!['manager', 'org_owner', 'platform_admin'].includes(req.user.role)) {
     throw new AppError('Insufficient permissions', 403);
   }
-  // Support date range from query params
+
   const { from, to } = req.query;
   const startDate = from ? new Date(from as string) : new Date(Date.now() - 30 * 86400000);
   const endDate = to ? new Date(to as string) : new Date();
   endDate.setHours(23, 59, 59, 999);
 
-  // Resolve org ID — try user's org first, then find all orgs they own
-  let orgId = req.user.organizationId;
+  // ALWAYS fetch fresh org ID from database — JWT may be stale
+  const freshUser = await prisma.user.findUnique({
+    where: { id: req.user.userId },
+    select: { organizationId: true },
+  });
+
+  let orgId = freshUser?.organizationId;
+
+  // Fallback: find org owned by this user
   if (!orgId) {
-    // Find org owned by this user
     const ownedOrg = await prisma.organization.findFirst({ where: { ownerId: req.user.userId } });
     orgId = ownedOrg?.id || undefined;
   }
 
-  if (!orgId) {
-    throw new AppError('You do not belong to an organization', 400);
+  // Build query — always include user's own logs as fallback
+  const memberIds = [req.user.userId]; // always include self
+  if (orgId) {
+    const orgMembers = await prisma.user.findMany({ where: { organizationId: orgId }, select: { id: true } });
+    for (const m of orgMembers) {
+      if (!memberIds.includes(m.id)) memberIds.push(m.id);
+    }
   }
 
-  // Query by org ID OR by user ID (fallback for logs before org was set)
-  const orgMembers = await prisma.user.findMany({ where: { organizationId: orgId }, select: { id: true } });
-  const memberIds = orgMembers.map(m => m.id);
+  // Query by BOTH org ID and member user IDs — covers all cases
+  const whereClause: any = { createdAt: { gte: startDate, lte: endDate } };
+  if (orgId) {
+    whereClause.OR = [
+      { organizationId: orgId },
+      { userId: { in: memberIds } },
+    ];
+  } else {
+    whereClause.userId = { in: memberIds };
+  }
 
   const logs = await prisma.usageLog.findMany({
-    where: {
-      OR: [
-        { organizationId: orgId, createdAt: { gte: startDate, lte: endDate } },
-        { userId: { in: memberIds }, createdAt: { gte: startDate, lte: endDate } },
-      ],
-    },
+    where: whereClause,
     select: {
       userId: true,
       customerPrice: true,
@@ -237,6 +251,8 @@ export const getOrgAnalytics = asyncHandler(async (req: Request, res: Response) 
     },
     orderBy: { createdAt: 'asc' },
   });
+
+  logger.info(`Analytics query: orgId=${orgId}, members=${memberIds.length}, logs found=${logs.length}, range=${startDate.toISOString()} to ${endDate.toISOString()}`);
 
   const dailyMap = new Map<string, { date: string; cost: number; queries: number; tokens: number }>();
   const memberMap = new Map<string, { name: string; cost: number; queries: number; tokens: number }>();

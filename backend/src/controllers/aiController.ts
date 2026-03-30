@@ -589,6 +589,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
 
               // 1. ALWAYS create usage log directly (bulletproof — no middleware dependency)
               try {
+                logger.info(`Creating usageLog: userId=${user.id}, orgId=${organizationId}, model=${aiModel.name}, tokens=${totalTokensUsed}, cost=$${customerPrice.toFixed(6)}`);
                 await prisma.usageLog.create({
                   data: {
                     userId: user.id,
@@ -605,8 +606,9 @@ export const queryAIStream = async (req: Request, res: Response) => {
                     status: 'completed',
                   },
                 });
-              } catch (logErr) {
-                logger.error('Direct usageLog creation failed:', logErr);
+                logger.info(`UsageLog created successfully for user ${user.id}`);
+              } catch (logErr: any) {
+                logger.error(`Direct usageLog creation FAILED: ${logErr.message}`, logErr);
               }
 
               // 2. Deduct tokens from TokenWallet
