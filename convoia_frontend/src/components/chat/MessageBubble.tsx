@@ -139,41 +139,59 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
       }}
       onMouseEnter={() => setShowActions(true)} onMouseLeave={() => setShowActions(false)}>
         <div style={{ maxWidth: '60%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-          {/* User bubble */}
-          <div className="user-message-bubble" style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
-            {/* Image preview — compact thumbnail like ChatGPT */}
-            {message.imagePreview && !isEditing && (
-              <div style={{
-                borderRadius: '12px', overflow: 'hidden',
-                border: '1px solid var(--chat-border)',
-                background: 'var(--chat-surface)',
-                width: 'fit-content',
-              }}>
-                <img src={message.imagePreview} alt="Uploaded" style={{
-                  maxWidth: '200px', maxHeight: '200px', display: 'block',
-                  objectFit: 'contain', borderRadius: '12px',
-                }} />
-              </div>
-            )}
-
-            {/* Text bubble */}
+          {isEditing ? (
+            /* ── Edit mode — clean standalone card, no blue bubble ── */
             <div style={{
-              background: 'var(--chat-user-bubble)', borderRadius: '18px', padding: '10px 16px',
-              fontSize: '15px', lineHeight: '1.6', color: 'var(--chat-text)', wordBreak: 'break-word',
-              maxWidth: '100%',
+              width: '100%', minWidth: '320px',
+              background: 'var(--chat-surface)', borderRadius: '16px',
+              border: '1px solid var(--chat-border)',
+              padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px',
             }}>
-            {isEditing ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <textarea value={editValue} onChange={(e) => setEditValue(e.target.value)} autoFocus
-                  style={{ width: '100%', borderRadius: '8px', padding: '8px 12px', fontSize: '14px', resize: 'none', minHeight: '60px', background: 'var(--chat-border)', border: '1px solid var(--color-border-hover)', color: 'var(--chat-text)', outline: 'none' }} />
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button onClick={handleSaveEdit} style={{ padding: '4px 12px', fontSize: '12px', color: 'white', borderRadius: '8px', background: 'var(--color-primary)', border: 'none', cursor: 'pointer' }}>Save & Resend</button>
-                  <button onClick={() => { setIsEditing(false); setEditValue(message.content) }}
-                    style={{ padding: '4px 12px', fontSize: '12px', borderRadius: '8px', background: 'var(--chat-border)', color: 'var(--chat-text-secondary)', border: 'none', cursor: 'pointer' }}>Cancel</button>
-                </div>
+              <textarea value={editValue} onChange={(e) => setEditValue(e.target.value)} autoFocus
+                style={{
+                  width: '100%', borderRadius: '10px', padding: '10px 14px',
+                  fontSize: '15px', lineHeight: '1.6', resize: 'vertical', minHeight: '80px',
+                  background: 'var(--chat-bg)', border: '1px solid var(--chat-border)',
+                  color: 'var(--chat-text)', outline: 'none',
+                  fontFamily: 'inherit',
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = 'var(--color-primary)'}
+                onBlur={(e) => e.currentTarget.style.borderColor = 'var(--chat-border)'}
+              />
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <button onClick={() => { setIsEditing(false); setEditValue(message.content) }}
+                  style={{ padding: '6px 16px', fontSize: '13px', borderRadius: '8px', background: 'transparent', color: 'var(--chat-text-secondary)', border: '1px solid var(--chat-border)', cursor: 'pointer', fontWeight: 500 }}>
+                  Cancel
+                </button>
+                <button onClick={handleSaveEdit}
+                  style={{ padding: '6px 16px', fontSize: '13px', color: 'white', borderRadius: '8px', background: 'var(--color-primary)', border: 'none', cursor: 'pointer', fontWeight: 500 }}>
+                  Save & Resend
+                </button>
               </div>
-            ) : (
-              <>
+            </div>
+          ) : (
+            /* ── Normal display — blue bubble ── */
+            <div className="user-message-bubble" style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
+              {/* Image preview — compact thumbnail */}
+              {message.imagePreview && (
+                <div style={{
+                  borderRadius: '12px', overflow: 'hidden',
+                  border: '1px solid var(--chat-border)',
+                  background: 'var(--chat-surface)',
+                  width: 'fit-content',
+                }}>
+                  <img src={message.imagePreview} alt="Uploaded" style={{
+                    maxWidth: '200px', maxHeight: '200px', display: 'block',
+                    objectFit: 'contain', borderRadius: '12px',
+                  }} />
+                </div>
+              )}
+
+              <div style={{
+                background: 'var(--chat-user-bubble)', borderRadius: '18px', padding: '10px 16px',
+                fontSize: '15px', lineHeight: '1.6', color: 'var(--chat-text)', wordBreak: 'break-word',
+                maxWidth: '100%',
+              }}>
                 {/* File chips */}
                 {message.fileAttachment && message.fileAttachment.type === 'document' && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--chat-border)', borderRadius: '8px', padding: '8px 12px', marginBottom: '8px', fontSize: '13px', color: 'var(--chat-text)' }}>
@@ -187,10 +205,9 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
                   </div>
                 )}
                 {message.content}
-              </>
-            )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Action buttons — below bubble, never clipped */}
           {showActions && !isEditing && (
