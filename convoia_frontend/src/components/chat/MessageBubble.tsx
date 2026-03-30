@@ -171,18 +171,16 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
             </div>
           ) : (
             /* ── Normal display — blue bubble ── */
-            <div className="user-message-bubble" style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
-              {/* Image preview — compact thumbnail */}
+            <div className="user-message-bubble" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
+              {/* Image preview — tight thumbnail clipped to content */}
               {message.imagePreview && (
                 <div style={{
-                  borderRadius: '12px', overflow: 'hidden',
-                  border: '1px solid var(--chat-border)',
-                  background: 'var(--chat-surface)',
-                  width: 'fit-content',
+                  borderRadius: '14px', overflow: 'hidden',
+                  width: 'fit-content', maxWidth: '160px',
                 }}>
                   <img src={message.imagePreview} alt="Uploaded" style={{
-                    maxWidth: '200px', maxHeight: '200px', display: 'block',
-                    objectFit: 'contain', borderRadius: '12px',
+                    maxWidth: '160px', maxHeight: '120px', display: 'block',
+                    objectFit: 'cover', borderRadius: '14px',
                   }} />
                 </div>
               )}
