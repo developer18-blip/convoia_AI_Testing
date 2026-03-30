@@ -247,7 +247,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
         await TokenWalletService.deductTokens({ userId: req.user.userId, tokens: imageTokenCost, reference: `image-gen-${Date.now()}`, description: `Image generation (${streamModelCheck.name})` });
         const imageContent = `\n\n![Generated Image](${result.imageUrl})\n\n*"${result.revisedPrompt}"*\n\n[Download image](${result.imageUrl})`;
         res.write(`data: ${JSON.stringify({ type: 'chunk', content: imageContent })}\n\n`);
-        res.write(`data: ${JSON.stringify({ type: 'done', inputTokens: 0, outputTokens: imageTokenCost, totalTokens: imageTokenCost, model: streamModelCheck.name, imageGenerated: true, imageUrl: result.imageUrl })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'done', tokens: { input: 0, output: imageTokenCost, total: imageTokenCost }, tokensUsed: imageTokenCost, model: streamModelCheck.name, imageGenerated: true, imageUrl: result.imageUrl })}\n\n`);
         res.write('data: [DONE]\n\n');
         res.end();
         // Log usage
@@ -372,9 +372,8 @@ export const queryAIStream = async (req: Request, res: Response) => {
         // Send done event with metadata
         res.write(`data: ${JSON.stringify({
           type: 'done',
-          inputTokens: 0,
-          outputTokens: imageTokenCost,
-          totalTokens: imageTokenCost,
+          tokens: { input: 0, output: imageTokenCost, total: imageTokenCost },
+          tokensUsed: imageTokenCost,
           model: result.provider === 'gemini' ? 'Gemini Flash Image' : 'DALL-E 3',
           imageGenerated: true,
           imageUrl: result.imageUrl,
