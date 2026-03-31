@@ -352,7 +352,7 @@ export function MessageInput({
   const canSend = (value.trim() || attachedFile) && !isLoading && !disabled && !fileLoading && !(attachedFile?.uploading)
 
   return (
-    <div style={{ flexShrink: 0, padding: '0 16px 16px', backgroundColor: 'var(--chat-bg)' }}>
+    <div className="chat-input-container" style={{ flexShrink: 0, padding: '0 16px 16px', backgroundColor: 'var(--chat-bg)', position: 'relative', zIndex: 10 }}>
       <div style={{ maxWidth: '760px', margin: '0 auto', width: '100%' }}>
 
         {/* Error banner */}
@@ -374,7 +374,7 @@ export function MessageInput({
             ? '0 0 0 3px rgba(124,58,237,0.08), 0 4px 16px rgba(0,0,0,0.25)'
             : '0 2px 12px rgba(0,0,0,0.15)',
           transition: 'all 200ms ease',
-          cursor: 'text', maxWidth: '100%',
+          cursor: 'text', maxWidth: '100%', overflowX: 'hidden',
         }}
         onClick={() => textareaRef.current?.focus()}
         onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
