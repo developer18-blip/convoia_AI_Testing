@@ -186,8 +186,8 @@ const aiModels = [
     provider: 'anthropic',
     modelId: 'claude-opus-4-6',
     description: 'Most capable Claude — best reasoning, coding, and analysis',
-    inputTokenPrice: 0.000015,     // $15.00 / 1M input
-    outputTokenPrice: 0.000075,    // $75.00 / 1M output
+    inputTokenPrice: 0.000005,     // $5.00 / 1M input
+    outputTokenPrice: 0.000025,    // $25.00 / 1M output
     capabilities: ['chat', 'vision', 'function_calling'],
     contextWindow: 200000,
   },
@@ -196,8 +196,8 @@ const aiModels = [
     provider: 'anthropic',
     modelId: 'claude-opus-4-5-20251101',
     description: 'Previous-gen Opus — creative writing, deep analysis',
-    inputTokenPrice: 0.000015,     // $15.00 / 1M input
-    outputTokenPrice: 0.000075,    // $75.00 / 1M output
+    inputTokenPrice: 0.000005,     // $5.00 / 1M input
+    outputTokenPrice: 0.000025,    // $25.00 / 1M output
     capabilities: ['chat', 'vision', 'function_calling'],
     contextWindow: 200000,
   },
@@ -226,8 +226,8 @@ const aiModels = [
     provider: 'anthropic',
     modelId: 'claude-haiku-4-5-20251001',
     description: 'Fastest Claude — instant responses at lowest cost',
-    inputTokenPrice: 0.0000008,    // $0.80 / 1M input
-    outputTokenPrice: 0.000004,    // $4.00 / 1M output
+    inputTokenPrice: 0.000001,     // $1.00 / 1M input
+    outputTokenPrice: 0.000005,    // $5.00 / 1M output
     capabilities: ['chat', 'vision', 'function_calling'],
     contextWindow: 200000,
   },
