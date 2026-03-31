@@ -396,7 +396,7 @@ export const removeMember = asyncHandler(async (req: Request, res: Response) => 
       p.userMemory?.deleteMany({ where: { userId } }),
       p.hourlySession?.deleteMany({ where: { userId } }),
       p.aPIKey?.deleteMany({ where: { userId } }),
-      p.orgInvite?.deleteMany({ where: { OR: [{ invitedBy: userId }, { acceptedById: userId }] } }),
+      p.orgInvite?.deleteMany({ where: { OR: [{ invitedById: userId }, { acceptedById: userId }] } }),
       p.activityLog?.deleteMany({ where: { OR: [{ actorId: userId }, { targetId: userId }] } }),
       p.review?.deleteMany({ where: { userId } }),
       p.billingRecord?.deleteMany({ where: { userId } }),
