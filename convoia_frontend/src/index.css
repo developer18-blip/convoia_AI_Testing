@@ -530,21 +530,7 @@ html.light header {
 
 /* Light mode user message bubble — clean, subtle (ChatGPT-style) */
 
-/* Light mode code blocks — warm tinted */
-html.light pre {
-  background: #1E293B !important;
-  color: #E2E8F0 !important;
-  border: 1px solid #334155 !important;
-  border-radius: 12px !important;
-}
-html.light pre code {
-  color: #E2E8F0 !important;
-  background: transparent !important;
-}
-html.light pre ::selection {
-  background: rgba(96, 165, 250, 0.3) !important;
-  color: #FFFFFF !important;
-}
+/* Light mode inline code — subtle background */
 html.light code:not(pre code) {
   background: #F1F5F9 !important;
   color: #1E293B !important;
