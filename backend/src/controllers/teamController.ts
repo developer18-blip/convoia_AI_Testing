@@ -375,16 +375,21 @@ export const removeMember = asyncHandler(async (req: Request, res: Response) => 
 
   if (hardDelete && requester?.role === 'org_owner') {
     // Hard delete — remove user and all their data from database
-    // Use raw queries for tables that might have naming issues, then transaction for core
     const p = prisma as any;
 
-    // Clean up all foreign key references (safe — ignore if table/column doesn't exist)
+    // 1. Handle token allocations — DON'T return tokens to pool, just delete the records
+    //    The employee's tokens are already spent/used. We preserve org pool as-is.
+    // Delete allocations without modifying org token pool
+    await p.tokenAllocation?.deleteMany({
+      where: { OR: [{ assignedToId: userId }, { assignedById: userId }] },
+    }).catch(() => {});
+
+    // 2. Clean up all other foreign key references
     const cleanups = [
       p.task?.deleteMany({ where: { OR: [{ assignedToId: userId }, { createdById: userId }] } }),
       p.subTask?.deleteMany({ where: { task: { OR: [{ assignedToId: userId }, { createdById: userId }] } } }),
       p.taskComment?.deleteMany({ where: { userId } }),
       p.notification?.deleteMany({ where: { userId } }),
-      p.usageLog?.deleteMany({ where: { userId } }),
       p.tokenTransaction?.deleteMany({ where: { userId } }),
       p.chatMessage?.deleteMany({ where: { conversation: { userId } } }),
       p.conversation?.deleteMany({ where: { userId } }),
@@ -398,11 +403,10 @@ export const removeMember = asyncHandler(async (req: Request, res: Response) => 
       p.tokenPurchase?.deleteMany({ where: { userId } }),
       p.budget?.deleteMany({ where: { userId } }),
       p.subscription?.deleteMany({ where: { userId } }),
-      p.tokenAllocation?.deleteMany({ where: { userId } }),
     ].filter(Boolean);
     await Promise.allSettled(cleanups);
 
-    // Delete wallet + its transactions
+    // 3. Delete employee's own wallet + transactions (does NOT touch org owner's wallet)
     const wallet = await prisma.wallet.findUnique({ where: { userId } });
     if (wallet) {
       await prisma.walletTransaction.deleteMany({ where: { walletId: wallet.id } });
@@ -410,10 +414,14 @@ export const removeMember = asyncHandler(async (req: Request, res: Response) => 
     }
     await prisma.tokenWallet.deleteMany({ where: { userId } });
 
-    // Clear managerId references
+    // 4. Delete usage logs LAST (preserves org analytics history if needed)
+    //    NOTE: We delete them so org analytics won't show ghost data
+    await prisma.usageLog.deleteMany({ where: { userId } });
+
+    // 5. Clear managerId references from other users
     await prisma.user.updateMany({ where: { managerId: userId }, data: { managerId: null } });
 
-    // Finally delete the user
+    // 6. Finally delete the user
     await prisma.user.delete({ where: { id: userId } });
 
     logger.info(`Member PERMANENTLY DELETED: userId=${userId} by=${req.user.userId}`);
