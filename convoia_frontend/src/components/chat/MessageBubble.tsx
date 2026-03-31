@@ -187,31 +187,40 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
       onMouseEnter={() => setShowActions(true)} onMouseLeave={() => setShowActions(false)}>
         <div className="user-msg-container" style={{ maxWidth: '75%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
           {isEditing ? (
-            /* ── Edit mode — clean standalone card, no blue bubble ── */
+            /* ── Edit mode — polished card with proper spacing ── */
             <div style={{
-              width: '100%', minWidth: '320px',
+              width: '100%', minWidth: '360px', maxWidth: '600px',
               background: 'var(--chat-surface)', borderRadius: '16px',
               border: '1px solid var(--chat-border)',
-              padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px',
+              padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
             }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Edit message
+              </div>
               <textarea value={editValue} onChange={(e) => setEditValue(e.target.value)} autoFocus
                 style={{
-                  width: '100%', borderRadius: '10px', padding: '10px 14px',
-                  fontSize: '15px', lineHeight: '1.6', resize: 'vertical', minHeight: '80px',
+                  width: '100%', borderRadius: '12px', padding: '14px 16px',
+                  fontSize: '14px', lineHeight: '1.7', resize: 'vertical', minHeight: '120px',
                   background: 'var(--chat-bg)', border: '1px solid var(--chat-border)',
                   color: 'var(--chat-text)', outline: 'none',
-                  fontFamily: 'inherit',
+                  fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
+                  transition: 'border-color 0.2s',
                 }}
-                onFocus={(e) => e.currentTarget.style.borderColor = 'var(--color-primary)'}
-                onBlur={(e) => e.currentTarget.style.borderColor = 'var(--chat-border)'}
+                onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-primary)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(124,58,237,0.1)' }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--chat-border)'; e.currentTarget.style.boxShadow = 'none' }}
               />
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                 <button onClick={() => { setIsEditing(false); setEditValue(message.content) }}
-                  style={{ padding: '6px 16px', fontSize: '13px', borderRadius: '8px', background: 'transparent', color: 'var(--chat-text-secondary)', border: '1px solid var(--chat-border)', cursor: 'pointer', fontWeight: 500 }}>
+                  style={{ padding: '8px 20px', fontSize: '13px', borderRadius: '10px', background: 'transparent', color: 'var(--chat-text-secondary)', border: '1px solid var(--chat-border)', cursor: 'pointer', fontWeight: 500, transition: 'all 0.15s' }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--chat-hover)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
                   Cancel
                 </button>
                 <button onClick={handleSaveEdit}
-                  style={{ padding: '6px 16px', fontSize: '13px', color: 'white', borderRadius: '8px', background: 'var(--color-primary)', border: 'none', cursor: 'pointer', fontWeight: 500 }}>
+                  style={{ padding: '8px 20px', fontSize: '13px', color: 'white', borderRadius: '10px', background: 'linear-gradient(135deg, #7C3AED, #6D28D9)', border: 'none', cursor: 'pointer', fontWeight: 600, transition: 'all 0.15s', boxShadow: '0 2px 8px rgba(124,58,237,0.3)' }}
+                  onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
+                  onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
                   Save & Resend
                 </button>
               </div>
@@ -227,12 +236,12 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
                 }} />
               )}
 
-              {/* Text bubble — separate below image */}
+              {/* Text bubble — clean ChatGPT-style, no harsh blue */}
               <div style={{
                 background: 'var(--chat-user-bubble)', borderRadius: '20px 20px 4px 20px',
-                padding: '12px 16px', fontSize: '15px', lineHeight: '1.65', color: 'var(--chat-text)',
+                padding: '14px 18px', fontSize: '15px', lineHeight: '1.65', color: 'var(--chat-text)',
                 wordBreak: 'break-word', maxWidth: '100%',
-                border: '1px solid rgba(255,255,255,0.06)',
+                border: '1px solid var(--chat-border)',
               }}>
                 {/* File chips */}
                 {message.fileAttachment && message.fileAttachment.type === 'document' && (

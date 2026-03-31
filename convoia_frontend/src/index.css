@@ -528,12 +528,7 @@ html.light header {
   border-bottom: 1px solid rgba(37, 99, 235, 0.08) !important;
 }
 
-/* Light mode user message bubble — vibrant purple */
-html.light .bg-user-bubble,
-html.light [style*="chat-user-bubble"] {
-  background: linear-gradient(135deg, #2563EB, #1D4ED8) !important;
-  color: white !important;
-}
+/* Light mode user message bubble — clean, subtle (ChatGPT-style) */
 
 /* Light mode code blocks — warm tinted */
 html.light pre {
