@@ -11,6 +11,7 @@ import {
   updateModelPricing,
   updateModelMarkup,
   toggleModel,
+  deleteUserPermanently,
 } from '../controllers/adminController.js';
 import { authMiddleware, requireRole } from '../middleware/authMiddleware.js';
 
@@ -24,6 +25,7 @@ router.get('/stats', requireRole('admin', 'platform_admin'), getAdminStats);
 
 // User management
 router.get('/users', requireRole('admin', 'platform_admin'), getUsers);
+router.delete('/users/:userId', requireRole('admin', 'platform_admin'), deleteUserPermanently);
 
 // Organization management
 router.get('/organizations', requireRole('admin', 'platform_admin'), getOrganizations);

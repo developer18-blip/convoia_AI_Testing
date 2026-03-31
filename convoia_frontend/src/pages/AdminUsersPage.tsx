@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Users, Search } from 'lucide-react'
+import { Users, Search, Trash2 } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { Avatar } from '../components/ui/Avatar'
 import { Badge } from '../components/ui/Badge'
@@ -33,12 +33,28 @@ export function AdminUsersPage() {
 
   useEffect(() => { fetch() }, [page, search])
 
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; email: string } | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
   const handleRoleChange = async (userId: string, role: string) => {
     try {
       await api.put(`/admin/users/${userId}/role`, { role })
       toast.success('Role updated')
       fetch()
     } catch { toast.error('Failed to update role') }
+  }
+
+  const handleDeleteUser = async () => {
+    if (!deleteTarget) return
+    try {
+      setDeleting(true)
+      await api.delete(`/admin/users/${deleteTarget.id}`)
+      toast.success(`${deleteTarget.email} permanently deleted`)
+      setDeleteTarget(null)
+      fetch()
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to delete user')
+    } finally { setDeleting(false) }
   }
 
   if (isLoading) return <LoadingPage />
@@ -67,6 +83,7 @@ export function AdminUsersPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase">Role</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-text-muted uppercase">Verified</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase">Joined</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-text-muted uppercase">Actions</th>
                 </tr></thead>
                 <tbody>
                   {users.map((u: any) => (
@@ -88,6 +105,15 @@ export function AdminUsersPage() {
                       </td>
                       <td className="px-4 py-3 text-center"><Badge size="sm" variant={u.isVerified ? 'success' : 'warning'}>{u.isVerified ? 'Yes' : 'No'}</Badge></td>
                       <td className="px-4 py-3 text-sm text-text-muted">{formatDate(u.createdAt)}</td>
+                      <td className="px-4 py-3 text-center">
+                        {u.role !== 'platform_admin' && (
+                          <button onClick={() => setDeleteTarget({ id: u.id, name: u.name, email: u.email })}
+                            className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
+                            title="Delete permanently">
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -97,6 +123,35 @@ export function AdminUsersPage() {
           </>
         )}
       </Card>
+
+      {/* Delete confirmation modal */}
+      {deleteTarget && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)' }}
+          onClick={() => setDeleteTarget(null)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--color-surface)', borderRadius: '16px', padding: '24px',
+            border: '1px solid var(--color-border)', maxWidth: '440px', width: '90%',
+          }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-primary)', margin: '0 0 12px' }}>Delete User Permanently</h3>
+            <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)', margin: '0 0 12px' }}>
+              Are you sure you want to permanently delete <strong>{deleteTarget.name}</strong> ({deleteTarget.email})?
+            </p>
+            <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', fontSize: '12px', color: '#EF4444', marginBottom: '16px' }}>
+              This will delete their account, conversations, usage logs, tokens, wallet, and all associated data. This cannot be undone.
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button onClick={() => setDeleteTarget(null)}
+                style={{ padding: '8px 16px', borderRadius: '8px', fontSize: '13px', border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button onClick={handleDeleteUser} disabled={deleting}
+                style={{ padding: '8px 16px', borderRadius: '8px', fontSize: '13px', border: 'none', background: '#EF4444', color: 'white', cursor: 'pointer', fontWeight: 600, opacity: deleting ? 0.6 : 1 }}>
+                {deleting ? 'Deleting...' : 'Delete Permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

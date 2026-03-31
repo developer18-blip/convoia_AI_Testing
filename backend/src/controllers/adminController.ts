@@ -626,3 +626,93 @@ export const getOrgUsageStats = asyncHandler(async (req: Request, res: Response)
   });
 });
 
+// ============ DELETE /api/admin/users/:userId — Permanently delete user ============
+export const deleteUserPermanently = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user || !['admin', 'platform_admin'].includes(req.user.role)) {
+    throw new AppError('Admin access required', 403);
+  }
+
+  const { userId } = req.params;
+  if (!isValidUUID(userId)) throw new AppError('Invalid user ID', 400);
+
+  const target = await prisma.user.findUnique({ where: { id: userId } });
+  if (!target) throw new AppError('User not found', 404);
+
+  // Cannot delete platform admins
+  if (target.role === 'platform_admin') {
+    throw new AppError('Cannot delete platform admins', 403);
+  }
+
+  // If user owns an organization, transfer ownership or delete org
+  if (target.role === 'org_owner') {
+    const ownedOrgs = await prisma.organization.findMany({ where: { ownerId: userId } });
+    for (const org of ownedOrgs) {
+      // Find another member to transfer ownership to
+      const nextOwner = await prisma.user.findFirst({
+        where: { organizationId: org.id, id: { not: userId }, role: { in: ['manager', 'employee'] } },
+        orderBy: { role: 'asc' }, // prefer managers
+      });
+      if (nextOwner) {
+        await prisma.organization.update({ where: { id: org.id }, data: { ownerId: nextOwner.id } });
+        await prisma.user.update({ where: { id: nextOwner.id }, data: { role: 'org_owner' } });
+      } else {
+        // No other members — remove org reference from all users, then delete org
+        await prisma.user.updateMany({ where: { organizationId: org.id }, data: { organizationId: null } });
+        // Delete org-related data
+        await prisma.tokenAllocation.deleteMany({ where: { organizationId: org.id } });
+        await prisma.orgInvite.deleteMany({ where: { organizationId: org.id } });
+        await prisma.activityLog.deleteMany({ where: { organizationId: org.id } });
+        const pool = await (prisma as any).tokenPool?.findUnique({ where: { organizationId: org.id } });
+        if (pool) await (prisma as any).tokenPool.delete({ where: { organizationId: org.id } });
+        await prisma.organization.delete({ where: { id: org.id } });
+      }
+    }
+  }
+
+  // Delete all user-related data
+  const p = prisma as any;
+  await Promise.allSettled([
+    p.task?.deleteMany({ where: { OR: [{ assignedToId: userId }, { createdById: userId }] } }),
+    p.subTask?.deleteMany({ where: { task: { OR: [{ assignedToId: userId }, { createdById: userId }] } } }),
+    p.taskComment?.deleteMany({ where: { userId } }),
+    p.notification?.deleteMany({ where: { userId } }),
+    p.usageLog?.deleteMany({ where: { userId } }),
+    p.tokenTransaction?.deleteMany({ where: { userId } }),
+    p.chatMessage?.deleteMany({ where: { conversation: { userId } } }),
+    p.conversation?.deleteMany({ where: { userId } }),
+    p.userMemory?.deleteMany({ where: { userId } }),
+    p.hourlySession?.deleteMany({ where: { userId } }),
+    p.aPIKey?.deleteMany({ where: { userId } }),
+    p.orgInvite?.deleteMany({ where: { OR: [{ invitedById: userId }, { acceptedById: userId }] } }),
+    p.activityLog?.deleteMany({ where: { OR: [{ actorId: userId }, { targetId: userId }] } }),
+    p.review?.deleteMany({ where: { userId } }),
+    p.billingRecord?.deleteMany({ where: { userId } }),
+    p.tokenPurchase?.deleteMany({ where: { userId } }),
+    p.budget?.deleteMany({ where: { userId } }),
+    p.subscription?.deleteMany({ where: { userId } }),
+    p.tokenAllocation?.deleteMany({ where: { OR: [{ assignedToId: userId }, { assignedById: userId }] } }),
+    p.agent?.deleteMany({ where: { userId } }),
+  ]);
+
+  // Delete wallet
+  const wallet = await prisma.wallet.findUnique({ where: { userId } });
+  if (wallet) {
+    await prisma.walletTransaction.deleteMany({ where: { walletId: wallet.id } });
+    await prisma.wallet.delete({ where: { userId } });
+  }
+  await prisma.tokenWallet.deleteMany({ where: { userId } });
+
+  // Clear manager references
+  await prisma.user.updateMany({ where: { managerId: userId }, data: { managerId: null } });
+
+  // Delete the user
+  await prisma.user.delete({ where: { id: userId } });
+
+  res.json({
+    success: true,
+    statusCode: 200,
+    message: `User ${target.email} permanently deleted`,
+    timestamp: new Date().toISOString(),
+  });
+});
+
