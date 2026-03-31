@@ -359,6 +359,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       let buffer = ''
       let accumulated = ''
       let metadata: { model?: string; provider?: string; tokens?: { input: number; output: number }; cost?: { charged: string } } = {}
+      let _ft: ReturnType<typeof setTimeout> | null = null
+      const _flush = () => { const s = accumulated; setMessages((p) => p.map((m) => m.id === assistantId ? { ...m, content: s, isLoading: false } : m)) }
 
       while (true) {
         const { done, value } = await reader.read()
@@ -378,9 +380,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
             if (parsed.type === 'chunk') {
               accumulated += parsed.content
-              setMessages((prev) => prev.map((m) =>
-                m.id === assistantId ? { ...m, content: accumulated, isLoading: false } : m
-              ))
+              // Throttle UI updates to every 80ms instead of every chunk
+              if (!_ft) { _ft = setTimeout(() => { _ft = null; _flush() }, 80) }
             } else if (parsed.type === 'status') {
               setMessages((prev) => prev.map((m) =>
                 m.id === assistantId ? { ...m, content: '', isLoading: true, statusText: parsed.content } : m
@@ -406,7 +407,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Apply final metadata
+      // Clear throttle timer and apply final state
+      if (_ft) clearTimeout(_ft)
       setMessages((prev) => prev.map((m) =>
         m.id === assistantId ? {
           ...m,
@@ -483,6 +485,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       let buffer = ''
       let accumulated = ''
       let metadata: { model?: string; provider?: string; tokens?: { input: number; output: number }; cost?: { charged: string } } = {}
+      let _ft: ReturnType<typeof setTimeout> | null = null
+      const _flush = () => { const s = accumulated; setMessages((p) => p.map((m) => m.id === assistantId ? { ...m, content: s, isLoading: false } : m)) }
 
       while (true) {
         const { done, value } = await reader.read()
@@ -502,9 +506,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
             if (parsed.type === 'chunk') {
               accumulated += parsed.content
-              setMessages((prev) => prev.map((m) =>
-                m.id === assistantId ? { ...m, content: accumulated, isLoading: false } : m
-              ))
+              // Throttle UI updates to every 80ms instead of every chunk
+              if (!_ft) { _ft = setTimeout(() => { _ft = null; _flush() }, 80) }
             } else if (parsed.type === 'status') {
               setMessages((prev) => prev.map((m) =>
                 m.id === assistantId ? { ...m, content: '', isLoading: true, statusText: parsed.content } : m
