@@ -64,9 +64,26 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
   // Memoize chart extraction so it doesn't run on every render
   const { cleanText: rawCleanText, charts } = useMemo(() => extractCharts(renderedContent), [renderedContent])
 
-  // Normalize markdown: convert • bullets to proper lists, ensure spacing for headings/hrs, fix unfenced code
+  // Normalize markdown: convert • bullets to proper lists, ensure spacing, fix unfenced code
   const cleanText = useMemo(() => {
     let t = rawCleanText
+
+    // Detect and wrap unfenced code blocks: if response has code-like lines NOT inside ``` fences
+    if (!t.includes('```')) {
+      const lines = t.split('\n')
+      const codePatterns = /^(import |from |class |def |function |const |let |var |export |return |if |elif |else:|for |while |try:|except |async |await |print\(|console\.|module\.|require\(|#include|package |public |private |protected |\s{2,}(self\.|this\.))/
+      const codeLineCount = lines.filter(l => codePatterns.test(l)).length
+      // If >40% of lines look like code, wrap the entire response in a code block
+      if (codeLineCount > 3 && codeLineCount / lines.length > 0.4) {
+        // Try to guess language
+        const lang = lines.some(l => /^(import |from |def |class \w+:|print\()/.test(l)) ? 'python'
+          : lines.some(l => /^(const |let |var |function |=>|console\.)/.test(l)) ? 'javascript'
+          : lines.some(l => /^(package |public class|System\.out)/.test(l)) ? 'java'
+          : ''
+        t = '```' + lang + '\n' + t + '\n```'
+      }
+    }
+
     // Convert "• text" bullet lines into markdown "- text" list items
     t = t.replace(/^[•●▪▸►]/gm, '-')
     t = t.replace(/\n[•●▪▸►] /g, '\n- ')
