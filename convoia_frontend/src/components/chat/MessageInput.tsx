@@ -321,18 +321,17 @@ export function MessageInput({
     }
   }
 
-  const adjustHeight = () => {
-    const el = textareaRef.current
-    if (el) {
-      el.style.height = 'auto'
-      const newHeight = Math.min(el.scrollHeight, 300)
-      el.style.height = newHeight + 'px'
-    }
-  }
-
-  // Auto-resize on every value change (typing, paste, external update)
+  // Auto-resize textarea to fit content
   useEffect(() => {
-    adjustHeight()
+    const el = textareaRef.current
+    if (!el) return
+    // Reset to min height first, then measure scrollHeight
+    el.style.height = '0px'
+    const scrollH = el.scrollHeight
+    const maxH = 300
+    const minH = 56
+    el.style.height = Math.max(minH, Math.min(scrollH, maxH)) + 'px'
+    el.style.overflowY = scrollH > maxH ? 'auto' : 'hidden'
   }, [value])
 
   const handleImageGenerated = (imageUrl: string, prompt: string) => {
@@ -374,7 +373,7 @@ export function MessageInput({
             ? '0 0 0 3px rgba(124,58,237,0.08), 0 4px 16px rgba(0,0,0,0.25)'
             : '0 2px 12px rgba(0,0,0,0.15)',
           transition: 'all 200ms ease',
-          cursor: 'text', overflow: 'hidden', maxWidth: '100%',
+          cursor: 'text', maxWidth: '100%',
         }}
         onClick={() => textareaRef.current?.focus()}
         onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
