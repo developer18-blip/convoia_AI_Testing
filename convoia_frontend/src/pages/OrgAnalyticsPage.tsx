@@ -26,9 +26,8 @@ const PRESET_RANGES = [
 function StatCard({ icon: Icon, label, value, sub, color }: { icon: any; label: string; value: string; sub?: string; color: string }) {
   return (
     <div style={{
-      background: 'var(--color-surface)', borderRadius: '16px', padding: '20px 24px',
-      border: '1px solid var(--color-border)', display: 'flex', alignItems: 'flex-start', gap: '16px',
-      flex: '1 1 0', minWidth: '180px',
+      background: 'var(--color-surface)', borderRadius: '16px', padding: '16px 20px',
+      border: '1px solid var(--color-border)', display: 'flex', alignItems: 'flex-start', gap: '12px',
     }}>
       <div style={{
         width: '44px', height: '44px', borderRadius: '12px',
@@ -183,7 +182,7 @@ export function OrgAnalyticsPage() {
   const queryBarData = [...dailyData].sort((a: any, b: any) => b.queries - a.queries).slice(0, 10)
 
   return (
-    <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 8px' }}>
+    <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 8px', overflowX: 'hidden' }}>
       {/* ── Header ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
@@ -236,7 +235,7 @@ export function OrgAnalyticsPage() {
       </div>
 
       {/* ── Summary Stats ── */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '24px' }}>
         <StatCard icon={DollarSign} label="Total Spend" value={fmt$(summary.totalCost || 0)} sub={`Avg ${fmt$(summary.avgCostPerQuery || 0)}/query`} color="#7C3AED" />
         <StatCard icon={MessageSquare} label="Total Queries" value={fmtK(summary.totalQueries || 0)} color="#3B82F6" />
         <StatCard icon={Zap} label="Tokens Used" value={fmtK(summary.totalTokens || 0)} color="#F59E0B" />
@@ -245,7 +244,7 @@ export function OrgAnalyticsPage() {
       </div>
 
       {/* ── Charts Grid ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+      <div className="analytics-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px', marginBottom: '24px' }}>
 
         {/* Daily Spend / Queries chart — full width */}
         <Section title={chartMode === 'cost' ? 'Daily Spend' : 'Daily Queries'} icon={TrendingUp} full>

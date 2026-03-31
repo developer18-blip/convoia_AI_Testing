@@ -313,7 +313,7 @@ export function ChatPage() {
       />
       <div
         className="fixed left-0 z-40 flex flex-col transition-transform duration-300 ease-in-out md:hidden"
-        style={{ top: '56px', height: 'calc(100% - 56px)', width: '280px', background: 'var(--color-surface)', transform: mobileLeftOpen ? 'translateX(0)' : 'translateX(-100%)' }}
+        style={{ top: '56px', height: 'calc(100% - 56px)', width: 'min(280px, calc(100vw - 48px))', background: 'var(--color-surface)', transform: mobileLeftOpen ? 'translateX(0)' : 'translateX(-100%)' }}
       >
         <ConversationList
           conversations={conversations} folders={folders} activeId={activeConversationId}
@@ -353,11 +353,11 @@ export function ChatPage() {
             </span>
           )}
 
-          {/* Industry */}
+          {/* Industry — hidden on mobile */}
           <select
             value={industry}
             onChange={(e) => setIndustry(e.target.value)}
-            className="hidden sm:block"
+            className="hidden lg:block"
             style={{ padding: '6px 10px', backgroundColor: 'var(--chat-surface)', border: '1px solid var(--chat-border)', borderRadius: '8px', color: 'var(--color-text-secondary)', fontSize: '12px', outline: 'none', cursor: 'pointer' }}
           >
             {industries.map((i) => (
@@ -365,23 +365,25 @@ export function ChatPage() {
             ))}
           </select>
 
-          {/* Agent selector */}
-          <AgentSelector
-            agents={agents}
-            models={models}
-            selectedId={selectedAgent?.id || null}
-            onChange={handleAgentChange}
-            onCreateAgent={createAgent}
-          />
+          {/* Agent selector — hidden on small mobile */}
+          <div className="hidden sm:block">
+            <AgentSelector
+              agents={agents}
+              models={models}
+              selectedId={selectedAgent?.id || null}
+              onChange={handleAgentChange}
+              onCreateAgent={createAgent}
+            />
+          </div>
 
-          {/* Think toggle */}
+          {/* Think toggle — compact on mobile */}
           <button
             onClick={() => setThinkingEnabled(!thinkingEnabled)}
             title={thinkingEnabled ? 'Extended thinking ON — deeper reasoning' : 'Enable extended thinking'}
             style={{
               display: 'flex', alignItems: 'center', gap: '5px',
               padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
-              cursor: 'pointer', transition: 'all 200ms',
+              cursor: 'pointer', transition: 'all 200ms', flexShrink: 0,
               background: thinkingEnabled ? 'var(--color-primary)' : 'var(--chat-surface)',
               color: thinkingEnabled ? 'white' : 'var(--chat-text-muted)',
               border: thinkingEnabled ? '1px solid var(--color-primary)' : '1px solid var(--chat-border)',
@@ -392,15 +394,15 @@ export function ChatPage() {
               <path d="M9 20h6v1a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-1z"/>
               {thinkingEnabled && <path d="M12 6v4l2 2" stroke="currentColor" strokeWidth="1.5"/>}
             </svg>
-            Think
+            <span className="hidden sm:inline">Think</span>
           </button>
 
-          <div className="ml-auto flex items-center gap-2 shrink-0">
-            <CostEstimator model={selectedModel} />
+          <div className="ml-auto flex items-center gap-1 sm:gap-2 shrink-0">
+            <div className="hidden md:block"><CostEstimator model={selectedModel} /></div>
 
-            <div className="flex items-center gap-1.5" style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums' }}>
-              <Zap size={12} style={{ color: '#A78BFA' }} />
-              {formattedBalance}
+            <div className="flex items-center gap-1" style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums' }}>
+              <Zap size={11} style={{ color: '#A78BFA' }} />
+              <span className="hidden sm:inline">{formattedBalance}</span>
             </div>
 
             {/* More menu */}

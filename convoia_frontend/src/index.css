@@ -371,6 +371,66 @@ pre {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* ═══════════════════════════════════════════════════════
+   MOBILE RESPONSIVE — Touch-friendly, clean mobile UX
+   ═══════════════════════════════════════════════════════ */
+
+/* Minimum touch target size */
+@media (max-width: 768px) {
+  button, a, input, select, textarea {
+    min-height: 40px;
+  }
+
+  /* Larger font on mobile for readability */
+  body { font-size: 15px; }
+
+  /* Chat messages take more width on mobile */
+  .message-content { font-size: 14px !important; line-height: 1.7 !important; }
+
+  /* User bubble wider on mobile */
+  .user-msg-container { max-width: 85% !important; }
+
+  /* AI avatar smaller on mobile */
+  .ai-avatar { width: 24px !important; height: 24px !important; font-size: 12px !important; }
+
+  /* Less gap in messages on mobile */
+  .ai-message-row { gap: 10px !important; margin-bottom: 20px !important; }
+
+  /* Prevent horizontal overflow on tables */
+  .table-wrapper { -webkit-overflow-scrolling: touch; }
+
+  /* Fix notification panel on mobile */
+  .notification-panel { width: calc(100vw - 24px) !important; max-width: 360px !important; right: 12px !important; }
+}
+
+/* Small phones (< 400px) */
+@media (max-width: 400px) {
+  body { font-size: 14px; }
+  .message-content { font-size: 13.5px !important; }
+}
+
+/* Hide scrollbar on mobile but keep functional */
+@media (max-width: 768px) {
+  ::-webkit-scrollbar { width: 0px; background: transparent; }
+  * { scrollbar-width: none; }
+}
+
+/* Safe area for devices with notch */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .chat-input-container {
+    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  }
+}
+
+/* Reduce motion for performance on mobile */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* ─── Utility animation classes ─── */
 .animate-gradient-shift { background-size: 200% 200%; animation: gradient-shift 6s ease infinite; }
 .animate-float { animation: float 3s ease-in-out infinite; }

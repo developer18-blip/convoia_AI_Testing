@@ -147,7 +147,7 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
         animation: 'fadeSlideIn 200ms ease-out',
       }}
       onMouseEnter={() => setShowActions(true)} onMouseLeave={() => setShowActions(false)}>
-        <div style={{ maxWidth: '60%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+        <div className="user-msg-container" style={{ maxWidth: '60%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
           {isEditing ? (
             /* ── Edit mode — clean standalone card, no blue bubble ── */
             <div style={{
@@ -239,14 +239,14 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
 
   /* ── AI MESSAGE — no bubble, text flows on dark bg ── */
   return (
-    <div style={{
+    <div className="ai-message-row" style={{
       display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '32px',
       animation: 'fadeSlideIn 200ms ease-out',
     }}
     onMouseEnter={() => setShowActions(true)} onMouseLeave={() => setShowActions(false)}>
 
       {/* AI Avatar */}
-      <div style={{
+      <div className="ai-avatar" style={{
         width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
         backgroundColor: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: '14px', color: 'white',
