@@ -35,31 +35,57 @@ export interface WebSearchResponse {
 // ── Query Classification ─────────────────────────────────────────────
 
 const REALTIME_PATTERNS = [
-  /\b(price|cost|worth)\b.*\b(of|for)\b.*\b(bitcoin|btc|ethereum|eth|crypto|stock|share|gold|silver|oil)\b/i,
-  /\b(bitcoin|btc|ethereum|eth|solana|sol|xrp|doge)\b.*\b(price|value|worth)\b/i,
-  /\b(current|latest|today|now|right now|live|real.?time)\b.*\b(price|news|weather|score|result|rate|exchange)\b/i,
-  /\b(what is|what's|how much|tell me)\b.*\b(today|now|current|latest|right now)\b/i,
-  /\b(news|headline|update|happening)\b.*\b(today|now|latest|recent|this week)\b/i,
-  /\b(weather|temperature|forecast)\b.*\b(in|at|for|today|now)\b/i,
-  /\b(score|result|match|game)\b.*\b(today|yesterday|last night|live)\b/i,
-  /\b(stock|share|market|nasdaq|dow|s&p)\b.*\b(price|today|now|current)\b/i,
-  /\b(exchange rate|conversion|convert)\b.*\b(usd|eur|gbp|inr|jpy)\b/i,
-  /\b(who won|who is winning|election|poll)\b/i,
-  /\b(latest|newest|recent|new)\b.*\b(version|release|update|model|iphone|android)\b/i,
-  /\bsearch\s+(the\s+)?(web|internet|online)\b/i,
-  /\b(look up|find out|check)\b.*\b(online|web)\b/i,
-  /\b(20[2-3]\d)\b/i, // Any year 2020-2039
+  // Time-sensitive queries
+  /\b(current|latest|today|now|right now|live|real.?time|recent|this week|this month|this year)\b/i,
+  /\b(news|headline|update|happening|breaking|trending|viral)\b/i,
+  /\b(weather|temperature|forecast)\b/i,
+  // Prices, stocks, crypto
+  /\b(price|cost|worth|valuation|market cap)\b.*\b(of|for)\b/i,
+  /\b(bitcoin|btc|ethereum|eth|solana|sol|xrp|doge|crypto|stock|share|nasdaq|dow|s&p|gold|silver|oil)\b/i,
+  /\b(exchange rate|conversion|convert)\b/i,
+  // Sports, events
+  /\b(score|result|match|game|tournament|championship|winner|won)\b.*\b(today|yesterday|last|live|final)\b/i,
+  /\b(election|poll|vote|voting)\b/i,
+  // Product/tech lookups
+  /\b(latest|newest|recent|new|upcoming)\b.*\b(version|release|update|model|phone|laptop|car|feature)\b/i,
+  /\b(compare|comparison|vs|versus|best|top \d+|review)\b/i,
+  // Explicit search requests
+  /\bsearch\s+(the\s+)?(web|internet|online|for)\b/i,
+  /\b(look up|find out|check|google|search for|find me)\b/i,
+  // Facts that may have changed
+  /\b(who is|who are|who was)\b.*\b(president|ceo|prime minister|leader|head|founder|owner)\b/i,
+  /\b(how many|how much|what is the population|gdp|revenue)\b/i,
+  // Years (anything mentioning recent/future years)
+  /\b(20[2-3]\d)\b/i,
+  // Locations, companies, people (proper nouns that may need current info)
+  /\b(war|conflict|crisis|disaster|earthquake|flood|hurricane)\b/i,
+  /\b(ipo|acquisition|merger|layoff|launch|announce)\b/i,
 ];
 
 const NEWS_PATTERNS = [
-  /\b(news|headline|breaking|update|happening|latest)\b/i,
-  /\b(today|this morning|tonight|this week)\b/i,
+  /\b(news|headline|breaking|update|happening|latest|trending)\b/i,
+  /\b(today|this morning|tonight|this week|this month)\b/i,
+];
+
+// Queries that should NOT trigger search (purely knowledge/creative tasks)
+const NO_SEARCH_PATTERNS = [
+  /^(write|create|draft|compose|generate)\b.*\b(poem|story|essay|code|email|letter|script|song)\b/i,
+  /^(explain|teach me|how does|what does)\b.*\b(work|mean|function)\b/i,
+  /^(translate|convert)\b.*\b(to|into)\b.*\b(english|spanish|french|hindi|german|chinese|japanese)\b/i,
+  /^(help me|can you|please)\b.*\b(write|code|debug|fix|refactor|optimize)\b/i,
+  /^(summarize|rewrite|paraphrase|simplify)\b/i,
+  /\b(hello|hi|hey|good morning|good evening|how are you|thank you|thanks)\b/i,
 ];
 
 /**
- * Check if a query needs web search
+ * Smart detection: should this query use web search?
  */
 export function needsWebSearch(query: string): boolean {
+  // Skip very short queries or greetings
+  if (query.length < 10) return false;
+  // Skip creative/knowledge tasks that don't need fresh data
+  if (NO_SEARCH_PATTERNS.some(p => p.test(query))) return false;
+  // Trigger on any realtime pattern
   return REALTIME_PATTERNS.some(pattern => pattern.test(query));
 }
 
@@ -253,40 +279,65 @@ async function searchDDGHTML(query: string, maxResults = 5): Promise<SearchResul
 
 async function crawlUrl(url: string): Promise<string> {
   try {
+    // Skip known problematic sites
+    if (/\.(pdf|zip|exe|dmg|mp4|mp3|avi)$/i.test(url)) return '';
+    if (/youtube\.com|youtu\.be|twitter\.com|x\.com|instagram\.com|facebook\.com/i.test(url)) return '';
+
     const response = await axios.get(url, {
-      headers: SEARCH_HEADERS,
-      timeout: 6000,
-      maxRedirects: 3,
+      headers: {
+        ...SEARCH_HEADERS,
+        'Accept': 'text/html,application/xhtml+xml',
+      },
+      timeout: 8000,
+      maxRedirects: 5,
       validateStatus: (s) => s < 400,
     });
 
     const $ = cheerio.load(response.data);
 
-    // Remove noise
-    $('script, style, nav, header, footer, .ad, .sidebar, .menu, .nav, .cookie, .popup, iframe, noscript').remove();
+    // Remove noise aggressively
+    $('script, style, nav, header, footer, aside, .ad, .ads, .advertisement, .sidebar, .menu, .nav, .cookie, .popup, .modal, .banner, .social, .share, .comments, .comment, .related, .recommended, iframe, noscript, svg, form, .newsletter').remove();
 
-    // Try to find main content
+    // Try to find main content — prioritize article content
     let text = '';
-    const mainSelectors = ['article', 'main', '[role="main"]', '.post-content', '.article-body', '.entry-content', '.content'];
+    const mainSelectors = [
+      'article', 'main', '[role="main"]', '.post-content', '.article-body',
+      '.entry-content', '.content', '.post-body', '.story-body', '.article-text',
+      '#content', '#main-content', '.main-content', '.page-content',
+      '[itemprop="articleBody"]', '.blog-post', '.markdown-body',
+    ];
     for (const sel of mainSelectors) {
       const el = $(sel).first();
-      if (el.length && el.text().trim().length > 200) {
+      if (el.length && el.text().trim().length > 300) {
         text = el.text().trim();
         break;
       }
     }
 
-    // Fallback to body
+    // Fallback: get all paragraph text
+    if (!text || text.length < 300) {
+      const paragraphs: string[] = [];
+      $('p').each((_i, el) => {
+        const t = $(el).text().trim();
+        if (t.length > 40) paragraphs.push(t);
+      });
+      if (paragraphs.join(' ').length > text.length) {
+        text = paragraphs.join('\n\n');
+      }
+    }
+
+    // Last fallback: body text
     if (!text || text.length < 200) {
       text = $('body').text().trim();
     }
 
-    // Clean up whitespace
+    // Clean up
     text = text
-      .replace(/\s+/g, ' ')
+      .replace(/\t/g, ' ')
+      .replace(/ {2,}/g, ' ')
       .replace(/\n{3,}/g, '\n\n')
       .trim()
-      .substring(0, 2000); // Cap at 2000 chars
+      .substring(0, 4000); // Increased from 2000 to 4000
 
     return text;
   } catch {
@@ -295,14 +346,14 @@ async function crawlUrl(url: string): Promise<string> {
 }
 
 /**
- * Crawl top results in parallel (max 3 to be fast)
+ * Crawl top 5 results in parallel for richer context
  */
 async function enrichResults(results: SearchResult[]): Promise<SearchResult[]> {
-  const toCrawl = results.slice(0, 3);
+  const toCrawl = results.slice(0, 5); // Increased from 3 to 5
   const crawlPromises = toCrawl.map(async (r) => {
     const content = await crawlUrl(r.url);
     if (content.length > r.content.length) {
-      return { ...r, content: content.substring(0, 1500) };
+      return { ...r, content: content.substring(0, 3000) }; // Increased from 1500 to 3000
     }
     return r;
   });
@@ -313,7 +364,7 @@ async function enrichResults(results: SearchResult[]): Promise<SearchResult[]> {
     .map(r => r.value);
 
   // Add remaining non-crawled results
-  return [...enrichedResults, ...results.slice(3)];
+  return [...enrichedResults, ...results.slice(5)];
 }
 
 // ── Confidence Scoring ───────────────────────────────────────────────
@@ -375,8 +426,9 @@ async function searchTavily(query: string, maxResults = 5): Promise<SearchResult
       query,
       max_results: maxResults,
       include_answer: true,
-      search_depth: 'basic',
-    }, { timeout: 10000 });
+      include_raw_content: false,
+      search_depth: 'advanced',
+    }, { timeout: 15000 });
 
     return (response.data.results || []).map((r: any, i: number) => ({
       title: r.title || '',
@@ -395,18 +447,28 @@ async function searchTavily(query: string, maxResults = 5): Promise<SearchResult
 function buildContextText(query: string, results: SearchResult[], source: string): string {
   if (results.length === 0) return '';
 
-  let ctx = `[Web Search Results for: "${query}" (via ${source})]\n\n`;
+  let ctx = `[WEB SEARCH RESULTS for: "${query}" — sourced via ${source}]\n`;
+  ctx += `[Date: ${new Date().toISOString().split('T')[0]}]\n\n`;
+
   results.slice(0, 5).forEach((r, i) => {
-    ctx += `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.content.substring(0, 400)}\n\n`;
+    ctx += `━━━ Source ${i + 1}: ${r.title} ━━━\n`;
+    ctx += `URL: ${r.url}\n`;
+    // Include up to 1500 chars of content per source (was 400)
+    const content = r.content.substring(0, 1500).trim();
+    ctx += `Content:\n${content}\n\n`;
   });
-  ctx += `[Use these sources to provide accurate, up-to-date information. Cite sources when relevant.]\n`;
+
+  ctx += `[INSTRUCTIONS: Use the above search results to provide accurate, current, and comprehensive answers. `;
+  ctx += `Cite sources by mentioning the website name. If results contain numbers, statistics, or comparisons, `;
+  ctx += `present them clearly. If information seems outdated or conflicting, note that. `;
+  ctx += `Synthesize information from multiple sources — don't just repeat one source.]\n`;
 
   return ctx;
 }
 
 // ── Main Search Function ─────────────────────────────────────────────
 
-const CONFIDENCE_THRESHOLD = 0.4;
+const CONFIDENCE_THRESHOLD = 0.5; // Higher threshold = Tavily kicks in more often = better results
 
 /**
  * Perform hybrid web search:
