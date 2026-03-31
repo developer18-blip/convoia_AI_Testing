@@ -80,6 +80,7 @@ interface SendMessageParams {
   maxOutputTokens?: number; // Cap output to user's available token balance
   memoryContext?: string; // Persistent user memory to inject into system prompt
   thinkingEnabled?: boolean; // Enable extended thinking (Claude only)
+  webSearchActive?: boolean; // Augment system prompt with web search formatting rules
 }
 
 interface SendVisionParams {
@@ -112,6 +113,29 @@ const axiosConfig = (headers: Record<string, string>): AxiosRequestConfig => ({
   headers,
   timeout: config.aiRequestTimeout,
 });
+
+// Injected into system prompt when web search data is present — models follow system-level instructions far better than user-message instructions
+const WEB_SEARCH_SYSTEM_BOOST = `
+
+IMPORTANT — WEB SEARCH RESPONSE FORMATTING:
+You are responding to a query that includes LIVE web search results. You MUST format your response as follows:
+
+1. EMOJIS: Start each major section with a relevant emoji (🔥 📊 💡 🚀 ⚡ 🎯 📌 🔍 💰 🌍 📈 ⚠️ ✅ 🏛️ 🤖 💼 📱 🔬 🏆 etc.). Use emojis generously throughout.
+2. STRUCTURE: Use ## or ### headings with emojis for each section. Add horizontal rules (---) between major sections.
+3. BOLD: Make key facts, names, numbers, dates, and important terms **bold**.
+4. LISTS: Use bullet points (•) and numbered lists for easy scanning.
+5. TABLES: When comparing items, use markdown tables (| Column | Column |).
+6. CITATIONS: Cite sources naturally inline — "According to **The Verge**..." or "*(Source: reuters.com)*"
+7. TONE: Write in an engaging, conversational, slightly enthusiastic tone — like a knowledgeable friend explaining something exciting. NOT dry or academic.
+8. DEPTH: Be DETAILED and THOROUGH. Cover all angles from the search data. Don't be brief — give comprehensive analysis.
+9. ENDING: Always end with a 💡 **Key Takeaway** or 🎯 **Bottom Line** section summarizing the most important points.
+10. CHARTS: If data contains numbers/comparisons, include a chart using the chart code block format.
+
+Example section format:
+## 🔥 Major Headline Here
+Key insight with **bold numbers** and engaging analysis...
+
+DO NOT write plain, unstyled paragraphs. Every response MUST use rich formatting.`;
 
 export function getSystemPrompt(industry?: string): string {
   const baseInstructions = `You are an intelligent, knowledgeable AI assistant powered by ConvoiaAI — a multi-model AI platform. Follow these guidelines:
@@ -1140,7 +1164,13 @@ export class AIGatewayService {
 
     // Use agent's system prompt if available, otherwise default
     // Append persistent user memory to all prompts
-    const basePrompt = agentConfig?.systemPrompt || getSystemPrompt(industry);
+    let basePrompt = agentConfig?.systemPrompt || getSystemPrompt(industry);
+
+    // Inject web search formatting rules into system prompt (models follow system prompt much better)
+    if (params.webSearchActive) {
+      basePrompt += WEB_SEARCH_SYSTEM_BOOST;
+    }
+
     const systemPrompt = memoryContext ? basePrompt + memoryContext : basePrompt;
 
     // Cap output tokens to user's balance AND provider's hard limit

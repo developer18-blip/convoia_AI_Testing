@@ -75,6 +75,7 @@ const isDev = process.env.NODE_ENV !== 'production';
 const allowedOrigins = [
   process.env.CORS_ORIGIN,
   process.env.FRONTEND_URL,
+  'https://intellect.convoia.com',
   // Development origins — excluded in production
   ...(isDev ? [
     'http://localhost:5173',
@@ -90,8 +91,8 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-      // Allow all ngrok domains + configured origins
-      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.ngrok-free.dev') || origin.endsWith('.ngrok.io')) {
+      // Allow all ngrok domains, convoia.com subdomains + configured origins
+      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.convoia.com') || origin.endsWith('.ngrok-free.dev') || origin.endsWith('.ngrok.io')) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));

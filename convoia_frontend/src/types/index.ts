@@ -174,7 +174,7 @@ export interface Message {
   statusText?: string
   webSearch?: {
     query: string
-    sources: { title: string; url: string }[]
+    sources: { title: string; url: string; image?: string; siteName?: string; snippet?: string }[]
   }
 }
 

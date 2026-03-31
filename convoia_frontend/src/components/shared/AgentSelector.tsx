@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { ChevronDown, Check, Plus, X, Thermometer, Hash, Zap } from 'lucide-react'
+import { ChevronDown, Check, Plus, X, Thermometer, Hash, Zap, Search } from 'lucide-react'
 import type { Agent, AIModel } from '../../types'
 
 interface AgentSelectorProps {
@@ -13,7 +13,9 @@ interface AgentSelectorProps {
 export function AgentSelector({ agents, models, selectedId, onChange, onCreateAgent }: AgentSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
+  const [search, setSearch] = useState('')
   const ref = useRef<HTMLDivElement>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
 
   const selected = agents.find((a) => a.id === selectedId)
 
@@ -31,16 +33,18 @@ export function AgentSelector({ agents, models, selectedId, onChange, onCreateAg
   const handleSelect = (agent: Agent | null) => {
     onChange(agent)
     setIsOpen(false)
+    setSearch('')
   }
 
-  const defaultAgents = agents.filter((a) => a.isDefault)
-  const myAgents = agents.filter((a) => !a.isDefault)
+  const q = search.toLowerCase().trim()
+  const defaultAgents = agents.filter((a) => a.isDefault).filter((a) => !q || a.name.toLowerCase().includes(q) || a.role.toLowerCase().includes(q) || a.description?.toLowerCase().includes(q))
+  const myAgents = agents.filter((a) => !a.isDefault).filter((a) => !q || a.name.toLowerCase().includes(q) || a.role.toLowerCase().includes(q) || a.description?.toLowerCase().includes(q))
 
   return (
     <div className="relative" ref={ref}>
       {/* Trigger button */}
       <button
-        onClick={() => { setIsOpen(!isOpen); setShowCreate(false) }}
+        onClick={() => { setIsOpen(!isOpen); setShowCreate(false); setSearch('') }}
         className="hidden sm:flex items-center gap-1.5"
         style={{
           padding: '6px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 500, cursor: 'pointer',
@@ -71,7 +75,38 @@ export function AgentSelector({ agents, models, selectedId, onChange, onCreateAg
           backgroundColor: 'var(--chat-surface)', border: '1px solid var(--chat-border)',
           borderRadius: '12px', padding: '6px',
           boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+          maxHeight: '420px', display: 'flex', flexDirection: 'column',
         }}>
+          {/* Search bar */}
+          <div style={{ padding: '4px 4px 6px', position: 'sticky', top: 0, background: 'var(--chat-surface)', zIndex: 1 }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '7px 10px', borderRadius: '8px',
+              background: 'var(--chat-hover)', border: '1px solid var(--chat-border)',
+            }}>
+              <Search size={14} style={{ color: 'var(--color-text-dim)', flexShrink: 0 }} />
+              <input
+                ref={searchRef}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search agents..."
+                autoFocus
+                style={{
+                  flex: 1, background: 'transparent', border: 'none', outline: 'none',
+                  color: 'var(--color-text-primary)', fontSize: '12px',
+                }}
+              />
+              {search && (
+                <button onClick={() => { setSearch(''); searchRef.current?.focus() }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex' }}>
+                  <X size={12} style={{ color: 'var(--color-text-dim)' }} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Scrollable list */}
+          <div style={{ overflowY: 'auto', flex: 1 }}>
           {/* No agent option */}
           <button
             onClick={() => handleSelect(null)}
@@ -135,6 +170,7 @@ export function AgentSelector({ agents, models, selectedId, onChange, onCreateAg
             <span style={{ fontSize: '14px', width: '28px', textAlign: 'center', color: 'var(--color-primary)' }}><Plus size={16} /></span>
             <div style={{ fontSize: '13px', color: 'var(--color-primary)', fontWeight: 500 }}>Hire New Employee</div>
           </button>
+          </div>{/* end scrollable list */}
         </div>
       )}
 

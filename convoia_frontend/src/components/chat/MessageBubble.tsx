@@ -258,62 +258,168 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
       {/* Text area — no background, no border */}
       <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
 
-        {/* Web Search Card */}
-        {message.webSearch && (
-          <div style={{
-            marginBottom: '16px', padding: '12px 16px',
-            background: 'linear-gradient(135deg, rgba(124,58,237,0.06), rgba(16,185,129,0.06))',
-            border: '1px solid rgba(124,58,237,0.15)',
-            borderRadius: '12px',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+        {/* Web Search Card — ChatGPT-style horizontal carousel */}
+        {message.webSearch && (() => {
+          const gradients = [
+            'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+            'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+            'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+            'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+          ]
+          return (
+            <div style={{ marginBottom: '16px' }}>
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                <div style={{
+                  width: '28px', height: '28px', borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #7C3AED, #10B981)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '13px', color: 'white', flexShrink: 0,
+                }}>✦</div>
+                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--chat-text)' }}>
+                  Searched the web
+                </span>
+                <span style={{ fontSize: '12px', color: 'var(--chat-text-muted)', fontStyle: 'italic' }}>
+                  "{message.webSearch.query}"
+                </span>
+              </div>
+
+              {/* Horizontal scrollable card carousel */}
               <div style={{
-                width: '24px', height: '24px', borderRadius: '6px',
-                background: 'linear-gradient(135deg, #7C3AED, #10B981)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '12px', color: 'white',
-              }}>🔍</div>
-              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                Searched the web
-              </span>
-              <span style={{ fontSize: '11px', color: 'var(--color-text-dim)', fontStyle: 'italic' }}>
-                "{message.webSearch.query}"
-              </span>
+                display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '8px',
+                scrollbarWidth: 'thin',
+                scrollSnapType: 'x mandatory',
+                WebkitOverflowScrolling: 'touch',
+              }}>
+                {message.webSearch.sources.map((source, idx) => {
+                  let domain = ''
+                  try { domain = new URL(source.url).hostname.replace('www.', '') } catch { domain = source.url }
+                  const displayName = source.siteName || domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1)
+                  // Detect if image is a real article thumbnail vs a logo fallback
+                  const isLogoFallback = source.image?.includes('logo.clearbit.com')
+                  const hasRealImage = source.image && !isLogoFallback
+                  return (
+                    <a
+                      key={idx}
+                      href={source.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'flex', flexDirection: 'column',
+                        minWidth: '220px', maxWidth: '260px', flex: '0 0 auto',
+                        borderRadius: '12px', overflow: 'hidden',
+                        background: 'var(--chat-surface)',
+                        border: '1px solid var(--chat-border)',
+                        textDecoration: 'none', transition: 'all 0.2s ease',
+                        scrollSnapAlign: 'start',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--color-primary)'
+                        e.currentTarget.style.transform = 'translateY(-2px)'
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--chat-border)'
+                        e.currentTarget.style.transform = 'translateY(0)'
+                        e.currentTarget.style.boxShadow = 'none'
+                      }}
+                    >
+                      {/* Thumbnail area */}
+                      <div style={{
+                        height: '130px', width: '100%', position: 'relative',
+                        background: gradients[idx % gradients.length],
+                        overflow: 'hidden',
+                      }}>
+                        {/* Real article image — full cover */}
+                        {hasRealImage && (
+                          <img
+                            src={source.image}
+                            alt=""
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }}
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                          />
+                        )}
+                        {/* Logo fallback — centered on gradient */}
+                        {isLogoFallback && (
+                          <div style={{
+                            position: 'absolute', inset: 0,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}>
+                            <img
+                              src={source.image}
+                              alt=""
+                              style={{
+                                width: '56px', height: '56px', borderRadius: '12px',
+                                background: 'rgba(255,255,255,0.95)', padding: '8px',
+                                objectFit: 'contain', boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                              }}
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                            />
+                          </div>
+                        )}
+                        {/* Dark gradient overlay at bottom */}
+                        <div style={{
+                          position: 'absolute', inset: 0,
+                          background: 'linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.1) 50%, transparent 100%)',
+                        }} />
+                        {/* Source badge */}
+                        <div style={{
+                          position: 'absolute', bottom: '8px', left: '8px',
+                          display: 'flex', alignItems: 'center', gap: '6px',
+                          background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
+                          padding: '4px 10px', borderRadius: '8px',
+                        }}>
+                          <img
+                            src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
+                            width={16} height={16} alt=""
+                            style={{ borderRadius: '3px', flexShrink: 0 }}
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                          />
+                          <span style={{ fontSize: '11px', color: '#fff', fontWeight: 600, letterSpacing: '0.02em' }}>
+                            {displayName}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Card text content */}
+                      <div style={{ padding: '10px 12px', flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{
+                          fontSize: '13px', fontWeight: 600, color: 'var(--chat-text)',
+                          lineHeight: '1.35',
+                          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const,
+                          overflow: 'hidden',
+                        }}>
+                          {source.title}
+                        </div>
+                        {source.snippet && (
+                          <div style={{
+                            fontSize: '11.5px', color: 'var(--chat-text-muted)', lineHeight: '1.45',
+                            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const,
+                            overflow: 'hidden',
+                          }}>
+                            {source.snippet}
+                          </div>
+                        )}
+                      </div>
+                    </a>
+                  )
+                })}
+              </div>
+
+              {/* Expand/collapse arrow hint */}
+              {message.webSearch.sources.length > 3 && (
+                <div style={{
+                  display: 'flex', justifyContent: 'center', marginTop: '4px',
+                  color: 'var(--chat-text-dim)', fontSize: '18px', cursor: 'default',
+                }}>
+                  ›
+                </div>
+              )}
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-              {message.webSearch.sources.map((source, idx) => {
-                let domain = ''
-                try { domain = new URL(source.url).hostname.replace('www.', '') } catch { domain = source.url }
-                return (
-                  <a
-                    key={idx}
-                    href={source.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', gap: '6px',
-                      padding: '4px 10px', borderRadius: '8px',
-                      background: 'var(--chat-surface)', border: '1px solid var(--chat-border)',
-                      fontSize: '11px', color: 'var(--color-text-secondary)',
-                      textDecoration: 'none', transition: 'all 0.15s',
-                      maxWidth: '200px',
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-primary)'; e.currentTarget.style.color = 'var(--color-primary)' }}
-                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--chat-border)'; e.currentTarget.style.color = 'var(--color-text-secondary)' }}
-                  >
-                    <img
-                      src={`https://www.google.com/s2/favicons?domain=${domain}&sz=16`}
-                      width={14} height={14} alt=""
-                      style={{ borderRadius: '2px', flexShrink: 0 }}
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                    />
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{domain}</span>
-                  </a>
-                )
-              })}
-            </div>
-          </div>
-        )}
+          )
+        })()}
 
         <div ref={contentRef} className="prose prose-sm max-w-none message-content" style={{ fontSize: '15px', lineHeight: '1.75', color: 'var(--chat-text)' }}>
           <ReactMarkdown remarkPlugins={[remarkGfm]}

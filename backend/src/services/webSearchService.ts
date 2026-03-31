@@ -21,6 +21,9 @@ export interface SearchResult {
   url: string;
   content: string;
   score: number;
+  image?: string;
+  siteName?: string;
+  snippet?: string;
 }
 
 export interface WebSearchResponse {
@@ -148,10 +151,18 @@ setInterval(() => {
 // ── Free Search (Multiple fallback sources) ─────────────────────────
 
 const SEARCH_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
   'Accept-Language': 'en-US,en;q=0.9',
-  'Accept-Encoding': 'gzip, deflate',
+  'Accept-Encoding': 'gzip, deflate, br',
+  'Sec-Ch-Ua': '"Chromium";v="131", "Not_A Brand";v="24"',
+  'Sec-Ch-Ua-Mobile': '?0',
+  'Sec-Ch-Ua-Platform': '"Windows"',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
+  'Sec-Fetch-User': '?1',
+  'Upgrade-Insecure-Requests': '1',
 };
 
 /**
@@ -277,11 +288,19 @@ async function searchDDGHTML(query: string, maxResults = 5): Promise<SearchResul
 
 // ── Web Crawling (Content Extraction) ────────────────────────────────
 
-async function crawlUrl(url: string): Promise<string> {
+interface CrawlResult {
+  content: string;
+  image?: string;
+  siteName?: string;
+  snippet?: string;
+}
+
+async function crawlUrl(url: string): Promise<CrawlResult> {
+  const empty: CrawlResult = { content: '' };
   try {
     // Skip known problematic sites
-    if (/\.(pdf|zip|exe|dmg|mp4|mp3|avi)$/i.test(url)) return '';
-    if (/youtube\.com|youtu\.be|twitter\.com|x\.com|instagram\.com|facebook\.com/i.test(url)) return '';
+    if (/\.(pdf|zip|exe|dmg|mp4|mp3|avi)$/i.test(url)) return empty;
+    if (/youtube\.com|youtu\.be|twitter\.com|x\.com|instagram\.com|facebook\.com/i.test(url)) return empty;
 
     const response = await axios.get(url, {
       headers: {
@@ -294,6 +313,46 @@ async function crawlUrl(url: string): Promise<string> {
     });
 
     const $ = cheerio.load(response.data);
+
+    // Extract Open Graph / meta metadata before removing elements
+    const rawOgImage = $('meta[property="og:image"]').attr('content')
+      || $('meta[property="og:image:url"]').attr('content')
+      || $('meta[property="og:image:secure_url"]').attr('content')
+      || $('meta[name="twitter:image"]').attr('content')
+      || $('meta[name="twitter:image:src"]').attr('content')
+      || $('link[rel="image_src"]').attr('href')
+      || '';
+    const siteName = $('meta[property="og:site_name"]').attr('content')
+      || $('meta[name="application-name"]').attr('content')
+      || $('title').first().text().split(/[|\-–—]/).pop()?.trim()
+      || '';
+    const ogDescription = $('meta[property="og:description"]').attr('content')
+      || $('meta[name="description"]').attr('content')
+      || '';
+
+    // Resolve image URL — handle relative, protocol-relative, and absolute URLs
+    let validImage = '';
+    if (rawOgImage) {
+      try {
+        // new URL handles relative, protocol-relative (//), and absolute URLs
+        const resolved = new URL(rawOgImage, url).href;
+        // Accept any http/https URL, reject data: URIs and tiny tracking pixels
+        if (/^https?:\/\//.test(resolved) && !resolved.includes('1x1') && !resolved.includes('pixel')) {
+          validImage = resolved;
+        }
+      } catch { /* invalid URL, skip */ }
+    }
+    // Fallback: try to find a large hero/article image in the page
+    if (!validImage) {
+      const heroImg = $('article img[src], .post-content img[src], .article-body img[src], main img[src]').first().attr('src')
+        || $('img[width]').filter((_i, el) => parseInt($(el).attr('width') || '0') >= 400).first().attr('src');
+      if (heroImg) {
+        try {
+          const resolved = new URL(heroImg, url).href;
+          if (/^https?:\/\//.test(resolved)) validImage = resolved;
+        } catch { /* skip */ }
+      }
+    }
 
     // Remove noise aggressively
     $('script, style, nav, header, footer, aside, .ad, .ads, .advertisement, .sidebar, .menu, .nav, .cookie, .popup, .modal, .banner, .social, .share, .comments, .comment, .related, .recommended, iframe, noscript, svg, form, .newsletter').remove();
@@ -339,9 +398,14 @@ async function crawlUrl(url: string): Promise<string> {
       .trim()
       .substring(0, 2000);
 
-    return text;
+    return {
+      content: text,
+      image: validImage || undefined,
+      siteName: siteName || undefined,
+      snippet: ogDescription ? ogDescription.substring(0, 200) : undefined,
+    };
   } catch {
-    return '';
+    return empty;
   }
 }
 
@@ -351,11 +415,25 @@ async function crawlUrl(url: string): Promise<string> {
 async function enrichResults(results: SearchResult[]): Promise<SearchResult[]> {
   const toCrawl = results.slice(0, 5); // Increased from 3 to 5
   const crawlPromises = toCrawl.map(async (r) => {
-    const content = await crawlUrl(r.url);
-    if (content.length > r.content.length) {
-      return { ...r, content: content.substring(0, 1500) };
+    const crawled = await crawlUrl(r.url);
+    const enriched: SearchResult = { ...r };
+    if (crawled.content.length > r.content.length) {
+      enriched.content = crawled.content.substring(0, 1500);
     }
-    return r;
+    if (crawled.image) {
+      enriched.image = crawled.image;
+      logger.info(`[WebSearch] OG image found for ${r.url}: ${crawled.image.substring(0, 100)}`);
+    } else {
+      // Fallback: use screenshot thumbnail service (free, no API key)
+      try {
+        const domain = new URL(r.url).hostname;
+        enriched.image = `https://logo.clearbit.com/${domain}`;
+        logger.info(`[WebSearch] No OG image for ${r.url}, using Clearbit logo for ${domain}`);
+      } catch { /* skip */ }
+    }
+    if (crawled.siteName) enriched.siteName = crawled.siteName;
+    if (crawled.snippet) enriched.snippet = crawled.snippet;
+    return enriched;
   });
 
   const enriched = await Promise.allSettled(crawlPromises);
@@ -447,19 +525,23 @@ async function searchTavily(query: string, maxResults = 5): Promise<SearchResult
 function buildContextText(query: string, results: SearchResult[], source: string): string {
   if (results.length === 0) return '';
 
-  let ctx = `[WEB SEARCH RESULTS for: "${query}" — ${source}, ${new Date().toISOString().split('T')[0]}]\n\n`;
+  const today = new Date().toISOString().split('T')[0];
+  let ctx = `[WEB SEARCH RESULTS for: "${query}" — via ${source}, searched on ${today}]\n\n`;
 
-  // Limit total context to ~3000 chars to keep token cost reasonable
-  const maxPerSource = Math.floor(3000 / Math.min(results.length, 4));
+  // Use ~5000 chars across 5 sources for richer, more detailed AI responses
+  const sourceCount = Math.min(results.length, 5);
+  const maxPerSource = Math.floor(5000 / sourceCount);
 
-  results.slice(0, 4).forEach((r, i) => {
-    ctx += `[${i + 1}] ${r.title}\n`;
-    ctx += `${r.url}\n`;
+  results.slice(0, sourceCount).forEach((r, i) => {
+    ctx += `━━━ SOURCE ${i + 1} ━━━\n`;
+    ctx += `Title: ${r.title}\n`;
+    ctx += `URL: ${r.url}\n`;
+    if (r.siteName) ctx += `Publisher: ${r.siteName}\n`;
     const content = r.content.substring(0, maxPerSource).trim();
-    ctx += `${content}\n\n`;
+    ctx += `Content:\n${content}\n\n`;
   });
 
-  ctx += `[Cite sources. Synthesize across sources. Note if info seems outdated.]\n`;
+  ctx += `[Use ALL sources above to write a comprehensive, well-structured answer. Cross-reference data between sources for accuracy.]\n`;
 
   return ctx;
 }
@@ -500,7 +582,9 @@ export async function searchWeb(query: string, maxResults = 5): Promise<WebSearc
     logger.info(`DuckDuckGo low confidence (${confidence}), falling back to Tavily for: "${query}"`);
     const tavilyResults = await searchTavily(query, maxResults);
     if (tavilyResults.length > 0) {
-      const tavilyScored = scoreResults(query, tavilyResults);
+      // Enrich Tavily results with OG metadata from crawling
+      const enrichedTavily = await enrichResults(tavilyResults);
+      const tavilyScored = scoreResults(query, enrichedTavily);
       if (tavilyScored.confidence > confidence) {
         scored = tavilyScored.results;
         confidence = tavilyScored.confidence;

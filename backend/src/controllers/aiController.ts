@@ -518,8 +518,8 @@ export const queryAIStream = async (req: Request, res: Response) => {
         const searchResult = await searchWeb(userQuery, 5);
         if (searchResult.searched && searchResult.results.length > 0) {
           webSearched = true;
-          // Append search results to the last user message (not as system — Anthropic rejects system in messages array)
-          const searchPrefix = `\n\n[Web Search Context — use this data to answer accurately. Cite sources with URLs. If data contains numbers/comparisons, include a chart using \`\`\`chart {"type":"line|bar|area|pie","title":"...","data":[...],"xKey":"name","yKeys":[{"key":"value","color":"#7C3AED","label":"..."}]} \`\`\` format.]\n\n${searchResult.contextText}`;
+          // Append search data to user message (formatting rules go in system prompt below)
+          const searchPrefix = `\n\n[LIVE WEB SEARCH DATA — searched on ${new Date().toISOString().split('T')[0]}]\n\n${searchResult.contextText}`;
           enrichedMessages = [...messages];
           const lastIdx = enrichedMessages.length - 1;
           if (enrichedMessages[lastIdx]?.role === 'user') {
@@ -529,8 +529,14 @@ export const queryAIStream = async (req: Request, res: Response) => {
             };
           }
 
-          // Send search indicator to frontend
-          const sources = searchResult.results.slice(0, 3).map(r => ({ title: r.title, url: r.url }));
+          // Send search indicator to frontend with rich metadata
+          const sources = searchResult.results.slice(0, 5).map(r => ({
+            title: r.title,
+            url: r.url,
+            image: r.image || undefined,
+            siteName: r.siteName || undefined,
+            snippet: r.snippet || (r.content ? r.content.substring(0, 150) : undefined),
+          }));
           res.write(`data: ${JSON.stringify({ type: 'web_search', searched: true, query: searchResult.query, sources })}\n\n`);
         }
       } catch (err: any) {
@@ -547,6 +553,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
         maxOutputTokens: streamMaxOutput,
         memoryContext: memoryPrompt || undefined,
         thinkingEnabled: !!thinkingEnabled,
+        webSearchActive: webSearched,
       },
       {
         onChunk: (text: string) => {
