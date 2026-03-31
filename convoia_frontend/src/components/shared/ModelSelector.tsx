@@ -86,7 +86,7 @@ export function ModelSelector({ models, selectedId, onChange, className }: Model
           fontSize: '16px', fontWeight: 600, color: 'var(--chat-text)',
           transition: 'background-color 150ms',
         }}
-        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2F2F2F'}
+        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--chat-hover)'}
         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
       >
         {selected && isImageModel(selected) && (
@@ -100,7 +100,7 @@ export function ModelSelector({ models, selectedId, onChange, className }: Model
       {isOpen && (
         <div className="absolute top-full left-0 z-50" style={{
           marginTop: '4px', minWidth: '300px',
-          backgroundColor: 'var(--chat-surface)', border: '1px solid #383838',
+          backgroundColor: 'var(--chat-surface)', border: '1px solid var(--chat-border)',
           borderRadius: '12px', padding: '6px',
           boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
         }}>
@@ -114,7 +114,7 @@ export function ModelSelector({ models, selectedId, onChange, className }: Model
               placeholder="Search models..."
               style={{
                 width: '100%', padding: '8px 10px 8px 32px', backgroundColor: 'var(--chat-hover)',
-                border: '1px solid #4A4A4A', borderRadius: '8px', color: 'var(--chat-text)',
+                border: '1px solid var(--chat-border)', borderRadius: '8px', color: 'var(--chat-text)',
                 fontSize: '13px', outline: 'none',
               }}
               onFocus={(e) => e.currentTarget.style.borderColor = 'var(--color-primary)'}
@@ -147,7 +147,7 @@ export function ModelSelector({ models, selectedId, onChange, className }: Model
             {filteredImage.length > 0 && (
               <>
                 <div style={{
-                  borderTop: '1px solid #4A4A4A', margin: '6px 0',
+                  borderTop: '1px solid var(--chat-border)', margin: '6px 0',
                 }} />
                 <div style={{
                   padding: '6px 12px 2px', fontSize: '11px', color: '#F59E0B',
