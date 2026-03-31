@@ -409,11 +409,20 @@ pre {
   .message-content { font-size: 13.5px !important; }
 }
 
+/* Thin elegant scrollbar */
+.chat-messages-container::-webkit-scrollbar { width: 4px; }
+.chat-messages-container::-webkit-scrollbar-track { background: transparent; }
+.chat-messages-container::-webkit-scrollbar-thumb { background: var(--chat-border); border-radius: 4px; }
+.chat-messages-container::-webkit-scrollbar-thumb:hover { background: var(--color-border-hover); }
+
 /* Hide scrollbar on mobile but keep functional */
 @media (max-width: 768px) {
   ::-webkit-scrollbar { width: 0px; background: transparent; }
   * { scrollbar-width: none; }
 }
+
+/* Chat input focus glow */
+.chat-input-box:hover { border-color: var(--color-border-hover) !important; }
 
 /* Safe area for devices with notch */
 @supports (padding: env(safe-area-inset-bottom)) {

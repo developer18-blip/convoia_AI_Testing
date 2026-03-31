@@ -143,11 +143,11 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
   if (isUser) {
     return (
       <div style={{
-        display: 'flex', justifyContent: 'flex-end', marginBottom: '24px',
+        display: 'flex', justifyContent: 'flex-end', marginBottom: '20px', paddingLeft: '60px',
         animation: 'fadeSlideIn 200ms ease-out',
       }}
       onMouseEnter={() => setShowActions(true)} onMouseLeave={() => setShowActions(false)}>
-        <div className="user-msg-container" style={{ maxWidth: '60%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+        <div className="user-msg-container" style={{ maxWidth: '75%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
           {isEditing ? (
             /* ── Edit mode — clean standalone card, no blue bubble ── */
             <div style={{
@@ -191,9 +191,10 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
 
               {/* Text bubble — separate below image */}
               <div style={{
-                background: 'var(--chat-user-bubble)', borderRadius: '18px', padding: '10px 16px',
-                fontSize: '15px', lineHeight: '1.6', color: 'var(--chat-text)', wordBreak: 'break-word',
-                maxWidth: '100%',
+                background: 'var(--chat-user-bubble)', borderRadius: '20px 20px 4px 20px',
+                padding: '12px 16px', fontSize: '15px', lineHeight: '1.65', color: 'var(--chat-text)',
+                wordBreak: 'break-word', maxWidth: '100%',
+                border: '1px solid rgba(255,255,255,0.06)',
               }}>
                 {/* File chips */}
                 {message.fileAttachment && message.fileAttachment.type === 'document' && (
@@ -240,16 +241,18 @@ export function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRu
   /* ── AI MESSAGE — no bubble, text flows on dark bg ── */
   return (
     <div className="ai-message-row" style={{
-      display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '32px',
-      animation: 'fadeSlideIn 200ms ease-out',
+      display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '28px',
+      paddingRight: '40px', animation: 'fadeSlideIn 200ms ease-out',
     }}
     onMouseEnter={() => setShowActions(true)} onMouseLeave={() => setShowActions(false)}>
 
       {/* AI Avatar */}
       <div className="ai-avatar" style={{
-        width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
-        backgroundColor: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '14px', color: 'white',
+        width: '32px', height: '32px', borderRadius: '10px', flexShrink: 0,
+        background: 'linear-gradient(135deg, rgba(124,58,237,0.15), rgba(79,70,229,0.15))',
+        border: '1px solid rgba(124,58,237,0.25)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: '16px', color: '#A78BFA', marginTop: '2px',
       }}>✦</div>
 
       {/* Text area — no background, no border */}

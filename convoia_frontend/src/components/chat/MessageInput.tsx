@@ -359,14 +359,14 @@ export function MessageInput({
           </div>
         )}
 
-        {/* Input pill container */}
+        {/* Input card */}
         <div className="chat-input-box" style={{
           display: 'flex', flexDirection: 'column',
-          backgroundColor: 'var(--chat-input-bg)', borderRadius: '26px',
-          border: '1px solid var(--chat-border)',
+          backgroundColor: 'var(--chat-input-bg)', borderRadius: '24px',
+          border: inputFocused ? '1px solid rgba(124,58,237,0.4)' : '1px solid var(--chat-border)',
           boxShadow: inputFocused
-            ? '0 0 0 1px var(--chat-border), 0 2px 8px rgba(0,0,0,0.06)'
-            : '0 1px 4px rgba(0,0,0,0.03)',
+            ? '0 0 0 3px rgba(124,58,237,0.08), 0 4px 16px rgba(0,0,0,0.25)'
+            : '0 2px 12px rgba(0,0,0,0.15)',
           transition: 'all 200ms ease',
           cursor: 'text', overflow: 'hidden', maxWidth: '100%',
         }}
@@ -456,14 +456,15 @@ export function MessageInput({
             }}
             onFocus={() => setInputFocused(true)}
             onBlur={() => setInputFocused(false)}
-            placeholder="Ask anything"
-            rows={2}
+            placeholder="Message ConvoiaAI..."
+            rows={1}
             disabled={disabled || fileLoading}
+            aria-label="Message input"
             style={{
               flex: 1, backgroundColor: 'transparent', border: 'none', outline: 'none',
               color: 'var(--chat-text)', fontSize: '15px', lineHeight: '1.6', resize: 'none',
-              minHeight: '52px', maxHeight: '300px', fontFamily: 'Inter, system-ui, sans-serif',
-              padding: '14px 20px 6px', overflowWrap: 'break-word', wordBreak: 'break-word',
+              minHeight: '56px', maxHeight: '200px', fontFamily: 'Inter, system-ui, sans-serif',
+              padding: '16px 20px 8px', overflowWrap: 'break-word', wordBreak: 'break-word',
               overflowY: 'auto', scrollbarWidth: 'thin', scrollbarColor: 'var(--chat-border) transparent',
             }}
           />
@@ -518,20 +519,25 @@ export function MessageInput({
                   }
                 }}
                 disabled={!canSend && !isLoading}
+                aria-label={isLoading ? 'Stop generation' : 'Send message'}
                 style={{
-                  width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
-                  backgroundColor: isLoading ? '#EF4444' : canSend ? 'var(--color-primary)' : 'var(--chat-text-dim)',
-                  border: 'none',
+                  width: '38px', height: '38px', borderRadius: '12px', flexShrink: 0,
+                  background: isLoading
+                    ? 'rgba(239,68,68,0.1)'
+                    : canSend
+                      ? 'linear-gradient(135deg, #7C3AED, #6D28D9)'
+                      : 'var(--chat-surface)',
+                  border: isLoading ? '1px solid rgba(239,68,68,0.3)' : canSend ? 'none' : '1px solid var(--chat-border)',
                   cursor: (canSend || isLoading) ? 'pointer' : 'not-allowed',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   transition: 'all 200ms ease',
-                  opacity: canSend || isLoading ? 1 : 0.4,
+                  boxShadow: canSend && !isLoading ? '0 2px 8px rgba(124,58,237,0.4)' : 'none',
                 }}
               >
                 {isLoading || fileLoading ? (
-                  <Square size={14} style={{ color: 'white', fill: 'white' }} />
+                  <Square size={14} style={{ color: '#EF4444', fill: '#EF4444' }} />
                 ) : (
-                  <ArrowUp size={18} style={{ color: '#FFFFFF' }} />
+                  <ArrowUp size={18} style={{ color: canSend ? '#FFFFFF' : 'var(--chat-text-dim)' }} />
                 )}
               </button>
             </div>
