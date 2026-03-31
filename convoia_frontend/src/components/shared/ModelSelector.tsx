@@ -218,7 +218,7 @@ function ModelOption({ model, isSelected, onSelect, isImage }: {
         <div style={{ fontSize: '12px', color: 'var(--chat-text-muted)', marginTop: '1px' }}>
           {isImage
             ? model.description
-            : `${(model.contextWindow / 1000).toFixed(0)}K ctx \u00B7 $${model.inputTokenPrice.toFixed(2)}/$${model.outputTokenPrice.toFixed(2)} per 1M`
+            : `${(model.contextWindow / 1000).toFixed(0)}K ctx \u00B7 $${(model.inputTokenPrice * 1_000_000).toFixed(2)}/$${(model.outputTokenPrice * 1_000_000).toFixed(2)} per 1M`
           }
         </div>
       </div>
