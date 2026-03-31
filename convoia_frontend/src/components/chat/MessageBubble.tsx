@@ -64,7 +64,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
   // Memoize chart extraction so it doesn't run on every render
   const { cleanText: rawCleanText, charts } = useMemo(() => extractCharts(renderedContent), [renderedContent])
 
-  // Normalize markdown: convert • bullets to proper lists, ensure spacing for headings/hrs
+  // Normalize markdown: convert • bullets to proper lists, ensure spacing for headings/hrs, fix unfenced code
   const cleanText = useMemo(() => {
     let t = rawCleanText
     // Convert "• text" bullet lines into markdown "- text" list items
@@ -77,6 +77,9 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
     t = t.replace(/(---)\n([^\n])/g, '$1\n\n$2')
     // Ensure list items after a paragraph have a blank line before
     t = t.replace(/([^\n-])\n(- )/g, '$1\n\n$2')
+    // Ensure code fences have blank lines around them (markdown requires it)
+    t = t.replace(/([^\n])\n(```)/g, '$1\n\n$2')
+    t = t.replace(/(```)\n([^\n])/g, '$1\n\n$2')
     return t
   }, [rawCleanText])
 
@@ -472,6 +475,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
                   style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>{children}</a>
               ),
               hr: () => <hr style={{ border: 'none', borderTop: '1px solid var(--chat-border)', margin: '20px 0' }} />,
+              pre: ({ children }) => <>{children}</>,
               table: ({ children }) => (
                 <div className="table-wrapper" style={{ margin: '16px 0', overflow: 'auto', borderRadius: '8px', border: '1px solid var(--chat-border)' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>{children}</table>
@@ -497,14 +501,18 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
                   )}
                 </div>
               ),
-              code(props: ComponentPropsWithoutRef<'code'> & { inline?: boolean; className?: string }) {
-                const { inline, className, children, ...rest } = props
+              code(props: ComponentPropsWithoutRef<'code'> & { inline?: boolean; className?: string; node?: any }) {
+                const { inline, className, children, node, ...rest } = props
                 const match = /language-(\w+)/.exec(className || '')
-                if (!inline && match) {
-                  return <CodeBlock language={match[1]}
-                    onRun={onRunCode ? () => onRunCode(String(children).replace(/\n$/, ''), match[1]) : undefined}
-                    onOpenInCanvas={onOpenInCanvas ? (code, lang) => onOpenInCanvas(code, lang, 'code') : undefined}>
-                    {String(children).replace(/\n$/, '')}
+                const codeStr = String(children).replace(/\n$/, '')
+                // Detect block code: has language class, or parent is <pre>, or contains newlines (multi-line)
+                const isBlock = !inline && (match || node?.position?.start?.line !== node?.position?.end?.line || codeStr.includes('\n'))
+                if (isBlock) {
+                  const lang = match ? match[1] : 'text'
+                  return <CodeBlock language={lang}
+                    onRun={onRunCode ? () => onRunCode(codeStr, lang) : undefined}
+                    onOpenInCanvas={onOpenInCanvas ? (code, l) => onOpenInCanvas(code, l, 'code') : undefined}>
+                    {codeStr}
                   </CodeBlock>
                 }
                 return (
