@@ -637,6 +637,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
                   provider: aiModel.provider,
                   tokens: { input: inputTokens, output: outputTokens, total: totalTokensUsed },
                   tokensUsed: totalTokensUsed,
+                  cost: { charged: customerPrice.toFixed(6) },
                   executionTime,
                   webSearched,
                 })}\n\n`);
