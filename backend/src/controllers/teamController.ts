@@ -377,6 +377,7 @@ export const removeMember = asyncHandler(async (req: Request, res: Response) => 
     // Hard delete — remove user and all their data from database
     await prisma.$transaction(async (tx) => {
       // Delete related records first (cascade may not cover all)
+      await (tx as any).task.deleteMany({ where: { OR: [{ assignedToId: userId }, { createdById: userId }] } }).catch(() => {});
       await tx.notification.deleteMany({ where: { userId } });
       await tx.usageLog.deleteMany({ where: { userId } });
       await tx.tokenTransaction.deleteMany({ where: { userId } });
@@ -392,9 +393,16 @@ export const removeMember = asyncHandler(async (req: Request, res: Response) => 
         await tx.wallet.delete({ where: { userId } });
       }
 
-      // Delete budget, subscription
+      // Delete budget, subscription, sessions, API keys, invites
       await tx.budget.deleteMany({ where: { userId } });
       await tx.subscription.deleteMany({ where: { userId } });
+      await (tx as any).hourlySession.deleteMany({ where: { userId } }).catch(() => {});
+      await (tx as any).apiKey.deleteMany({ where: { userId } }).catch(() => {});
+      await (tx as any).orgInvite.deleteMany({ where: { invitedBy: userId } }).catch(() => {});
+      await (tx as any).activityLog.deleteMany({ where: { userId } }).catch(() => {});
+
+      // Clear managerId references from other users
+      await tx.user.updateMany({ where: { managerId: userId }, data: { managerId: null } });
 
       // Finally delete the user
       await tx.user.delete({ where: { id: userId } });
