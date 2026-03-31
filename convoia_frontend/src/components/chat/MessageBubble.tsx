@@ -42,6 +42,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState(message.content)
   const [showActions, setShowActions] = useState(false)
+  const [showFullUserMsg, setShowFullUserMsg] = useState(false)
 
   // Debounce markdown rendering during streaming to prevent jitter
   const [renderedContent, setRenderedContent] = useState(message.content)
@@ -245,7 +246,63 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
                     <Music size={14} /><span>{message.fileAttachment.name}</span>
                   </div>
                 )}
-                {message.content}
+                {message.content.length > 500 ? (
+                  // Long messages: show as collapsible doc-style block
+                  <div>
+                    <div style={{
+                      maxHeight: showFullUserMsg ? 'none' : '120px', overflow: 'hidden',
+                      position: 'relative', whiteSpace: 'pre-wrap',
+                    }}>
+                      <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}
+                        components={{
+                          code(codeProps: ComponentPropsWithoutRef<'code'> & { inline?: boolean; className?: string }) {
+                            const { inline, className, children: codeChildren, ...codeRest } = codeProps
+                            const langMatch = /language-(\w+)/.exec(className || '')
+                            const codeString = String(codeChildren).replace(/\n$/, '')
+                            if (!inline && (langMatch || codeString.includes('\n'))) {
+                              return <CodeBlock language={langMatch ? langMatch[1] : 'text'}>{codeString}</CodeBlock>
+                            }
+                            return <code style={{ backgroundColor: 'rgba(255,255,255,0.1)', padding: '1px 4px', borderRadius: '3px', fontSize: '13px' }} {...codeRest}>{codeChildren}</code>
+                          },
+                          pre: ({ children }) => <>{children}</>,
+                          p: ({ children }) => <p style={{ marginBottom: '8px', lineHeight: '1.6' }} className="last:mb-0">{children}</p>,
+                        }}>
+                        {message.content}
+                      </ReactMarkdown>
+                      {!showFullUserMsg && (
+                        <div style={{
+                          position: 'absolute', bottom: 0, left: 0, right: 0, height: '50px',
+                          background: 'linear-gradient(transparent, var(--chat-user-bubble))',
+                        }} />
+                      )}
+                    </div>
+                    <button onClick={() => setShowFullUserMsg(!showFullUserMsg)}
+                      style={{
+                        background: 'none', border: 'none', color: 'var(--color-primary)',
+                        fontSize: '12px', fontWeight: 600, cursor: 'pointer', padding: '4px 0', marginTop: '4px',
+                      }}>
+                      {showFullUserMsg ? 'Show less' : `Show more (${message.content.length} chars)`}
+                    </button>
+                  </div>
+                ) : (
+                  // Short messages: render with basic markdown
+                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}
+                    components={{
+                      code(codeProps: ComponentPropsWithoutRef<'code'> & { inline?: boolean; className?: string }) {
+                        const { inline, className, children: codeChildren, ...codeRest } = codeProps
+                        const langMatch = /language-(\w+)/.exec(className || '')
+                        const codeString = String(codeChildren).replace(/\n$/, '')
+                        if (!inline && (langMatch || codeString.includes('\n'))) {
+                          return <CodeBlock language={langMatch ? langMatch[1] : 'text'}>{codeString}</CodeBlock>
+                        }
+                        return <code style={{ backgroundColor: 'rgba(255,255,255,0.1)', padding: '1px 4px', borderRadius: '3px', fontSize: '13px' }} {...codeRest}>{codeChildren}</code>
+                      },
+                      pre: ({ children }) => <>{children}</>,
+                      p: ({ children }) => <p style={{ marginBottom: '4px', lineHeight: '1.6' }} className="last:mb-0">{children}</p>,
+                    }}>
+                    {message.content}
+                  </ReactMarkdown>
+                )}
               </div>
             </div>
           )}
