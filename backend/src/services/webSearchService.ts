@@ -337,7 +337,7 @@ async function crawlUrl(url: string): Promise<string> {
       .replace(/ {2,}/g, ' ')
       .replace(/\n{3,}/g, '\n\n')
       .trim()
-      .substring(0, 4000); // Increased from 2000 to 4000
+      .substring(0, 2000);
 
     return text;
   } catch {
@@ -353,7 +353,7 @@ async function enrichResults(results: SearchResult[]): Promise<SearchResult[]> {
   const crawlPromises = toCrawl.map(async (r) => {
     const content = await crawlUrl(r.url);
     if (content.length > r.content.length) {
-      return { ...r, content: content.substring(0, 3000) }; // Increased from 1500 to 3000
+      return { ...r, content: content.substring(0, 1500) };
     }
     return r;
   });
@@ -447,21 +447,19 @@ async function searchTavily(query: string, maxResults = 5): Promise<SearchResult
 function buildContextText(query: string, results: SearchResult[], source: string): string {
   if (results.length === 0) return '';
 
-  let ctx = `[WEB SEARCH RESULTS for: "${query}" — sourced via ${source}]\n`;
-  ctx += `[Date: ${new Date().toISOString().split('T')[0]}]\n\n`;
+  let ctx = `[WEB SEARCH RESULTS for: "${query}" — ${source}, ${new Date().toISOString().split('T')[0]}]\n\n`;
 
-  results.slice(0, 5).forEach((r, i) => {
-    ctx += `━━━ Source ${i + 1}: ${r.title} ━━━\n`;
-    ctx += `URL: ${r.url}\n`;
-    // Include up to 1500 chars of content per source (was 400)
-    const content = r.content.substring(0, 1500).trim();
-    ctx += `Content:\n${content}\n\n`;
+  // Limit total context to ~3000 chars to keep token cost reasonable
+  const maxPerSource = Math.floor(3000 / Math.min(results.length, 4));
+
+  results.slice(0, 4).forEach((r, i) => {
+    ctx += `[${i + 1}] ${r.title}\n`;
+    ctx += `${r.url}\n`;
+    const content = r.content.substring(0, maxPerSource).trim();
+    ctx += `${content}\n\n`;
   });
 
-  ctx += `[INSTRUCTIONS: Use the above search results to provide accurate, current, and comprehensive answers. `;
-  ctx += `Cite sources by mentioning the website name. If results contain numbers, statistics, or comparisons, `;
-  ctx += `present them clearly. If information seems outdated or conflicting, note that. `;
-  ctx += `Synthesize information from multiple sources — don't just repeat one source.]\n`;
+  ctx += `[Cite sources. Synthesize across sources. Note if info seems outdated.]\n`;
 
   return ctx;
 }
