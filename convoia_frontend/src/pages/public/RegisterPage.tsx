@@ -193,7 +193,7 @@ export function RegisterPage() {
         >
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2.5 mb-8">
-            <img src="/logo.png" alt="ConvoiaAI" style={{ height: '48px', objectFit: 'contain' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+            <img src="/logo.png?v=2" alt="ConvoiaAI" style={{ height: '48px', objectFit: 'contain' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
           </Link>
 
           <h1 className="text-3xl font-bold text-text-primary tracking-tight">Create your account</h1>

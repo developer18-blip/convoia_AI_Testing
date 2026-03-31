@@ -202,7 +202,7 @@ export function Sidebar({ collapsed, onToggle, onClose }: SidebarProps) {
           className="flex items-center gap-2.5"
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-primary)' }}
         >
-          <img src="/logo.png" alt="ConvoiaAI" style={{ height: collapsed ? '28px' : '32px', objectFit: 'contain' }} />
+          <img src="/logo.png?v=2" alt="ConvoiaAI" style={{ height: collapsed ? '28px' : '32px', objectFit: 'contain' }} />
           {!collapsed && (
             <span style={{ fontWeight: 800, fontSize: '17px', background: 'linear-gradient(135deg, var(--color-primary), var(--color-accent-end))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               ConvoiaAI
