@@ -1,4 +1,4 @@
-import { useState, useRef, type KeyboardEvent } from 'react'
+import { useState, useRef, useEffect, type KeyboardEvent } from 'react'
 import { ArrowUp, Plus, Square, X, FileText, Music, Film } from 'lucide-react'
 import { VoiceInputButton } from './VoiceInputButton'
 import { ImageGenerationModal } from './ImageGenerationModal'
@@ -321,13 +321,19 @@ export function MessageInput({
     }
   }
 
-  const handleInput = () => {
+  const adjustHeight = () => {
     const el = textareaRef.current
     if (el) {
       el.style.height = 'auto'
-      el.style.height = Math.min(el.scrollHeight, 300) + 'px'
+      const newHeight = Math.min(el.scrollHeight, 300)
+      el.style.height = newHeight + 'px'
     }
   }
+
+  // Auto-resize on every value change (typing, paste, external update)
+  useEffect(() => {
+    adjustHeight()
+  }, [value])
 
   const handleImageGenerated = (imageUrl: string, prompt: string) => {
     onImageGenerated?.({ url: imageUrl, prompt })
@@ -440,7 +446,7 @@ export function MessageInput({
           <textarea
             ref={textareaRef}
             value={value}
-            onChange={(e) => { setValue(e.target.value); handleInput() }}
+            onChange={(e) => setValue(e.target.value)}
             onKeyDown={handleKeyDown}
             onPaste={(e) => {
               const items = e.clipboardData?.items
@@ -463,7 +469,7 @@ export function MessageInput({
             style={{
               flex: 1, backgroundColor: 'transparent', border: 'none', outline: 'none',
               color: 'var(--chat-text)', fontSize: '15px', lineHeight: '1.6', resize: 'none',
-              minHeight: '56px', maxHeight: '200px', fontFamily: 'Inter, system-ui, sans-serif',
+              minHeight: '56px', maxHeight: '300px', fontFamily: 'Inter, system-ui, sans-serif',
               padding: '16px 20px 8px', overflowWrap: 'break-word', wordBreak: 'break-word',
               overflowY: 'auto', scrollbarWidth: 'thin', scrollbarColor: 'var(--chat-border) transparent',
             }}
