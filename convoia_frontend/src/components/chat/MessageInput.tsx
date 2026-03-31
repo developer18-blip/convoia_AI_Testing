@@ -457,13 +457,13 @@ export function MessageInput({
             onFocus={() => setInputFocused(true)}
             onBlur={() => setInputFocused(false)}
             placeholder="Ask anything"
-            rows={1}
+            rows={2}
             disabled={disabled || fileLoading}
             style={{
               flex: 1, backgroundColor: 'transparent', border: 'none', outline: 'none',
               color: 'var(--chat-text)', fontSize: '15px', lineHeight: '1.6', resize: 'none',
-              minHeight: '28px', maxHeight: '300px', fontFamily: 'Inter, system-ui, sans-serif',
-              padding: '16px 20px 6px', overflowWrap: 'break-word', wordBreak: 'break-word',
+              minHeight: '52px', maxHeight: '300px', fontFamily: 'Inter, system-ui, sans-serif',
+              padding: '14px 20px 6px', overflowWrap: 'break-word', wordBreak: 'break-word',
               overflowY: 'auto', scrollbarWidth: 'thin', scrollbarColor: 'var(--chat-border) transparent',
             }}
           />
