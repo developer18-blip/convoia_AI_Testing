@@ -286,6 +286,7 @@ export function ChatPage() {
   ]
 
   const totalTokens = messages.reduce((s, m) => s + (m.tokensInput || 0) + (m.tokensOutput || 0), 0)
+  const totalCost = messages.reduce((s, m) => s + (m.cost || 0), 0)
 
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 56px)', margin: '-16px', overflow: 'hidden', backgroundColor: 'var(--chat-bg)', color: 'var(--chat-text)', fontFamily: "'Inter', sans-serif" }}>
@@ -397,12 +398,30 @@ export function ChatPage() {
             <span className="hidden sm:inline">Think</span>
           </button>
 
-          <div className="ml-auto flex items-center gap-1 sm:gap-2 shrink-0">
-            <div className="hidden md:block"><CostEstimator model={selectedModel} /></div>
+          <div className="ml-auto flex items-center gap-1 sm:gap-3 shrink-0">
+            {/* Per-conversation cost — live updating */}
+            {totalCost > 0 && (
+              <div className="hidden md:flex items-center gap-1" style={{ fontSize: '11px', color: 'var(--color-text-dim)', fontFamily: 'monospace' }}>
+                <span>$</span>
+                <span style={{ color: 'var(--color-text-muted)' }}>~${totalCost.toFixed(4)}/query</span>
+              </div>
+            )}
+            {!totalCost && (
+              <div className="hidden md:block"><CostEstimator model={selectedModel} /></div>
+            )}
 
-            <div className="flex items-center gap-1" style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums' }}>
+            {/* Per-conversation token usage — live updating */}
+            <div className="flex items-center gap-1" style={{
+              fontSize: '12px', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums',
+              color: totalTokens > 0 ? 'var(--color-text-secondary)' : 'var(--color-text-muted)',
+              padding: '3px 8px', borderRadius: '6px',
+              background: totalTokens > 0 ? 'var(--color-primary-light)' : 'transparent',
+              transition: 'all 0.3s',
+            }}>
               <Zap size={11} style={{ color: '#A78BFA' }} />
-              <span className="hidden sm:inline">{formattedBalance}</span>
+              <span className="hidden sm:inline">
+                {totalTokens > 0 ? formatTokens(totalTokens) : formattedBalance}
+              </span>
             </div>
 
             {/* More menu */}
