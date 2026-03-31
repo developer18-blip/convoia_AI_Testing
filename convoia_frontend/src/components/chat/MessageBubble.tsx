@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo, memo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import remarkBreaks from 'remark-breaks'
 import { AlertCircle, RefreshCw, Copy, Check, Pencil, Trash2, ThumbsUp, ThumbsDown, Download, FileText, Music, PanelRight } from 'lucide-react'
 import { CodeBlock } from './CodeBlock'
 import { AgentPanel } from './AgentPanel'
@@ -61,7 +62,23 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
   }, [message.content, message.isLoading])
 
   // Memoize chart extraction so it doesn't run on every render
-  const { cleanText, charts } = useMemo(() => extractCharts(renderedContent), [renderedContent])
+  const { cleanText: rawCleanText, charts } = useMemo(() => extractCharts(renderedContent), [renderedContent])
+
+  // Normalize markdown: convert • bullets to proper lists, ensure spacing for headings/hrs
+  const cleanText = useMemo(() => {
+    let t = rawCleanText
+    // Convert "• text" bullet lines into markdown "- text" list items
+    t = t.replace(/^[•●▪▸►]/gm, '-')
+    t = t.replace(/\n[•●▪▸►] /g, '\n- ')
+    // Ensure headings have a blank line before them (markdown requires it)
+    t = t.replace(/([^\n])\n(#{1,3} )/g, '$1\n\n$2')
+    // Ensure horizontal rules have blank lines around them
+    t = t.replace(/([^\n])\n(---)/g, '$1\n\n$2')
+    t = t.replace(/(---)\n([^\n])/g, '$1\n\n$2')
+    // Ensure list items after a paragraph have a blank line before
+    t = t.replace(/([^\n-])\n(- )/g, '$1\n\n$2')
+    return t
+  }, [rawCleanText])
 
   // Detect if response is document-worthy (for download bar)
   const contentRef = useRef<HTMLDivElement>(null)
@@ -422,7 +439,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
         })()}
 
         <div ref={contentRef} className="prose prose-sm max-w-none message-content" style={{ fontSize: '15px', lineHeight: '1.75', color: 'var(--chat-text)' }}>
-          <ReactMarkdown remarkPlugins={[remarkGfm]}
+          <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}
             components={{
               p: ({ children }) => {
                 // Check if this paragraph is a chart placeholder
