@@ -62,9 +62,56 @@ export function formatRelativeTime(dateStr: string): string {
 
 export function getGreeting(): string {
   const hour = new Date().getHours()
-  if (hour < 12) return 'Good morning'
-  if (hour < 17) return 'Good afternoon'
-  return 'Good evening'
+  const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)]
+
+  if (hour >= 0 && hour < 4) return pick([
+    'Night owl, still grinding',
+    'Burning the midnight oil',
+    'Up late and building',
+    'The world sleeps, you create',
+  ])
+  if (hour < 6) return pick([
+    'Early riser, respect',
+    'Up before the sun',
+    'The early bird catches the worm',
+    'Dawn warrior, let\'s go',
+  ])
+  if (hour < 9) return pick([
+    'Rise and shine',
+    'Fresh start today',
+    'Morning energy, let\'s build',
+    'New day, new possibilities',
+  ])
+  if (hour < 12) return pick([
+    'Good morning',
+    'Morning momentum',
+    'Let\'s make today count',
+    'Productive morning ahead',
+  ])
+  if (hour < 14) return pick([
+    'Good afternoon',
+    'Lunch break hustle',
+    'Afternoon focus mode',
+    'Midday momentum',
+  ])
+  if (hour < 17) return pick([
+    'Afternoon grind',
+    'Powering through the day',
+    'Keeping the energy up',
+    'Finishing strong today',
+  ])
+  if (hour < 20) return pick([
+    'Good evening',
+    'Evening productivity',
+    'Winding down or warming up',
+    'Evening session, let\'s go',
+  ])
+  return pick([
+    'Burning the midnight oil',
+    'Night mode activated',
+    'Late night builder',
+    'Still at it, legend',
+  ])
 }
 
 export function getInitials(name: string): string {
