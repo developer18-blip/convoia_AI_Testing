@@ -321,17 +321,18 @@ export function MessageInput({
     }
   }
 
-  // Auto-resize textarea to fit content
+  // Auto-resize textarea — expand as user types, scroll after max
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
-    // Reset to min height first, then measure scrollHeight
-    el.style.height = '0px'
-    const scrollH = el.scrollHeight
-    const maxH = 300
-    const minH = 56
-    el.style.height = Math.max(minH, Math.min(scrollH, maxH)) + 'px'
-    el.style.overflowY = scrollH > maxH ? 'auto' : 'hidden'
+    // Temporarily shrink to measure true content height
+    const prev = el.style.height
+    el.style.height = '1px'
+    const contentH = el.scrollHeight
+    el.style.height = prev // restore immediately to avoid flash
+    // Apply: min 56px, grow to content, max 300px, then scroll
+    const h = Math.max(56, Math.min(contentH, 300))
+    el.style.height = h + 'px'
   }, [value])
 
   const handleImageGenerated = (imageUrl: string, prompt: string) => {
@@ -466,9 +467,10 @@ export function MessageInput({
             disabled={disabled || fileLoading}
             aria-label="Message input"
             style={{
-              flex: 1, backgroundColor: 'transparent', border: 'none', outline: 'none',
+              width: '100%', backgroundColor: 'transparent', border: 'none', outline: 'none',
               color: 'var(--chat-text)', fontSize: '15px', lineHeight: '1.6', resize: 'none',
-              minHeight: '56px', maxHeight: '300px', fontFamily: 'Inter, system-ui, sans-serif',
+              height: '56px', /* controlled by useEffect */
+              fontFamily: 'Inter, system-ui, sans-serif',
               padding: '16px 20px 8px', overflowWrap: 'break-word', wordBreak: 'break-word',
               overflowY: 'auto', scrollbarWidth: 'thin', scrollbarColor: 'var(--chat-border) transparent',
             }}
