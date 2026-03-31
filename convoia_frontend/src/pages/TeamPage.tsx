@@ -199,11 +199,11 @@ export function TeamPage() {
     }
   }
 
-  const handleRemoveMember = async (userId: string) => {
+  const handleRemoveMember = async (userId: string, permanent = false) => {
     try {
       setIsActioning(true)
-      await api.delete(`/team/members/${userId}`)
-      toast.success('Member removed from organization')
+      await api.delete(`/team/members/${userId}${permanent ? '?permanent=true' : ''}`)
+      toast.success(permanent ? 'Member permanently deleted' : 'Member removed from organization')
       setConfirmAction(null)
       fetchData()
     } catch (err: any) {
@@ -434,6 +434,7 @@ export function TeamPage() {
                           onSetBudget={() => { setBudgetTarget(m); setBudgetCap(String(m.budget?.monthlyCap || '')) }}
                           onChangeRole={() => { setRoleChangeTarget(m); setNewRole(m.role) }}
                           onRemove={() => setConfirmAction({ type: 'remove', id: m.id, name: m.name })}
+                          onDelete={isOwner ? () => setConfirmAction({ type: 'delete', id: m.id, name: m.name }) : undefined}
                         />
                       </div>
                     </td>
@@ -585,26 +586,43 @@ export function TeamPage() {
       <Modal
         isOpen={!!confirmAction}
         onClose={() => setConfirmAction(null)}
-        title={confirmAction?.type === 'revoke' ? 'Revoke Invite' : 'Remove Member'}
+        title={confirmAction?.type === 'revoke' ? 'Revoke Invite' : confirmAction?.type === 'delete' ? 'Delete Member Permanently' : 'Remove Member'}
         size="sm"
       >
         <div className="space-y-4">
           <p className="text-sm text-text-secondary">
             {confirmAction?.type === 'revoke'
               ? `Are you sure you want to revoke the invite for ${confirmAction?.name}?`
-              : `Are you sure you want to remove ${confirmAction?.name} from the organization? They will lose access immediately.`}
+              : confirmAction?.type === 'delete'
+              ? `Are you sure you want to PERMANENTLY DELETE ${confirmAction?.name}? This will remove their account and ALL data (usage logs, conversations, tokens, wallet) from the database. This action CANNOT be undone.`
+              : `Are you sure you want to remove ${confirmAction?.name} from the organization? They will lose access immediately but their account will remain.`}
           </p>
+          {confirmAction?.type === 'delete' && (
+            <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', fontSize: '12px', color: '#EF4444' }}>
+              This permanently deletes the user, their conversations, usage history, tokens, and wallet data.
+            </div>
+          )}
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setConfirmAction(null)}>Cancel</Button>
+            {confirmAction?.type === 'remove' && (
+              <Button
+                variant="danger"
+                isLoading={isActioning}
+                onClick={() => handleRemoveMember(confirmAction.id, false)}
+              >
+                Remove from Org
+              </Button>
+            )}
             <Button
               variant="danger"
               isLoading={isActioning}
               onClick={() => {
                 if (confirmAction?.type === 'revoke') handleRevokeInvite(confirmAction.id)
-                else if (confirmAction?.type === 'remove') handleRemoveMember(confirmAction.id)
+                else if (confirmAction?.type === 'remove') handleRemoveMember(confirmAction.id, false)
+                else if (confirmAction?.type === 'delete') handleRemoveMember(confirmAction.id, true)
               }}
             >
-              {confirmAction?.type === 'revoke' ? 'Revoke' : 'Remove'}
+              {confirmAction?.type === 'revoke' ? 'Revoke' : confirmAction?.type === 'delete' ? 'Delete Permanently' : 'Remove'}
             </Button>
           </div>
         </div>
@@ -621,6 +639,7 @@ function MemberActions({
   onSetBudget,
   onChangeRole,
   onRemove,
+  onDelete,
 }: {
   member: TeamMember
   isOwner: boolean
@@ -628,6 +647,7 @@ function MemberActions({
   onSetBudget: () => void
   onChangeRole: () => void
   onRemove: () => void
+  onDelete?: () => void
 }) {
   const [open, setOpen] = useState(false)
 
@@ -664,12 +684,22 @@ function MemberActions({
               </button>
             )}
             {member.role !== 'org_owner' && (
-              <button
-                onClick={() => { onRemove(); setOpen(false) }}
-                className="w-full px-3 py-2 text-left text-sm text-danger hover:bg-danger/5 transition-colors flex items-center gap-2"
-              >
-                <Trash2 size={14} /> Remove
-              </button>
+              <>
+                <button
+                  onClick={() => { onRemove(); setOpen(false) }}
+                  className="w-full px-3 py-2 text-left text-sm text-text-secondary hover:bg-surface-2 transition-colors flex items-center gap-2"
+                >
+                  <Trash2 size={14} /> Remove from Org
+                </button>
+                {isOwner && onDelete && (
+                  <button
+                    onClick={() => { onDelete(); setOpen(false) }}
+                    className="w-full px-3 py-2 text-left text-sm text-danger hover:bg-danger/5 transition-colors flex items-center gap-2"
+                  >
+                    <Trash2 size={14} /> Delete Permanently
+                  </button>
+                )}
+              </>
             )}
           </div>
         </>

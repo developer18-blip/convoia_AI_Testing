@@ -371,36 +371,73 @@ export const removeMember = asyncHandler(async (req: Request, res: Response) => 
     throw new AppError('Cannot remove the organization owner', 403);
   }
 
-  // Remove from org (don't delete account)
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      organizationId: null,
-      managerId: null,
-      role: 'employee',
-    },
-  });
+  const hardDelete = req.query.permanent === 'true';
 
-  // Notify the removed user
-  try {
-    await prisma.notification.create({
+  if (hardDelete && requester?.role === 'org_owner') {
+    // Hard delete — remove user and all their data from database
+    await prisma.$transaction(async (tx) => {
+      // Delete related records first (cascade may not cover all)
+      await tx.notification.deleteMany({ where: { userId } });
+      await tx.usageLog.deleteMany({ where: { userId } });
+      await tx.tokenTransaction.deleteMany({ where: { userId } });
+      await tx.tokenWallet.deleteMany({ where: { userId } });
+      await tx.chatMessage.deleteMany({ where: { conversation: { userId } } });
+      await tx.conversation.deleteMany({ where: { userId } });
+      await (tx as any).userMemory.deleteMany({ where: { userId } }).catch(() => {});
+
+      // Delete wallet and transactions
+      const wallet = await tx.wallet.findUnique({ where: { userId } });
+      if (wallet) {
+        await tx.walletTransaction.deleteMany({ where: { walletId: wallet.id } });
+        await tx.wallet.delete({ where: { userId } });
+      }
+
+      // Delete budget, subscription
+      await tx.budget.deleteMany({ where: { userId } });
+      await tx.subscription.deleteMany({ where: { userId } });
+
+      // Finally delete the user
+      await tx.user.delete({ where: { id: userId } });
+    });
+
+    logger.info(`Member PERMANENTLY DELETED: userId=${userId} by=${req.user.userId}`);
+
+    res.json({
+      success: true,
+      message: 'Member permanently deleted from database',
+    });
+  } else {
+    // Soft remove — clear org association, keep account
+    await prisma.user.update({
+      where: { id: userId },
       data: {
-        userId: targetUser.id,
-        type: 'system_message',
-        title: 'Removed from organization',
-        message: 'You have been removed from the organization.',
+        organizationId: null,
+        managerId: null,
+        role: 'user',
       },
     });
-  } catch (err) {
-    logger.warn('Failed to create removal notification', err);
+
+    // Notify the removed user
+    try {
+      await prisma.notification.create({
+        data: {
+          userId: targetUser.id,
+          type: 'system_message',
+          title: 'Removed from organization',
+          message: 'You have been removed from the organization.',
+        },
+      });
+    } catch (err) {
+      logger.warn('Failed to create removal notification', err);
+    }
+
+    logger.info(`Member removed from org: userId=${userId} by=${req.user.userId}`);
+
+    res.json({
+      success: true,
+      message: 'Member removed from organization',
+    });
   }
-
-  logger.info(`Member removed: userId=${userId} by=${req.user.userId}`);
-
-  res.json({
-    success: true,
-    message: 'Member removed from organization',
-  });
 });
 
 // ── ASSIGN MANAGER TO EMPLOYEE ─────────────────
