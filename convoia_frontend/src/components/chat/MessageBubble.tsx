@@ -181,31 +181,29 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
   if (isUser) {
     return (
       <div style={{
-        display: 'flex', justifyContent: 'flex-end', marginBottom: '20px', paddingLeft: '60px',
+        display: 'flex', justifyContent: 'flex-end', marginBottom: '20px',
+        paddingLeft: isEditing ? '0px' : '60px',
         animation: 'fadeSlideIn 200ms ease-out',
       }}
       onMouseEnter={() => setShowActions(true)} onMouseLeave={() => setShowActions(false)}>
-        <div className="user-msg-container" style={{ maxWidth: '75%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+        <div className="user-msg-container" style={{ maxWidth: isEditing ? '100%' : '75%', width: isEditing ? '100%' : 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
           {isEditing ? (
-            /* ── Edit mode — polished card with proper spacing ── */
+            /* ── Edit mode — full-width like ChatGPT ── */
             <div style={{
-              width: '100%', minWidth: '360px', maxWidth: '600px',
+              width: '100%',
               background: 'var(--chat-surface)', borderRadius: '16px',
               border: '1px solid var(--chat-border)',
               padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
             }}>
-              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Edit message
-              </div>
               <textarea value={editValue} onChange={(e) => setEditValue(e.target.value)} autoFocus
                 style={{
                   width: '100%', borderRadius: '12px', padding: '14px 16px',
-                  fontSize: '14px', lineHeight: '1.7', resize: 'vertical', minHeight: '120px',
+                  fontSize: '15px', lineHeight: '1.7', resize: 'vertical', minHeight: '140px',
                   background: 'var(--chat-bg)', border: '1px solid var(--chat-border)',
                   color: 'var(--chat-text)', outline: 'none',
-                  fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
-                  transition: 'border-color 0.2s',
+                  fontFamily: 'inherit',
+                  transition: 'border-color 0.2s, box-shadow 0.2s',
                 }}
                 onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-primary)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(124,58,237,0.1)' }}
                 onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--chat-border)'; e.currentTarget.style.boxShadow = 'none' }}
