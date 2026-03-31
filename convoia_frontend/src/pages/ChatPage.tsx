@@ -398,28 +398,27 @@ export function ChatPage() {
             <span className="hidden sm:inline">Think</span>
           </button>
 
-          <div className="ml-auto flex items-center gap-1 sm:gap-3 shrink-0">
-            {/* Per-conversation cost — live updating */}
-            {totalCost > 0 && (
-              <div className="hidden md:flex items-center gap-1" style={{ fontSize: '11px', color: 'var(--color-text-dim)', fontFamily: 'monospace' }}>
-                <span>$</span>
-                <span style={{ color: 'var(--color-text-muted)' }}>~${totalCost.toFixed(4)}/query</span>
-              </div>
-            )}
-            {!totalCost && (
+          <div className="ml-auto flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* Per-conversation spend — shows after first AI response */}
+            <div className="hidden md:flex items-center gap-1" style={{ fontSize: '11px', color: 'var(--color-text-dim)', fontFamily: 'monospace' }}>
+              <span style={{ color: 'var(--color-text-muted)' }}>
+                {totalCost > 0 ? `~$${totalCost.toFixed(4)}/query` : ''}
+              </span>
+            </div>
+            {totalCost === 0 && (
               <div className="hidden md:block"><CostEstimator model={selectedModel} /></div>
             )}
 
-            {/* Per-conversation token usage — live updating */}
+            {/* Token counter — shows conversation tokens OR wallet balance */}
             <div className="flex items-center gap-1" style={{
               fontSize: '12px', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums',
-              color: totalTokens > 0 ? 'var(--color-text-secondary)' : 'var(--color-text-muted)',
+              color: 'var(--color-text-muted)',
               padding: '3px 8px', borderRadius: '6px',
               background: totalTokens > 0 ? 'var(--color-primary-light)' : 'transparent',
               transition: 'all 0.3s',
             }}>
               <Zap size={11} style={{ color: '#A78BFA' }} />
-              <span className="hidden sm:inline">
+              <span className="hidden sm:inline" style={{ color: totalTokens > 0 ? 'var(--color-text-secondary)' : 'var(--color-text-muted)' }}>
                 {totalTokens > 0 ? formatTokens(totalTokens) : formattedBalance}
               </span>
             </div>
