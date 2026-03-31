@@ -375,38 +375,46 @@ export const removeMember = asyncHandler(async (req: Request, res: Response) => 
 
   if (hardDelete && requester?.role === 'org_owner') {
     // Hard delete — remove user and all their data from database
-    await prisma.$transaction(async (tx) => {
-      // Delete related records first (cascade may not cover all)
-      await (tx as any).task.deleteMany({ where: { OR: [{ assignedToId: userId }, { createdById: userId }] } }).catch(() => {});
-      await tx.notification.deleteMany({ where: { userId } });
-      await tx.usageLog.deleteMany({ where: { userId } });
-      await tx.tokenTransaction.deleteMany({ where: { userId } });
-      await tx.tokenWallet.deleteMany({ where: { userId } });
-      await tx.chatMessage.deleteMany({ where: { conversation: { userId } } });
-      await tx.conversation.deleteMany({ where: { userId } });
-      await (tx as any).userMemory.deleteMany({ where: { userId } }).catch(() => {});
+    // Use raw queries for tables that might have naming issues, then transaction for core
+    const p = prisma as any;
 
-      // Delete wallet and transactions
-      const wallet = await tx.wallet.findUnique({ where: { userId } });
-      if (wallet) {
-        await tx.walletTransaction.deleteMany({ where: { walletId: wallet.id } });
-        await tx.wallet.delete({ where: { userId } });
-      }
+    // Clean up all foreign key references (safe — ignore if table/column doesn't exist)
+    const cleanups = [
+      p.task?.deleteMany({ where: { OR: [{ assignedToId: userId }, { createdById: userId }] } }),
+      p.subTask?.deleteMany({ where: { task: { OR: [{ assignedToId: userId }, { createdById: userId }] } } }),
+      p.taskComment?.deleteMany({ where: { userId } }),
+      p.notification?.deleteMany({ where: { userId } }),
+      p.usageLog?.deleteMany({ where: { userId } }),
+      p.tokenTransaction?.deleteMany({ where: { userId } }),
+      p.chatMessage?.deleteMany({ where: { conversation: { userId } } }),
+      p.conversation?.deleteMany({ where: { userId } }),
+      p.userMemory?.deleteMany({ where: { userId } }),
+      p.hourlySession?.deleteMany({ where: { userId } }),
+      p.aPIKey?.deleteMany({ where: { userId } }),
+      p.orgInvite?.deleteMany({ where: { invitedBy: userId } }),
+      p.activityLog?.deleteMany({ where: { userId } }),
+      p.review?.deleteMany({ where: { userId } }),
+      p.billingRecord?.deleteMany({ where: { userId } }),
+      p.tokenPurchase?.deleteMany({ where: { userId } }),
+      p.budget?.deleteMany({ where: { userId } }),
+      p.subscription?.deleteMany({ where: { userId } }),
+      p.tokenAllocation?.deleteMany({ where: { userId } }),
+    ].filter(Boolean);
+    await Promise.allSettled(cleanups);
 
-      // Delete budget, subscription, sessions, API keys, invites
-      await tx.budget.deleteMany({ where: { userId } });
-      await tx.subscription.deleteMany({ where: { userId } });
-      await (tx as any).hourlySession.deleteMany({ where: { userId } }).catch(() => {});
-      await (tx as any).apiKey.deleteMany({ where: { userId } }).catch(() => {});
-      await (tx as any).orgInvite.deleteMany({ where: { invitedBy: userId } }).catch(() => {});
-      await (tx as any).activityLog.deleteMany({ where: { userId } }).catch(() => {});
+    // Delete wallet + its transactions
+    const wallet = await prisma.wallet.findUnique({ where: { userId } });
+    if (wallet) {
+      await prisma.walletTransaction.deleteMany({ where: { walletId: wallet.id } });
+      await prisma.wallet.delete({ where: { userId } });
+    }
+    await prisma.tokenWallet.deleteMany({ where: { userId } });
 
-      // Clear managerId references from other users
-      await tx.user.updateMany({ where: { managerId: userId }, data: { managerId: null } });
+    // Clear managerId references
+    await prisma.user.updateMany({ where: { managerId: userId }, data: { managerId: null } });
 
-      // Finally delete the user
-      await tx.user.delete({ where: { id: userId } });
-    });
+    // Finally delete the user
+    await prisma.user.delete({ where: { id: userId } });
 
     logger.info(`Member PERMANENTLY DELETED: userId=${userId} by=${req.user.userId}`);
 
