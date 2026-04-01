@@ -653,11 +653,17 @@ function MemberActions({
   const btnRef = useRef<HTMLDivElement>(null)
   const [dropUp, setDropUp] = useState(false)
 
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
+
   const handleOpen = () => {
     if (btnRef.current) {
       const rect = btnRef.current.getBoundingClientRect()
       const spaceBelow = window.innerHeight - rect.bottom
       setDropUp(spaceBelow < 250)
+      setMenuPos({
+        top: spaceBelow < 250 ? rect.top : rect.bottom + 4,
+        left: rect.right - 192, // 192 = w-48 (12rem)
+      })
     }
     setOpen(!open)
   }
@@ -673,7 +679,8 @@ function MemberActions({
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className={`absolute right-0 ${dropUp ? 'bottom-full mb-1' : 'top-full mt-1'} w-48 bg-surface border border-border rounded-lg shadow-xl z-50 py-1`}>
+          <div className="fixed w-48 bg-surface border border-border rounded-lg shadow-xl z-50 py-1"
+            style={{ top: dropUp ? undefined : menuPos.top, bottom: dropUp ? (window.innerHeight - menuPos.top) : undefined, left: menuPos.left }}>
             <button
               onClick={() => { onViewProfile(); setOpen(false) }}
               className="w-full px-3 py-2 text-left text-sm text-text-secondary hover:bg-surface-2 transition-colors flex items-center gap-2"
