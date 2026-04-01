@@ -98,6 +98,18 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
     // Ensure code fences have blank lines around them (markdown requires it)
     t = t.replace(/([^\n])\n(```)/g, '$1\n\n$2')
     t = t.replace(/(```)\n([^\n])/g, '$1\n\n$2')
+    // Convert "(Source: domain.com)" into clickable links
+    t = t.replace(/\(Source:\s*([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:\/[^\s)]*)?)\)/gi,
+      (_match, domain) => {
+        const url = domain.startsWith('http') ? domain : `https://${domain}`
+        return `([Source](${url}))`
+      })
+    // Also handle "*(Source: domain.com)*" italic variant
+    t = t.replace(/\*\(Source:\s*([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:\/[^\s)]*)?)\)\*/gi,
+      (_match, domain) => {
+        const url = domain.startsWith('http') ? domain : `https://${domain}`
+        return `*([Source](${url}))*`
+      })
     return t
   }, [rawCleanText])
 
