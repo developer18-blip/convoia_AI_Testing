@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Users, Activity, DollarSign, UserPlus, Mail, Copy, Check, X,
@@ -650,11 +650,22 @@ function MemberActions({
   onDelete?: () => void
 }) {
   const [open, setOpen] = useState(false)
+  const btnRef = useRef<HTMLDivElement>(null)
+  const [dropUp, setDropUp] = useState(false)
+
+  const handleOpen = () => {
+    if (btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - rect.bottom
+      setDropUp(spaceBelow < 250)
+    }
+    setOpen(!open)
+  }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={btnRef}>
       <button
-        onClick={() => setOpen(!open)}
+        onClick={handleOpen}
         className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-2 transition-colors"
       >
         <MoreHorizontal size={16} />
@@ -662,7 +673,7 @@ function MemberActions({
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1 w-48 bg-surface border border-border rounded-lg shadow-xl z-50 py-1">
+          <div className={`absolute right-0 ${dropUp ? 'bottom-full mb-1' : 'top-full mt-1'} w-48 bg-surface border border-border rounded-lg shadow-xl z-50 py-1`}>
             <button
               onClick={() => { onViewProfile(); setOpen(false) }}
               className="w-full px-3 py-2 text-left text-sm text-text-secondary hover:bg-surface-2 transition-colors flex items-center gap-2"
