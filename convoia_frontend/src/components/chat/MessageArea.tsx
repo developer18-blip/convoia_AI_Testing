@@ -75,8 +75,8 @@ export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, o
 
   if (messages.length === 0) {
     return (
-      <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 24px', backgroundColor: 'var(--chat-bg)' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '55vh', gap: '0' }}>
+      <div style={{ height: '100%', overflowY: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 24px 120px', backgroundColor: 'var(--chat-bg)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0' }}>
           {/* Logo mark */}
           <div style={{
             width: '52px', height: '52px', borderRadius: '50%',

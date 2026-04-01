@@ -330,8 +330,8 @@ export function MessageInput({
     el.style.height = '1px'
     const contentH = el.scrollHeight
     el.style.height = prev // restore immediately to avoid flash
-    // Apply: min 56px, grow to content, max 300px, then scroll
-    const h = Math.max(56, Math.min(contentH, 300))
+    // Apply: min 56px, grow to content, max 200px, then scroll
+    const h = Math.max(56, Math.min(contentH, 200))
     el.style.height = h + 'px'
   }, [value])
 
