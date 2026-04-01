@@ -404,6 +404,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
                     <a
                       key={idx}
                       href={source.url}
+                      title={source.url}
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{
@@ -485,7 +486,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
                       </div>
 
                       {/* Card text content */}
-                      <div style={{ padding: '10px 12px', flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ padding: '10px 12px', flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         <div style={{
                           fontSize: '13px', fontWeight: 600, color: 'var(--chat-text)',
                           lineHeight: '1.35',
@@ -503,6 +504,14 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
                             {source.snippet}
                           </div>
                         )}
+                        {/* URL — visible at bottom */}
+                        <div style={{
+                          fontSize: '10px', color: 'var(--color-primary)', marginTop: 'auto',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          opacity: 0.7,
+                        }}>
+                          {domain}
+                        </div>
                       </div>
                     </a>
                   )
