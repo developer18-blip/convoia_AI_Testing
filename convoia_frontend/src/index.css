@@ -109,10 +109,10 @@ html.light input:-webkit-autofill:focus {
 }
 
 html.light * {
-  scrollbar-color: #93C5FD transparent;
+  scrollbar-color: #D1D5DB transparent;
 }
-html.light ::-webkit-scrollbar-thumb { background: #93C5FD; }
-html.light ::-webkit-scrollbar-thumb:hover { background: #60A5FA; }
+html.light ::-webkit-scrollbar-thumb { background: #D1D5DB; }
+html.light ::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
 
 html.light ::selection {
   background: rgba(37, 99, 235, 0.2);
@@ -537,31 +537,34 @@ html.light code:not(pre code) {
   border: 1px solid #E2E8F0 !important;
 }
 
-/* Light mode tables — clean with purple accents */
+/* Light mode tables — clean, subtle styling */
 html.light table {
   border-collapse: separate;
   border-spacing: 0;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.06);
+  border: 1px solid #E5E7EB;
 }
 html.light th {
-  background: linear-gradient(135deg, #2563EB, #1D4ED8) !important;
-  color: white !important;
+  background: #F9FAFB !important;
+  color: #6B7280 !important;
   font-weight: 600 !important;
   padding: 12px 16px !important;
-  border: none !important;
+  border-bottom: 1px solid #E5E7EB !important;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 html.light td {
   background: #FFFFFF !important;
   padding: 10px 16px !important;
-  border-bottom: 1px solid #F1F5F9 !important;
+  border-bottom: 1px solid #F3F4F6 !important;
 }
 html.light tr:last-child td {
   border-bottom: none !important;
 }
 html.light tr:hover td {
-  background: #F1F5F9 !important;
+  background: #F9FAFB !important;
 }
 
 /* Light mode badges — vibrant colors */
