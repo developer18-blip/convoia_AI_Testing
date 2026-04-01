@@ -388,7 +388,8 @@ export const resetPassword = asyncHandler(async (req: Request, res: Response) =>
   }
 
   // Hash new password and clear reset token
-  const bcrypt = await import('bcryptjs');
+  const bcryptModule = await import('bcryptjs');
+  const bcrypt = bcryptModule.default || bcryptModule;
   const hashedPassword = await bcrypt.hash(password, 12);
 
   await prisma.user.update({
