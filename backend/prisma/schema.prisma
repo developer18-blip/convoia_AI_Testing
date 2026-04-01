@@ -58,6 +58,8 @@ model User {
   isVerified         Boolean         @default(false)
   verificationToken  String?
   verificationExpiry DateTime?
+  resetToken         String?
+  resetTokenExpiry   DateTime?
   isActive           Boolean         @default(true)
   organizationId     String?
   managerId          String?

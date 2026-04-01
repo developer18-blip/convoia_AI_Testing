@@ -33,6 +33,10 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(false)
+  const [showForgot, setShowForgot] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotLoading, setForgotLoading] = useState(false)
+  const [forgotSent, setForgotSent] = useState(false)
 
   const validate = () => {
     const e: Record<string, string> = {}
@@ -144,7 +148,7 @@ export function LoginPage() {
                 <input type="checkbox" className="rounded border-border bg-surface text-primary focus:ring-primary w-4 h-4" />
                 <span>Remember me</span>
               </label>
-              <button type="button" className="text-sm text-primary hover:text-primary-hover font-medium transition-colors">
+              <button type="button" onClick={() => { setShowForgot(true); setForgotEmail(email); setForgotSent(false) }} className="text-sm text-primary hover:text-primary-hover font-medium transition-colors">
                 Forgot password?
               </button>
             </div>
@@ -229,6 +233,69 @@ export function LoginPage() {
           </motion.div>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      {showForgot && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setShowForgot(false)}>
+          <div style={{ background: 'var(--color-surface)', borderRadius: '16px', padding: '28px', maxWidth: '400px', width: '90%', boxShadow: '0 16px 48px rgba(0,0,0,0.2)' }}
+            onClick={(e) => e.stopPropagation()}>
+            {forgotSent ? (
+              <div style={{ textAlign: 'center' }}>
+                <Mail size={40} style={{ color: 'var(--color-primary)', margin: '0 auto 16px' }} />
+                <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: '8px' }}>Check your email</h3>
+                <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '20px' }}>
+                  If an account exists for <strong>{forgotEmail}</strong>, we've sent a password reset link.
+                </p>
+                <button onClick={() => setShowForgot(false)}
+                  style={{ padding: '8px 24px', borderRadius: '8px', border: 'none', background: 'var(--color-primary)', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
+                  Got it
+                </button>
+              </div>
+            ) : (
+              <>
+                <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: '8px' }}>Forgot your password?</h3>
+                <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '20px' }}>
+                  Enter your email and we'll send you a link to reset your password.
+                </p>
+                <form onSubmit={async (e) => {
+                  e.preventDefault()
+                  if (!forgotEmail) return
+                  setForgotLoading(true)
+                  try {
+                    await api.post('/auth/forgot-password', { email: forgotEmail })
+                    setForgotSent(true)
+                  } catch {
+                    setForgotSent(true) // Still show success to prevent email enumeration
+                  } finally {
+                    setForgotLoading(false)
+                  }
+                }}>
+                  <input
+                    type="email" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)}
+                    placeholder="Enter your email" autoFocus required
+                    style={{
+                      width: '100%', padding: '10px 14px', borderRadius: '10px', marginBottom: '12px',
+                      border: '1px solid var(--color-border)', background: 'var(--color-bg)',
+                      color: 'var(--color-text-primary)', fontSize: '14px', outline: 'none',
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    <button type="button" onClick={() => setShowForgot(false)}
+                      style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: '13px', cursor: 'pointer' }}>
+                      Cancel
+                    </button>
+                    <button type="submit" disabled={forgotLoading}
+                      style={{ padding: '8px 20px', borderRadius: '8px', border: 'none', background: 'var(--color-primary)', color: 'white', fontSize: '13px', fontWeight: 600, cursor: forgotLoading ? 'wait' : 'pointer', opacity: forgotLoading ? 0.7 : 1 }}>
+                      {forgotLoading ? 'Sending...' : 'Send reset link'}
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

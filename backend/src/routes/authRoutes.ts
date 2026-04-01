@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { register, login, getProfile, updateProfile, changePassword, verifyToken, refreshToken, googleAuth, verifyEmail, resendVerification, uploadAvatar, selectAvatar } from '../controllers/authController.js';
+import { register, login, getProfile, updateProfile, changePassword, verifyToken, refreshToken, googleAuth, verifyEmail, resendVerification, uploadAvatar, selectAvatar, forgotPassword, resetPassword } from '../controllers/authController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 
 import { uploadSingle } from '../middleware/uploadMiddleware.js';
@@ -13,6 +13,8 @@ router.post('/verify-email', verifyEmail);
 router.post('/resend-verification', resendVerification);
 router.post('/google', googleAuth);
 router.post('/refresh', refreshToken);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
 
 // Protected routes
 router.post('/verify', authMiddleware, verifyToken);

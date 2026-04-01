@@ -213,4 +213,29 @@ export class EmailService {
 
     await sendEmail(ownerEmail, `Token purchase confirmed — ${tokenLabel} tokens added`, baseTemplate('Purchase Confirmed', body));
   }
+
+  /**
+   * Send password reset email with a secure link.
+   */
+  static async sendPasswordResetEmail(params: {
+    recipientEmail: string;
+    name: string;
+    resetToken: string;
+  }) {
+    const { recipientEmail, name, resetToken } = params;
+    const resetUrl = `${FRONTEND_URL}/reset-password?token=${resetToken}`;
+
+    const body = `
+      <p style="color:#3f3f46; margin:0 0 16px;">Hi <strong>${name}</strong>,</p>
+      <p style="color:#3f3f46; margin:0 0 20px;">We received a request to reset your password. Click the button below to set a new password:</p>
+      <div style="text-align:center; margin:24px 0;">
+        <a href="${resetUrl}" class="btn">Reset Password</a>
+      </div>
+      <p class="muted" style="text-align:center;">This link expires in <strong>30 minutes</strong>.</p>
+      <p class="muted" style="margin-top:20px;">If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.</p>
+      <p class="muted" style="margin-top:16px; font-size:11px; word-break:break-all;">Or paste this link: ${resetUrl}</p>
+    `;
+
+    await sendEmail(recipientEmail, 'Reset your ConvoiaAI password', baseTemplate('Reset Your Password', body));
+  }
 }
