@@ -77,7 +77,7 @@ export async function exportToPdf(contentElement: HTMLElement, title: string): P
   // Footer
   const footer = document.createElement('div')
   footer.style.cssText = 'text-align: center; margin-top: 40px; padding-top: 16px; border-top: 1px solid #ddd; font-size: 10px; color: #999;'
-  footer.textContent = 'Powered by ConvoiaAI — convoia.com'
+  footer.textContent = 'Powered by ConvoiaAI — intellect.convoia.com'
   wrapper.appendChild(footer)
 
   // Generate PDF

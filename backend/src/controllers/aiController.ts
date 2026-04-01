@@ -218,7 +218,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
     }
 
     // If user selected an image-only model, route to image generation automatically
-    const streamModelCheck = await prisma.aIModel.findUnique({ where: { id: modelId }, select: { id: true, modelId: true, name: true } });
+    const streamModelCheck = await prisma.aIModel.findUnique({ where: { id: modelId }, select: { id: true, modelId: true, name: true, provider: true } });
     if (streamModelCheck && IMAGE_ONLY_MODELS.has(streamModelCheck.modelId)) {
       const lastMsg = messages[messages.length - 1]?.content || '';
       // Build contextual prompt from conversation history
@@ -253,7 +253,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
         const imageContent = `\n\n![Generated Image](${result.imageUrl})\n\n*"${result.revisedPrompt}"*\n\n[Download image](${result.imageUrl})`;
         res.write(`data: ${JSON.stringify({ type: 'chunk', content: imageContent })}\n\n`);
         const imgCustomerPrice = imageTokenCost * 0.000002; // ~$0.002 per 1K tokens
-        res.write(`data: ${JSON.stringify({ type: 'done', tokens: { input: 0, output: imageTokenCost, total: imageTokenCost }, tokensUsed: imageTokenCost, cost: { charged: imgCustomerPrice.toFixed(6) }, model: streamModelCheck.name, imageGenerated: true, imageUrl: result.imageUrl })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'done', tokens: { input: 0, output: imageTokenCost, total: imageTokenCost }, tokensUsed: imageTokenCost, cost: { charged: imgCustomerPrice.toFixed(6) }, model: streamModelCheck.name, provider: 'openai', imageGenerated: true, imageUrl: result.imageUrl })}\n\n`);
         res.write('data: [DONE]\n\n');
         res.end();
         // Log usage
@@ -261,7 +261,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
         await prisma.usageLog.create({ data: { userId: req.user.userId, organizationId: orgId, modelId: streamModelCheck.id, prompt: lastMsg.substring(0, 500), response: `[Image: ${result.revisedPrompt?.substring(0, 200)}]`, tokensInput: 0, tokensOutput: imageTokenCost, totalTokens: imageTokenCost, providerCost: 0, markupPercentage: 20, customerPrice: imgCustomerPrice, status: 'completed' } });
       } catch (err: any) {
         res.write(`data: ${JSON.stringify({ type: 'chunk', content: `\n\nImage generation failed: ${err.message}` })}\n\n`);
-        res.write(`data: ${JSON.stringify({ type: 'done', tokens: { input: 0, output: 0, total: 0 }, tokensUsed: 0, cost: { charged: '0' }, model: streamModelCheck.name })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'done', tokens: { input: 0, output: 0, total: 0 }, tokensUsed: 0, cost: { charged: '0' }, model: streamModelCheck.name, provider: 'openai' })}\n\n`);
         res.write('data: [DONE]\n\n');
         res.end();
       }
@@ -392,6 +392,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
           tokensUsed: imageTokenCost,
           cost: { charged: imgCustomerPrice.toFixed(6) },
           model: result.provider === 'gemini' ? 'Gemini Flash Image' : 'DALL-E 3',
+          provider: result.provider || 'openai',
           imageGenerated: true,
           imageUrl: result.imageUrl,
         })}\n\n`);
@@ -413,7 +414,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
       } catch (err: any) {
         logger.error(`Image generation failed: ${err.message}`);
         res.write(`data: ${JSON.stringify({ type: 'chunk', content: `\n\nImage generation failed: ${err.message}. Try rephrasing your request.` })}\n\n`);
-        res.write(`data: ${JSON.stringify({ type: 'done', tokens: { input: 0, output: 0, total: 0 }, tokensUsed: 0, cost: { charged: '0' }, model: 'Image Gen' })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'done', tokens: { input: 0, output: 0, total: 0 }, tokensUsed: 0, cost: { charged: '0' }, model: 'Image Gen', provider: 'openai' })}\n\n`);
         res.write('data: [DONE]\n\n');
         res.end();
       }
@@ -491,7 +492,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
       res.write(`data: ${JSON.stringify({
         type: 'done', tokens: { input: 0, output: 0, total: 0 }, tokensUsed: 0,
         cost: { charged: '0' },
-        model: streamModelCheck?.name || 'AI', cached: true,
+        model: streamModelCheck?.name || 'AI', provider: streamModelCheck?.provider || '', cached: true,
       })}\n\n`);
       res.write('data: [DONE]\n\n');
       res.end();

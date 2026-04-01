@@ -6,7 +6,7 @@ const EFFECTIVE_DATE = 'March 23, 2026'
 const COMPANY_NAME = 'ConvoiaAI'
 const COMPANY_ENTITY = 'Convoia Inc.'
 const CONTACT_EMAIL = 'legal@convoia.com'
-const WEBSITE = 'convoia.com'
+const WEBSITE = 'intellect.convoia.com'
 
 export function TermsOfServicePage() {
   return (
