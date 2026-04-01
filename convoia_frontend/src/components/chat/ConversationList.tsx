@@ -5,6 +5,7 @@ import { formatRelativeTime, formatCurrency, truncate, groupByDate } from '../..
 import type { Conversation, ChatFolder } from '../../types'
 import { useAuth } from '../../hooks/useAuth'
 import { useTheme } from '../../hooks/useTheme'
+import { Avatar } from '../ui/Avatar'
 
 interface ConversationListProps {
   conversations: Conversation[]
@@ -55,11 +56,6 @@ function ContextMenuItem({ icon, label, onClick, danger }: { icon: React.ReactNo
       {label}
     </button>
   )
-}
-
-function getUserInitial(name?: string): string {
-  if (!name) return 'U'
-  return name.charAt(0).toUpperCase()
 }
 
 export function ConversationList({
@@ -333,14 +329,7 @@ export function ConversationList({
         {/* User profile — click to go to settings */}
         <div className="flex items-center gap-3" style={{ padding: '8px 12px', cursor: 'pointer' }}
           onClick={() => navigate('/settings')}>
-          <div style={{
-            width: '32px', height: '32px', borderRadius: '50%',
-            background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-hover))',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '13px', fontWeight: 600, color: 'white', flexShrink: 0,
-          }}>
-            {getUserInitial(user?.name)}
-          </div>
+          <Avatar name={user?.name || 'User'} src={user?.avatar} size="sm" />
           <div style={{ flex: 1, minWidth: 0 }}>
             <p className="truncate" style={{ fontSize: '13px', color: 'var(--color-text-primary)', margin: 0, fontWeight: 500 }}>{user?.name || 'User'}</p>
             <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: 0, textTransform: 'capitalize' }}>{user?.role?.replace('_', ' ') || 'Member'}</p>
