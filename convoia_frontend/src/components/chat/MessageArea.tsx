@@ -85,7 +85,7 @@ export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, o
         </h2>
 
         {/* Suggestion cards — wide 2x2 grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', width: '100%', maxWidth: '620px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', width: '100%', maxWidth: '700px' }}>
           {suggestions.map((s) => (
             <button key={s.title} onClick={() => onSuggestedPrompt?.(s.prompt)}
               style={{
@@ -106,7 +106,7 @@ export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, o
 
   return (
     <div ref={containerRef} className="chat-messages-container" style={{ height: '100%', overflowY: 'auto', overflowX: 'hidden', backgroundColor: 'var(--chat-bg)' }}>
-      <div style={{ maxWidth: '820px', margin: '0 auto', padding: '20px 20px 0', width: '100%' }}>
+      <div style={{ maxWidth: '900px', margin: '0 auto', padding: '20px 24px 0', width: '100%' }}>
         {messages.map((msg) => (
           <MessageBubble key={msg.id} message={msg}
             onRetry={msg.error ? onRetry : undefined}

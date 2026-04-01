@@ -294,7 +294,7 @@ export function ChatPage() {
       {/* LEFT PANEL — Desktop sidebar */}
       <div
         className="hidden md:flex flex-col flex-shrink-0 overflow-hidden transition-all duration-300 ease-in-out"
-        style={{ width: leftOpen ? '260px' : '0px' }}
+        style={{ width: leftOpen ? '240px' : '0px' }}
       >
         <ConversationList
           conversations={conversations} folders={folders} activeId={activeConversationId}
@@ -354,12 +354,12 @@ export function ChatPage() {
             </span>
           )}
 
-          {/* Industry — hidden on mobile */}
+          {/* Industry — hidden unless xl screen */}
           <select
             value={industry}
             onChange={(e) => setIndustry(e.target.value)}
-            className="hidden lg:block"
-            style={{ padding: '6px 10px', backgroundColor: 'var(--chat-surface)', border: '1px solid var(--chat-border)', borderRadius: '8px', color: 'var(--color-text-secondary)', fontSize: '12px', outline: 'none', cursor: 'pointer' }}
+            className="hidden xl:block"
+            style={{ padding: '5px 8px', backgroundColor: 'var(--chat-surface)', border: '1px solid var(--chat-border)', borderRadius: '8px', color: 'var(--color-text-secondary)', fontSize: '11px', outline: 'none', cursor: 'pointer' }}
           >
             {industries.map((i) => (
               <option key={i.value} value={i.value}>{i.label}</option>
