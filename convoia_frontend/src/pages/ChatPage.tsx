@@ -16,10 +16,8 @@ import { useToast } from '../hooks/useToast'
 import { useAuth } from '../hooks/useAuth'
 import { useTokens } from '../contexts/TokenContext'
 import { formatTokens } from '../lib/utils'
-import {
-  Zap, PanelLeftClose, PanelLeft,
-  MoreHorizontal, Trash2, Download, Menu,
-} from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Zap, PanelLeftClose, PanelLeft, MoreHorizontal, Trash2, Download, Menu, Search } from 'lucide-react'
 
 export function ChatPage() {
   const { models } = useModels()
@@ -45,6 +43,21 @@ export function ChatPage() {
   const [leftOpen, setLeftOpen] = useState(true)
   const [mobileLeftOpen, setMobileLeftOpen] = useState(false)
   const [showMoreMenu, setShowMoreMenu] = useState(false)
+  const [pageSearch, setPageSearch] = useState('')
+  const [showPageSearch, setShowPageSearch] = useState(false)
+  const navigate = useNavigate()
+  const pageSearchRef = useRef<HTMLDivElement>(null)
+  const searchPages = [
+    { label: 'Dashboard', path: '/dashboard' },
+    { label: 'Models', path: '/models' },
+    { label: 'Buy Tokens', path: '/tokens/buy' },
+    { label: 'Usage', path: '/usage' },
+    { label: 'Settings', path: '/settings' },
+    { label: 'Team', path: '/team' },
+    { label: 'API Keys', path: '/api-keys' },
+    { label: 'Tasks', path: '/tasks' },
+  ]
+  const filteredPages = pageSearch ? searchPages.filter(p => p.label.toLowerCase().includes(pageSearch.toLowerCase())) : searchPages
   const [codeInterpreter, setCodeInterpreter] = useState<{ code: string; language: string } | null>(null)
 
   // Canvas state
@@ -289,7 +302,7 @@ export function ChatPage() {
   const totalCost = messages.reduce((s, m) => s + (m.cost || 0), 0)
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 56px)', margin: '-16px', overflow: 'hidden', backgroundColor: 'var(--chat-bg)', color: 'var(--chat-text)', fontFamily: "'Inter', sans-serif" }}>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', backgroundColor: 'var(--chat-bg)', color: 'var(--chat-text)', fontFamily: "'Inter', sans-serif" }}>
 
       {/* LEFT PANEL — Desktop sidebar */}
       <div
@@ -314,7 +327,7 @@ export function ChatPage() {
       />
       <div
         className="fixed left-0 z-40 flex flex-col transition-transform duration-300 ease-in-out md:hidden"
-        style={{ top: '56px', height: 'calc(100% - 56px)', width: 'min(280px, calc(100vw - 48px))', background: 'var(--color-surface)', transform: mobileLeftOpen ? 'translateX(0)' : 'translateX(-100%)' }}
+        style={{ top: 0, height: '100%', width: 'min(280px, calc(100vw - 48px))', background: 'var(--color-surface)', transform: mobileLeftOpen ? 'translateX(0)' : 'translateX(-100%)' }}
       >
         <ConversationList
           conversations={conversations} folders={folders} activeId={activeConversationId}
@@ -398,7 +411,44 @@ export function ChatPage() {
             <span className="hidden sm:inline">Think</span>
           </button>
 
-          <div className="ml-auto flex items-center gap-2 sm:gap-3 shrink-0">
+          {/* Page search — compact, in header */}
+          <div className="hidden md:block relative ml-auto" ref={pageSearchRef}>
+            <div
+              onClick={() => setShowPageSearch(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '5px 12px', borderRadius: '8px', cursor: 'pointer',
+                background: 'var(--chat-surface)', border: '1px solid var(--chat-border)',
+                fontSize: '12px', color: 'var(--color-text-dim)', minWidth: '160px',
+                transition: 'all 0.15s',
+              }}>
+              <Search size={12} />
+              <span>Search pages...</span>
+            </div>
+            {showPageSearch && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', zIndex: 50,
+                background: 'var(--chat-surface)', border: '1px solid var(--chat-border)',
+                borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.15)', padding: '4px', minWidth: '200px',
+              }}>
+                <input
+                  autoFocus value={pageSearch} onChange={(e) => setPageSearch(e.target.value)}
+                  placeholder="Search..." onBlur={() => setTimeout(() => { setShowPageSearch(false); setPageSearch('') }, 150)}
+                  style={{ width: '100%', padding: '6px 10px', border: 'none', background: 'transparent', color: 'var(--color-text-primary)', fontSize: '13px', outline: 'none' }}
+                />
+                {filteredPages.map(p => (
+                  <button key={p.path} onClick={() => { navigate(p.path); setShowPageSearch(false); setPageSearch('') }}
+                    style={{ display: 'block', width: '100%', padding: '8px 10px', border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: '13px', cursor: 'pointer', textAlign: 'left', borderRadius: '6px' }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--chat-hover)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* Per-conversation spend — shows after first AI response */}
             <div className="hidden md:flex items-center gap-1" style={{ fontSize: '11px', color: 'var(--color-text-dim)', fontFamily: 'monospace' }}>
               <span style={{ color: 'var(--color-text-muted)' }}>
