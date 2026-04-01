@@ -353,7 +353,7 @@ export function MessageInput({
 
   return (
     <div className="chat-input-container" style={{ flexShrink: 0, padding: '0 16px 16px', backgroundColor: 'var(--chat-bg)' }}>
-      <div style={{ maxWidth: '760px', margin: '0 auto', width: '100%' }}>
+      <div style={{ maxWidth: '820px', margin: '0 auto', width: '100%' }}>
 
         {/* Error banner */}
         {fileError && (
