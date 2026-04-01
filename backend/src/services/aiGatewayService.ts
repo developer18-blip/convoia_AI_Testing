@@ -280,7 +280,7 @@ async function callAnthropic(modelId: string, messages: any[], systemPrompt: str
     body,
     axiosConfig({
       'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
+      'anthropic-version': '2025-04-15',
       'Content-Type': 'application/json',
     })
   );
@@ -451,7 +451,7 @@ async function callAnthropicVision(modelId: string, prompt: string, imageBase64:
     },
     axiosConfig({
       'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
+      'anthropic-version': '2025-04-15',
       'Content-Type': 'application/json',
     })
   );
@@ -779,8 +779,8 @@ function callAnthropicStream(
   // Extended thinking mode (Claude only)
   if (overrides?.thinkingEnabled) {
     body.thinking = { type: 'enabled', budget_tokens: 10000 };
-    // Extended thinking requires higher max_tokens and no temperature
-    body.max_tokens = Math.max(body.max_tokens, 16384);
+    // Extended thinking requires higher max_tokens (must be > budget_tokens) and no temperature
+    body.max_tokens = Math.max(body.max_tokens, 32000);
     delete body.temperature;
     delete body.top_p;
   } else {
@@ -802,7 +802,7 @@ function callAnthropicStream(
         {
           headers: {
             'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
+            'anthropic-version': '2025-04-15',
             'Content-Type': 'application/json',
           },
           timeout: config.aiRequestTimeout,
