@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
-import { Plus, Search, Trash2, Pin, PinOff, Pencil, FolderPlus, Folder, ChevronDown, ChevronRight, Download, MoreHorizontal, X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Plus, Search, Trash2, Pin, PinOff, Pencil, FolderPlus, Folder, ChevronDown, ChevronRight, Download, MoreHorizontal, X, LogOut, Settings, LayoutDashboard, Sun, Moon } from 'lucide-react'
 import { formatRelativeTime, formatCurrency, truncate, groupByDate } from '../../lib/utils'
 import type { Conversation, ChatFolder } from '../../types'
 import { useAuth } from '../../hooks/useAuth'
+import { useTheme } from '../../hooks/useTheme'
 
 interface ConversationListProps {
   conversations: Conversation[]
@@ -64,7 +66,9 @@ export function ConversationList({
   conversations, folders, activeId, onSelect, onNew, onDelete,
   onRename, onTogglePin, onMoveToFolder, onCreateFolder, onDeleteFolder,
 }: ConversationListProps) {
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
+  const { theme, toggleTheme } = useTheme()
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [contextMenu, setContextMenu] = useState<{ id: string; x: number; y: number } | null>(null)
   const [renamingId, setRenamingId] = useState<string | null>(null)
@@ -188,7 +192,7 @@ export function ConversationList({
   }
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-surface)', width: '260px', minWidth: '260px', overflow: 'hidden' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-surface)', width: '240px', minWidth: '240px', overflow: 'hidden' }}>
       {/* Header */}
       <div style={{ padding: '12px 12px 10px', flexShrink: 0 }}>
         <div className="flex items-center justify-between" style={{ marginBottom: '10px' }}>
@@ -296,20 +300,50 @@ export function ConversationList({
         )}
       </div>
 
-      {/* User info at bottom */}
-      <div style={{ padding: '12px', borderTop: '1px solid var(--color-surface-2)', flexShrink: 0 }}>
-        <div className="flex items-center gap-3">
+      {/* Navigation + User at bottom */}
+      <div style={{ flexShrink: 0, borderTop: '1px solid var(--color-surface-2)' }}>
+        {/* Quick nav links */}
+        <div style={{ display: 'flex', gap: '2px', padding: '8px 8px 4px' }}>
+          <button onClick={() => navigate('/dashboard')} title="Dashboard"
+            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '6px', borderRadius: '8px', background: 'none', border: 'none', color: 'var(--color-text-dim)', cursor: 'pointer', fontSize: '11px', transition: 'all 0.15s' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-surface-2)'; e.currentTarget.style.color = 'var(--color-text-primary)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--color-text-dim)' }}>
+            <LayoutDashboard size={14} />
+          </button>
+          <button onClick={() => navigate('/settings')} title="Settings"
+            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '6px', borderRadius: '8px', background: 'none', border: 'none', color: 'var(--color-text-dim)', cursor: 'pointer', fontSize: '11px', transition: 'all 0.15s' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-surface-2)'; e.currentTarget.style.color = 'var(--color-text-primary)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--color-text-dim)' }}>
+            <Settings size={14} />
+          </button>
+          <button onClick={toggleTheme} title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '6px', borderRadius: '8px', background: 'none', border: 'none', color: 'var(--color-text-dim)', cursor: 'pointer', fontSize: '11px', transition: 'all 0.15s' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-surface-2)'; e.currentTarget.style.color = 'var(--color-text-primary)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--color-text-dim)' }}>
+            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+          </button>
+          <button onClick={logout} title="Logout"
+            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '6px', borderRadius: '8px', background: 'none', border: 'none', color: 'var(--color-text-dim)', cursor: 'pointer', fontSize: '11px', transition: 'all 0.15s' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; e.currentTarget.style.color = '#EF4444' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--color-text-dim)' }}>
+            <LogOut size={14} />
+          </button>
+        </div>
+
+        {/* User profile — click to go to settings */}
+        <div className="flex items-center gap-3" style={{ padding: '8px 12px', cursor: 'pointer' }}
+          onClick={() => navigate('/settings')}>
           <div style={{
-            width: '36px', height: '36px', borderRadius: '50%',
+            width: '32px', height: '32px', borderRadius: '50%',
             background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-hover))',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '14px', fontWeight: 600, color: 'white', flexShrink: 0,
+            fontSize: '13px', fontWeight: 600, color: 'white', flexShrink: 0,
           }}>
             {getUserInitial(user?.name)}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p className="truncate" style={{ fontSize: '14px', color: 'var(--color-text-primary)', margin: 0 }}>{user?.name || 'User'}</p>
-            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: 0, textTransform: 'capitalize' }}>{user?.role?.replace('_', ' ') || 'Member'}</p>
+            <p className="truncate" style={{ fontSize: '13px', color: 'var(--color-text-primary)', margin: 0, fontWeight: 500 }}>{user?.name || 'User'}</p>
+            <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: 0, textTransform: 'capitalize' }}>{user?.role?.replace('_', ' ') || 'Member'}</p>
           </div>
         </div>
       </div>
