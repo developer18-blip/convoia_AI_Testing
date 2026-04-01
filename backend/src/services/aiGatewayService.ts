@@ -280,7 +280,7 @@ async function callAnthropic(modelId: string, messages: any[], systemPrompt: str
     body,
     axiosConfig({
       'x-api-key': apiKey,
-      'anthropic-version': '2025-04-15',
+      'anthropic-version': '2023-06-01',
       'Content-Type': 'application/json',
     })
   );
@@ -451,7 +451,7 @@ async function callAnthropicVision(modelId: string, prompt: string, imageBase64:
     },
     axiosConfig({
       'x-api-key': apiKey,
-      'anthropic-version': '2025-04-15',
+      'anthropic-version': '2023-06-01',
       'Content-Type': 'application/json',
     })
   );
@@ -796,15 +796,21 @@ function callAnthropicStream(
 
   return new Promise(async (resolve, reject) => {
     try {
+      const headers: Record<string, string> = {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      };
+      // Extended thinking requires beta header
+      if (overrides?.thinkingEnabled) {
+        headers['anthropic-beta'] = 'interleaved-thinking-2025-05-14';
+      }
+
       const response = await axios.post(
         'https://api.anthropic.com/v1/messages',
         body,
         {
-          headers: {
-            'x-api-key': apiKey,
-            'anthropic-version': '2025-04-15',
-            'Content-Type': 'application/json',
-          },
+          headers,
           timeout: config.aiRequestTimeout,
           responseType: 'stream',
         }
