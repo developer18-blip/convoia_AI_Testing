@@ -78,6 +78,17 @@ export function ChatPage() {
     prevStreaming.current = isStreaming
   }, [isStreaming, messages])
 
+  // Close page search on click outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (pageSearchRef.current && !pageSearchRef.current.contains(e.target as Node)) {
+        setShowPageSearch(false); setPageSearch('')
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
   const handleModelChange = (id: string) => {
     setSelectedModelId(id)
     const model = models.find((m) => m.id === id)
@@ -433,17 +444,25 @@ export function ChatPage() {
               }}>
                 <input
                   autoFocus value={pageSearch} onChange={(e) => setPageSearch(e.target.value)}
-                  placeholder="Search..." onBlur={() => setTimeout(() => { setShowPageSearch(false); setPageSearch('') }, 150)}
-                  style={{ width: '100%', padding: '6px 10px', border: 'none', background: 'transparent', color: 'var(--color-text-primary)', fontSize: '13px', outline: 'none' }}
+                  placeholder="Search..."
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') { setShowPageSearch(false); setPageSearch('') }
+                    if (e.key === 'Enter' && filteredPages.length > 0) { navigate(filteredPages[0].path); setShowPageSearch(false); setPageSearch('') }
+                  }}
+                  style={{ width: '100%', padding: '6px 10px', border: 'none', background: 'transparent', color: 'var(--color-text-primary)', fontSize: '13px', outline: 'none', borderBottom: '1px solid var(--chat-border)' }}
                 />
                 {filteredPages.map(p => (
-                  <button key={p.path} onClick={() => { navigate(p.path); setShowPageSearch(false); setPageSearch('') }}
+                  <button key={p.path}
+                    onMouseDown={(e) => { e.preventDefault(); navigate(p.path); setShowPageSearch(false); setPageSearch('') }}
                     style={{ display: 'block', width: '100%', padding: '8px 10px', border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: '13px', cursor: 'pointer', textAlign: 'left', borderRadius: '6px' }}
                     onMouseEnter={(e) => e.currentTarget.style.background = 'var(--chat-hover)'}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
                     {p.label}
                   </button>
                 ))}
+                {filteredPages.length === 0 && (
+                  <div style={{ padding: '8px 10px', fontSize: '12px', color: 'var(--color-text-dim)', textAlign: 'center' }}>No pages found</div>
+                )}
               </div>
             )}
           </div>
