@@ -61,7 +61,7 @@ export function MessageInput({
   onError,
 }: MessageInputProps) {
   const [value, setValue] = useState('')
-  const [attachedFile, setAttachedFile] = useState<AttachedFile | null>(null)
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
   const [fileLoading, setFileLoading] = useState(false)
   const [fileError, setFileError] = useState<string | null>(null)
   const [imageGenOpen, setImageGenOpen] = useState(false)
@@ -70,6 +70,12 @@ export function MessageInput({
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileSelect = async (file: File) => {
+    // Limit to 5 files max
+    if (attachedFiles.length >= 5) {
+      setFileError('Maximum 5 files at once')
+      return
+    }
+
     const type: AttachedFile['type'] = file.type.startsWith('image/')
       ? 'image'
       : file.type.startsWith('audio/')
@@ -88,15 +94,15 @@ export function MessageInput({
     }
 
     const attached: AttachedFile = { file, type, preview, uploading: false, uploaded: false }
-    setAttachedFile(attached)
+    setAttachedFiles(prev => [...prev, attached])
     setFileError(null)
 
-    if (type === 'document') preUploadDocument(file)
-    if (type === 'audio') preUploadAudio(file)
+    if (type === 'document') preUploadDocumentAtIndex(file, attachedFiles.length)
+    if (type === 'audio') preUploadAudioAtIndex(file, attachedFiles.length)
   }
 
-  const preUploadDocument = async (file: File) => {
-    setAttachedFile((prev) => (prev ? { ...prev, uploading: true } : null))
+  const preUploadDocumentAtIndex = async (file: File, idx: number) => {
+    setAttachedFiles(prev => prev.map((f, i) => i === idx ? { ...f, uploading: true } : f))
     try {
       const formData = new FormData()
       formData.append('file', file)
@@ -108,17 +114,17 @@ export function MessageInput({
       })
       const data = await res.json()
       if (data.success && data.data.extractedText) {
-        setAttachedFile((prev) => prev ? { ...prev, uploading: false, uploaded: true, extractedText: data.data.extractedText } : null)
+        setAttachedFiles(prev => prev.map((f, i) => i === idx ? { ...f, uploading: false, uploaded: true, extractedText: data.data.extractedText } : f))
       } else {
-        setAttachedFile((prev) => prev ? { ...prev, uploading: false, error: data.message || 'Failed to process document' } : null)
+        setAttachedFiles(prev => prev.map((f, i) => i === idx ? { ...f, uploading: false, error: data.message || 'Failed to process' } : f))
       }
     } catch {
-      setAttachedFile((prev) => prev ? { ...prev, uploading: false, error: 'Failed to process document' } : null)
+      setAttachedFiles(prev => prev.map((f, i) => i === idx ? { ...f, uploading: false, error: 'Failed to process' } : f))
     }
   }
 
-  const preUploadAudio = async (file: File) => {
-    setAttachedFile((prev) => (prev ? { ...prev, uploading: true } : null))
+  const preUploadAudioAtIndex = async (file: File, idx: number) => {
+    setAttachedFiles(prev => prev.map((f, i) => i === idx ? { ...f, uploading: true } : f))
     try {
       const formData = new FormData()
       formData.append('file', file)
@@ -130,38 +136,76 @@ export function MessageInput({
       })
       const data = await res.json()
       if (data.success && data.data.transcript) {
-        setAttachedFile((prev) => prev ? { ...prev, uploading: false, uploaded: true, transcript: data.data.transcript } : null)
+        setAttachedFiles(prev => prev.map((f, i) => i === idx ? { ...f, uploading: false, uploaded: true, transcript: data.data.transcript } : f))
       } else {
-        setAttachedFile((prev) => prev ? { ...prev, uploading: false, error: 'Failed to transcribe audio' } : null)
+        setAttachedFiles(prev => prev.map((f, i) => i === idx ? { ...f, uploading: false, error: 'Transcription failed' } : f))
       }
     } catch {
-      setAttachedFile((prev) => prev ? { ...prev, uploading: false, error: 'Failed to transcribe audio' } : null)
+      setAttachedFiles(prev => prev.map((f, i) => i === idx ? { ...f, uploading: false, error: 'Transcription failed' } : f))
     }
+  }
+
+  const removeFile = (idx: number) => {
+    setAttachedFiles(prev => prev.filter((_, i) => i !== idx))
   }
 
   const handleSend = async () => {
     if (isLoading || fileLoading) return
+    if (attachedFiles.some(f => f.uploading)) return
     setFileError(null)
 
-    if (attachedFile) {
-      if (attachedFile.uploading) return
-      const currentFile = attachedFile
+    if (attachedFiles.length > 0) {
+      const images = attachedFiles.filter(f => f.type === 'image')
+      const docs = attachedFiles.filter(f => f.type === 'document')
+      const audios = attachedFiles.filter(f => f.type === 'audio')
 
-      if (currentFile.type === 'image') {
-        const success = await sendWithImage(value.trim(), currentFile)
+      // Single image — use existing image flow
+      if (images.length === 1 && docs.length === 0 && audios.length === 0) {
+        const success = await sendWithImage(value.trim(), images[0])
         if (!success) return
-      } else if (currentFile.type === 'document') {
-        await sendWithDocument(value.trim(), currentFile)
-        setAttachedFile(null)
-      } else if (currentFile.type === 'audio') {
-        sendWithAudio(value.trim(), currentFile)
-        setAttachedFile(null)
+        setValue('')
+        setAttachedFiles([])
+        if (textareaRef.current) textareaRef.current.style.height = 'auto'
+        return
+      }
+
+      // Multiple files or mixed — combine all extracted text as context
+      const contextParts: string[] = []
+      for (const doc of docs) {
+        if (doc.extractedText) contextParts.push(`[Document: ${doc.file.name}]\n${doc.extractedText}`)
+      }
+      for (const audio of audios) {
+        if (audio.transcript) contextParts.push(`[Audio transcript: ${audio.file.name}]\n${audio.transcript}`)
+      }
+      // For multiple images, send the first one as image and include others as context note
+      if (images.length > 0 && images[0].preview) {
+        if (images.length > 1) contextParts.push(`[${images.length} images attached — analyzing first image]`)
+        const firstImage = images[0]
+        if (onSendWithContext) {
+          const combinedContext = contextParts.length > 0 ? contextParts.join('\n\n---\n\n') : null
+          const question = value.trim() || (docs.length > 0 ? 'Analyze these documents' : 'Analyze this')
+          onSendWithContext(
+            combinedContext ? `${question}\n\n${combinedContext}` : question,
+            null,
+            { fileAttachment: { name: firstImage.file.name, type: 'image', size: firstImage.file.size }, imagePreview: firstImage.preview },
+          )
+        }
+      } else if (contextParts.length > 0) {
+        // Documents/audio only — combine contexts
+        const combinedContext = contextParts.join('\n\n---\n\n')
+        const question = value.trim() || 'Analyze these files'
+        const fileNames = [...docs, ...audios].map(f => f.file.name).join(', ')
+        if (onSendWithContext) {
+          onSendWithContext(question, combinedContext, { fileAttachment: { name: fileNames, type: 'document', size: [...docs, ...audios].reduce((s, f) => s + f.file.size, 0) } })
+        } else {
+          onSend(`${question}\n\n${combinedContext}`)
+        }
       } else {
         if (value.trim()) onSend(value.trim())
-        setAttachedFile(null)
       }
 
       setValue('')
+      setAttachedFiles([])
       if (textareaRef.current) textareaRef.current.style.height = 'auto'
       return
     }
@@ -191,7 +235,7 @@ export function MessageInput({
     // through the normal chat flow. The image preview (base64) is passed via
     // onSendWithContext so ChatContext includes it as referenceImage.
     if (question && isImageGenIntent(question)) {
-      setAttachedFile(null)
+      setAttachedFiles([])
       setFileLoading(false)
       if (onSendWithContext) {
         // Pass image as system context so the backend gets it as referenceImage
@@ -226,7 +270,7 @@ export function MessageInput({
         const errorMsg = errorData?.message || `Upload failed (${res.status})`
         setFileError(errorMsg)
         onError?.(errorMsg)
-        setAttachedFile(attached)
+        /* keep files on error for retry */
         return false
       }
 
@@ -235,7 +279,7 @@ export function MessageInput({
         const errorMsg = data?.message || 'Image processing failed'
         setFileError(errorMsg)
         onError?.(errorMsg)
-        setAttachedFile(attached)
+        /* keep files on error for retry */
         return false
       }
 
@@ -244,7 +288,7 @@ export function MessageInput({
         const errorMsg = data?.message || 'Invalid response from server'
         setFileError(errorMsg)
         onError?.(errorMsg)
-        setAttachedFile(attached)
+        /* keep files on error for retry */
         return false
       }
 
@@ -261,56 +305,22 @@ export function MessageInput({
         })
         window.dispatchEvent(new Event('wallet:refresh'))
         window.dispatchEvent(new Event('tokens:refresh'))
-        setAttachedFile(null)
+        setAttachedFiles([])
         return true
       } else {
         setFileError('Unexpected response from server')
         onError?.('Unexpected response from server')
-        setAttachedFile(attached)
+        /* keep files on error for retry */
         return false
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to upload image. Check your connection.'
       setFileError(errorMsg)
       onError?.(errorMsg)
-      setAttachedFile(attached)
+      /* keep files on error for retry */
       return false
     } finally {
       setFileLoading(false)
-    }
-  }
-
-  const sendWithDocument = async (question: string, attached: AttachedFile) => {
-    if (!question) {
-      textareaRef.current?.focus()
-      return
-    }
-    if (!attached.extractedText) {
-      onSend(question)
-      return
-    }
-    const systemContext =
-      `The user has uploaded a document: "${attached.file.name}"\n\n` +
-      `Document content:\n${attached.extractedText}\n\n` +
-      `Please answer the user's question about this document.`
-    const extras = { fileAttachment: { name: attached.file.name, type: 'document' as const, size: attached.file.size } }
-    if (onSendWithContext) {
-      onSendWithContext(question, systemContext, extras)
-    } else {
-      onSend(question)
-    }
-  }
-
-  const sendWithAudio = (question: string, attached: AttachedFile) => {
-    if (attached.transcript) {
-      const content = question
-        ? `${question}\n\nTranscript: ${attached.transcript}`
-        : attached.transcript
-      if (onSendWithContext) {
-        onSendWithContext(content, null, { fileAttachment: { name: attached.file.name, type: 'audio', size: attached.file.size } })
-      } else {
-        onSend(content)
-      }
     }
   }
 
@@ -342,14 +352,15 @@ export function MessageInput({
   }
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    handleFileSelect(file)
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    Array.from(files).forEach(f => handleFileSelect(f))
     e.target.value = ''
   }
 
   const estimatedTokens = tokenCount ?? Math.ceil(value.length / 4)
-  const canSend = (value.trim() || attachedFile) && !isLoading && !disabled && !fileLoading && !(attachedFile?.uploading)
+  const anyUploading = attachedFiles.some(f => f.uploading)
+  const canSend = (value.trim() || attachedFiles.length > 0) && !isLoading && !disabled && !fileLoading && !anyUploading
 
   return (
     <div className="chat-input-container" style={{ flexShrink: 0, padding: '0 16px 16px', backgroundColor: 'var(--chat-bg)' }}>
@@ -387,58 +398,48 @@ export function MessageInput({
         }}
         >
 
-          {/* File preview */}
-          {attachedFile && (
-            <div style={{ padding: '12px 16px 0' }}>
-              {attachedFile.type === 'image' && attachedFile.preview && (
-                <div className="relative inline-block">
-                  <img src={attachedFile.preview} alt="Attached" style={{ height: '80px', width: 'auto', borderRadius: '10px', border: '1px solid var(--chat-border)', objectFit: 'cover' }} />
-                  <button
-                    onClick={() => setAttachedFile(null)}
-                    className="absolute flex items-center justify-center"
-                    style={{ top: '-6px', right: '-6px', width: '20px', height: '20px', borderRadius: '50%', background: 'var(--chat-border)', border: '1px solid var(--color-border-hover)', color: 'var(--chat-text-secondary)', cursor: 'pointer' }}
-                  >
-                    <X size={10} />
-                  </button>
-                </div>
-              )}
-
-              {attachedFile.type === 'document' && (
-                <div className="inline-flex items-center gap-2" style={{ background: 'var(--chat-border)', border: '1px solid var(--color-border-hover)', borderRadius: '10px', padding: '6px 12px', fontSize: '13px' }}>
-                  <FileText size={14} style={{ color: '#3B82F6' }} />
-                  <span className="truncate max-w-48" style={{ color: 'var(--chat-text)' }}>{attachedFile.file.name}</span>
-                  <span style={{ color: 'var(--chat-text-muted)', fontSize: '11px' }}>
-                    {attachedFile.uploading ? 'Processing...' : attachedFile.uploaded ? 'Ready' : attachedFile.error ? 'Error' : ''}
-                  </span>
-                  {attachedFile.uploading && <div style={{ width: '12px', height: '12px', border: '1.5px solid var(--color-primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin-slow 1s linear infinite' }} />}
-                  {!attachedFile.uploading && (
-                    <button onClick={() => setAttachedFile(null)} style={{ color: 'var(--chat-text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}><X size={12} /></button>
+          {/* File previews — multiple files */}
+          {attachedFiles.length > 0 && (
+            <div style={{ padding: '12px 16px 0', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {attachedFiles.map((af, idx) => (
+                <div key={idx}>
+                  {af.type === 'image' && af.preview && (
+                    <div className="relative inline-block">
+                      <img src={af.preview} alt="Attached" style={{ height: '70px', width: 'auto', borderRadius: '10px', border: '1px solid var(--chat-border)', objectFit: 'cover' }} />
+                      <button onClick={() => removeFile(idx)} className="absolute flex items-center justify-center"
+                        style={{ top: '-6px', right: '-6px', width: '20px', height: '20px', borderRadius: '50%', background: 'var(--chat-border)', border: '1px solid var(--color-border-hover)', color: 'var(--chat-text-secondary)', cursor: 'pointer' }}>
+                        <X size={10} />
+                      </button>
+                    </div>
+                  )}
+                  {af.type === 'document' && (
+                    <div className="inline-flex items-center gap-2" style={{ background: 'var(--chat-border)', border: '1px solid var(--color-border-hover)', borderRadius: '10px', padding: '5px 10px', fontSize: '12px' }}>
+                      <FileText size={13} style={{ color: '#3B82F6' }} />
+                      <span className="truncate" style={{ maxWidth: '120px', color: 'var(--chat-text)' }}>{af.file.name}</span>
+                      {af.uploading && <div style={{ width: '12px', height: '12px', border: '1.5px solid var(--color-primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin-slow 1s linear infinite' }} />}
+                      {af.uploaded && <span style={{ color: '#10B981', fontSize: '10px' }}>Ready</span>}
+                      {af.error && <span style={{ color: '#EF4444', fontSize: '10px' }}>Error</span>}
+                      {!af.uploading && <button onClick={() => removeFile(idx)} style={{ color: 'var(--chat-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}><X size={11} /></button>}
+                    </div>
+                  )}
+                  {af.type === 'audio' && (
+                    <div className="inline-flex items-center gap-2" style={{ background: 'var(--chat-border)', border: '1px solid var(--color-border-hover)', borderRadius: '10px', padding: '5px 10px', fontSize: '12px' }}>
+                      <Music size={13} style={{ color: '#10B981' }} />
+                      <span className="truncate" style={{ maxWidth: '120px', color: 'var(--chat-text)' }}>{af.file.name}</span>
+                      {af.uploading && <div style={{ width: '12px', height: '12px', border: '1.5px solid var(--color-primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin-slow 1s linear infinite' }} />}
+                      {af.uploaded && <span style={{ color: '#10B981', fontSize: '10px' }}>Ready</span>}
+                      {!af.uploading && <button onClick={() => removeFile(idx)} style={{ color: 'var(--chat-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}><X size={11} /></button>}
+                    </div>
+                  )}
+                  {af.type === 'video' && (
+                    <div className="inline-flex items-center gap-2" style={{ background: 'var(--chat-border)', border: '1px solid var(--color-border-hover)', borderRadius: '10px', padding: '5px 10px', fontSize: '12px' }}>
+                      <Film size={13} style={{ color: 'var(--color-primary)' }} />
+                      <span className="truncate" style={{ maxWidth: '120px', color: 'var(--chat-text)' }}>{af.file.name}</span>
+                      <button onClick={() => removeFile(idx)} style={{ color: 'var(--chat-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}><X size={11} /></button>
+                    </div>
                   )}
                 </div>
-              )}
-
-              {attachedFile.type === 'audio' && (
-                <div className="inline-flex items-center gap-2" style={{ background: 'var(--chat-border)', border: '1px solid var(--color-border-hover)', borderRadius: '10px', padding: '6px 12px', fontSize: '13px' }}>
-                  <Music size={14} style={{ color: '#10B981' }} />
-                  <span className="truncate max-w-48" style={{ color: 'var(--chat-text)' }}>{attachedFile.file.name}</span>
-                  <span style={{ color: 'var(--chat-text-muted)', fontSize: '11px' }}>
-                    {attachedFile.uploading ? 'Transcribing...' : attachedFile.uploaded ? 'Transcribed' : attachedFile.error ? 'Error' : ''}
-                  </span>
-                  {attachedFile.uploading && <div style={{ width: '12px', height: '12px', border: '1.5px solid var(--color-primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin-slow 1s linear infinite' }} />}
-                  {!attachedFile.uploading && (
-                    <button onClick={() => setAttachedFile(null)} style={{ color: 'var(--chat-text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}><X size={12} /></button>
-                  )}
-                </div>
-              )}
-
-              {attachedFile.type === 'video' && (
-                <div className="inline-flex items-center gap-2" style={{ background: 'var(--chat-border)', border: '1px solid var(--color-border-hover)', borderRadius: '10px', padding: '6px 12px', fontSize: '13px' }}>
-                  <Film size={14} style={{ color: 'var(--color-primary)' }} />
-                  <span className="truncate max-w-48" style={{ color: 'var(--chat-text)' }}>{attachedFile.file.name}</span>
-                  <span style={{ color: 'var(--chat-text-muted)', fontSize: '11px' }}>Video (not yet supported)</span>
-                  <button onClick={() => setAttachedFile(null)} style={{ color: 'var(--chat-text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}><X size={12} /></button>
-                </div>
-              )}
+              ))}
             </div>
           )}
 
@@ -485,6 +486,7 @@ export function MessageInput({
                 type="file"
                 className="hidden"
                 accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,audio/*,video/*"
+                multiple
                 onChange={handleFileInputChange}
               />
               <button
