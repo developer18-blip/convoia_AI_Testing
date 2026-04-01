@@ -83,6 +83,15 @@ const NO_SEARCH_PATTERNS = [
 /**
  * Smart detection: should this query use web search?
  */
+/**
+ * Check if query needs recent/fresh results (news, current events, etc.)
+ */
+function isTimeSensitive(query: string): boolean {
+  return NEWS_PATTERNS.some(p => p.test(query))
+    || /\b(current|latest|recent|today|now|this week|this month|this year|20[2-3]\d)\b/i.test(query)
+    || /\b(news|war|election|crisis|update|happening|score|price|stock)\b/i.test(query);
+}
+
 export function needsWebSearch(query: string): boolean {
   // Skip very short queries or greetings
   if (query.length < 10) return false;
@@ -498,6 +507,8 @@ async function searchTavily(query: string, maxResults = 5): Promise<SearchResult
   const apiKey = process.env.TAVILY_API_KEY;
   if (!apiKey) return [];
 
+  const timeSensitive = isTimeSensitive(query);
+
   try {
     const response = await axios.post('https://api.tavily.com/search', {
       api_key: apiKey,
@@ -506,6 +517,7 @@ async function searchTavily(query: string, maxResults = 5): Promise<SearchResult
       include_answer: true,
       include_raw_content: false,
       search_depth: 'advanced',
+      ...(timeSensitive ? { topic: 'news', days: 7 } : {}),
     }, { timeout: 15000 });
 
     return (response.data.results || []).map((r: any, i: number) => ({
@@ -566,7 +578,11 @@ export async function searchWeb(query: string, maxResults = 5): Promise<WebSearc
   }
 
   // 2. Try free search (DuckDuckGo Lite → DuckDuckGo HTML)
-  let results = await searchFree(query, maxResults);
+  // For time-sensitive queries, append current year to bias toward recent results
+  const timeSensitive = isTimeSensitive(query);
+  const year = new Date().getFullYear();
+  const searchQuery = timeSensitive && !query.includes(String(year)) ? `${query} ${year}` : query;
+  let results = await searchFree(searchQuery, maxResults);
   let source: 'duckduckgo' | 'tavily' = 'duckduckgo';
 
   // Enrich top results with crawled content (parallel, fast)
@@ -577,9 +593,10 @@ export async function searchWeb(query: string, maxResults = 5): Promise<WebSearc
   // 3. Score results
   let { results: scored, confidence } = scoreResults(query, results);
 
-  // 4. Fallback to Tavily if confidence too low
-  if (confidence < CONFIDENCE_THRESHOLD || scored.length < 2) {
-    logger.info(`DuckDuckGo low confidence (${confidence}), falling back to Tavily for: "${query}"`);
+  // 4. Fallback to Tavily if confidence too low (always use Tavily for time-sensitive queries — better recency)
+  const tavilyThreshold = timeSensitive ? 0.9 : CONFIDENCE_THRESHOLD; // Force Tavily for news/recent queries
+  if (confidence < tavilyThreshold || scored.length < 2) {
+    logger.info(`${timeSensitive ? 'Time-sensitive query' : 'Low confidence'} (${confidence}), falling back to Tavily for: "${query}"`);
     const tavilyResults = await searchTavily(query, maxResults);
     if (tavilyResults.length > 0) {
       // Enrich Tavily results with OG metadata from crawling
