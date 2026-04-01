@@ -252,16 +252,16 @@ export const queryAIStream = async (req: Request, res: Response) => {
         await TokenWalletService.deductTokens({ userId: req.user.userId, tokens: imageTokenCost, reference: `image-gen-${Date.now()}`, description: `Image generation (${streamModelCheck.name})` });
         const imageContent = `\n\n![Generated Image](${result.imageUrl})\n\n*"${result.revisedPrompt}"*\n\n[Download image](${result.imageUrl})`;
         res.write(`data: ${JSON.stringify({ type: 'chunk', content: imageContent })}\n\n`);
-        res.write(`data: ${JSON.stringify({ type: 'done', tokens: { input: 0, output: imageTokenCost, total: imageTokenCost }, tokensUsed: imageTokenCost, model: streamModelCheck.name, imageGenerated: true, imageUrl: result.imageUrl })}\n\n`);
+        const imgCustomerPrice = imageTokenCost * 0.000002; // ~$0.002 per 1K tokens
+        res.write(`data: ${JSON.stringify({ type: 'done', tokens: { input: 0, output: imageTokenCost, total: imageTokenCost }, tokensUsed: imageTokenCost, cost: { charged: imgCustomerPrice.toFixed(6) }, model: streamModelCheck.name, imageGenerated: true, imageUrl: result.imageUrl })}\n\n`);
         res.write('data: [DONE]\n\n');
         res.end();
         // Log usage
         const orgId = imgUser?.organizationId || undefined;
-        const imgCustomerPrice = imageTokenCost * 0.000002; // ~$0.002 per 1K tokens
         await prisma.usageLog.create({ data: { userId: req.user.userId, organizationId: orgId, modelId: streamModelCheck.id, prompt: lastMsg.substring(0, 500), response: `[Image: ${result.revisedPrompt?.substring(0, 200)}]`, tokensInput: 0, tokensOutput: imageTokenCost, totalTokens: imageTokenCost, providerCost: 0, markupPercentage: 20, customerPrice: imgCustomerPrice, status: 'completed' } });
       } catch (err: any) {
         res.write(`data: ${JSON.stringify({ type: 'chunk', content: `\n\nImage generation failed: ${err.message}` })}\n\n`);
-        res.write(`data: ${JSON.stringify({ type: 'done', inputTokens: 0, outputTokens: 0, totalTokens: 0, model: streamModelCheck.name })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'done', tokens: { input: 0, output: 0, total: 0 }, tokensUsed: 0, cost: { charged: '0' }, model: streamModelCheck.name })}\n\n`);
         res.write('data: [DONE]\n\n');
         res.end();
       }
@@ -375,18 +375,6 @@ export const queryAIStream = async (req: Request, res: Response) => {
 
         res.write(`data: ${JSON.stringify({ type: 'chunk', content: imageContent })}\n\n`);
 
-        // Send done event with metadata
-        res.write(`data: ${JSON.stringify({
-          type: 'done',
-          tokens: { input: 0, output: imageTokenCost, total: imageTokenCost },
-          tokensUsed: imageTokenCost,
-          model: result.provider === 'gemini' ? 'Gemini Flash Image' : 'DALL-E 3',
-          imageGenerated: true,
-          imageUrl: result.imageUrl,
-        })}\n\n`);
-        res.write('data: [DONE]\n\n');
-        res.end();
-
         // Log usage — find the actual image model ID
         let imageModelId = finalModelId;
         try {
@@ -396,6 +384,19 @@ export const queryAIStream = async (req: Request, res: Response) => {
         } catch { /* use chat model as fallback */ }
 
         const imgCustomerPrice = imageTokenCost * 0.000002;
+
+        // Send done event with metadata including cost
+        res.write(`data: ${JSON.stringify({
+          type: 'done',
+          tokens: { input: 0, output: imageTokenCost, total: imageTokenCost },
+          tokensUsed: imageTokenCost,
+          cost: { charged: imgCustomerPrice.toFixed(6) },
+          model: result.provider === 'gemini' ? 'Gemini Flash Image' : 'DALL-E 3',
+          imageGenerated: true,
+          imageUrl: result.imageUrl,
+        })}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
         await prisma.usageLog.create({
           data: {
             userId: user.id, organizationId,
@@ -412,7 +413,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
       } catch (err: any) {
         logger.error(`Image generation failed: ${err.message}`);
         res.write(`data: ${JSON.stringify({ type: 'chunk', content: `\n\nImage generation failed: ${err.message}. Try rephrasing your request.` })}\n\n`);
-        res.write(`data: ${JSON.stringify({ type: 'done', inputTokens: 0, outputTokens: 0, totalTokens: 0, model: 'Image Gen' })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'done', tokens: { input: 0, output: 0, total: 0 }, tokensUsed: 0, cost: { charged: '0' }, model: 'Image Gen' })}\n\n`);
         res.write('data: [DONE]\n\n');
         res.end();
       }
@@ -488,7 +489,8 @@ export const queryAIStream = async (req: Request, res: Response) => {
         res.write(`data: ${JSON.stringify({ type: 'chunk', content: chunk })}\n\n`);
       }
       res.write(`data: ${JSON.stringify({
-        type: 'done', inputTokens: 0, outputTokens: 0, totalTokens: 0,
+        type: 'done', tokens: { input: 0, output: 0, total: 0 }, tokensUsed: 0,
+        cost: { charged: '0' },
         model: streamModelCheck?.name || 'AI', cached: true,
       })}\n\n`);
       res.write('data: [DONE]\n\n');
