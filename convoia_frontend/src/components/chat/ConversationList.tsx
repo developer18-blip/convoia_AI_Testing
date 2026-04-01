@@ -286,10 +286,10 @@ export function ConversationList({
             ))}
 
             {/* YOUR CHATS section label */}
-            {Object.entries(grouped).map(([group, convs]) => (
+            {['Today', 'Yesterday', 'Older'].filter(g => grouped[g]?.length).map((group) => (
               <div key={group} style={{ marginBottom: '4px' }}>
                 <p style={{ padding: '12px 14px 4px', fontSize: '12px', fontWeight: 500, color: 'var(--color-text-muted)', margin: 0 }}>{group}</p>
-                {convs.map(renderConvItem)}
+                {grouped[group].map(renderConvItem)}
               </div>
             ))}
           </>
