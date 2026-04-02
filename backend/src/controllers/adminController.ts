@@ -135,12 +135,14 @@ export const getUsers = asyncHandler(async (req: Request, res: Response) => {
     success: true,
     statusCode: 200,
     message: 'Users retrieved',
-    data: users,
-    pagination: {
-      page: parseInt(page as string),
-      limit: parseInt(limit as string),
-      total,
-      pages: Math.ceil(total / parseInt(limit as string)),
+    data: {
+      data: users,
+      pagination: {
+        page: parseInt(page as string),
+        limit: parseInt(limit as string),
+        total,
+        pages: Math.ceil(total / parseInt(limit as string)),
+      },
     },
     timestamp: new Date().toISOString(),
   });
@@ -192,12 +194,14 @@ export const getOrganizations = asyncHandler(async (req: Request, res: Response)
     success: true,
     statusCode: 200,
     message: 'Organizations retrieved',
-    data: organizations,
-    pagination: {
-      page: parseInt(page as string),
-      limit: parseInt(limit as string),
-      total,
-      pages: Math.ceil(total / parseInt(limit as string)),
+    data: {
+      data: organizations,
+      pagination: {
+        page: parseInt(page as string),
+        limit: parseInt(limit as string),
+        total,
+        pages: Math.ceil(total / parseInt(limit as string)),
+      },
     },
     timestamp: new Date().toISOString(),
   });
