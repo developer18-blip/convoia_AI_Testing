@@ -476,16 +476,19 @@ async function callGoogleVision(modelId: string, prompt: string, imageBase64: st
 async function routeToProvider(aiModel: any, rawMessages: any[], systemPrompt: string, overrides?: ProviderOverrides) {
   const { provider, modelId } = aiModel;
 
-  // Move any 'system' role messages (document/file context) into the first user message
+  // Move any 'system' role messages (document/file context) into the last user message
   const sysMsgs = rawMessages.filter((m: any) => m.role === 'system');
   let messages = rawMessages.filter((m: any) => m.role !== 'system');
   if (sysMsgs.length > 0) {
     const docCtx = sysMsgs.map((m: any) => m.content).join('\n\n---\n\n');
-    const idx = messages.findIndex((m: any) => m.role === 'user');
-    if (idx >= 0) {
-      messages[idx] = { ...messages[idx], content: docCtx + '\n\n' + messages[idx].content };
+    let lastIdx = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') { lastIdx = i; break; }
+    }
+    if (lastIdx >= 0) {
+      messages[lastIdx] = { ...messages[lastIdx], content: docCtx + '\n\n---\n\nUser question: ' + messages[lastIdx].content };
     } else {
-      messages.unshift({ role: 'user', content: docCtx });
+      messages.push({ role: 'user', content: docCtx });
     }
   }
 
@@ -973,22 +976,24 @@ async function routeToProviderStream(
   const { provider, modelId } = aiModel;
   const contextWindow = MODEL_CONTEXT_WINDOWS[modelId] || 128000;
 
-  // Move any 'system' role messages (document/file context) into the first user message
+  // Move any 'system' role messages (document/file context) into the last user message
   // System role is invalid in Anthropic and confusing for other providers
   const systemMsgs = rawMessages.filter((m: any) => m.role === 'system');
   let cleaned = rawMessages.filter((m: any) => m.role !== 'system');
   if (systemMsgs.length > 0) {
     const docContext = systemMsgs.map((m: any) => m.content).join('\n\n---\n\n');
-    // Prepend document context to the first user message
-    const firstUserIdx = cleaned.findIndex((m: any) => m.role === 'user');
-    if (firstUserIdx >= 0) {
-      cleaned[firstUserIdx] = {
-        ...cleaned[firstUserIdx],
-        content: docContext + '\n\n' + cleaned[firstUserIdx].content,
+    // Prepend document context to the LAST user message (the current question)
+    let lastUserIdx = -1;
+    for (let i = cleaned.length - 1; i >= 0; i--) {
+      if (cleaned[i].role === 'user') { lastUserIdx = i; break; }
+    }
+    if (lastUserIdx >= 0) {
+      cleaned[lastUserIdx] = {
+        ...cleaned[lastUserIdx],
+        content: docContext + '\n\n---\n\nUser question: ' + cleaned[lastUserIdx].content,
       };
     } else {
-      // No user message — create one
-      cleaned.unshift({ role: 'user', content: docContext });
+      cleaned.push({ role: 'user', content: docContext });
     }
   }
 
