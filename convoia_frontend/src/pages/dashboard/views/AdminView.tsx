@@ -29,6 +29,28 @@ export function AdminView() {
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [orgSearch, setOrgSearch] = useState('')
+  const [searchResults, setSearchResults] = useState<{ users: any[]; orgs: any[] } | null>(null)
+  const [isSearching, setIsSearching] = useState(false)
+
+  // Debounced server-side search
+  useEffect(() => {
+    if (!orgSearch || orgSearch.length < 2) { setSearchResults(null); return }
+    const timer = setTimeout(async () => {
+      setIsSearching(true)
+      try {
+        const [uRes, oRes] = await Promise.allSettled([
+          api.get(`/admin/users?search=${encodeURIComponent(orgSearch)}&page=1`),
+          api.get(`/admin/orgs?search=${encodeURIComponent(orgSearch)}&page=1`),
+        ])
+        setSearchResults({
+          users: uRes.status === 'fulfilled' ? (uRes.value.data.data?.data || uRes.value.data.data || []) : [],
+          orgs: oRes.status === 'fulfilled' ? (oRes.value.data.data?.data || oRes.value.data.data || []) : [],
+        })
+      } catch { /* ignore */ }
+      setIsSearching(false)
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [orgSearch])
 
   useEffect(() => {
     Promise.allSettled([
@@ -131,36 +153,90 @@ export function AdminView() {
         />
       </Card>
 
-      {/* Search bar for orgs/users */}
-      <div className="relative max-w-sm">
+      {/* Search bar — queries server */}
+      <div className="relative max-w-md">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
         <input
           type="text"
-          placeholder="Search organizations or users..."
+          placeholder="Search all organizations or users..."
           value={orgSearch}
           onChange={(e) => setOrgSearch(e.target.value)}
-          className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-primary"
+          className="w-full pl-9 pr-3 py-2.5 text-sm rounded-lg border border-border bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/50"
         />
+        {isSearching && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-text-muted">Searching...</span>}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Top Organizations */}
-        <Card padding="none">
-          <div className="px-5 py-4 border-b border-border">
-            <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-              <Building2 size={16} className="text-primary" />
-              Top Organizations
-            </h3>
-          </div>
-          <div className="divide-y divide-border/50" style={{ maxHeight: '360px', overflowY: 'auto' }}>
-            {(() => {
-              const filtered = stats.topOrgs.filter((o) =>
-                o.name.toLowerCase().includes(orgSearch.toLowerCase())
-              )
-              if (filtered.length === 0) {
-                return <div className="px-5 py-8 text-center text-text-muted text-sm">No organizations found</div>
-              }
-              return filtered.slice(0, 10).map((org, i) => (
+      {/* Search results overlay — shown when typing */}
+      {searchResults && orgSearch.length >= 2 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Card padding="none">
+            <div className="px-5 py-4 border-b border-border">
+              <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                <Building2 size={16} className="text-primary" />
+                Organizations ({searchResults.orgs.length})
+              </h3>
+            </div>
+            <div className="divide-y divide-border/50" style={{ maxHeight: '360px', overflowY: 'auto' }}>
+              {searchResults.orgs.length === 0 ? (
+                <div className="px-5 py-8 text-center text-text-muted text-sm">No organizations found</div>
+              ) : searchResults.orgs.slice(0, 15).map((org: any) => (
+                <div key={org.id} onClick={() => navigate(`/admin/orgs/${org.id}`)}
+                  className="px-5 py-3 flex items-center gap-3 hover:bg-surface-2 transition-colors cursor-pointer">
+                  <Building2 size={14} className="text-primary shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-text-primary truncate">{org.name}</p>
+                    <p className="text-xs text-text-muted truncate">{org.email}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">{org.tier || 'free'}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card padding="none">
+            <div className="px-5 py-4 border-b border-border">
+              <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                <Users size={16} className="text-primary" />
+                Users ({searchResults.users.length})
+              </h3>
+            </div>
+            <div className="divide-y divide-border/50" style={{ maxHeight: '360px', overflowY: 'auto' }}>
+              {searchResults.users.length === 0 ? (
+                <div className="px-5 py-8 text-center text-text-muted text-sm">No users found</div>
+              ) : searchResults.users.slice(0, 15).map((u: any) => (
+                <div key={u.id} onClick={() => navigate(`/admin/users/${u.id}`)}
+                  className="px-5 py-3 flex items-center gap-3 hover:bg-surface-2 transition-colors cursor-pointer">
+                  <Users size={14} className="text-text-muted shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-text-primary truncate">{u.name}</p>
+                    <p className="text-xs text-text-muted truncate">{u.email}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-surface-2 text-text-muted">{u.role || 'user'}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Default top lists — shown when NOT searching */}
+      {!searchResults && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Card padding="none">
+            <div className="px-5 py-4 border-b border-border">
+              <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                <Building2 size={16} className="text-primary" />
+                Top Organizations
+              </h3>
+            </div>
+            <div className="divide-y divide-border/50" style={{ maxHeight: '360px', overflowY: 'auto' }}>
+              {stats.topOrgs.length === 0 ? (
+                <div className="px-5 py-8 text-center text-text-muted text-sm">No organizations</div>
+              ) : stats.topOrgs.slice(0, 10).map((org, i) => (
                 <div key={`${org.name}-${i}`}
                   onClick={() => org.organizationId && navigate(`/admin/orgs/${org.organizationId}`)}
                   className="px-5 py-3 flex items-center gap-3 hover:bg-surface-2 transition-colors cursor-pointer">
@@ -173,29 +249,21 @@ export function AdminView() {
                     <p className="text-xs text-text-muted">{formatNumber(org.queries)} queries</p>
                   </div>
                 </div>
-              ))
-            })()}
-          </div>
-        </Card>
+              ))}
+            </div>
+          </Card>
 
-        {/* Top Personal Users */}
-        <Card padding="none">
-          <div className="px-5 py-4 border-b border-border">
-            <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-              <Users size={16} className="text-primary" />
-              Top Personal Users
-            </h3>
-          </div>
-          <div className="divide-y divide-border/50" style={{ maxHeight: '360px', overflowY: 'auto' }}>
-            {(() => {
-              const filtered = stats.topPersonalUsers.filter((u) =>
-                u.name.toLowerCase().includes(orgSearch.toLowerCase()) ||
-                u.email.toLowerCase().includes(orgSearch.toLowerCase())
-              )
-              if (filtered.length === 0) {
-                return <div className="px-5 py-8 text-center text-text-muted text-sm">No personal users found</div>
-              }
-              return filtered.slice(0, 10).map((user, i) => (
+          <Card padding="none">
+            <div className="px-5 py-4 border-b border-border">
+              <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                <Users size={16} className="text-primary" />
+                Top Personal Users
+              </h3>
+            </div>
+            <div className="divide-y divide-border/50" style={{ maxHeight: '360px', overflowY: 'auto' }}>
+              {stats.topPersonalUsers.length === 0 ? (
+                <div className="px-5 py-8 text-center text-text-muted text-sm">No personal users</div>
+              ) : stats.topPersonalUsers.slice(0, 10).map((user, i) => (
                 <div key={user.userId}
                   onClick={() => navigate(`/admin/users/${user.userId}`)}
                   className="px-5 py-3 flex items-center gap-3 hover:bg-surface-2 transition-colors cursor-pointer">
@@ -209,11 +277,11 @@ export function AdminView() {
                     <p className="text-xs text-text-muted">{formatNumber(user.queries)} queries</p>
                   </div>
                 </div>
-              ))
-            })()}
-          </div>
-        </Card>
-      </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
 
       <Card padding="lg">
         <h3 className="text-sm font-medium text-text-secondary mb-4">Revenue by Provider</h3>
