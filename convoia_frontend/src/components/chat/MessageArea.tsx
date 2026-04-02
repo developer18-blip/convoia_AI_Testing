@@ -111,18 +111,20 @@ export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, o
   }
 
   return (
-    <div ref={containerRef} className="chat-messages-container" style={{ height: '100%', overflowY: 'auto', overflowX: 'hidden', backgroundColor: 'var(--chat-bg)', position: 'relative' }}>
-      <div style={{ maxWidth: '900px', margin: '0 auto', padding: '20px 24px 0', width: '100%' }}>
-        {messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg}
-            onRetry={msg.error ? onRetry : undefined}
-            onEdit={onEditMessage} onDelete={onDeleteMessage} onRunCode={onRunCode}
-            onOpenInCanvas={onOpenInCanvas} />
-        ))}
-        <div ref={bottomRef} style={{ height: '20px' }} />
+    <div style={{ height: '100%', position: 'relative' }}>
+      <div ref={containerRef} className="chat-messages-container" style={{ height: '100%', overflowY: 'auto', overflowX: 'hidden', backgroundColor: 'var(--chat-bg)' }}>
+        <div style={{ maxWidth: '900px', margin: '0 auto', padding: '20px 24px 0', width: '100%' }}>
+          {messages.map((msg) => (
+            <MessageBubble key={msg.id} message={msg}
+              onRetry={msg.error ? onRetry : undefined}
+              onEdit={onEditMessage} onDelete={onDeleteMessage} onRunCode={onRunCode}
+              onOpenInCanvas={onOpenInCanvas} />
+          ))}
+          <div ref={bottomRef} style={{ height: '20px' }} />
+        </div>
       </div>
 
-      {/* Scroll to bottom button */}
+      {/* Scroll to bottom button — positioned outside scroll container so it stays fixed */}
       {showScrollBtn && (
         <button
           onClick={scrollToBottom}
