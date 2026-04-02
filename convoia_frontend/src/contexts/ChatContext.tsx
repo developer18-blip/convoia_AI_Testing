@@ -454,9 +454,17 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
     try {
       const history = [...messages, userMsg].map((m) => ({ role: m.role, content: m.content }))
-      const messagesForAPI = systemContext
-        ? [{ role: 'system' as const, content: systemContext }, ...history]
-        : history
+      // Embed document/file context directly into the last user message
+      // Using role:'system' caused issues with Anthropic and other providers
+      let messagesForAPI = history
+      if (systemContext) {
+        const lastIdx = messagesForAPI.length - 1
+        messagesForAPI = [...messagesForAPI]
+        messagesForAPI[lastIdx] = {
+          ...messagesForAPI[lastIdx],
+          content: `Here is the attached document content:\n\n${systemContext}\n\n---\n\nUser question: ${messagesForAPI[lastIdx].content}`,
+        }
+      }
 
       const token = localStorage.getItem('convoia_token')
       const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'

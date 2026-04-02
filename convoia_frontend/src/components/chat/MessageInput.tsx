@@ -113,10 +113,11 @@ export function MessageInput({
         body: formData,
       })
       const data = await res.json()
-      if (data.success && data.data.extractedText) {
+      console.log('[PDF Upload] Response:', { success: data.success, textLength: data.data?.extractedText?.length, warning: data.data?.warning })
+      if (data.success && data.data?.extractedText) {
         setAttachedFiles(prev => prev.map((f, i) => i === idx ? { ...f, uploading: false, uploaded: true, extractedText: data.data.extractedText } : f))
       } else {
-        setAttachedFiles(prev => prev.map((f, i) => i === idx ? { ...f, uploading: false, error: data.message || 'Failed to process' } : f))
+        setAttachedFiles(prev => prev.map((f, i) => i === idx ? { ...f, uploading: false, error: data.data?.warning || data.message || 'Failed to process' } : f))
       }
     } catch {
       setAttachedFiles(prev => prev.map((f, i) => i === idx ? { ...f, uploading: false, error: 'Failed to process' } : f))
@@ -195,12 +196,14 @@ export function MessageInput({
         const combinedContext = contextParts.join('\n\n---\n\n')
         const question = value.trim() || 'Analyze these files'
         const fileNames = [...docs, ...audios].map(f => f.file.name).join(', ')
+        console.log('[PDF Send] Context length:', combinedContext.length, 'chars, question:', question)
         if (onSendWithContext) {
           onSendWithContext(question, combinedContext, { fileAttachment: { name: fileNames, type: 'document', size: [...docs, ...audios].reduce((s, f) => s + f.file.size, 0) } })
         } else {
           onSend(`${question}\n\n${combinedContext}`)
         }
       } else {
+        console.log('[PDF Send] No context extracted from docs:', docs.map(d => ({ name: d.file.name, hasText: !!d.extractedText, textLen: d.extractedText?.length })))
         if (value.trim()) onSend(value.trim())
       }
 
