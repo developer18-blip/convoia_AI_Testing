@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react'
-import { Pencil, Code2, Search, BarChart3 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Pencil, Code2, Search, BarChart3, ArrowDown } from 'lucide-react'
 import { MessageBubble } from './MessageBubble'
 import type { Message } from '../../types'
 
@@ -26,6 +26,11 @@ export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, o
   const containerRef = useRef<HTMLDivElement>(null)
   const userScrolledUp = useRef(false)
   const lastScrollTime = useRef(0)
+  const [showScrollBtn, setShowScrollBtn] = useState(false)
+
+  const scrollToBottom = () => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
 
   // Detect if user scrolled away from bottom
   useEffect(() => {
@@ -37,6 +42,7 @@ export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, o
       const distanceFromBottom = scrollHeight - scrollTop - clientHeight
       // User is "at bottom" if within 150px
       userScrolledUp.current = distanceFromBottom > 150
+      setShowScrollBtn(distanceFromBottom > 300)
     }
 
     container.addEventListener('scroll', handleScroll, { passive: true })
@@ -105,7 +111,7 @@ export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, o
   }
 
   return (
-    <div ref={containerRef} className="chat-messages-container" style={{ height: '100%', overflowY: 'auto', overflowX: 'hidden', backgroundColor: 'var(--chat-bg)' }}>
+    <div ref={containerRef} className="chat-messages-container" style={{ height: '100%', overflowY: 'auto', overflowX: 'hidden', backgroundColor: 'var(--chat-bg)', position: 'relative' }}>
       <div style={{ maxWidth: '900px', margin: '0 auto', padding: '20px 24px 0', width: '100%' }}>
         {messages.map((msg) => (
           <MessageBubble key={msg.id} message={msg}
@@ -115,6 +121,26 @@ export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, o
         ))}
         <div ref={bottomRef} style={{ height: '20px' }} />
       </div>
+
+      {/* Scroll to bottom button */}
+      {showScrollBtn && (
+        <button
+          onClick={scrollToBottom}
+          style={{
+            position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)',
+            width: '36px', height: '36px', borderRadius: '50%',
+            background: 'var(--chat-surface)', border: '1px solid var(--chat-border)',
+            color: 'var(--color-text-muted)', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)', transition: 'all 0.2s',
+            zIndex: 10,
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-primary)'; e.currentTarget.style.color = 'white'; e.currentTarget.style.borderColor = 'var(--color-primary)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--chat-surface)'; e.currentTarget.style.color = 'var(--color-text-muted)'; e.currentTarget.style.borderColor = 'var(--chat-border)' }}
+        >
+          <ArrowDown size={18} />
+        </button>
+      )}
     </div>
   )
 }
