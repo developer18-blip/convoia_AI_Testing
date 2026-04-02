@@ -867,7 +867,7 @@ export const getRevenueDashboard = asyncHandler(async (req: Request, res: Respon
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  const [totalRevenue, totalCost, dailyRevenue, providerBreakdown, topOrgs] = await Promise.all([
+  const [totalRevenue, totalCost, dailyRevenue, providerBreakdown, topOrgs, topPersonalUsersRaw] = await Promise.all([
     // Total revenue (customer price)
     prisma.usageLog.aggregate({
       _sum: { customerPrice: true },
@@ -899,7 +899,7 @@ export const getRevenueDashboard = asyncHandler(async (req: Request, res: Respon
       GROUP BY m.provider
       ORDER BY revenue DESC
     ` as Promise<any[]>,
-    // Top orgs
+    // Top orgs (real organizations, exclude "Personal")
     prisma.$queryRaw`
       SELECT o.name, o.id,
         SUM(u."customerPrice") as revenue,
@@ -907,7 +907,22 @@ export const getRevenueDashboard = asyncHandler(async (req: Request, res: Respon
       FROM "UsageLog" u
       JOIN "Organization" o ON u."organizationId" = o.id
       WHERE u."createdAt" >= ${thirtyDaysAgo}
+        AND LOWER(o.name) != 'personal'
       GROUP BY o.id, o.name
+      ORDER BY revenue DESC
+      LIMIT 10
+    ` as Promise<any[]>,
+    // Top personal users
+    prisma.$queryRaw`
+      SELECT usr.id as "userId", usr.name, usr.email,
+        SUM(u."customerPrice") as revenue,
+        COUNT(*)::int as queries
+      FROM "UsageLog" u
+      JOIN "User" usr ON u."userId" = usr.id
+      LEFT JOIN "Organization" o ON u."organizationId" = o.id
+      WHERE u."createdAt" >= ${thirtyDaysAgo}
+        AND (u."organizationId" IS NULL OR LOWER(o.name) = 'personal')
+      GROUP BY usr.id, usr.name, usr.email
       ORDER BY revenue DESC
       LIMIT 10
     ` as Promise<any[]>,
@@ -938,6 +953,13 @@ export const getRevenueDashboard = asyncHandler(async (req: Request, res: Respon
         id: o.id,
         revenue: Number(o.revenue || 0),
         queries: o.queries,
+      })),
+      topPersonalUsers: topPersonalUsersRaw.map((u: any) => ({
+        userId: u.userId,
+        name: u.name || u.email,
+        email: u.email,
+        revenue: Number(u.revenue || 0),
+        queries: u.queries,
       })),
     },
     timestamp: new Date().toISOString(),

@@ -455,6 +455,7 @@ export const getAdminUsage = asyncHandler(async (req: Request, res: Response) =>
     newUsersCount,
     last30DaysLogs,
     topOrgs,
+    topPersonalUsers,
   ] = await Promise.all([
     // Total queries all time
     prisma.usageLog.aggregate({
@@ -483,14 +484,22 @@ export const getAdminUsage = asyncHandler(async (req: Request, res: Response) =>
       },
       orderBy: { createdAt: 'asc' },
     }),
-    // Top 10 orgs by spend
+    // Top orgs by spend (real orgs only, exclude "Personal")
     prisma.usageLog.groupBy({
       by: ['organizationId'],
-      where: { organizationId: { not: undefined } },
+      where: { organizationId: { not: null } },
       _sum: { customerPrice: true },
       _count: true,
       orderBy: { _sum: { customerPrice: 'desc' } },
-      take: 10,
+      take: 20, // fetch more, filter after name lookup
+    }),
+    // Top personal users by spend
+    prisma.usageLog.groupBy({
+      by: ['userId'],
+      _sum: { customerPrice: true },
+      _count: true,
+      orderBy: { _sum: { customerPrice: 'desc' } },
+      take: 20,
     }),
   ]);
 
@@ -508,12 +517,64 @@ export const getAdminUsage = asyncHandler(async (req: Request, res: Response) =>
 
   const orgNameMap = new Map(orgs.map((o) => [o.id, o.name]));
 
-  const topOrgsList = topOrgs.map((o) => ({
-    organizationId: o.organizationId,
-    name: orgNameMap.get(o.organizationId!) || 'Unknown',
-    totalQueries: o._count,
-    totalSpend: parseFloat((o._sum?.customerPrice || 0).toFixed(4)),
-  }));
+  // Separate real organizations from "Personal" ones
+  const realOrgsList: Array<{ organizationId: string; name: string; totalQueries: number; totalSpend: number }> = [];
+  const personalOrgIds = new Set<string>();
+
+  for (const o of topOrgs) {
+    const name = orgNameMap.get(o.organizationId!) || 'Unknown';
+    if (name.toLowerCase() === 'personal' || name === 'Unknown') {
+      if (o.organizationId) personalOrgIds.add(o.organizationId);
+    } else {
+      realOrgsList.push({
+        organizationId: o.organizationId!,
+        name,
+        totalQueries: o._count,
+        totalSpend: parseFloat((o._sum?.customerPrice || 0).toFixed(4)),
+      });
+    }
+  }
+
+  // Fetch user details for top personal users
+  const personalUserIds = topPersonalUsers.map((u: { userId: string }) => u.userId);
+  const personalUsers = personalUserIds.length > 0
+    ? await prisma.user.findMany({
+        where: { id: { in: personalUserIds } },
+        select: { id: true, name: true, email: true, organizationId: true },
+      })
+    : [];
+
+  const userMap = new Map(personalUsers.map((u) => [u.id, u]));
+
+  // Build personal users list (users in "Personal" orgs or without org)
+  const personalUsersList = topPersonalUsers
+    .map((u: { userId: string; _count: number; _sum: { customerPrice: number | null } }) => {
+      const user = userMap.get(u.userId);
+      if (!user) return null;
+      // Only include if user is in a "Personal" org or has no org
+      const isPersonal = !user.organizationId || personalOrgIds.has(user.organizationId);
+      if (!isPersonal) return null;
+      return {
+        userId: u.userId,
+        name: user.name || user.email,
+        email: user.email,
+        totalQueries: u._count,
+        totalSpend: parseFloat((u._sum?.customerPrice || 0).toFixed(4)),
+      };
+    })
+    .filter((u: unknown): u is { userId: string; name: string; email: string; totalQueries: number; totalSpend: number } => u !== null)
+    .slice(0, 10);
+
+  // Also build a combined topOrgs for backward compatibility
+  const topOrgsList = [
+    ...realOrgsList.slice(0, 10),
+    ...personalUsersList.map((u: { userId: string; name: string; totalQueries: number; totalSpend: number }) => ({
+      organizationId: u.userId,
+      name: u.name,
+      totalQueries: u.totalQueries,
+      totalSpend: u.totalSpend,
+    })),
+  ].sort((a, b) => b.totalSpend - a.totalSpend).slice(0, 10);
 
   // Revenue by provider
   const providerRevenue = new Map<string, { providerCost: number; customerPrice: number }>();
@@ -603,6 +664,8 @@ export const getAdminUsage = asyncHandler(async (req: Request, res: Response) =>
       },
       revenueByProvider,
       topOrgs: topOrgsList,
+      topOrganizations: realOrgsList.slice(0, 10),
+      topPersonalUsers: personalUsersList,
       dailyRevenue,
     },
     timestamp: new Date().toISOString(),

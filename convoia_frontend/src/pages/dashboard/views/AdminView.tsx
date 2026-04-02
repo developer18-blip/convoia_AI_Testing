@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
-import { DollarSign, TrendingUp, BarChart3, Activity, Building2, Users } from 'lucide-react'
+import { DollarSign, TrendingUp, BarChart3, Activity, Building2, Users, Search } from 'lucide-react'
 import { StatCard } from '../../../components/shared/StatCard'
 import { Card } from '../../../components/ui/Card'
 import { LineChart } from '../../../components/charts/LineChart'
 import { BarChart } from '../../../components/charts/BarChart'
 import { formatCurrency, formatNumber } from '../../../lib/utils'
 import api from '../../../lib/api'
+
+interface OrgEntry { name: string; revenue: number; queries: number }
+interface PersonalEntry { name: string; email: string; userId: string; revenue: number; queries: number }
 
 interface AdminStats {
   revenue: number
@@ -15,13 +18,15 @@ interface AdminStats {
   activeOrgs: number
   newUsers: number
   dailyRevenue: Array<{ date: string; revenue: number; cost: number }>
-  topOrgs: Array<{ name: string; revenue: number; queries: number }>
+  topOrgs: OrgEntry[]
+  topPersonalUsers: PersonalEntry[]
   providerRevenue: Array<{ provider: string; revenue: number }>
 }
 
 export function AdminView() {
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [orgSearch, setOrgSearch] = useState('')
 
   useEffect(() => {
     Promise.allSettled([
@@ -47,10 +52,17 @@ export function AdminView() {
           revenue: Number(d.revenue ?? 0) || 0,
           cost: Number(d.providerCost ?? 0) || 0,
         })),
-        topOrgs: (Array.isArray(rev?.topOrgs) ? rev.topOrgs : []).map((o: Record<string, unknown>) => ({
+        topOrgs: (Array.isArray(rev?.topOrganizations) ? rev.topOrganizations : Array.isArray(rev?.topOrgs) ? rev.topOrgs : []).map((o: Record<string, unknown>) => ({
           name: String(o.name ?? 'Unknown'),
           revenue: Number(o.totalSpend ?? 0) || 0,
           queries: Number(o.totalQueries ?? 0) || 0,
+        })),
+        topPersonalUsers: (Array.isArray(rev?.topPersonalUsers) ? rev.topPersonalUsers : []).map((u: Record<string, unknown>) => ({
+          name: String(u.name ?? 'Unknown'),
+          email: String(u.email ?? ''),
+          userId: String(u.userId ?? ''),
+          revenue: Number(u.totalSpend ?? 0) || 0,
+          queries: Number(u.totalQueries ?? 0) || 0,
         })),
         providerRevenue: Object.entries((rev?.revenueByProvider ?? {}) as Record<string, Record<string, unknown>>).map(([provider, data]) => ({
           provider,
@@ -99,41 +111,96 @@ export function AdminView() {
         />
       </Card>
 
+      {/* Search bar for orgs/users */}
+      <div className="relative max-w-sm">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+        <input
+          type="text"
+          placeholder="Search organizations or users..."
+          value={orgSearch}
+          onChange={(e) => setOrgSearch(e.target.value)}
+          className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-primary"
+        />
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Top Organizations */}
         <Card padding="none">
           <div className="px-5 py-4 border-b border-border">
-            <h3 className="text-sm font-medium text-text-secondary">Top 10 Organizations</h3>
+            <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+              <Building2 size={16} className="text-primary" />
+              Top Organizations
+            </h3>
           </div>
-          <div className="divide-y divide-border/50">
-            {stats.topOrgs.length === 0 ? (
-              <div className="px-5 py-8 text-center text-text-muted text-sm">No data</div>
-            ) : (
-              stats.topOrgs.slice(0, 10).map((org, i) => (
-                <div key={org.name} className="px-5 py-3 flex items-center gap-3">
+          <div className="divide-y divide-border/50" style={{ maxHeight: '360px', overflowY: 'auto' }}>
+            {(() => {
+              const filtered = stats.topOrgs.filter((o) =>
+                o.name.toLowerCase().includes(orgSearch.toLowerCase())
+              )
+              if (filtered.length === 0) {
+                return <div className="px-5 py-8 text-center text-text-muted text-sm">No organizations found</div>
+              }
+              return filtered.slice(0, 10).map((org, i) => (
+                <div key={`${org.name}-${i}`} className="px-5 py-3 flex items-center gap-3 hover:bg-surface-2 transition-colors">
                   <span className="text-sm font-mono text-text-muted w-6">#{i + 1}</span>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-text-primary">{org.name}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-text-primary truncate">{org.name}</p>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right shrink-0">
                     <p className="text-sm font-mono text-text-primary">{formatCurrency(org.revenue)}</p>
                     <p className="text-xs text-text-muted">{formatNumber(org.queries)} queries</p>
                   </div>
                 </div>
               ))
-            )}
+            })()}
           </div>
         </Card>
-        <Card padding="lg">
-          <h3 className="text-sm font-medium text-text-secondary mb-4">Revenue by Provider</h3>
-          <BarChart
-            data={stats.providerRevenue.map((p) => ({ name: p.provider, value: p.revenue }))}
-            xKey="name"
-            yKey="value"
-            height={300}
-            formatY={(v: number) => `$${v.toFixed(0)}`}
-          />
+
+        {/* Top Personal Users */}
+        <Card padding="none">
+          <div className="px-5 py-4 border-b border-border">
+            <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+              <Users size={16} className="text-primary" />
+              Top Personal Users
+            </h3>
+          </div>
+          <div className="divide-y divide-border/50" style={{ maxHeight: '360px', overflowY: 'auto' }}>
+            {(() => {
+              const filtered = stats.topPersonalUsers.filter((u) =>
+                u.name.toLowerCase().includes(orgSearch.toLowerCase()) ||
+                u.email.toLowerCase().includes(orgSearch.toLowerCase())
+              )
+              if (filtered.length === 0) {
+                return <div className="px-5 py-8 text-center text-text-muted text-sm">No personal users found</div>
+              }
+              return filtered.slice(0, 10).map((user, i) => (
+                <div key={user.userId} className="px-5 py-3 flex items-center gap-3 hover:bg-surface-2 transition-colors">
+                  <span className="text-sm font-mono text-text-muted w-6">#{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-text-primary truncate">{user.name}</p>
+                    <p className="text-xs text-text-muted truncate">{user.email}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-mono text-text-primary">{formatCurrency(user.revenue)}</p>
+                    <p className="text-xs text-text-muted">{formatNumber(user.queries)} queries</p>
+                  </div>
+                </div>
+              ))
+            })()}
+          </div>
         </Card>
       </div>
+
+      <Card padding="lg">
+        <h3 className="text-sm font-medium text-text-secondary mb-4">Revenue by Provider</h3>
+        <BarChart
+          data={stats.providerRevenue.map((p) => ({ name: p.provider, value: p.revenue }))}
+          xKey="name"
+          yKey="value"
+          height={300}
+          formatY={(v: number) => `$${v.toFixed(0)}`}
+        />
+      </Card>
     </div>
   )
 }
