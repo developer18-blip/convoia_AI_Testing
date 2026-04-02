@@ -35,70 +35,113 @@ export interface WebSearchResponse {
   contextText: string;
 }
 
-// ── Query Classification ─────────────────────────────────────────────
-
-const REALTIME_PATTERNS = [
-  // Time-sensitive queries
-  /\b(current|latest|today|now|right now|live|real.?time|recent|this week|this month|this year)\b/i,
-  /\b(news|headline|update|happening|breaking|trending|viral)\b/i,
-  /\b(weather|temperature|forecast)\b/i,
-  // Prices, stocks, crypto
-  /\b(price|cost|worth|valuation|market cap)\b.*\b(of|for)\b/i,
-  /\b(bitcoin|btc|ethereum|eth|solana|sol|xrp|doge|crypto|stock|share|nasdaq|dow|s&p|gold|silver|oil)\b/i,
-  /\b(exchange rate|conversion|convert)\b/i,
-  // Sports, events
-  /\b(score|result|match|game|tournament|championship|winner|won)\b.*\b(today|yesterday|last|live|final)\b/i,
-  /\b(election|poll|vote|voting)\b/i,
-  // Product/tech lookups
-  /\b(latest|newest|recent|new|upcoming)\b.*\b(version|release|update|model|phone|laptop|car|feature)\b/i,
-  /\b(compare|comparison|vs|versus|best|top \d+|review)\b/i,
-  // Explicit search requests
-  /\bsearch\s+(the\s+)?(web|internet|online|for)\b/i,
-  /\b(look up|find out|check|google|search for|find me)\b/i,
-  // Facts that may have changed
-  /\b(who is|who are|who was)\b.*\b(president|ceo|prime minister|leader|head|founder|owner)\b/i,
-  /\b(how many|how much|what is the population|gdp|revenue)\b/i,
-  // Years (anything mentioning recent/future years)
-  /\b(20[2-3]\d)\b/i,
-  // Locations, companies, people (proper nouns that may need current info)
-  /\b(war|conflict|crisis|disaster|earthquake|flood|hurricane)\b/i,
-  /\b(ipo|acquisition|merger|layoff|launch|announce)\b/i,
-];
+// ── Intelligent Query Classification ────────────────────────────────
+// Uses a scoring system instead of binary pattern matching.
+// Requires multiple signals to trigger search — single keywords alone won't.
+// Inspired by how ChatGPT/Claude decide when to invoke web search.
 
 const NEWS_PATTERNS = [
   /\b(news|headline|breaking|update|happening|latest|trending)\b/i,
   /\b(today|this morning|tonight|this week|this month)\b/i,
 ];
 
-// Queries that should NOT trigger search (purely knowledge/creative tasks)
-const NO_SEARCH_PATTERNS = [
-  /^(write|create|draft|compose|generate)\b.*\b(poem|story|essay|code|email|letter|script|song)\b/i,
-  /^(explain|teach me|how does|what does)\b.*\b(work|mean|function)\b/i,
-  /^(translate|convert)\b.*\b(to|into)\b.*\b(english|spanish|french|hindi|german|chinese|japanese)\b/i,
-  /^(help me|can you|please)\b.*\b(write|code|debug|fix|refactor|optimize)\b/i,
-  /^(summarize|rewrite|paraphrase|simplify)\b/i,
-  /\b(hello|hi|hey|good morning|good evening|how are you|thank you|thanks)\b/i,
-];
-
-/**
- * Smart detection: should this query use web search?
- */
-/**
- * Check if query needs recent/fresh results (news, current events, etc.)
- */
 function isTimeSensitive(query: string): boolean {
   return NEWS_PATTERNS.some(p => p.test(query))
     || /\b(current|latest|recent|today|now|this week|this month|this year|20[2-3]\d)\b/i.test(query)
     || /\b(news|war|election|crisis|update|happening|score|price|stock)\b/i.test(query);
 }
 
-export function needsWebSearch(query: string): boolean {
-  // Skip very short queries or greetings
-  if (query.length < 10) return false;
-  // Skip creative/knowledge tasks that don't need fresh data
-  if (NO_SEARCH_PATTERNS.some(p => p.test(query))) return false;
-  // Trigger on any realtime pattern
-  return REALTIME_PATTERNS.some(pattern => pattern.test(query));
+/**
+ * Intelligent web search detection using weighted scoring.
+ *
+ * Design principles (matching ChatGPT/Claude behavior):
+ * - Single keywords like "compare", "analyze", "best" are NOT enough
+ * - Need COMBINATION of signals (temporal + topic, or explicit request)
+ * - Document/file analysis should NEVER trigger search
+ * - Creative/coding tasks should NEVER trigger search
+ * - Only search when the user clearly needs fresh/external information
+ */
+export function needsWebSearch(query: string, hasDocumentContext = false): boolean {
+  // Very short queries or document analysis → never search
+  if (query.length < 15) return false;
+  if (hasDocumentContext) return false;
+
+  // ── ABSOLUTE NEGATIVES — skip search entirely ──
+  const SKIP_PATTERNS = [
+    // Document/file analysis
+    /\b(this document|this pdf|this file|the file|the document|attached|uploaded|the text above)\b/i,
+    /\b(analyze this|summarize this|explain this|read this|review this)\b/i,
+    /^here is the attached document/i,
+    // Creative/writing tasks
+    /^(write|create|draft|compose|generate|make)\b/i,
+    /\b(poem|story|essay|email|letter|script|song|blog post|article)\b.*\b(about|for|on)\b/i,
+    // Coding tasks
+    /\b(code|function|class|variable|bug|error|syntax|debug|fix|refactor|optimize|implement)\b/i,
+    /\b(python|javascript|typescript|java|rust|go|html|css|sql|react|node)\b/i,
+    // Translation/transformation
+    /^(translate|convert|rewrite|paraphrase|simplify|rephrase)\b/i,
+    // General knowledge that doesn't change
+    /^(explain|teach me|what is|what are|how does|how do|why does|why do|define)\b.*\b(work|mean|function|concept|theory|algorithm|principle)\b/i,
+    // Conversational
+    /^(hello|hi|hey|good morning|good evening|how are you|thank you|thanks|ok|okay|sure|yes|no|bye)\b/i,
+    // Math/calculation
+    /^(calculate|solve|compute|what is \d)/i,
+    // Conversation references
+    /\b(you said|you mentioned|earlier|above|previous|last message|in our conversation)\b/i,
+  ];
+  if (SKIP_PATTERNS.some(p => p.test(query))) return false;
+
+  // ── EXPLICIT SEARCH REQUESTS — always search ──
+  if (/\bsearch\s+(the\s+)?(web|internet|online|for)\b/i.test(query)) return true;
+  if (/\b(look up|google|search for|find me|browse)\b/i.test(query)) return true;
+
+  // ── SCORING SYSTEM — accumulate evidence ──
+  let score = 0;
+
+  // Strong temporal signals (+3) — user wants CURRENT info
+  if (/\b(today|right now|currently|at the moment|as of now)\b/i.test(query)) score += 3;
+  if (/\b(breaking|happening now|live|real.?time)\b/i.test(query)) score += 3;
+  if (/\b(news|headline|trending|viral)\b/i.test(query)) score += 3;
+
+  // Moderate temporal signals (+2)
+  if (/\b(latest|newest|recent|this week|this month|this year)\b/i.test(query)) score += 2;
+  if (/\b(20(2[5-9]|[3-9]\d))\b/.test(query)) score += 2; // Future years or very recent
+
+  // Real-time data — need BOTH topic + freshness indicator (+3 for combo)
+  if (/\b(price|stock|market|crypto|bitcoin|ethereum|nasdaq)\b/i.test(query) &&
+      /\b(current|now|today|live|latest|what is)\b/i.test(query)) score += 3;
+  if (/\b(weather|forecast|temperature)\b/i.test(query) &&
+      /\b(today|tomorrow|this week|in|at)\b/i.test(query)) score += 3;
+  if (/\b(score|match|game|result)\b/i.test(query) &&
+      /\b(today|last night|yesterday|live|final)\b/i.test(query)) score += 3;
+  if (/\b(election|vote|poll)\b/i.test(query) &&
+      /\b(result|winner|latest|current|update)\b/i.test(query)) score += 3;
+
+  // Product/service research — need BOTH comparison intent + product category (+2 for combo)
+  if (/\b(compare|vs|versus|comparison|which is better)\b/i.test(query) &&
+      /\b(product|phone|laptop|car|service|plan|tool|app|software|camera|tablet|watch|tv)\b/i.test(query)) score += 2;
+  if (/\b(best|top \d+|review|recommend)\b/i.test(query) &&
+      /\b(product|phone|laptop|car|service|plan|tool|app|software|buy|purchase|20\d\d)\b/i.test(query)) score += 2;
+
+  // Current affairs (+3) — factual lookups about people/positions change frequently
+  if (/\b(who is|who are|who was)\b.*\b(president|ceo|prime minister|leader|founder|owner|chairman|director)\b/i.test(query)) score += 3;
+  if (/\b(war|conflict|crisis|earthquake|hurricane|flood)\b/i.test(query) &&
+      /\b(current|latest|update|status|now|today)\b/i.test(query)) score += 2;
+  if (/\b(ipo|acquisition|merger|layoff|bankruptcy)\b/i.test(query) &&
+      /\b(recent|latest|new|announce|just)\b/i.test(query)) score += 2;
+
+  // Weak signals (+1) — not enough alone, but support other signals
+  if (/\b(current|new|update|recent)\b/i.test(query)) score += 1;
+  if (/\b(price|cost|how much)\b/i.test(query)) score += 1;
+  if (/\b(20[2-3]\d)\b/.test(query)) score += 1;
+
+  // Threshold: need score >= 3 to trigger search
+  // This means: one strong signal, or two moderate signals, or multiple weak ones
+  const shouldSearch = score >= 3;
+  if (shouldSearch) {
+    logger.info(`Web search triggered (score=${score}) for: "${query.substring(0, 80)}"`);
+  }
+  return shouldSearch;
 }
 
 /**

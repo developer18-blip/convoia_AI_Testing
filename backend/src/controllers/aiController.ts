@@ -526,10 +526,16 @@ export const queryAIStream = async (req: Request, res: Response) => {
 
     // Web search: check if the latest user message needs real-time data
     const lastUserMsg = [...messages].reverse().find((m: any) => m.role === 'user');
-    const userQuery = typeof lastUserMsg?.content === 'string' ? lastUserMsg.content : '';
+    const rawUserContent = typeof lastUserMsg?.content === 'string' ? lastUserMsg.content : '';
+    // Extract actual user question if document context is embedded
+    const docSeparator = '---\n\nUser question: ';
+    const hasDocContext = rawUserContent.includes('Here is the attached document content:');
+    const userQuery = hasDocContext && rawUserContent.includes(docSeparator)
+      ? rawUserContent.split(docSeparator).pop()?.trim() || rawUserContent
+      : rawUserContent;
     let enrichedMessages = messages;
 
-    if (userQuery && needsWebSearch(userQuery)) {
+    if (userQuery && needsWebSearch(userQuery, hasDocContext)) {
       try {
         res.write(`data: ${JSON.stringify({ type: 'status', content: 'Searching the web...' })}\n\n`);
         const searchResult = await searchWeb(userQuery, 5);
