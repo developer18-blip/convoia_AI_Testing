@@ -3,7 +3,6 @@ import {
   getTokenPackages,
   purchaseTokens,
   getTokenPoolStatus,
-  createPortalSession,
   verifyAndCreditSession,
 } from '../controllers/stripeController.js';
 import { jwtOrApiKey } from '../middleware/apiKeyAuth.js';
@@ -19,6 +18,5 @@ router.use(jwtOrApiKey);
 router.post('/purchase-tokens', purchaseTokens);
 router.get('/verify-session/:sessionId', verifyAndCreditSession);
 router.get('/token-pool', getTokenPoolStatus);
-router.post('/create-portal', createPortalSession);
 
 export default router;

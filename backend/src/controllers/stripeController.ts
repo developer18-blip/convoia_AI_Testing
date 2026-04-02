@@ -87,23 +87,6 @@ export const getTokenPoolStatus = asyncHandler(
   }
 );
 
-// ─── Create Customer Portal session ──────────────────────────────────────────
-export const createPortalSession = asyncHandler(
-  async (req: Request, res: Response) => {
-    if (!req.user) throw new AppError('Unauthorized', 401);
-
-    const result = await StripeService.createPortalSession({
-      userId: req.user.userId,
-    });
-
-    res.json({
-      success: true,
-      data: result,
-      timestamp: new Date().toISOString(),
-    });
-  }
-);
-
 // ─── Verify checkout session & credit tokens (belt-and-suspenders) ───────────
 // This endpoint is called by the frontend after Stripe redirect.
 // It verifies the session with Stripe AND credits tokens if not already done.

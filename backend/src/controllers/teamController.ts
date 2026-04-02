@@ -402,16 +402,10 @@ export const removeMember = asyncHandler(async (req: Request, res: Response) => 
       p.billingRecord?.deleteMany({ where: { userId } }),
       p.tokenPurchase?.deleteMany({ where: { userId } }),
       p.budget?.deleteMany({ where: { userId } }),
-      p.subscription?.deleteMany({ where: { userId } }),
     ].filter(Boolean);
     await Promise.allSettled(cleanups);
 
-    // 3. Delete employee's own wallet + transactions (does NOT touch org owner's wallet)
-    const wallet = await prisma.wallet.findUnique({ where: { userId } });
-    if (wallet) {
-      await prisma.walletTransaction.deleteMany({ where: { walletId: wallet.id } });
-      await prisma.wallet.delete({ where: { userId } });
-    }
+    // 3. Delete employee's token wallet
     await prisma.tokenWallet.deleteMany({ where: { userId } });
 
     // 4. Delete usage logs LAST (preserves org analytics history if needed)

@@ -15,7 +15,6 @@ import authRoutes from './routes/authRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
 import usageRoutes from './routes/usageRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
-import walletRoutes from './routes/walletRoutes.js';
 import budgetRoutes from './routes/budgetRoutes.js';
 import sessionRoutes from './routes/sessionRoutes.js';
 import apiKeyRoutes from './routes/apiKeyRoutes.js';
@@ -176,7 +175,6 @@ const apiInfo = {
     ai: '/api/ai',
     usage: '/api/usage',
     admin: '/api/admin',
-    wallet: '/api/wallet',
     budget: '/api/budget',
     session: '/api/session',
     keys: '/api/keys',
@@ -209,7 +207,6 @@ app.get('/', (req: Request, res: Response) => {
       ai: '/api/ai',
       usage: '/api/usage',
       admin: '/api/admin',
-      wallet: '/api/wallet',
       budget: '/api/budget',
       session: '/api/session',
       keys: '/api/keys',
@@ -229,7 +226,6 @@ app.use('/api/auth', authRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/usage', usageRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/wallet', walletRoutes);
 app.use('/api/budget', budgetRoutes);
 app.use('/api/session', sessionRoutes);
 app.use('/api/keys', apiKeyRoutes);

@@ -13,7 +13,6 @@ const pageTitles: Record<string, string> = {
   '/dashboard': 'Dashboard',
   '/chat': 'Chat',
   '/models': 'AI Models',
-  '/wallet': 'Wallet',
   '/usage': 'Usage',
   '/sessions': 'Sessions',
   '/api-keys': 'API Keys',

@@ -54,9 +54,7 @@ export const config = {
   // Stripe
   stripeSecretKey: process.env.STRIPE_SECRET_KEY,
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
-  stripeStarterPriceId: process.env.STRIPE_STARTER_PRICE_ID,
-  stripeProPriceId: process.env.STRIPE_PRO_PRICE_ID,
-  stripeBusinessPriceId: process.env.STRIPE_BUSINESS_PRICE_ID,
+  // Token-only billing — no subscription plans
 
   // Resend (transactional emails)
   resendApiKey: process.env.RESEND_API_KEY,

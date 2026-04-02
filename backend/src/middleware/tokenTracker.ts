@@ -72,41 +72,8 @@ export async function afterQueryMiddleware(
       },
     });
 
-    // 2. Update budget and subscription tracking (non-critical)
-    // NOTE: Token deduction is handled by TokenWalletService.deductTokens() in aiController.
-    // We do NOT deduct from the legacy Wallet table here to avoid double-billing.
-    try {
-      // Update budget usage if exists
-      const budget = await prisma.budget.findFirst({ where: { userId } });
-      if (budget) {
-        const newUsage = budget.currentUsage + customerPrice;
-        const usagePercent = (newUsage / budget.monthlyCap) * 100;
-        const shouldAlert = usagePercent >= budget.alertThreshold && !budget.alertSent;
-        await prisma.budget.update({
-          where: { id: budget.id },
-          data: { currentUsage: newUsage, ...(shouldAlert ? { alertSent: true } : {}) },
-        });
-        if (shouldAlert) {
-          logger.warn(`BUDGET ALERT: User ${userId} reached ${usagePercent.toFixed(1)}% of monthly budget`);
-        }
-      }
-
-      // Update subscription token usage if exists
-      const subscription = await prisma.subscription.findFirst({ where: { userId, status: 'active' } });
-      if (subscription) {
-        const newTokenUsage = subscription.tokensUsedThisMonth + totalTokens;
-        const quotaExceeded = newTokenUsage >= subscription.monthlyTokenQuota;
-        await prisma.subscription.update({
-          where: { id: subscription.id },
-          data: { tokensUsedThisMonth: newTokenUsage, ...(quotaExceeded ? { status: 'quota_exceeded' } : {}) },
-        });
-        if (quotaExceeded) {
-          logger.warn(`QUOTA EXCEEDED: User ${userId} exceeded monthly token quota`);
-        }
-      }
-    } catch (trackingErr) {
-      logger.warn(`Budget/subscription tracking failed (usage log still saved): ${trackingErr}`);
-    }
+    // 2. Token deduction is handled by TokenWalletService.deductTokens() in aiController.
+    // Single billing system: tokens only. No subscriptions, no fiat wallet.
 
     logger.info(
       `Query tracked — User: ${userId}, Cost: $${customerPrice.toFixed(6)}, Profit: $${profit.toFixed(6)}`

@@ -4,7 +4,6 @@ import { GoogleOAuthProvider } from '@react-oauth/google'
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { ToastProvider } from './contexts/ToastContext'
-import { WalletProvider } from './contexts/WalletContext'
 import { TokenProvider } from './contexts/TokenContext'
 import { ChatProvider } from './contexts/ChatContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -22,7 +21,6 @@ const VerifyEmailPage = lazy(() => import('./pages/public/VerifyEmailPage'))
 const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'))
 const ChatPage = lazy(() => import('./pages/ChatPage'))
 const ModelsPage = lazy(() => import('./pages/ModelsPage'))
-const WalletPage = lazy(() => import('./pages/WalletPage'))
 const UsagePage = lazy(() => import('./pages/UsagePage'))
 const SessionsPage = lazy(() => import('./pages/SessionsPage'))
 const TeamPage = lazy(() => import('./pages/TeamPage'))
@@ -98,21 +96,6 @@ function TokenBuyGuard() {
 }
 
 /**
- * Guard: only allow users WITHOUT an organization (freelancers)
- */
-function FreelancerGuard() {
-  const { user } = useAuth()
-  const toast = useToast()
-
-  if (user?.organizationId) {
-    toast.error('This page is not available for your role.')
-    return <Navigate to="/dashboard" replace />
-  }
-
-  return <Outlet />
-}
-
-/**
  * Guard: only allow users without org OR org_owner/platform_admin
  */
 function SessionGuard() {
@@ -157,10 +140,6 @@ function AppRoutes() {
           <Route path="/payment/success" element={<PaymentSuccessPage />} />
           <Route path="/payment/cancel" element={<PaymentCancelPage />} />
 
-          {/* Wallet — only freelancers (no org) */}
-          <Route element={<FreelancerGuard />}>
-            <Route path="/wallet" element={<WalletPage />} />
-          </Route>
           {/* API Keys — all authenticated users */}
           <Route path="/api-keys" element={<ApiKeysPage />} />
 
@@ -220,14 +199,12 @@ export default function App() {
           <BrowserRouter>
             <AuthProvider>
               <ToastProvider>
-                <WalletProvider>
-                  <TokenProvider>
-                    <ChatProvider>
-                      <AppRoutes />
-                      <ToastContainer />
-                    </ChatProvider>
-                  </TokenProvider>
-                </WalletProvider>
+                <TokenProvider>
+                  <ChatProvider>
+                    <AppRoutes />
+                    <ToastContainer />
+                  </ChatProvider>
+                </TokenProvider>
               </ToastProvider>
             </AuthProvider>
           </BrowserRouter>

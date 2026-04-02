@@ -3,7 +3,6 @@ import { Outlet, useLocation } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { MobileNav } from './MobileNav'
-import { WalletTopUpModal } from '../shared/WalletTopUpModal'
 
 export function AppShell() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -34,8 +33,6 @@ export function AppShell() {
         </main>
       </div>
 
-      {/* Global modals */}
-      <WalletTopUpModal />
     </div>
   )
 }

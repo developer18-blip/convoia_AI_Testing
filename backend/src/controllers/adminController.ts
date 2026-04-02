@@ -22,7 +22,7 @@ export const getAdminStats = asyncHandler(async (req: Request, res: Response) =>
     totalUsers,
     totalOrganizations,
     totalQueries,
-    activeSubscriptions,
+    _unused,
     newUsersThisMonth,
     usageAggregates,
     revenueAggregates,
@@ -30,7 +30,7 @@ export const getAdminStats = asyncHandler(async (req: Request, res: Response) =>
     prisma.user.count(),
     prisma.organization.count(),
     prisma.usageLog.count(),
-    prisma.subscription.count({ where: { status: 'active' } }),
+    Promise.resolve(0), // subscription system removed — token-only billing
     prisma.user.count({ where: { createdAt: { gte: monthStart } } }),
     prisma.usageLog.aggregate({
       _sum: { tokensInput: true, tokensOutput: true, customerPrice: true },
@@ -74,7 +74,7 @@ export const getAdminStats = asyncHandler(async (req: Request, res: Response) =>
     totalQueries,
     totalTokensUsed,
     totalRevenue: parseFloat(totalRevenue.toFixed(4)),
-    activeSubscriptions,
+    activeSubscriptions: 0,
     newUsersThisMonth,
     topModels: topModelsData,
   };
@@ -719,17 +719,11 @@ export const deleteUserPermanently = asyncHandler(async (req: Request, res: Resp
     p.billingRecord?.deleteMany({ where: { userId } }),
     p.tokenPurchase?.deleteMany({ where: { userId } }),
     p.budget?.deleteMany({ where: { userId } }),
-    p.subscription?.deleteMany({ where: { userId } }),
     p.tokenAllocation?.deleteMany({ where: { OR: [{ assignedToId: userId }, { assignedById: userId }] } }),
     p.agent?.deleteMany({ where: { userId } }),
   ]);
 
-  // Delete wallet
-  const wallet = await prisma.wallet.findUnique({ where: { userId } });
-  if (wallet) {
-    await prisma.walletTransaction.deleteMany({ where: { walletId: wallet.id } });
-    await prisma.wallet.delete({ where: { userId } });
-  }
+  // Delete token wallet
   await prisma.tokenWallet.deleteMany({ where: { userId } });
 
   // Clear manager references
@@ -842,7 +836,6 @@ export const deleteOrganization = asyncHandler(async (req: Request, res: Respons
     prisma.budget.deleteMany({ where: { organizationId: orgId } }),
     prisma.usageLog.deleteMany({ where: { organizationId: orgId } }),
     prisma.billingRecord.deleteMany({ where: { organizationId: orgId } }),
-    prisma.subscription.deleteMany({ where: { organizationId: orgId } }),
     prisma.tokenPurchase.deleteMany({ where: { organizationId: orgId } }),
     prisma.tokenAllocation.deleteMany({ where: { organizationId: orgId } }),
     prisma.activityLog.deleteMany({ where: { organizationId: orgId } }),
@@ -1015,9 +1008,6 @@ export const adminCreateAccount = asyncHandler(async (req: Request, res: Respons
       await tx.user.update({ where: { id: user.id }, data: { organizationId } });
     }
 
-    await tx.wallet.create({
-      data: { userId: user.id, balance: 0, totalToppedUp: 0, totalSpent: 0, currency: 'USD' },
-    });
     await tx.tokenWallet.upsert({
       where: { userId: user.id },
       update: {},

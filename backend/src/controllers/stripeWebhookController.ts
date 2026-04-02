@@ -12,8 +12,9 @@ const stripe = config.stripeSecretKey
 
 /**
  * Handle Stripe webhook events.
+ * Single billing system: token packages only.
  * IMPORTANT: This endpoint must receive the raw body (not JSON-parsed)
- * for signature verification to work. See stripeRoutes.ts for setup.
+ * for signature verification to work.
  */
 export const handleStripeWebhook = async (
   req: Request,
@@ -45,60 +46,17 @@ export const handleStripeWebhook = async (
 
   try {
     switch (event.type) {
-      // ---- Checkout session completed (Stripe-hosted checkout) ----
+      // Token purchase checkout completed
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        logger.info(`=== CHECKOUT SESSION COMPLETED === id=${session.id} mode=${session.mode} status=${session.payment_status} type=${session.metadata?.type}`);
-        await handleCheckoutSessionCompleted(session);
+        logger.info(`=== CHECKOUT SESSION COMPLETED === id=${session.id} status=${session.payment_status}`);
+        await handleTokenPurchaseCompleted(session);
         break;
       }
 
-      // ---- Checkout session expired ----
       case 'checkout.session.expired': {
         const session = event.data.object as Stripe.Checkout.Session;
         logger.info(`Checkout session expired: ${session.id} user=${session.metadata?.userId}`);
-        break;
-      }
-
-      // ---- One-time payment succeeded (wallet top-up via Elements) ----
-      case 'payment_intent.succeeded': {
-        const paymentIntent = event.data.object as Stripe.PaymentIntent;
-        await handlePaymentIntentSucceeded(paymentIntent);
-        break;
-      }
-
-      // ---- Subscription created ----
-      case 'customer.subscription.created': {
-        const subscription = event.data.object as Stripe.Subscription;
-        await handleSubscriptionCreated(subscription);
-        break;
-      }
-
-      // ---- Subscription updated (plan change, renewal) ----
-      case 'customer.subscription.updated': {
-        const subscription = event.data.object as Stripe.Subscription;
-        await handleSubscriptionUpdated(subscription);
-        break;
-      }
-
-      // ---- Subscription cancelled or expired ----
-      case 'customer.subscription.deleted': {
-        const subscription = event.data.object as Stripe.Subscription;
-        await handleSubscriptionDeleted(subscription);
-        break;
-      }
-
-      // ---- Invoice paid (recurring payment) ----
-      case 'invoice.paid': {
-        const invoice = event.data.object as Stripe.Invoice;
-        await handleInvoicePaid(invoice);
-        break;
-      }
-
-      // ---- Payment failed ----
-      case 'invoice.payment_failed': {
-        const invoice = event.data.object as Stripe.Invoice;
-        await handlePaymentFailed(invoice);
         break;
       }
 
@@ -117,105 +75,9 @@ export const handleStripeWebhook = async (
 
 // ============ HANDLERS ============
 
-async function handleCheckoutSessionCompleted(
-  session: Stripe.Checkout.Session
-) {
-  const userId = session.metadata?.userId;
-  if (!userId) {
-    logger.warn(`Checkout session ${session.id} has no userId in metadata — skipping`);
-    return;
-  }
-
-  // ── Token purchase checkout ──
-  if (session.metadata?.type === 'token_purchase') {
-    await handleTokenPurchaseCompleted(session);
-    return;
-  }
-
-  // ── One-time payment (wallet top-up) ──
-  if (session.payment_status !== 'paid') {
-    logger.info(`Checkout session ${session.id} payment_status=${session.payment_status} — skipping`);
-    return;
-  }
-
-  const amount = parseFloat(session.metadata?.amount || '0');
-  if (amount <= 0) {
-    logger.warn(`Checkout session ${session.id} has invalid amount — skipping`);
-    return;
-  }
-
-  // Idempotency: check if this session was already processed
-  const existing = await prisma.walletTransaction.findFirst({
-    where: { reference: session.id },
-  });
-  if (existing) {
-    logger.info(`Checkout session ${session.id} already processed — skipping`);
-    return;
-  }
-
-  // Credit wallet atomically
-  await prisma.$transaction(async (tx) => {
-    let wallet = await tx.wallet.findUnique({ where: { userId } });
-
-    if (!wallet) {
-      wallet = await tx.wallet.create({
-        data: {
-          userId,
-          balance: 0,
-          totalToppedUp: 0,
-          totalSpent: 0,
-          currency: 'USD',
-        },
-      });
-    }
-
-    await tx.wallet.update({
-      where: { userId },
-      data: {
-        balance: { increment: amount },
-        totalToppedUp: { increment: amount },
-        lastTopedUpAt: new Date(),
-      },
-    });
-
-    await tx.walletTransaction.create({
-      data: {
-        walletId: wallet.id,
-        amount,
-        type: 'credit',
-        description: `Wallet top-up via Stripe Checkout`,
-        reference: session.id,
-      },
-    });
-
-    // Extract paymentIntent ID for billing record
-    const paymentIntentId = typeof session.payment_intent === 'string'
-      ? session.payment_intent
-      : (session.payment_intent as any)?.id || null;
-
-    await tx.billingRecord.create({
-      data: {
-        userId,
-        amount,
-        description: `Wallet top-up via Stripe Checkout`,
-        type: 'wallet_topup',
-        status: 'paid',
-        stripePaymentId: paymentIntentId || session.id,
-        paidDate: new Date(),
-      },
-    });
-  });
-
-  // Receipt email handled by verify endpoint
-
-  logger.info(
-    `Wallet topped up via Checkout: user=${userId} amount=$${amount} session=${session.id}`
-  );
-}
-
 /**
  * Handle token purchase checkout.session.completed.
- * Credits tokens to the organization's pool.
+ * Credits tokens to the user's token wallet.
  */
 async function handleTokenPurchaseCompleted(
   session: Stripe.Checkout.Session
@@ -269,7 +131,7 @@ async function handleTokenPurchaseCompleted(
     organizationId,
   });
 
-  // Create billing record (internal, not shown to users)
+  // Create billing record
   await prisma.billingRecord.create({
     data: {
       userId,
@@ -311,248 +173,4 @@ async function handleTokenPurchaseCompleted(
   }
 
   logger.info(`Token purchase completed: userId=${userId} tokens=${tokens} package=${packageName}`);
-}
-
-async function handlePaymentIntentSucceeded(
-  paymentIntent: Stripe.PaymentIntent
-) {
-  const userId = paymentIntent.metadata?.userId;
-  if (!userId) {
-    logger.warn(
-      `PaymentIntent ${paymentIntent.id} has no userId in metadata — skipping`
-    );
-    return;
-  }
-
-  // Amount is in cents
-  const amount = paymentIntent.amount / 100;
-
-  // Idempotency: check if this payment was already processed
-  const existing = await prisma.walletTransaction.findFirst({
-    where: { reference: paymentIntent.id },
-  });
-  if (existing) {
-    logger.info(
-      `PaymentIntent ${paymentIntent.id} already processed — skipping`
-    );
-    return;
-  }
-
-  // Get or create wallet, then credit it
-  await prisma.$transaction(async (tx) => {
-    let wallet = await tx.wallet.findUnique({ where: { userId } });
-
-    if (!wallet) {
-      wallet = await tx.wallet.create({
-        data: {
-          userId,
-          balance: 0,
-          totalToppedUp: 0,
-          totalSpent: 0,
-          currency: 'USD',
-        },
-      });
-    }
-
-    await tx.wallet.update({
-      where: { userId },
-      data: {
-        balance: { increment: amount },
-        totalToppedUp: { increment: amount },
-        lastTopedUpAt: new Date(),
-      },
-    });
-
-    await tx.walletTransaction.create({
-      data: {
-        walletId: wallet.id,
-        amount,
-        type: 'credit',
-        description: `Stripe payment: ${paymentIntent.id}`,
-        reference: paymentIntent.id,
-      },
-    });
-
-    await tx.billingRecord.create({
-      data: {
-        userId,
-        amount,
-        description: `Wallet top-up via Stripe`,
-        type: 'wallet_topup',
-        status: 'paid',
-        stripePaymentId: paymentIntent.id,
-        paidDate: new Date(),
-      },
-    });
-  });
-
-  logger.info(
-    `Wallet topped up: user=${userId} amount=$${amount} stripe=${paymentIntent.id}`
-  );
-}
-
-async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
-  const userId = subscription.metadata?.userId;
-  if (!userId) {
-    logger.warn(
-      `Subscription ${subscription.id} has no userId in metadata — skipping`
-    );
-    return;
-  }
-
-  const priceId = subscription.items.data[0]?.price?.id || null;
-
-  // Determine plan and quota from metadata or price
-  const plan = subscription.metadata?.plan || 'pro';
-  const monthlyTokenQuota = parseInt(
-    subscription.metadata?.monthlyTokenQuota || '5000000',
-    10
-  );
-
-  await prisma.subscription.upsert({
-    where: { stripeSubscriptionId: subscription.id },
-    update: {
-      status: subscription.status === 'active' ? 'active' : 'pending',
-      plan,
-      monthlyTokenQuota,
-      stripePriceId: priceId,
-    },
-    create: {
-      userId,
-      plan,
-      status: subscription.status === 'active' ? 'active' : 'pending',
-      monthlyTokenQuota,
-      stripeSubscriptionId: subscription.id,
-      stripePriceId: priceId,
-      quotaResetDate: new Date(
-        new Date().getFullYear(),
-        new Date().getMonth() + 1,
-        1
-      ),
-    },
-  });
-
-  logger.info(
-    `Subscription created: user=${userId} plan=${plan} stripe=${subscription.id}`
-  );
-}
-
-async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
-  const existing = await prisma.subscription.findUnique({
-    where: { stripeSubscriptionId: subscription.id },
-  });
-
-  if (!existing) {
-    logger.warn(
-      `Subscription ${subscription.id} not found in DB — cannot update`
-    );
-    return;
-  }
-
-  const statusMap: Record<string, string> = {
-    active: 'active',
-    past_due: 'past_due',
-    canceled: 'cancelled',
-    unpaid: 'suspended',
-  };
-
-  // current_period_end may be on the subscription object depending on Stripe API version
-  const periodEnd = (subscription as any).current_period_end as number | undefined;
-
-  await prisma.subscription.update({
-    where: { stripeSubscriptionId: subscription.id },
-    data: {
-      status: statusMap[subscription.status] || subscription.status,
-      renewalDate: periodEnd ? new Date(periodEnd * 1000) : undefined,
-    },
-  });
-
-  logger.info(
-    `Subscription updated: stripe=${subscription.id} status=${subscription.status}`
-  );
-}
-
-async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-  await prisma.subscription.updateMany({
-    where: { stripeSubscriptionId: subscription.id },
-    data: {
-      status: 'cancelled',
-      endDate: new Date(),
-    },
-  });
-
-  logger.info(`Subscription cancelled: stripe=${subscription.id}`);
-}
-
-async function handleInvoicePaid(invoice: Stripe.Invoice) {
-  // Stripe v20+ moved subscription to parent; raw event data still has it
-  const invoiceData = invoice as any;
-  const subscriptionId: string | null =
-    invoiceData.subscription || invoiceData.parent?.subscription_details?.subscription || null;
-
-  if (!subscriptionId) return;
-
-  const sub = await prisma.subscription.findUnique({
-    where: { stripeSubscriptionId: subscriptionId },
-  });
-
-  if (!sub) return;
-
-  const amount = (invoice.amount_paid || 0) / 100;
-  const paymentIntentId: string | null = invoiceData.payment_intent || null;
-
-  await prisma.billingRecord.create({
-    data: {
-      userId: sub.userId,
-      organizationId: sub.organizationId,
-      subscriptionId: sub.id,
-      amount,
-      description: `Subscription payment — ${sub.plan} plan`,
-      type: 'subscription',
-      status: 'paid',
-      stripePaymentId: paymentIntentId || undefined,
-      invoiceNumber: invoice.number || undefined,
-      paidDate: new Date(),
-    },
-  });
-
-  // Reset token quota on successful renewal
-  await prisma.subscription.update({
-    where: { id: sub.id },
-    data: {
-      tokensUsedThisMonth: 0,
-      quotaResetDate: new Date(
-        new Date().getFullYear(),
-        new Date().getMonth() + 1,
-        1
-      ),
-    },
-  });
-
-  logger.info(
-    `Invoice paid: user=${sub.userId} amount=$${amount} invoice=${invoice.id}`
-  );
-}
-
-async function handlePaymentFailed(invoice: Stripe.Invoice) {
-  const invoiceData = invoice as any;
-  const subscriptionId: string | null =
-    invoiceData.subscription || invoiceData.parent?.subscription_details?.subscription || null;
-
-  if (!subscriptionId) return;
-
-  const sub = await prisma.subscription.findUnique({
-    where: { stripeSubscriptionId: subscriptionId },
-  });
-
-  if (!sub) return;
-
-  await prisma.subscription.update({
-    where: { id: sub.id },
-    data: { status: 'past_due' },
-  });
-
-  logger.warn(
-    `Payment failed: user=${sub.userId} subscription=${subscriptionId} invoice=${invoice.id}`
-  );
 }
