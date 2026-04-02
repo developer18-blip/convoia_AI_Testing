@@ -220,6 +220,10 @@ export const queryAIStream = async (req: Request, res: Response) => {
       return;
     }
 
+    // Debug: log message roles and content lengths to diagnose PDF context issues
+    const msgSummary = messages.map((m: any) => `${m.role}:${typeof m.content === 'string' ? m.content.length : 0}chars`).join(', ');
+    logger.info(`Stream request: ${messages.length} msgs [${msgSummary}], hasSystemMsg=${messages.some((m: any) => m.role === 'system')}`);
+
     // Check if model is active + handle image models
     const streamModelCheck = await prisma.aIModel.findUnique({ where: { id: modelId }, select: { id: true, modelId: true, name: true, provider: true, isActive: true } });
     if (streamModelCheck && !streamModelCheck.isActive) {

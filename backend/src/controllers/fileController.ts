@@ -139,13 +139,27 @@ export const processFile = asyncHandler(async (req: Request, res: Response): Pro
         let pageCount = 0
 
         if (file.mimetype === 'application/pdf') {
-          const { PDFParse } = await import('pdf-parse')
-          const dataBuffer = fs.readFileSync(file.path)
-          const parser = new PDFParse({ data: new Uint8Array(dataBuffer) })
-          const result = await parser.getText()
-          await parser.destroy()
-          extractedText = result.text
-          pageCount = result.total
+          try {
+            const { PDFParse } = await import('pdf-parse')
+            const dataBuffer = fs.readFileSync(file.path)
+            const parser = new PDFParse({ data: new Uint8Array(dataBuffer) })
+            const result = await parser.getText()
+            await parser.destroy()
+            extractedText = result.text || ''
+            pageCount = result.total || 0
+            logger.info(`PDF extracted: ${file.originalname}, pages=${pageCount}, chars=${extractedText.length}`)
+          } catch (pdfErr: any) {
+            logger.error(`PDF extraction failed for ${file.originalname}: ${pdfErr.message}`)
+            // Fallback: try reading raw text
+            try {
+              const rawText = fs.readFileSync(file.path, 'utf-8')
+              const cleaned = rawText.replace(/[^\x20-\x7E\n\r\t]/g, ' ').replace(/\s{3,}/g, ' ').trim()
+              if (cleaned.length > 50) {
+                extractedText = cleaned
+                logger.info(`PDF fallback raw extraction: ${cleaned.length} chars`)
+              }
+            } catch { /* silent */ }
+          }
         } else if (
           file.mimetype.includes('wordprocessingml') ||
           file.mimetype === 'application/msword'
@@ -161,6 +175,28 @@ export const processFile = asyncHandler(async (req: Request, res: Response): Pro
         const wordCount = extractedText.split(/\s+/).filter((w) => w.length > 0).length
         const truncated = extractedText.length > 15000
         const processedText = extractedText.slice(0, 15000)
+
+        logger.info(`Document processed: ${file.originalname}, words=${wordCount}, chars=${processedText.length}, empty=${processedText.length === 0}`)
+
+        if (processedText.length === 0) {
+          // PDF may be scanned/image-based with no text layer
+          res.json({
+            success: true,
+            data: {
+              type: 'document',
+              extractedText: `[This PDF appears to be scanned or image-based. No extractable text was found in "${file.originalname}" (${pageCount} pages, ${Math.round(file.size / 1024)}KB). The document may need OCR processing.]`,
+              truncated: false,
+              originalLength: 0,
+              pageCount,
+              wordCount: 0,
+              fileName: file.originalname,
+              fileSize: file.size,
+              mimeType: file.mimetype,
+              warning: 'No text extracted — PDF may be scanned/image-based',
+            },
+          })
+          return
+        }
 
         res.json({
           success: true,
