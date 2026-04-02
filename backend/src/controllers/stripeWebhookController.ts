@@ -82,9 +82,28 @@ export const handleStripeWebhook = async (
 async function handleTokenPurchaseCompleted(
   session: Stripe.Checkout.Session
 ) {
+  // CHECK 1: Session payment status
   if (session.payment_status !== 'paid') {
     logger.info(`Token purchase ${session.id} not paid — skipping`);
     return;
+  }
+
+  // CHECK 2: Verify PaymentIntent actually succeeded
+  if (stripe && session.payment_intent) {
+    const piId = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent.id;
+    const pi = await stripe.paymentIntents.retrieve(piId);
+    if (pi.status !== 'succeeded') {
+      logger.error(`PaymentIntent ${piId} status=${pi.status} — NOT crediting tokens`);
+      return;
+    }
+
+    // CHECK 3: Verify amount matches
+    const expectedCents = Math.round(parseFloat(session.metadata?.amount || '0') * 100);
+    if (pi.amount_received < expectedCents) {
+      logger.error(`Amount mismatch: session=${session.id} paid=${pi.amount_received} expected=${expectedCents}`);
+      return;
+    }
+    logger.info(`Payment verified: pi=${piId} status=succeeded amount=$${(pi.amount_received / 100).toFixed(2)}`);
   }
 
   const userId = session.metadata?.userId;

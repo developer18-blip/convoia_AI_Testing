@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import Stripe from 'stripe';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { StripeService, stripe } from '../services/stripeService.js';
 import { TOKEN_PACKAGES } from '../config/tokenPackages.js';
@@ -101,20 +102,42 @@ export const verifyAndCreditSession = asyncHandler(
       throw new AppError('Invalid session ID', 400);
     }
 
-    // Retrieve session from Stripe
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    // Retrieve session from Stripe (expand payment_intent for deep verification)
+    const session = await stripe.checkout.sessions.retrieve(sessionId, {
+      expand: ['payment_intent'],
+    });
 
     // Verify ownership
     if (session.metadata?.userId !== req.user.userId) {
       throw new AppError('Session does not belong to this user', 403);
     }
 
+    // CHECK 1: Session payment status
     if (session.payment_status !== 'paid') {
       res.json({
         success: true,
-        data: { credited: false, status: session.payment_status },
+        data: { credited: false, status: session.payment_status, reason: 'session_not_paid' },
       });
       return;
+    }
+
+    // CHECK 2: Verify the actual PaymentIntent charge succeeded
+    const paymentIntent = session.payment_intent as Stripe.PaymentIntent | null;
+    if (!paymentIntent || paymentIntent.status !== 'succeeded') {
+      logger.warn(`Payment not confirmed: session=${sessionId} pi_status=${paymentIntent?.status || 'missing'}`);
+      res.json({
+        success: true,
+        data: { credited: false, status: paymentIntent?.status || 'no_payment_intent', reason: 'payment_not_succeeded' },
+      });
+      return;
+    }
+
+    // CHECK 3: Verify amount matches the package (prevent tampering)
+    const paidAmountCents = paymentIntent.amount_received;
+    const expectedAmountCents = Math.round(parseFloat(session.metadata?.amount || '0') * 100);
+    if (paidAmountCents < expectedAmountCents) {
+      logger.error(`Amount mismatch: session=${sessionId} paid=${paidAmountCents} expected=${expectedAmountCents}`);
+      throw new AppError('Payment amount does not match', 400);
     }
 
     const tokens = parseInt(session.metadata?.tokens || '0', 10);

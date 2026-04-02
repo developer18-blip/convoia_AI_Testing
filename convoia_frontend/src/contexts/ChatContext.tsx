@@ -391,6 +391,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               setMessages((prev) => prev.map((m) =>
                 m.id === assistantId ? { ...m, content: '', isLoading: false, webSearch: { query: parsed.query, sources: parsed.sources || [] } } : m
               ))
+            } else if (parsed.type === 'thinking_result') {
+              // Deep thinking Pass 1 result — show as collapsible blockquote
+              const thinkBlock = `<details><summary>🧠 <strong>Deep Thinking</strong> <em>(click to expand)</em></summary>\n\n> ${parsed.content.replace(/\n/g, '\n> ')}\n\n</details>\n\n---\n\n`
+              accumulated += thinkBlock
+              setMessages((prev) => prev.map((m) =>
+                m.id === assistantId ? { ...m, content: accumulated, isLoading: true, statusText: 'Refining answer...' } : m
+              ))
             } else if (parsed.type === 'note') {
               accumulated += `> **Note:** ${parsed.content}\n\n`
               setMessages((prev) => prev.map((m) =>
@@ -524,6 +531,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               accumulated = ''
               setMessages((prev) => prev.map((m) =>
                 m.id === assistantId ? { ...m, content: '', isLoading: false, webSearch: { query: parsed.query, sources: parsed.sources || [] } } : m
+              ))
+            } else if (parsed.type === 'thinking_result') {
+              // Deep thinking Pass 1 result — show as collapsible blockquote
+              const thinkBlock = `<details><summary>🧠 <strong>Deep Thinking</strong> <em>(click to expand)</em></summary>\n\n> ${parsed.content.replace(/\n/g, '\n> ')}\n\n</details>\n\n---\n\n`
+              accumulated += thinkBlock
+              setMessages((prev) => prev.map((m) =>
+                m.id === assistantId ? { ...m, content: accumulated, isLoading: true, statusText: 'Refining answer...' } : m
               ))
             } else if (parsed.type === 'note') {
               accumulated += `> **Note:** ${parsed.content}\n\n`

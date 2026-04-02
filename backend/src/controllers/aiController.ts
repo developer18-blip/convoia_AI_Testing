@@ -12,6 +12,7 @@ import { FileProcessingService } from '../services/fileProcessingService.js';
 import { getCachedResponse, setCachedResponse } from '../services/modelRecommendationService.js';
 import { getUserMemoryPrompt } from '../services/userMemoryService.js';
 import { processMemoryForQuery } from '../services/vectorMemoryService.js';
+import { analyzeQuery, getClarificationSystemPrompt, getDeepThinkingSystemPrompt, buildRefinementPrompt } from '../services/thinkingService.js';
 import logger from '../config/logger.js';
 
 // Image-only models that cannot handle chat/streaming
@@ -567,6 +568,103 @@ export const queryAIStream = async (req: Request, res: Response) => {
       }
     }
 
+    // ── EXTENDED THINKING PIPELINE ──────────────────────────────
+    // When thinking is enabled, run a 3-stage reasoning pipeline:
+    // Stage 1: Analyze query (rule-based, instant)
+    // Stage 2: Clarification (if query is vague — ask questions)
+    // Stage 3: Multi-pass (Pass 1: deep think → Pass 2: refine & stream)
+    let pass1ExtraInputTokens = 0;
+    let pass1ExtraOutputTokens = 0;
+    let useProviderThinking = !!thinkingEnabled;
+
+    if (thinkingEnabled) {
+      const analysis = analyzeQuery(userQuery, enrichedMessages);
+      logger.info(`Thinking analysis: confidence=${analysis.confidenceScore.toFixed(2)}, task=${analysis.taskType}, clarify=${analysis.needsClarification}`);
+
+      if (analysis.needsClarification) {
+        // ── Stage 2: Clarification — ask smart questions instead of guessing ──
+        res.write(`data: ${JSON.stringify({ type: 'status', content: 'Analyzing your question...' })}\n\n`);
+        agentConfig = {
+          systemPrompt: getClarificationSystemPrompt(analysis),
+          temperature: 0.3,
+          maxTokens: 1000,
+          topP: 0.9,
+          name: agentConfig?.name || 'AI',
+        };
+        useProviderThinking = false; // no native thinking for clarification
+
+      } else {
+        // ── Stage 3: Multi-pass reasoning ──
+        res.write(`data: ${JSON.stringify({ type: 'status', content: 'Thinking deeply...' })}\n\n`);
+
+        try {
+          // Pass 1: Deep thinking (non-streaming) — get full analysis
+          const thinkingPrompt = getDeepThinkingSystemPrompt(analysis.taskType);
+          const pass1MaxTokens = Math.min(Math.floor(streamMaxOutput * 0.4), 4096);
+
+          const pass1Result = await AIGatewayService.sendMessage({
+            userId: user.id,
+            organizationId,
+            modelId: finalModelId,
+            messages: enrichedMessages,
+            agentConfig: {
+              systemPrompt: thinkingPrompt,
+              temperature: 0.3,
+              maxTokens: pass1MaxTokens,
+              topP: 0.9,
+              name: agentConfig?.name || 'AI',
+            },
+            maxOutputTokens: pass1MaxTokens,
+            memoryContext: memoryPrompt || undefined,
+            thinkingEnabled: true, // native thinking for Anthropic/DeepSeek
+          });
+
+          pass1ExtraInputTokens = pass1Result.inputTokens;
+          pass1ExtraOutputTokens = pass1Result.outputTokens;
+
+          // Send thinking to client (collapsible in UI)
+          if (pass1Result.response && !streamEnded) {
+            const thinkingSummary = pass1Result.response.length > 3000
+              ? pass1Result.response.substring(0, 3000) + '\n\n[...truncated for refinement]'
+              : pass1Result.response;
+            res.write(`data: ${JSON.stringify({
+              type: 'thinking_result',
+              content: thinkingSummary,
+            })}\n\n`);
+          }
+
+          // Prepare Pass 2: Refinement — replace last user message with refinement prompt
+          res.write(`data: ${JSON.stringify({ type: 'status', content: 'Refining answer...' })}\n\n`);
+
+          const refinementPrompt = buildRefinementPrompt(pass1Result.response, userQuery);
+          enrichedMessages = [
+            ...enrichedMessages.slice(0, -1), // keep conversation history
+            { role: 'user', content: refinementPrompt },
+          ];
+
+          // Override agent config for refinement pass
+          agentConfig = {
+            systemPrompt: 'You are an expert who delivers precise, well-structured, actionable answers. Use markdown formatting. Be thorough but concise — every sentence must add value.',
+            temperature: 0.4,
+            maxTokens: agentConfig?.maxTokens || 16384,
+            topP: 0.9,
+            name: agentConfig?.name || 'AI',
+          };
+          useProviderThinking = false; // no native thinking on refinement pass
+
+          logger.info(`Pass 1 complete: ${pass1Result.response.length} chars, ${pass1ExtraInputTokens + pass1ExtraOutputTokens} tokens. Starting Pass 2 refinement.`);
+
+        } catch (pass1Err: any) {
+          // Pass 1 failed — fall back to normal streaming with thinking enabled
+          logger.error(`Pass 1 failed, falling back to single-pass: ${pass1Err.message}`);
+          res.write(`data: ${JSON.stringify({ type: 'status', content: 'Processing...' })}\n\n`);
+          useProviderThinking = true;
+          // enrichedMessages and agentConfig unchanged — falls through to normal streaming
+        }
+      }
+    }
+
+    // ── STREAMING CALL (handles normal, clarification, and Pass 2 refinement) ──
     await AIGatewayService.sendMessageStream(
       {
         userId: user.id, organizationId,
@@ -574,8 +672,8 @@ export const queryAIStream = async (req: Request, res: Response) => {
         industry: industry || user.organization?.industry || undefined,
         agentConfig,
         maxOutputTokens: streamMaxOutput,
-        memoryContext: memoryPrompt || undefined,
-        thinkingEnabled: !!thinkingEnabled,
+        memoryContext: !thinkingEnabled ? (memoryPrompt || undefined) : undefined, // memory already in Pass 1
+        thinkingEnabled: useProviderThinking,
         webSearchActive: webSearched,
       },
       {
@@ -600,13 +698,17 @@ export const queryAIStream = async (req: Request, res: Response) => {
                 return;
               }
 
+              // Combine Pass 1 + Pass 2 tokens (pass1 extras are 0 for normal/clarification mode)
+              const rawInputTotal = rawInputTokens + pass1ExtraInputTokens;
+              const rawOutputTotal = rawOutputTokens + pass1ExtraOutputTokens;
+
               // Fallback: if provider didn't report token counts, estimate from text
-              const inputTokens = rawInputTokens > 0 ? rawInputTokens : Math.ceil(inputText.length / 4) + 500;
-              const outputTokens = rawOutputTokens > 0 ? rawOutputTokens : Math.ceil(fullResponse.length / 4);
+              const inputTokens = rawInputTotal > 0 ? rawInputTotal : Math.ceil(inputText.length / 4) + 500;
+              const outputTokens = rawOutputTotal > 0 ? rawOutputTotal : Math.ceil(fullResponse.length / 4);
               const totalTokensUsed = inputTokens + outputTokens;
 
               // Cache the response for identical future queries (saves tokens)
-              if (fullResponse.length > 10 && !webSearched) {
+              if (fullResponse.length > 10 && !webSearched && !thinkingEnabled) {
                 setCachedResponse(cachePrompt, finalModelId, fullResponse, totalTokensUsed);
               }
 
@@ -619,7 +721,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
 
               // 1. ALWAYS create usage log directly (bulletproof — no middleware dependency)
               try {
-                logger.info(`Creating usageLog: userId=${user.id}, orgId=${organizationId}, model=${aiModel.name}, tokens=${totalTokensUsed}, cost=$${customerPrice.toFixed(6)}`);
+                logger.info(`Creating usageLog: userId=${user.id}, orgId=${organizationId}, model=${aiModel.name}, tokens=${totalTokensUsed}, cost=$${customerPrice.toFixed(6)}${pass1ExtraInputTokens > 0 ? ' (multi-pass)' : ''}`);
                 await prisma.usageLog.create({
                   data: {
                     userId: user.id,
@@ -647,7 +749,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
                   userId: user.id,
                   tokens: totalTokensUsed,
                   reference: aiModel.id,
-                  description: `Query: ${aiModel.name}`,
+                  description: `Query: ${aiModel.name}${pass1ExtraInputTokens > 0 ? ' (deep think)' : ''}`,
                 });
               } catch (deductErr) {
                 logger.error('Token deduction failed:', deductErr);
@@ -663,6 +765,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
                   cost: { charged: customerPrice.toFixed(6) },
                   executionTime,
                   webSearched,
+                  deepThinking: pass1ExtraInputTokens > 0,
                 })}\n\n`);
                 res.write('data: [DONE]\n\n');
                 res.end();

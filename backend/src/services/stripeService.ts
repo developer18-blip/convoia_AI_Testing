@@ -85,20 +85,6 @@ export class StripeService {
     return { checkoutUrl: session.url, sessionId: session.id };
   }
 
-  /**
-   * Create Customer Portal session.
-   */
-  static async createPortalSession(params: { userId: string }) {
-    if (!stripe) throw new Error('Stripe is not configured');
-    const customerId = await this.getOrCreateCustomer(params.userId);
-
-    const session = await stripe.billingPortal.sessions.create({
-      customer: customerId,
-      return_url: `${config.frontendUrl}/tokens/buy`,
-    });
-
-    return { portalUrl: session.url };
-  }
 }
 
 export { stripe, TOKEN_PACKAGES };
