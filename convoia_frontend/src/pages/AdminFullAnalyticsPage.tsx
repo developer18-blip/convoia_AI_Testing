@@ -212,7 +212,7 @@ export function AdminFullAnalyticsPage() {
               <div key={u.userId} onClick={() => navigate(`/admin/users/${u.userId}`)}
                 className="px-5 py-3 flex items-center gap-3 hover:bg-surface-2 cursor-pointer transition-colors">
                 <span className="text-xs font-mono text-text-muted w-5">#{i + 1}</span>
-                <Avatar name={u.name} size="sm" />
+                <Avatar name={u.name} src={u.avatar} size="sm" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-text-primary truncate">{u.name}</p>
                   <p className="text-xs text-text-muted truncate">{u.email}</p>
@@ -235,7 +235,7 @@ export function AdminFullAnalyticsPage() {
               <div key={u.userId} onClick={() => navigate(`/admin/users/${u.userId}`)}
                 className="px-5 py-3 flex items-center gap-3 hover:bg-surface-2 cursor-pointer transition-colors">
                 <span className="text-xs font-mono text-text-muted w-5">#{i + 1}</span>
-                <Avatar name={u.name} size="sm" />
+                <Avatar name={u.name} src={u.avatar} size="sm" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-text-primary truncate">{u.name}</p>
                   <p className="text-xs text-text-muted truncate">{u.email}</p>

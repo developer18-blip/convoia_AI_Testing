@@ -230,6 +230,7 @@ export interface UserInHierarchy {
   id: string;
   email: string;
   name: string;
+  avatar: string | null;
   role: string;
   employees?: UserInHierarchy[];
 }

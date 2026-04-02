@@ -280,6 +280,7 @@ export const getOrganizationUsers = asyncHandler(async (req: Request, res: Respo
     id: user.id,
     email: user.email,
     name: user.name,
+    avatar: user.avatar || null,
     role: user.role,
     employees:
       user.employees && user.employees.length > 0
@@ -287,6 +288,7 @@ export const getOrganizationUsers = asyncHandler(async (req: Request, res: Respo
             id: emp.id,
             email: emp.email,
             name: emp.name,
+            avatar: emp.avatar || null,
             role: emp.role,
           }))
         : undefined,
@@ -587,7 +589,7 @@ export const getOrgUsageStats = asyncHandler(async (req: Request, res: Response)
   const totalCost = usageLogs.reduce((sum: number, log: any) => sum + log.customerPrice, 0);
 
   // Get top users
-  const userMap = new Map<string, { userId: string; email: string; name: string; queries: number; cost: number }>();
+  const userMap = new Map<string, { userId: string; email: string; name: string; avatar: string | null; queries: number; cost: number }>();
   usageLogs.forEach((log: any) => {
     const key = log.userId;
     if (!userMap.has(key)) {
@@ -595,6 +597,7 @@ export const getOrgUsageStats = asyncHandler(async (req: Request, res: Response)
         userId: log.userId,
         email: log.user.email,
         name: log.user.name,
+        avatar: log.user.avatar || null,
         queries: 0,
         cost: 0,
       });
@@ -1130,13 +1133,13 @@ export const getAdminAnalytics = asyncHandler(async (req: Request, res: Response
         userId: true, organizationId: true, customerPrice: true, providerCost: true,
         tokensInput: true, tokensOutput: true, createdAt: true,
         model: { select: { name: true, provider: true } },
-        user: { select: { name: true, email: true } },
+        user: { select: { name: true, email: true, avatar: true } },
       },
       orderBy: { createdAt: 'asc' },
     }),
     prisma.tokenWallet.findMany({
       select: { userId: true, tokenBalance: true, totalTokensPurchased: true, totalTokensUsed: true,
-        user: { select: { name: true, email: true, organizationId: true } } },
+        user: { select: { name: true, email: true, avatar: true, organizationId: true } } },
     }),
     prisma.tokenTransaction.findMany({
       where: dateFilter,
@@ -1148,7 +1151,7 @@ export const getAdminAnalytics = asyncHandler(async (req: Request, res: Response
   // Aggregations
   const dailyMap = new Map<string, { queries: number; revenue: number; cost: number; tokens: number }>();
   let totalRevenue = 0, totalCostAgg = 0, totalTokensUsed = 0;
-  const userAgg = new Map<string, { name: string; email: string; orgId: string | null; queries: number; cost: number; tokens: number }>();
+  const userAgg = new Map<string, { name: string; email: string; avatar: string | null; orgId: string | null; queries: number; cost: number; tokens: number }>();
   const modelAgg = new Map<string, { name: string; provider: string; queries: number; cost: number }>();
   const providerAgg = new Map<string, { queries: number; revenue: number; cost: number }>();
 
@@ -1164,7 +1167,7 @@ export const getAdminAnalytics = asyncHandler(async (req: Request, res: Response
 
     const u = userAgg.get(log.userId);
     if (u) { u.queries++; u.cost += log.customerPrice; u.tokens += log.tokensInput + log.tokensOutput; }
-    else { userAgg.set(log.userId, { name: log.user.name, email: log.user.email, orgId: log.organizationId, queries: 1, cost: log.customerPrice, tokens: log.tokensInput + log.tokensOutput }); }
+    else { userAgg.set(log.userId, { name: log.user.name, email: log.user.email, avatar: log.user.avatar || null, orgId: log.organizationId, queries: 1, cost: log.customerPrice, tokens: log.tokensInput + log.tokensOutput }); }
 
     const mKey = log.model.name;
     const m = modelAgg.get(mKey);
@@ -1194,7 +1197,7 @@ export const getAdminAnalytics = asyncHandler(async (req: Request, res: Response
   const topUsers = Array.from(userAgg.entries()).map(([id, u]) => ({ userId: id, ...u, cost: parseFloat(u.cost.toFixed(4)) })).sort((a, b) => b.cost - a.cost).slice(0, 20);
   const topModels = Array.from(modelAgg.values()).map((m) => ({ ...m, cost: parseFloat(m.cost.toFixed(4)) })).sort((a, b) => b.queries - a.queries);
   const providerBreakdown = Array.from(providerAgg.entries()).map(([provider, d]) => ({ provider, queries: d.queries, revenue: parseFloat(d.revenue.toFixed(4)), cost: parseFloat(d.cost.toFixed(4)), profit: parseFloat((d.revenue - d.cost).toFixed(4)) })).sort((a, b) => b.revenue - a.revenue);
-  const topTokenHolders = tokenWallets.map((w) => ({ userId: w.userId, name: w.user.name, email: w.user.email, balance: w.tokenBalance, purchased: w.totalTokensPurchased, used: w.totalTokensUsed })).sort((a, b) => b.balance - a.balance).slice(0, 20);
+  const topTokenHolders = tokenWallets.map((w) => ({ userId: w.userId, name: w.user.name, email: w.user.email, avatar: w.user.avatar || null, balance: w.tokenBalance, purchased: w.totalTokensPurchased, used: w.totalTokensUsed })).sort((a, b) => b.balance - a.balance).slice(0, 20);
 
   res.json({
     success: true,

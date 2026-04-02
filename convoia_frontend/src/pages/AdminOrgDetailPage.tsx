@@ -19,7 +19,7 @@ interface OrgStats {
   totalQueries: number
   totalTokensUsed: number
   totalCost: number
-  topUsers: Array<{ userId: string; email: string; name: string; queries: number; cost: number }>
+  topUsers: Array<{ userId: string; email: string; name: string; avatar?: string | null; queries: number; cost: number }>
   topModels: Array<{ modelName: string; usageCount: number; totalCost: number }>
   dailyBreakdown: Array<{ date: string; queries: number; cost: number }>
 }
@@ -166,7 +166,7 @@ export function AdminOrgDetailPage() {
                 onClick={() => navigate(`/admin/users/${u.userId}`)}
                 className="px-5 py-3 flex items-center gap-3 hover:bg-surface-2 transition-colors cursor-pointer">
                 <span className="text-sm font-mono text-text-muted w-6">#{i + 1}</span>
-                <Avatar name={u.name} size="sm" />
+                <Avatar name={u.name} src={u.avatar} size="sm" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-text-primary truncate">{u.name}</p>
                   <p className="text-xs text-text-muted truncate">{u.email}</p>
