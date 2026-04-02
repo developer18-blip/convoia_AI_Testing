@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { DollarSign, TrendingUp, BarChart3, Activity, Building2, Users, Search } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { DollarSign, TrendingUp, BarChart3, Activity, Building2, Users, Search, Download } from 'lucide-react'
 import { StatCard } from '../../../components/shared/StatCard'
 import { Card } from '../../../components/ui/Card'
 import { LineChart } from '../../../components/charts/LineChart'
@@ -7,7 +8,7 @@ import { BarChart } from '../../../components/charts/BarChart'
 import { formatCurrency, formatNumber } from '../../../lib/utils'
 import api from '../../../lib/api'
 
-interface OrgEntry { name: string; revenue: number; queries: number }
+interface OrgEntry { organizationId: string; name: string; revenue: number; queries: number }
 interface PersonalEntry { name: string; email: string; userId: string; revenue: number; queries: number }
 
 interface AdminStats {
@@ -24,6 +25,7 @@ interface AdminStats {
 }
 
 export function AdminView() {
+  const navigate = useNavigate()
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [orgSearch, setOrgSearch] = useState('')
@@ -53,6 +55,7 @@ export function AdminView() {
           cost: Number(d.providerCost ?? 0) || 0,
         })),
         topOrgs: (Array.isArray(rev?.topOrganizations) ? rev.topOrganizations : Array.isArray(rev?.topOrgs) ? rev.topOrgs : []).map((o: Record<string, unknown>) => ({
+          organizationId: String(o.organizationId ?? ''),
           name: String(o.name ?? 'Unknown'),
           revenue: Number(o.totalSpend ?? 0) || 0,
           queries: Number(o.totalQueries ?? 0) || 0,
@@ -86,7 +89,24 @@ export function AdminView() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-semibold text-text-primary">Admin Dashboard</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-semibold text-text-primary">Admin Dashboard</h2>
+        <button onClick={() => {
+          const rows = [
+            ['Type', 'Name', 'Email', 'Revenue ($)', 'Queries'],
+            ...stats.topOrgs.map((o) => ['Organization', o.name, '', o.revenue.toFixed(4), String(o.queries)]),
+            ...stats.topPersonalUsers.map((u) => ['Personal', u.name, u.email, u.revenue.toFixed(4), String(u.queries)]),
+          ]
+          const csv = rows.map((r) => r.join(',')).join('\n')
+          const blob = new Blob([csv], { type: 'text/csv' })
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url; a.download = 'admin-dashboard-export.csv'; a.click()
+          URL.revokeObjectURL(url)
+        }} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors">
+          <Download size={16} /> Export CSV
+        </button>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard title="Revenue" value={formatCurrency(stats.revenue)} subtitle="This month" icon={<DollarSign size={20} />} />
@@ -141,7 +161,9 @@ export function AdminView() {
                 return <div className="px-5 py-8 text-center text-text-muted text-sm">No organizations found</div>
               }
               return filtered.slice(0, 10).map((org, i) => (
-                <div key={`${org.name}-${i}`} className="px-5 py-3 flex items-center gap-3 hover:bg-surface-2 transition-colors">
+                <div key={`${org.name}-${i}`}
+                  onClick={() => org.organizationId && navigate(`/admin/orgs/${org.organizationId}`)}
+                  className="px-5 py-3 flex items-center gap-3 hover:bg-surface-2 transition-colors cursor-pointer">
                   <span className="text-sm font-mono text-text-muted w-6">#{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-text-primary truncate">{org.name}</p>
@@ -174,7 +196,9 @@ export function AdminView() {
                 return <div className="px-5 py-8 text-center text-text-muted text-sm">No personal users found</div>
               }
               return filtered.slice(0, 10).map((user, i) => (
-                <div key={user.userId} className="px-5 py-3 flex items-center gap-3 hover:bg-surface-2 transition-colors">
+                <div key={user.userId}
+                  onClick={() => navigate(`/admin/users/${user.userId}`)}
+                  className="px-5 py-3 flex items-center gap-3 hover:bg-surface-2 transition-colors cursor-pointer">
                   <span className="text-sm font-mono text-text-muted w-6">#{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-text-primary truncate">{user.name}</p>

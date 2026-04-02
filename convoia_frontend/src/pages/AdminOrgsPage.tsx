@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Building2, Search, Ban, Trash2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Building2, Search, Ban, Trash2, ExternalLink } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Pagination } from '../components/ui/Pagination'
@@ -12,6 +13,7 @@ import { formatDate } from '../lib/utils'
 import api from '../lib/api'
 
 export function AdminOrgsPage() {
+  const navigate = useNavigate()
   const toast = useToast()
   const [orgs, setOrgs] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -76,13 +78,14 @@ export function AdminOrgsPage() {
                 <tbody>
                   {orgs.map((org: any) => (
                     <tr key={org.id} className="border-b border-border/50 hover:bg-surface-2 transition-colors">
-                      <td className="px-4 py-3"><p className="text-sm font-medium text-text-primary">{org.name}</p><p className="text-xs text-text-muted">{org.email}</p></td>
+                      <td className="px-4 py-3"><p className="text-sm font-medium text-text-primary hover:text-primary cursor-pointer" onClick={() => navigate(`/admin/orgs/${org.id}`)}>{org.name}</p><p className="text-xs text-text-muted">{org.email}</p></td>
                       <td className="px-4 py-3 text-sm text-text-secondary">{org.industry || '-'}</td>
                       <td className="px-4 py-3"><Badge size="sm" variant="primary">{org.tier}</Badge></td>
                       <td className="px-4 py-3"><Badge size="sm" variant={org.status === 'active' ? 'success' : 'danger'}>{org.status}</Badge></td>
                       <td className="px-4 py-3 text-sm text-text-muted">{formatDate(org.createdAt || new Date().toISOString())}</td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <button onClick={() => navigate(`/admin/orgs/${org.id}`)} className="p-1.5 text-text-muted hover:text-primary hover:bg-primary/10 rounded-lg" title="View usage stats"><ExternalLink size={14} /></button>
                           <button onClick={() => setConfirmAction({ id: org.id, action: 'suspend' })} className="p-1.5 text-text-muted hover:text-warning hover:bg-warning/10 rounded-lg"><Ban size={14} /></button>
                           <button onClick={() => setConfirmAction({ id: org.id, action: 'delete' })} className="p-1.5 text-text-muted hover:text-danger hover:bg-danger/10 rounded-lg"><Trash2 size={14} /></button>
                         </div>

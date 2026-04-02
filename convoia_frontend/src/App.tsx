@@ -36,6 +36,8 @@ const AdminOrgsPage = lazy(() => import('./pages/AdminOrgsPage'))
 const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage'))
 const AdminModelsPage = lazy(() => import('./pages/AdminModelsPage'))
 const AdminRevenuePage = lazy(() => import('./pages/AdminRevenuePage'))
+const AdminUserDetailPage = lazy(() => import('./pages/AdminUserDetailPage'))
+const AdminOrgDetailPage = lazy(() => import('./pages/AdminOrgDetailPage'))
 const ApiKeysPage = lazy(() => import('./pages/ApiKeysPage'))
 const ApiDocsPage = lazy(() => import('./pages/ApiDocsPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
@@ -188,6 +190,8 @@ function AppRoutes() {
             <Route path="/admin" element={<DashboardPage />} />
             <Route path="/admin/orgs" element={<AdminOrgsPage />} />
             <Route path="/admin/users" element={<AdminUsersPage />} />
+            <Route path="/admin/users/:userId" element={<AdminUserDetailPage />} />
+            <Route path="/admin/orgs/:orgId" element={<AdminOrgDetailPage />} />
             <Route path="/admin/models" element={<AdminModelsPage />} />
             <Route path="/admin/revenue" element={<AdminRevenuePage />} />
             <Route path="/admin/analytics" element={<OrgAnalyticsPage />} />

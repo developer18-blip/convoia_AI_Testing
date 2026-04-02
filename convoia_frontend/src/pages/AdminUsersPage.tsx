@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Users, Search, Trash2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Users, Search, Trash2, ExternalLink } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { Avatar } from '../components/ui/Avatar'
 import { Badge } from '../components/ui/Badge'
@@ -13,6 +14,7 @@ import { formatDate } from '../lib/utils'
 import api from '../lib/api'
 
 export function AdminUsersPage() {
+  const navigate = useNavigate()
   const toast = useToast()
   const [users, setUsers] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -88,7 +90,7 @@ export function AdminUsersPage() {
                 <tbody>
                   {users.map((u: any) => (
                     <tr key={u.id} className="border-b border-border/50 hover:bg-surface-2 transition-colors">
-                      <td className="px-4 py-3"><div className="flex items-center gap-3"><Avatar name={u.name} src={u.avatar} size="sm" /><div><p className="text-sm font-medium text-text-primary">{u.name}</p><p className="text-xs text-text-muted">{u.email}</p></div></div></td>
+                      <td className="px-4 py-3"><div className="flex items-center gap-3"><Avatar name={u.name} src={u.avatar} size="sm" /><div><p className="text-sm font-medium text-text-primary hover:text-primary cursor-pointer" onClick={() => navigate(`/admin/users/${u.id}`)}>{u.name}</p><p className="text-xs text-text-muted">{u.email}</p></div></div></td>
                       <td className="px-4 py-3 text-sm text-text-secondary">{u.organization?.name || '-'}</td>
                       <td className="px-4 py-3">
                         <Select
@@ -106,13 +108,20 @@ export function AdminUsersPage() {
                       <td className="px-4 py-3 text-center"><Badge size="sm" variant={u.isVerified ? 'success' : 'warning'}>{u.isVerified ? 'Yes' : 'No'}</Badge></td>
                       <td className="px-4 py-3 text-sm text-text-muted">{formatDate(u.createdAt)}</td>
                       <td className="px-4 py-3 text-center">
-                        {u.role !== 'platform_admin' && (
-                          <button onClick={() => setDeleteTarget({ id: u.id, name: u.name, email: u.email })}
-                            className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
-                            title="Delete permanently">
-                            <Trash2 size={15} />
+                        <div className="flex items-center justify-center gap-1">
+                          <button onClick={() => navigate(`/admin/users/${u.id}`)}
+                            className="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 transition-colors"
+                            title="View usage stats">
+                            <ExternalLink size={15} />
                           </button>
-                        )}
+                          {u.role !== 'platform_admin' && (
+                            <button onClick={() => setDeleteTarget({ id: u.id, name: u.name, email: u.email })}
+                              className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
+                              title="Delete permanently">
+                              <Trash2 size={15} />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
