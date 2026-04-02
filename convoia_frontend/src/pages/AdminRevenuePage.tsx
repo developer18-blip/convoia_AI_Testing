@@ -23,13 +23,13 @@ export function AdminRevenuePage() {
   if (isLoading) return <LoadingPage />
   if (error) return <ErrorState message={error} />
 
-  const revenue = data?.totalRevenue || 0
-  const cost = data?.totalProviderCost || 0
-  const profit = revenue - cost
+  const revenue = data?.revenue ?? data?.totalRevenue ?? 0
+  const cost = data?.cost ?? data?.totalProviderCost ?? 0
+  const profit = data?.profit ?? (revenue - cost)
   const margin = revenue > 0 ? (profit / revenue) * 100 : 0
 
   const dailyData = data?.dailyRevenue || []
-  const providerData = (data?.providerRevenue || []).map((p: any) => ({ name: p.provider, value: p.revenue }))
+  const providerData = (data?.providerBreakdown || data?.providerRevenue || []).map((p: any) => ({ name: p.provider, value: p.revenue }))
   const topOrgs = data?.topOrgs || []
   const topPersonalUsers = data?.topPersonalUsers || []
 
