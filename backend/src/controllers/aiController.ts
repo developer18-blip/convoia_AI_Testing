@@ -26,8 +26,11 @@ export const queryAI = asyncHandler(async (req: Request, res: Response) => {
   if (!modelId || !messages || messages.length === 0) {
     throw new AppError('modelId and messages are required', 400);
   }
-  // Block image-only models from chat
-  const modelCheck = await prisma.aIModel.findUnique({ where: { id: modelId }, select: { modelId: true, name: true } });
+  // Block image-only models from chat + check if model is active
+  const modelCheck = await prisma.aIModel.findUnique({ where: { id: modelId }, select: { modelId: true, name: true, isActive: true } });
+  if (modelCheck && !modelCheck.isActive) {
+    throw new AppError(`${modelCheck.name} has been deactivated by the platform admin. Please select a different model.`, 400);
+  }
   if (modelCheck && IMAGE_ONLY_MODELS.has(modelCheck.modelId)) {
     throw new AppError(`${modelCheck.name} is an image generation model and cannot be used for chat. Please select a different model.`, 400);
   }
@@ -217,8 +220,15 @@ export const queryAIStream = async (req: Request, res: Response) => {
       return;
     }
 
-    // If user selected an image-only model, route to image generation automatically
-    const streamModelCheck = await prisma.aIModel.findUnique({ where: { id: modelId }, select: { id: true, modelId: true, name: true, provider: true } });
+    // Check if model is active + handle image models
+    const streamModelCheck = await prisma.aIModel.findUnique({ where: { id: modelId }, select: { id: true, modelId: true, name: true, provider: true, isActive: true } });
+    if (streamModelCheck && !streamModelCheck.isActive) {
+      res.write(`data: ${JSON.stringify({ type: 'chunk', content: `**${streamModelCheck.name}** has been deactivated by the platform admin. Please select a different model.` })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: 'done', tokens: { input: 0, output: 0, total: 0 }, tokensUsed: 0, cost: { charged: '0' }, model: streamModelCheck.name, provider: streamModelCheck.provider })}\n\n`);
+      res.write('data: [DONE]\n\n');
+      res.end();
+      return;
+    }
     if (streamModelCheck && IMAGE_ONLY_MODELS.has(streamModelCheck.modelId)) {
       const lastMsg = messages[messages.length - 1]?.content || '';
       // Build contextual prompt from conversation history

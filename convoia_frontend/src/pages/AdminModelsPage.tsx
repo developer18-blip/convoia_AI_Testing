@@ -1,6 +1,5 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Save, ToggleLeft, ToggleRight } from 'lucide-react'
-import { useModels } from '../hooks/useModels'
 import { useToast } from '../hooks/useToast'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -11,8 +10,21 @@ import { ErrorState } from '../components/shared/ErrorState'
 import api from '../lib/api'
 
 export function AdminModelsPage() {
-  const { models, isLoading, error, refetch } = useModels()
   const toast = useToast()
+  const [models, setModels] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const refetch = useCallback(async () => {
+    try {
+      setIsLoading(true); setError(null)
+      const res = await api.get('/admin/models')
+      setModels(res.data.data || [])
+    } catch { setError('Failed to load models') }
+    finally { setIsLoading(false) }
+  }, [])
+
+  useEffect(() => { refetch() }, [refetch])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValues, setEditValues] = useState({ inputPrice: '', outputPrice: '', markup: '' })
   const [isSaving, setIsSaving] = useState(false)
@@ -86,8 +98,8 @@ export function AdminModelsPage() {
                     </>
                   )}
                   <td className="px-4 py-3 text-center">
-                    <button onClick={() => handleToggle(model.id, model.isActive)} className="text-text-muted hover:text-text-primary">
-                      {model.isActive ? <ToggleRight size={24} className="text-success" /> : <ToggleLeft size={24} />}
+                    <button onClick={() => handleToggle(model.id, model.isActive)} className="hover:opacity-80 transition-opacity">
+                      {model.isActive ? <ToggleRight size={24} className="text-success" /> : <ToggleLeft size={24} className="text-danger" />}
                     </button>
                   </td>
                   <td className="px-4 py-3 text-right">
