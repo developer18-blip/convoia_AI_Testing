@@ -4,6 +4,7 @@ import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { AdminStats, OrganizationUserTree, UserUsageStats, OrganizationUsageStats, UserInHierarchy } from '../types/index.js';
 import { isValidUUID } from '../utils/validators.js';
 import logger from '../config/logger.js';
+import { TokenWalletService } from '../services/tokenWalletService.js';
 
 
 export const getAdminStats = asyncHandler(async (req: Request, res: Response) => {
@@ -966,3 +967,238 @@ export const getRevenueDashboard = asyncHandler(async (req: Request, res: Respon
   });
 });
 
+// ── Admin Create Account ─────────────────────────────────────────────
+
+export const adminCreateAccount = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user || !['admin', 'platform_admin'].includes(req.user.role)) {
+    throw new AppError('Admin access required', 403);
+  }
+
+  const { email, name, password, accountType, organizationName, industry, role } = req.body;
+
+  if (!email || !name || !password) {
+    throw new AppError('email, name, and password are required', 400);
+  }
+  if (password.length < 6) {
+    throw new AppError('Password must be at least 6 characters', 400);
+  }
+
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    throw new AppError('User already exists with this email', 400);
+  }
+
+  const bcryptLib = (await import('bcryptjs')).default;
+  const hashedPassword = await bcryptLib.hash(password, 12);
+
+  const result = await prisma.$transaction(async (tx) => {
+    let organizationId: string | undefined;
+    const resolvedRole = accountType === 'organization' ? 'org_owner' : (role || 'user');
+
+    const user = await tx.user.create({
+      data: { email, name, password: hashedPassword, role: resolvedRole, isVerified: true },
+    });
+
+    if (accountType === 'organization' && organizationName) {
+      const org = await tx.organization.create({
+        data: { name: organizationName, email, ownerId: user.id, ...(industry ? { industry } : {}) },
+      });
+      organizationId = org.id;
+      await tx.user.update({ where: { id: user.id }, data: { organizationId } });
+    }
+
+    await tx.wallet.create({
+      data: { userId: user.id, balance: 0, totalToppedUp: 0, totalSpent: 0, currency: 'USD' },
+    });
+    await tx.tokenWallet.upsert({
+      where: { userId: user.id },
+      update: {},
+      create: { userId: user.id, tokenBalance: 0, totalTokensPurchased: 0, totalTokensUsed: 0 },
+    });
+
+    return { ...user, organizationId: organizationId || null };
+  });
+
+  logger.info(`Admin created account: ${result.email} (${accountType}) by ${req.user.userId}`);
+
+  res.status(201).json({
+    success: true,
+    message: `Account created for ${result.email}`,
+    data: { id: result.id, email: result.email, name: result.name, role: result.role, organizationId: result.organizationId },
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// ── Admin Send Tokens ────────────────────────────────────────────────
+
+export const adminSendTokens = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user || !['admin', 'platform_admin'].includes(req.user.role)) {
+    throw new AppError('Admin access required', 403);
+  }
+
+  const { targetUserId, targetOrgId, tokens, reason } = req.body;
+
+  if (!tokens || parseInt(tokens) <= 0) {
+    throw new AppError('tokens must be a positive number', 400);
+  }
+  if (!targetUserId && !targetOrgId) {
+    throw new AppError('Either targetUserId or targetOrgId is required', 400);
+  }
+
+  const parsedTokens = parseInt(tokens);
+
+  if (targetUserId) {
+    if (!isValidUUID(targetUserId)) throw new AppError('Invalid user ID', 400);
+    const user = await prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!user) throw new AppError('User not found', 404);
+
+    await TokenWalletService.addTokens({
+      userId: targetUserId,
+      tokens: parsedTokens,
+      reference: `admin_grant_${Date.now()}`,
+      description: reason || `Admin token grant by ${req.user.userId}`,
+    });
+
+    logger.info(`Admin sent ${parsedTokens} tokens to user ${user.email}`);
+    const balance = await TokenWalletService.getBalance(targetUserId);
+
+    res.json({
+      success: true,
+      message: `${parsedTokens.toLocaleString()} tokens sent to ${user.email}`,
+      data: { targetEmail: user.email, tokensSent: parsedTokens, newBalance: balance.tokenBalance },
+      timestamp: new Date().toISOString(),
+    });
+    return;
+  }
+
+  if (targetOrgId) {
+    if (!isValidUUID(targetOrgId)) throw new AppError('Invalid org ID', 400);
+    const org = await prisma.organization.findUnique({ where: { id: targetOrgId } });
+    if (!org) throw new AppError('Organization not found', 404);
+
+    const members = await prisma.user.findMany({
+      where: { organizationId: targetOrgId },
+      select: { id: true },
+    });
+
+    for (const member of members) {
+      await TokenWalletService.addTokens({
+        userId: member.id,
+        tokens: parsedTokens,
+        reference: `admin_org_grant_${Date.now()}`,
+        description: reason || `Admin org token grant to ${org.name}`,
+      });
+    }
+
+    logger.info(`Admin sent ${parsedTokens} tokens to ${members.length} members of ${org.name}`);
+
+    res.json({
+      success: true,
+      message: `${parsedTokens.toLocaleString()} tokens sent to ${members.length} members of ${org.name}`,
+      data: { orgName: org.name, memberCount: members.length, tokensPerMember: parsedTokens },
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// ── Admin Full Analytics ─────────────────────────────────────────────
+
+export const getAdminAnalytics = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user || !['admin', 'platform_admin'].includes(req.user.role)) {
+    throw new AppError('Admin access required', 403);
+  }
+
+  const { from, to } = req.query;
+  const now = new Date();
+  const fromDate = from ? new Date(from as string) : new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const toDate = to ? new Date(to as string) : now;
+
+  const dateFilter = { createdAt: { gte: fromDate, lte: toDate } };
+
+  const [totalUsers, totalOrgs, activeUsers, usageLogs, tokenWallets, tokenTransactions] = await Promise.all([
+    prisma.user.count(),
+    prisma.organization.count(),
+    prisma.user.count({ where: { usageLogs: { some: dateFilter } } }),
+    prisma.usageLog.findMany({
+      where: dateFilter,
+      select: {
+        userId: true, organizationId: true, customerPrice: true, providerCost: true,
+        tokensInput: true, tokensOutput: true, createdAt: true,
+        model: { select: { name: true, provider: true } },
+        user: { select: { name: true, email: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    }),
+    prisma.tokenWallet.findMany({
+      select: { userId: true, tokenBalance: true, totalTokensPurchased: true, totalTokensUsed: true,
+        user: { select: { name: true, email: true, organizationId: true } } },
+    }),
+    prisma.tokenTransaction.findMany({
+      where: dateFilter,
+      select: { type: true, tokens: true, createdAt: true, userId: true },
+      orderBy: { createdAt: 'asc' },
+    }),
+  ]);
+
+  // Aggregations
+  const dailyMap = new Map<string, { queries: number; revenue: number; cost: number; tokens: number }>();
+  let totalRevenue = 0, totalCostAgg = 0, totalTokensUsed = 0;
+  const userAgg = new Map<string, { name: string; email: string; orgId: string | null; queries: number; cost: number; tokens: number }>();
+  const modelAgg = new Map<string, { name: string; provider: string; queries: number; cost: number }>();
+  const providerAgg = new Map<string, { queries: number; revenue: number; cost: number }>();
+
+  for (const log of usageLogs) {
+    const dateKey = log.createdAt.toISOString().split('T')[0];
+    totalRevenue += log.customerPrice;
+    totalCostAgg += log.providerCost;
+    totalTokensUsed += log.tokensInput + log.tokensOutput;
+
+    const d = dailyMap.get(dateKey);
+    if (d) { d.queries++; d.revenue += log.customerPrice; d.cost += log.providerCost; d.tokens += log.tokensInput + log.tokensOutput; }
+    else { dailyMap.set(dateKey, { queries: 1, revenue: log.customerPrice, cost: log.providerCost, tokens: log.tokensInput + log.tokensOutput }); }
+
+    const u = userAgg.get(log.userId);
+    if (u) { u.queries++; u.cost += log.customerPrice; u.tokens += log.tokensInput + log.tokensOutput; }
+    else { userAgg.set(log.userId, { name: log.user.name, email: log.user.email, orgId: log.organizationId, queries: 1, cost: log.customerPrice, tokens: log.tokensInput + log.tokensOutput }); }
+
+    const mKey = log.model.name;
+    const m = modelAgg.get(mKey);
+    if (m) { m.queries++; m.cost += log.customerPrice; }
+    else { modelAgg.set(mKey, { name: log.model.name, provider: log.model.provider, queries: 1, cost: log.customerPrice }); }
+
+    const p = providerAgg.get(log.model.provider);
+    if (p) { p.queries++; p.revenue += log.customerPrice; p.cost += log.providerCost; }
+    else { providerAgg.set(log.model.provider, { queries: 1, revenue: log.customerPrice, cost: log.providerCost }); }
+  }
+
+  // Token summary
+  let totalTokenBalance = 0, totalTokensPurchased = 0, totalTokensSpent = 0;
+  for (const w of tokenWallets) { totalTokenBalance += w.tokenBalance; totalTokensPurchased += w.totalTokensPurchased; totalTokensSpent += w.totalTokensUsed; }
+
+  const tokenByType = new Map<string, number>();
+  for (const t of tokenTransactions) { tokenByType.set(t.type, (tokenByType.get(t.type) || 0) + Math.abs(t.tokens)); }
+
+  // Fill daily chart
+  const dailyUsage = [];
+  for (let d = new Date(fromDate); d <= toDate; d.setDate(d.getDate() + 1)) {
+    const key = d.toISOString().split('T')[0];
+    const entry = dailyMap.get(key);
+    dailyUsage.push({ date: key, queries: entry?.queries || 0, revenue: parseFloat((entry?.revenue || 0).toFixed(4)), cost: parseFloat((entry?.cost || 0).toFixed(4)), tokens: entry?.tokens || 0 });
+  }
+
+  const topUsers = Array.from(userAgg.entries()).map(([id, u]) => ({ userId: id, ...u, cost: parseFloat(u.cost.toFixed(4)) })).sort((a, b) => b.cost - a.cost).slice(0, 20);
+  const topModels = Array.from(modelAgg.values()).map((m) => ({ ...m, cost: parseFloat(m.cost.toFixed(4)) })).sort((a, b) => b.queries - a.queries);
+  const providerBreakdown = Array.from(providerAgg.entries()).map(([provider, d]) => ({ provider, queries: d.queries, revenue: parseFloat(d.revenue.toFixed(4)), cost: parseFloat(d.cost.toFixed(4)), profit: parseFloat((d.revenue - d.cost).toFixed(4)) })).sort((a, b) => b.revenue - a.revenue);
+  const topTokenHolders = tokenWallets.map((w) => ({ userId: w.userId, name: w.user.name, email: w.user.email, balance: w.tokenBalance, purchased: w.totalTokensPurchased, used: w.totalTokensUsed })).sort((a, b) => b.balance - a.balance).slice(0, 20);
+
+  res.json({
+    success: true,
+    data: {
+      overview: { totalUsers, totalOrgs, activeUsers, totalQueries: usageLogs.length, totalRevenue: parseFloat(totalRevenue.toFixed(4)), totalCost: parseFloat(totalCostAgg.toFixed(4)), totalProfit: parseFloat((totalRevenue - totalCostAgg).toFixed(4)), profitMargin: totalRevenue > 0 ? parseFloat(((totalRevenue - totalCostAgg) / totalRevenue * 100).toFixed(1)) : 0, totalTokensUsed },
+      tokenSummary: { totalTokenBalance, totalTokensPurchased, totalTokensSpent, transactionsByType: Object.fromEntries(tokenByType) },
+      dailyUsage, topUsers, topModels, providerBreakdown, topTokenHolders,
+      dateRange: { from: fromDate.toISOString(), to: toDate.toISOString() },
+    },
+    timestamp: new Date().toISOString(),
+  });
+});

@@ -38,6 +38,9 @@ const AdminModelsPage = lazy(() => import('./pages/AdminModelsPage'))
 const AdminRevenuePage = lazy(() => import('./pages/AdminRevenuePage'))
 const AdminUserDetailPage = lazy(() => import('./pages/AdminUserDetailPage'))
 const AdminOrgDetailPage = lazy(() => import('./pages/AdminOrgDetailPage'))
+const AdminCreateAccountPage = lazy(() => import('./pages/AdminCreateAccountPage'))
+const AdminSendTokensPage = lazy(() => import('./pages/AdminSendTokensPage'))
+const AdminFullAnalyticsPage = lazy(() => import('./pages/AdminFullAnalyticsPage'))
 const ApiKeysPage = lazy(() => import('./pages/ApiKeysPage'))
 const ApiDocsPage = lazy(() => import('./pages/ApiDocsPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
@@ -194,7 +197,9 @@ function AppRoutes() {
             <Route path="/admin/orgs/:orgId" element={<AdminOrgDetailPage />} />
             <Route path="/admin/models" element={<AdminModelsPage />} />
             <Route path="/admin/revenue" element={<AdminRevenuePage />} />
-            <Route path="/admin/analytics" element={<OrgAnalyticsPage />} />
+            <Route path="/admin/analytics" element={<AdminFullAnalyticsPage />} />
+            <Route path="/admin/create-account" element={<AdminCreateAccountPage />} />
+            <Route path="/admin/send-tokens" element={<AdminSendTokensPage />} />
           </Route>
         </Route>
 

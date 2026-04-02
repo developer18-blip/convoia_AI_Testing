@@ -85,6 +85,8 @@ function getNavItems(role: string, hasOrg: boolean): NavItem[] {
       ...base,
       { icon: <Building2 size={20} />, label: 'Organizations', path: '/admin/orgs' },
       { icon: <Users size={20} />, label: 'All Users', path: '/admin/users' },
+      { icon: <Plus size={20} />, label: 'Create Account', path: '/admin/create-account' },
+      { icon: <Coins size={20} />, label: 'Send Tokens', path: '/admin/send-tokens' },
       { icon: <Bot size={20} />, label: 'Model Pricing', path: '/admin/models' },
       { icon: <TrendingUp size={20} />, label: 'Revenue', path: '/admin/revenue' },
       { icon: <BarChart3 size={20} />, label: 'Analytics', path: '/admin/analytics' },

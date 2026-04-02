@@ -16,6 +16,9 @@ import {
   suspendOrganization,
   deleteOrganization,
   getRevenueDashboard,
+  adminCreateAccount,
+  adminSendTokens,
+  getAdminAnalytics,
 } from '../controllers/adminController.js';
 import { authMiddleware, requireRole } from '../middleware/authMiddleware.js';
 
@@ -57,6 +60,13 @@ router.get('/models', requireRole('admin', 'platform_admin'), getAdminModels);
 router.put('/models/:id/pricing', requireRole('admin', 'platform_admin'), updateModelPricing);
 router.put('/models/:id/markup', requireRole('admin', 'platform_admin'), updateModelMarkup);
 router.post('/models/:id/toggle', requireRole('admin', 'platform_admin'), toggleModel);
+
+// Admin account creation & token management
+router.post('/accounts', requireRole('admin', 'platform_admin'), adminCreateAccount);
+router.post('/send-tokens', requireRole('admin', 'platform_admin'), adminSendTokens);
+
+// Admin analytics
+router.get('/analytics', requireRole('admin', 'platform_admin'), getAdminAnalytics);
 
 export default router;
 
