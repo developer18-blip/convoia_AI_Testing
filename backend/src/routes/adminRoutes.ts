@@ -12,6 +12,10 @@ import {
   updateModelMarkup,
   toggleModel,
   deleteUserPermanently,
+  changeUserRole,
+  suspendOrganization,
+  deleteOrganization,
+  getRevenueDashboard,
 } from '../controllers/adminController.js';
 import { authMiddleware, requireRole } from '../middleware/authMiddleware.js';
 
@@ -25,10 +29,16 @@ router.get('/stats', requireRole('admin', 'platform_admin'), getAdminStats);
 
 // User management
 router.get('/users', requireRole('admin', 'platform_admin'), getUsers);
+router.put('/users/:userId/role', requireRole('admin', 'platform_admin'), changeUserRole);
 router.delete('/users/:userId', requireRole('admin', 'platform_admin'), deleteUserPermanently);
 
 // Organization management
 router.get('/organizations', requireRole('admin', 'platform_admin'), getOrganizations);
+router.put('/orgs/:orgId/suspend', requireRole('admin', 'platform_admin'), suspendOrganization);
+router.delete('/orgs/:orgId', requireRole('admin', 'platform_admin'), deleteOrganization);
+
+// Revenue dashboard
+router.get('/revenue/dashboard', requireRole('admin', 'platform_admin'), getRevenueDashboard);
 
 // System health check
 router.get('/health', requireRole('admin', 'platform_admin'), getSystemHealth);

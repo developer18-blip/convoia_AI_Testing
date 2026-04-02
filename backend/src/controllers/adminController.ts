@@ -3,6 +3,7 @@ import prisma from '../config/db.js';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { AdminStats, OrganizationUserTree, UserUsageStats, OrganizationUsageStats, UserInHierarchy } from '../types/index.js';
 import { isValidUUID } from '../utils/validators.js';
+import logger from '../config/logger.js';
 
 
 export const getAdminStats = asyncHandler(async (req: Request, res: Response) => {
@@ -91,16 +92,28 @@ export const getUsers = asyncHandler(async (req: Request, res: Response) => {
     throw new AppError('Admin access required', 403);
   }
 
-  const { page = '1', limit = '20' } = req.query;
+  const { page = '1', limit = '20', search = '' } = req.query;
   const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+  const searchStr = String(search).trim();
+
+  const where = searchStr ? {
+    OR: [
+      { name: { contains: searchStr, mode: 'insensitive' as const } },
+      { email: { contains: searchStr, mode: 'insensitive' as const } },
+    ],
+  } : {};
 
   const [users, total] = await Promise.all([
     prisma.user.findMany({
+      where,
       select: {
         id: true,
         email: true,
         name: true,
         role: true,
+        isActive: true,
+        isVerified: true,
+        avatar: true,
         createdAt: true,
         organization: {
           select: {
@@ -114,7 +127,7 @@ export const getUsers = asyncHandler(async (req: Request, res: Response) => {
         createdAt: 'desc',
       },
     }),
-    prisma.user.count(),
+    prisma.user.count({ where }),
   ]);
 
   res.json({
@@ -137,17 +150,27 @@ export const getOrganizations = asyncHandler(async (req: Request, res: Response)
     throw new AppError('Admin access required', 403);
   }
 
-  const { page = '1', limit = '20' } = req.query;
+  const { page = '1', limit = '20', search = '' } = req.query;
   const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+  const searchStr = String(search).trim();
+
+  const where = searchStr ? {
+    OR: [
+      { name: { contains: searchStr, mode: 'insensitive' as const } },
+      { email: { contains: searchStr, mode: 'insensitive' as const } },
+    ],
+  } : {};
 
   const [organizations, total] = await Promise.all([
     prisma.organization.findMany({
+      where,
       select: {
         id: true,
         name: true,
         email: true,
         tier: true,
         status: true,
+        industry: true,
         createdAt: true,
         _count: {
           select: {
@@ -161,7 +184,7 @@ export const getOrganizations = asyncHandler(async (req: Request, res: Response)
         createdAt: 'desc',
       },
     }),
-    prisma.organization.count(),
+    prisma.organization.count({ where }),
   ]);
 
   res.json({
@@ -712,6 +735,211 @@ export const deleteUserPermanently = asyncHandler(async (req: Request, res: Resp
     success: true,
     statusCode: 200,
     message: `User ${target.email} permanently deleted`,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// ── Change User Role ────────────────────────────────────────────────
+
+export const changeUserRole = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user || !['admin', 'platform_admin'].includes(req.user.role)) {
+    throw new AppError('Admin access required', 403);
+  }
+
+  const { userId } = req.params;
+  const { role } = req.body;
+  if (!isValidUUID(userId)) throw new AppError('Invalid user ID', 400);
+
+  const validRoles = ['employee', 'manager', 'org_owner', 'platform_admin'];
+  if (!role || !validRoles.includes(role)) {
+    throw new AppError(`Invalid role. Must be one of: ${validRoles.join(', ')}`, 400);
+  }
+
+  const target = await prisma.user.findUnique({ where: { id: userId } });
+  if (!target) throw new AppError('User not found', 404);
+
+  // Only platform_admin can promote to platform_admin
+  if (role === 'platform_admin' && req.user.role !== 'platform_admin') {
+    throw new AppError('Only platform admins can promote to platform_admin', 403);
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { role },
+  });
+
+  logger.info(`Admin ${req.user.userId} changed role of ${target.email} from ${target.role} to ${role}`);
+
+  res.json({
+    success: true,
+    statusCode: 200,
+    message: `${target.name}'s role changed to ${role}`,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// ── Suspend Organization ────────────────────────────────────────────
+
+export const suspendOrganization = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user || !['admin', 'platform_admin'].includes(req.user.role)) {
+    throw new AppError('Admin access required', 403);
+  }
+
+  const { orgId } = req.params;
+  if (!isValidUUID(orgId)) throw new AppError('Invalid organization ID', 400);
+
+  const org = await prisma.organization.findUnique({ where: { id: orgId } });
+  if (!org) throw new AppError('Organization not found', 404);
+
+  const newStatus = org.status === 'active' ? 'suspended' : 'active';
+  await prisma.organization.update({
+    where: { id: orgId },
+    data: { status: newStatus },
+  });
+
+  logger.info(`Admin ${req.user.userId} ${newStatus === 'suspended' ? 'suspended' : 'reactivated'} org ${org.name}`);
+
+  res.json({
+    success: true,
+    statusCode: 200,
+    message: `Organization ${org.name} ${newStatus === 'suspended' ? 'suspended' : 'reactivated'}`,
+    data: { status: newStatus },
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// ── Delete Organization ─────────────────────────────────────────────
+
+export const deleteOrganization = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user || !['admin', 'platform_admin'].includes(req.user.role)) {
+    throw new AppError('Admin access required', 403);
+  }
+
+  const { orgId } = req.params;
+  if (!isValidUUID(orgId)) throw new AppError('Invalid organization ID', 400);
+
+  const org = await prisma.organization.findUnique({
+    where: { id: orgId },
+    include: { _count: { select: { users: true } } },
+  });
+  if (!org) throw new AppError('Organization not found', 404);
+
+  // Detach all users from the org first
+  await prisma.user.updateMany({
+    where: { organizationId: orgId },
+    data: { organizationId: null, role: 'user' },
+  });
+
+  // Delete org-related data
+  await Promise.allSettled([
+    prisma.budget.deleteMany({ where: { organizationId: orgId } }),
+    prisma.usageLog.deleteMany({ where: { organizationId: orgId } }),
+    prisma.billingRecord.deleteMany({ where: { organizationId: orgId } }),
+    prisma.subscription.deleteMany({ where: { organizationId: orgId } }),
+    prisma.tokenPurchase.deleteMany({ where: { organizationId: orgId } }),
+    prisma.tokenAllocation.deleteMany({ where: { organizationId: orgId } }),
+    prisma.activityLog.deleteMany({ where: { organizationId: orgId } }),
+    prisma.orgInvite.deleteMany({ where: { organizationId: orgId } }),
+    prisma.agent.deleteMany({ where: { organizationId: orgId } }),
+    prisma.aPIKey.deleteMany({ where: { organizationId: orgId } }),
+  ]);
+
+  // Delete the org
+  await prisma.organization.delete({ where: { id: orgId } });
+
+  logger.info(`Admin ${req.user.userId} deleted org ${org.name} (${org.id}) with ${org._count.users} members`);
+
+  res.json({
+    success: true,
+    statusCode: 200,
+    message: `Organization ${org.name} deleted. ${org._count.users} members detached.`,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// ── Revenue Dashboard (alias for /usage/admin) ─────────────────────
+
+export const getRevenueDashboard = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user || !['admin', 'platform_admin'].includes(req.user.role)) {
+    throw new AppError('Admin access required', 403);
+  }
+
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  const [totalRevenue, totalCost, dailyRevenue, providerBreakdown, topOrgs] = await Promise.all([
+    // Total revenue (customer price)
+    prisma.usageLog.aggregate({
+      _sum: { customerPrice: true },
+      where: { createdAt: { gte: thirtyDaysAgo } },
+    }),
+    // Total provider cost
+    prisma.usageLog.aggregate({
+      _sum: { providerCost: true },
+      where: { createdAt: { gte: thirtyDaysAgo } },
+    }),
+    // Daily revenue for chart
+    prisma.$queryRaw`
+      SELECT DATE("createdAt") as date,
+        SUM("customerPrice") as revenue,
+        SUM("providerCost") as cost
+      FROM "UsageLog"
+      WHERE "createdAt" >= ${thirtyDaysAgo}
+      GROUP BY DATE("createdAt")
+      ORDER BY date
+    ` as Promise<any[]>,
+    // Revenue by provider
+    prisma.$queryRaw`
+      SELECT m.provider,
+        SUM(u."customerPrice") as revenue,
+        COUNT(*)::int as queries
+      FROM "UsageLog" u
+      JOIN "AIModel" m ON u."modelId" = m.id
+      WHERE u."createdAt" >= ${thirtyDaysAgo}
+      GROUP BY m.provider
+      ORDER BY revenue DESC
+    ` as Promise<any[]>,
+    // Top orgs
+    prisma.$queryRaw`
+      SELECT o.name, o.id,
+        SUM(u."customerPrice") as revenue,
+        COUNT(*)::int as queries
+      FROM "UsageLog" u
+      JOIN "Organization" o ON u."organizationId" = o.id
+      WHERE u."createdAt" >= ${thirtyDaysAgo}
+      GROUP BY o.id, o.name
+      ORDER BY revenue DESC
+      LIMIT 10
+    ` as Promise<any[]>,
+  ]);
+
+  const revenue = Number(totalRevenue._sum.customerPrice || 0);
+  const cost = Number(totalCost._sum.providerCost || 0);
+
+  res.json({
+    success: true,
+    data: {
+      revenue,
+      cost,
+      profit: revenue - cost,
+      profitMargin: revenue > 0 ? ((revenue - cost) / revenue * 100).toFixed(1) : '0',
+      dailyRevenue: dailyRevenue.map((d: any) => ({
+        date: d.date,
+        revenue: Number(d.revenue || 0),
+        cost: Number(d.cost || 0),
+      })),
+      providerBreakdown: providerBreakdown.map((p: any) => ({
+        provider: p.provider,
+        revenue: Number(p.revenue || 0),
+        queries: p.queries,
+      })),
+      topOrgs: topOrgs.map((o: any) => ({
+        name: o.name,
+        id: o.id,
+        revenue: Number(o.revenue || 0),
+        queries: o.queries,
+      })),
+    },
     timestamp: new Date().toISOString(),
   });
 });
