@@ -242,11 +242,18 @@ async function callOpenAI(modelId: string, messages: any[], systemPrompt: string
 }
 
 async function callAnthropic(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
+  // Anthropic requires system content in the 'system' field, not in messages array
+  const systemMsgs = messages.filter((m: any) => m.role === 'system');
+  const cleanMessages = messages.filter((m: any) => m.role !== 'system');
+  const fullSystem = systemMsgs.length > 0
+    ? [systemPrompt, ...systemMsgs.map((m: any) => m.content)].filter(Boolean).join('\n\n')
+    : systemPrompt;
+
   const body: Record<string, any> = {
     model: modelId,
     max_tokens: overrides?.maxTokens ?? 16384,
-    system: systemPrompt,
-    messages,
+    system: fullSystem,
+    messages: cleanMessages,
   };
   // Anthropic rejects requests with BOTH temperature AND top_p — use only one
   if (overrides?.temperature != null) {
@@ -750,11 +757,18 @@ function callAnthropicStream(
   modelId: string, messages: any[], systemPrompt: string,
   apiKey: string, callbacks: StreamCallbacks, overrides?: ProviderOverrides
 ): Promise<void> {
+  // Anthropic requires system content in the 'system' field, not in messages array
+  const systemMsgs = messages.filter((m: any) => m.role === 'system');
+  const cleanMessages = messages.filter((m: any) => m.role !== 'system');
+  const fullSystem = systemMsgs.length > 0
+    ? [systemPrompt, ...systemMsgs.map((m: any) => m.content)].filter(Boolean).join('\n\n')
+    : systemPrompt;
+
   const body: Record<string, any> = {
     model: modelId,
     max_tokens: overrides?.maxTokens ?? 16384,
-    system: systemPrompt,
-    messages,
+    system: fullSystem,
+    messages: cleanMessages,
     stream: true,
   };
 
