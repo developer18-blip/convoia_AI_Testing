@@ -82,8 +82,8 @@ export function AdminFullAnalyticsPage() {
   if (isLoading) return <LoadingPage />
   if (error || !data) return <ErrorState message={error || 'No data'} onRetry={fetchData} />
 
-  const ov = data.overview
-  const ts = data.tokenSummary
+  const ov = data.overview || {}
+  const ts = data.tokenSummary || {}
 
   return (
     <div className="space-y-6">
@@ -127,7 +127,9 @@ export function AdminFullAnalyticsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card padding="lg">
           <h3 className="text-sm font-medium text-text-secondary mb-4">Revenue vs Cost</h3>
-          <LineChart data={data.dailyUsage} xKey="date" yKey="revenue" yKey2="cost" color="#7C3AED" color2="#EF4444" height={280} formatY={(v: number) => `$${v.toFixed(0)}`} />
+          {(data.dailyUsage?.length || 0) > 0 ? (
+            <LineChart data={data.dailyUsage} xKey="date" yKey="revenue" yKey2="cost" color="#7C3AED" color2="#EF4444" height={280} formatY={(v: number) => `$${v.toFixed(0)}`} />
+          ) : <div className="h-[280px] flex items-center justify-center text-text-muted text-sm">No usage data for this period</div>}
         </Card>
         <Card padding="lg">
           <h3 className="text-sm font-medium text-text-secondary mb-4">Daily Queries</h3>

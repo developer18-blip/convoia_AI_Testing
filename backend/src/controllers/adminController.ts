@@ -414,8 +414,7 @@ export const getUserUsageStats = asyncHandler(async (req: Request, res: Response
     totalCost: Math.round(totalCost * 100) / 100,
     topModels: Array.from(modelStats.values())
       .sort((a, b) => b.usageCount - a.usageCount)
-      .slice(0, 5)
-      .map(({ tokensUsed, ...rest }) => rest),
+      .slice(0, 5),
     dailyBreakdown: Array.from(dailyStats.values()).sort((a, b) => a.date.localeCompare(b.date)),
   };
 
@@ -938,6 +937,8 @@ export const getRevenueDashboard = asyncHandler(async (req: Request, res: Respon
 
   res.json({
     success: true,
+    statusCode: 200,
+    message: 'Revenue dashboard retrieved',
     data: {
       revenue,
       cost,

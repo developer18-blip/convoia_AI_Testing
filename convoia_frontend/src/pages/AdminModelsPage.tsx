@@ -39,12 +39,21 @@ export function AdminModelsPage() {
   }
 
   const handleSave = async (modelId: string) => {
+    const input = parseFloat(editValues.inputPrice)
+    const output = parseFloat(editValues.outputPrice)
+    const markup = parseFloat(editValues.markup)
+    if (isNaN(input) || input < 0 || isNaN(output) || output < 0) {
+      toast.error('Prices must be valid non-negative numbers'); return
+    }
+    if (isNaN(markup) || markup < 0 || markup > 200) {
+      toast.error('Markup must be between 0% and 200%'); return
+    }
     try {
       setIsSaving(true)
       await api.put(`/admin/models/${modelId}/pricing`, {
-        inputTokenPrice: parseFloat(editValues.inputPrice),
-        outputTokenPrice: parseFloat(editValues.outputPrice),
-        markupPercentage: parseFloat(editValues.markup),
+        inputTokenPrice: input,
+        outputTokenPrice: output,
+        markupPercentage: markup,
       })
       toast.success('Pricing updated')
       setEditingId(null)
@@ -80,6 +89,9 @@ export function AdminModelsPage() {
               <th className="px-4 py-3 text-right text-xs font-medium text-text-muted uppercase">Actions</th>
             </tr></thead>
             <tbody>
+              {models.length === 0 && (
+                <tr><td colSpan={7} className="px-4 py-12 text-center text-text-muted text-sm">No models found</td></tr>
+              )}
               {models.map((model) => (
                 <tr key={model.id} className="border-b border-border/50 hover:bg-surface-2 transition-colors">
                   <td className="px-4 py-3 text-sm font-medium text-text-primary">{model.name}</td>

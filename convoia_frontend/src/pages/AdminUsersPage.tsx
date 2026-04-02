@@ -34,6 +34,7 @@ export function AdminUsersPage() {
   }
 
   useEffect(() => { fetch() }, [page, search])
+  useEffect(() => { setPage(1) }, [search])
 
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; email: string } | null>(null)
   const [deleting, setDeleting] = useState(false)
