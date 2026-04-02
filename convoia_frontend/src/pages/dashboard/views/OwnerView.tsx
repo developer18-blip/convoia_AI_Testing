@@ -148,32 +148,41 @@ export function OwnerView({ stats, userName, orgName }: OwnerViewProps) {
           padding: '20px',
         }}
       >
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>My Token Balance</h3>
-          <div className="flex items-center gap-2">
+        <div style={{ marginBottom: '16px' }}>
+          <h3 className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)', marginBottom: '14px' }}>My Token Balance</h3>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
             {members.length > 0 && tokenBalance > 0 && (
               <button
                 onClick={() => setShowAssignModal(true)}
-                className="text-xs flex items-center gap-1 px-2 py-1 rounded-lg transition-colors"
                 style={{
-                  color: 'var(--color-success)',
-                  border: '1px solid rgba(16,185,129,0.3)',
-                  background: 'transparent',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  padding: '10px 24px', borderRadius: '12px', fontSize: '14px', fontWeight: 600,
+                  color: '#10B981', border: '1.5px solid rgba(16,185,129,0.3)',
+                  background: 'rgba(16,185,129,0.06)', cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  minWidth: '160px',
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(16,185,129,0.12)'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.5)'; e.currentTarget.style.transform = 'translateY(-1px)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(16,185,129,0.06)'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.3)'; e.currentTarget.style.transform = 'translateY(0)' }}
               >
-                <Send size={11} /> Assign Tokens
+                <Send size={15} /> Assign Tokens
               </button>
             )}
             <button
               onClick={() => navigate('/tokens/buy')}
-              className="text-xs flex items-center gap-1 px-2 py-1 rounded-lg transition-colors"
               style={{
-                color: 'var(--color-primary)',
-                border: '1px solid var(--color-border)',
-                background: 'transparent',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                padding: '10px 24px', borderRadius: '12px', fontSize: '14px', fontWeight: 600,
+                color: 'white', border: 'none',
+                background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-hover))',
+                cursor: 'pointer', transition: 'all 0.2s',
+                boxShadow: '0 2px 8px rgba(124,58,237,0.25)',
+                minWidth: '160px',
               }}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(124,58,237,0.35)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(124,58,237,0.25)' }}
             >
-              <ShoppingCart size={11} /> Buy Tokens
+              <ShoppingCart size={15} /> Buy Tokens
             </button>
           </div>
         </div>
