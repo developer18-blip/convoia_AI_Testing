@@ -37,6 +37,7 @@ router.delete('/users/:userId', requireRole('admin', 'platform_admin'), deleteUs
 
 // Organization management
 router.get('/organizations', requireRole('admin', 'platform_admin'), getOrganizations);
+router.get('/orgs', requireRole('admin', 'platform_admin'), getOrganizations);
 router.put('/orgs/:orgId/suspend', requireRole('admin', 'platform_admin'), suspendOrganization);
 router.delete('/orgs/:orgId', requireRole('admin', 'platform_admin'), deleteOrganization);
 
