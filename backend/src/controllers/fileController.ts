@@ -1,4 +1,5 @@
 import fs from 'fs'
+import axios from 'axios'
 import { Request, Response } from 'express'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
 import { FileProcessingService } from '../services/fileProcessingService.js'
@@ -6,8 +7,80 @@ import { AIGatewayService } from '../services/aiGatewayService.js'
 import { afterQueryMiddleware } from '../middleware/tokenTracker.js'
 import { getOrCreatePersonalOrg } from '../utils/orgHelper.js'
 import { TokenWalletService } from '../services/tokenWalletService.js'
+import { config } from '../config/env.js'
 import logger from '../config/logger.js'
 import prisma from '../config/db.js'
+
+// OCR scanned/image-based PDFs using AI vision models
+async function ocrPdfWithVision(filePath: string): Promise<string | null> {
+  const pdfBase64 = fs.readFileSync(filePath).toString('base64')
+
+  // Try Anthropic first (native PDF support)
+  if (config.apiKeys.anthropic) {
+    try {
+      logger.info('OCR: Using Anthropic document vision for scanned PDF')
+      const resp = await axios.post('https://api.anthropic.com/v1/messages', {
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 8192,
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'document',
+              source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 },
+            },
+            {
+              type: 'text',
+              text: 'Extract ALL text content from this document. Return the text exactly as written, preserving the structure and formatting. Do not add commentary — only return the extracted text.',
+            },
+          ],
+        }],
+      }, {
+        headers: {
+          'x-api-key': config.apiKeys.anthropic,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json',
+        },
+        timeout: 60000,
+      })
+      const text = resp.data?.content?.[0]?.text || ''
+      if (text.length > 20) {
+        logger.info(`OCR: Anthropic extracted ${text.length} chars from scanned PDF`)
+        return text
+      }
+    } catch (err: any) {
+      logger.error(`OCR Anthropic failed: ${err.message}`)
+    }
+  }
+
+  // Fallback: Google Gemini (also supports PDF)
+  if (config.apiKeys.google) {
+    try {
+      logger.info('OCR: Using Google Gemini for scanned PDF')
+      const resp = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${config.apiKeys.google}`,
+        {
+          contents: [{
+            parts: [
+              { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } },
+              { text: 'Extract ALL text content from this document. Return the text exactly as written, preserving structure. Do not add commentary.' },
+            ],
+          }],
+        },
+        { timeout: 60000 }
+      )
+      const text = resp.data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      if (text.length > 20) {
+        logger.info(`OCR: Gemini extracted ${text.length} chars from scanned PDF`)
+        return text
+      }
+    } catch (err: any) {
+      logger.error(`OCR Google failed: ${err.message}`)
+    }
+  }
+
+  return null
+}
 
 // Upload and process file
 export const processFile = asyncHandler(async (req: Request, res: Response): Promise<void> => {
@@ -172,6 +245,19 @@ export const processFile = asyncHandler(async (req: Request, res: Response): Pro
           extractedText = fs.readFileSync(file.path, 'utf-8')
         }
 
+        // Check if extracted text is only page markers (scanned/image-based PDF)
+        if (file.mimetype === 'application/pdf') {
+          const meaningfulText = extractedText.replace(/--\s*\d+\s*of\s*\d+\s*--/g, '').replace(/\s+/g, '').trim()
+          if (meaningfulText.length < 50 && file.size > 1000) {
+            logger.info(`PDF appears scanned (only ${meaningfulText.length} meaningful chars). Attempting vision OCR...`)
+            const ocrText = await ocrPdfWithVision(file.path)
+            if (ocrText) {
+              extractedText = ocrText
+              logger.info(`OCR succeeded: ${ocrText.length} chars extracted from scanned PDF`)
+            }
+          }
+        }
+
         const wordCount = extractedText.split(/\s+/).filter((w) => w.length > 0).length
         const truncated = extractedText.length > 15000
         const processedText = extractedText.slice(0, 15000)
@@ -179,12 +265,12 @@ export const processFile = asyncHandler(async (req: Request, res: Response): Pro
         logger.info(`Document processed: ${file.originalname}, words=${wordCount}, chars=${processedText.length}, empty=${processedText.length === 0}`)
 
         if (processedText.length === 0) {
-          // PDF may be scanned/image-based with no text layer
+          // PDF may be scanned/image-based with no text layer and OCR also failed
           res.json({
             success: true,
             data: {
               type: 'document',
-              extractedText: `[This PDF appears to be scanned or image-based. No extractable text was found in "${file.originalname}" (${pageCount} pages, ${Math.round(file.size / 1024)}KB). The document may need OCR processing.]`,
+              extractedText: `[This PDF appears to be scanned or image-based. No extractable text was found in "${file.originalname}" (${pageCount} pages, ${Math.round(file.size / 1024)}KB). Try uploading the pages as images instead.]`,
               truncated: false,
               originalLength: 0,
               pageCount,
