@@ -218,6 +218,10 @@ export const queryAIStream = async (req: Request, res: Response) => {
       return;
     }
     const { modelId, messages, industry, agentId, thinkingEnabled, referenceImage, referenceImages } = req.body;
+    // Debug: log multi-file info
+    if (referenceImages?.length > 0 || referenceImage) {
+      logger.info(`Files received: referenceImages=${referenceImages?.length || 0}, referenceImage=${referenceImage ? 'yes' : 'no'}`);
+    }
     if (!modelId || !messages || messages.length === 0) {
       res.status(400).json({ success: false, message: 'modelId and messages are required' });
       return;

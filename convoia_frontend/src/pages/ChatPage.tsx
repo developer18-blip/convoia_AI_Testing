@@ -270,13 +270,14 @@ export function ChatPage() {
     addMessages([userMsg, assistantMsg])
   }
 
-  const handleSendWithContext = (text: string, systemContext: string | null, extras?: { fileAttachment?: { name: string; type: 'image' | 'document' | 'audio' | 'video'; size: number }; imagePreview?: string }) => {
+  const handleSendWithContext = (text: string, systemContext: string | null, extras?: { fileAttachment?: { name: string; type: 'image' | 'document' | 'audio' | 'video'; size: number }; imagePreview?: string; imagePreviews?: string[] }) => {
     if (!activeConversationId) {
       createConversation(selectedModelId, selectedModel?.name || 'AI', industry || undefined)
     }
     const messageExtras: Partial<Message> = {}
     if (extras?.fileAttachment) messageExtras.fileAttachment = extras.fileAttachment
     if (extras?.imagePreview) messageExtras.imagePreview = extras.imagePreview
+    if (extras?.imagePreviews) messageExtras.imagePreviews = extras.imagePreviews
     sendWithContext(text, selectedModelId, systemContext, messageExtras, industry || undefined, selectedAgent?.id, thinkingEnabled)
   }
 
