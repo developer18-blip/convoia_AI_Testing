@@ -376,6 +376,19 @@ export const queryAIStream = async (req: Request, res: Response) => {
     const hasImageAttachment = !!referenceImage || (referenceImages && referenceImages.length > 0);
     const videoIntent = detectVideoIntent(lastUserText, hasImageAttachment);
 
+    // Movie Director agent: ALWAYS route to video generation regardless of keywords
+    const isMovieDirectorAgent = agentId ? await (async () => {
+      const agent = await (prisma as any).agent.findUnique({ where: { id: agentId }, select: { name: true } });
+      return agent?.name === 'Movie Director';
+    })() : false;
+
+    if (isMovieDirectorAgent) {
+      videoIntent.isVideoRequest = true;
+      videoIntent.confidence = 'high';
+      videoIntent.mediaType = hasImageAttachment ? 'image-to-video' : 'text-to-video';
+      videoIntent.extractedSubject = lastUserText; // use full message as the scene description
+    }
+
     if (videoIntent.isVideoRequest) {
       logger.info(`Video intent detected (${videoIntent.confidence}): type=${videoIntent.mediaType}, "${lastUserText.substring(0, 80)}"`);
 
@@ -390,7 +403,9 @@ export const queryAIStream = async (req: Request, res: Response) => {
         let videoThinkTokens = 0; // extra tokens from AI prompt enhancement
 
         // ── THINK MODE: Use AI to craft a pro-level cinematic prompt ──
-        if (thinkingEnabled) {
+        // Movie Director agent ALWAYS uses think mode for better video prompts
+        const useDirectorThinking = thinkingEnabled || isMovieDirectorAgent;
+        if (useDirectorThinking) {
           res.write(`data: ${JSON.stringify({ type: 'status', content: 'Thinking about your vision...' })}\n\n`);
           try {
             const directorResult = await AIGatewayService.sendMessage({
