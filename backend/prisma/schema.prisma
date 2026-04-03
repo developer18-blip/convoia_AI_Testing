@@ -585,6 +585,7 @@ model ChatMessage {
   cost            Float?
   imageUrl        String?
   imagePrompt     String?
+  videoUrl        String?
   webSearchData   String?      // JSON string of search results
   createdAt       DateTime     @default(now())
 

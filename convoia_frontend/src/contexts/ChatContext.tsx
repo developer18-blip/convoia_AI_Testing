@@ -73,6 +73,7 @@ async function loadConversationMessages(convId: string): Promise<Message[]> {
       model: m.model, provider: m.provider,
       tokensInput: m.tokensInput, tokensOutput: m.tokensOutput,
       cost: m.cost, imageUrl: m.imageUrl, imagePrompt: m.imagePrompt,
+      videoUrl: m.videoUrl,
       timestamp: m.createdAt,
     }))
   } catch { return [] }

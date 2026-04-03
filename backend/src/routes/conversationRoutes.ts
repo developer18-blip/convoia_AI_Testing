@@ -125,9 +125,14 @@ router.post('/:id/messages', asyncHandler(async (req: Request, res: Response) =>
           cost: msg.cost || null,
           imageUrl: msg.imageUrl || null,
           imagePrompt: msg.imagePrompt || null,
+          videoUrl: msg.videoUrl || null,
           webSearchData: msg.webSearchData ? JSON.stringify(msg.webSearchData) : null,
         },
-        update: {}, // don't update existing
+        update: {
+          // Update if video/image URL was added after initial save
+          ...(msg.videoUrl ? { videoUrl: msg.videoUrl } : {}),
+          ...(msg.imageUrl ? { imageUrl: msg.imageUrl } : {}),
+        },
       })
     )
   );
@@ -192,6 +197,7 @@ router.post('/sync', asyncHandler(async (req: Request, res: Response) => {
               tokensOutput: msg.tokensOutput || null,
               cost: msg.cost || null,
               imageUrl: msg.imageUrl || null,
+              videoUrl: msg.videoUrl || null,
               createdAt: msg.timestamp ? new Date(msg.timestamp) : new Date(),
             },
             update: {},
