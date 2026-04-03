@@ -162,11 +162,13 @@ export function Header({ onMenuClick }: HeaderProps) {
             placeholder="Search pages..."
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setShowSearch(true) }}
-            onFocus={() => setShowSearch(true)}
+            onFocus={(e) => { setShowSearch(true); e.currentTarget.style.borderColor = 'var(--color-primary)'; e.currentTarget.style.boxShadow = '0 0 0 3px var(--color-primary-glow)' }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--chat-border)'; e.currentTarget.style.boxShadow = 'none' }}
+            className="search-bar"
             style={{
               width: '100%', background: 'var(--chat-hover)', border: '1px solid var(--chat-border)',
               borderRadius: '10px', padding: '7px 14px 7px 36px', fontSize: '13px',
-              color: 'var(--color-text-primary)', outline: 'none', transition: 'border-color 150ms',
+              color: 'var(--color-text-primary)', outline: 'none', transition: 'border-color 200ms, box-shadow 200ms',
             }}
           />
           <AnimatePresence>

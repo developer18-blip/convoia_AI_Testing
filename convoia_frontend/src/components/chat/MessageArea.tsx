@@ -81,28 +81,43 @@ export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, o
 
   if (messages.length === 0) {
     return (
-      <div style={{ height: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 32px 140px', backgroundColor: 'var(--chat-bg)' }}>
+      <div style={{ height: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 24px 140px', backgroundColor: 'var(--chat-bg)' }}>
         {/* Welcome heading — big, clean, ChatGPT-style */}
-        <h2 style={{
-          fontSize: '28px', fontWeight: 700, letterSpacing: '-0.5px',
-          color: 'var(--color-text-primary)', textAlign: 'center', marginBottom: '40px',
-        }}>
-          How can I help you today?
-        </h2>
+        <div style={{ animation: 'fade-in 0.4s ease-out', textAlign: 'center', marginBottom: '36px' }}>
+          <div style={{
+            width: '48px', height: '48px', borderRadius: '14px', margin: '0 auto 20px',
+            background: 'linear-gradient(135deg, var(--color-primary-light), rgba(16,163,127,0.05))',
+            border: '1px solid rgba(16,163,127,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '24px', color: 'var(--color-primary)',
+          }}>✦</div>
+          <h2 style={{
+            fontSize: '26px', fontWeight: 700, letterSpacing: '-0.5px',
+            color: 'var(--color-text-primary)', margin: 0,
+          }}>
+            How can I help you today?
+          </h2>
+          <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginTop: '8px' }}>
+            Choose a suggestion or type your message below
+          </p>
+        </div>
 
-        {/* Suggestion cards — wide 2x2 grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', width: '100%', maxWidth: '700px' }}>
-          {suggestions.map((s) => (
+        {/* Suggestion cards — responsive 2x2 grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px', width: '100%', maxWidth: '680px', animation: 'slideUp 0.5s ease-out' }}>
+          {suggestions.map((s, i) => (
             <button key={s.title} onClick={() => onSuggestedPrompt?.(s.prompt)}
+              className="suggestion-card"
               style={{
                 padding: '16px 18px', backgroundColor: 'var(--chat-surface)', border: '1px solid var(--chat-border)',
-                borderRadius: '14px', cursor: 'pointer', textAlign: 'left', transition: 'all 180ms',
+                borderRadius: '16px', cursor: 'pointer', textAlign: 'left',
+                animationDelay: `${i * 60}ms`, animationFillMode: 'backwards',
+                animation: `fadeSlideIn 0.3s ease-out ${i * 60}ms backwards`,
               }}
               onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--chat-hover)'; e.currentTarget.style.borderColor = 'var(--color-primary)' }}
               onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--chat-surface)'; e.currentTarget.style.borderColor = 'var(--chat-border)' }}>
-              <div style={{ fontSize: '16px', marginBottom: '8px', opacity: 0.7 }}>{s.icon}</div>
+              <div style={{ marginBottom: '10px' }}>{s.icon}</div>
               <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '4px' }}>{s.title}</div>
-              <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden' }}>{s.prompt}</p>
+              <p style={{ fontSize: '12.5px', color: 'var(--color-text-muted)', margin: 0, lineHeight: '1.5', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden' }}>{s.prompt}</p>
             </button>
           ))}
         </div>
@@ -128,17 +143,19 @@ export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, o
       {showScrollBtn && (
         <button
           onClick={scrollToBottom}
+          className="scroll-btn-enter"
+          aria-label="Scroll to bottom"
           style={{
             position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)',
             width: '36px', height: '36px', borderRadius: '50%',
             background: 'var(--chat-surface)', border: '1px solid var(--chat-border)',
             color: 'var(--color-text-muted)', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)', transition: 'all 0.2s',
-            zIndex: 10,
+            boxShadow: '0 2px 12px rgba(0,0,0,0.2)', transition: 'background 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s',
+            zIndex: 10, backdropFilter: 'blur(8px)',
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-primary)'; e.currentTarget.style.color = 'white'; e.currentTarget.style.borderColor = 'var(--color-primary)' }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--chat-surface)'; e.currentTarget.style.color = 'var(--color-text-muted)'; e.currentTarget.style.borderColor = 'var(--chat-border)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-primary)'; e.currentTarget.style.color = 'white'; e.currentTarget.style.borderColor = 'var(--color-primary)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(16,163,127,0.3)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--chat-surface)'; e.currentTarget.style.color = 'var(--color-text-muted)'; e.currentTarget.style.borderColor = 'var(--chat-border)'; e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.2)' }}
         >
           <ArrowDown size={18} />
         </button>

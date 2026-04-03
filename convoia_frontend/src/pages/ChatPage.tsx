@@ -438,10 +438,11 @@ export function ChatPage() {
               <span>Search pages...</span>
             </div>
             {showPageSearch && (
-              <div style={{
+              <div className="context-menu-enter" style={{
                 position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', zIndex: 50,
                 background: 'var(--chat-surface)', border: '1px solid var(--chat-border)',
-                borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.15)', padding: '4px', minWidth: '200px',
+                borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', padding: '4px', minWidth: '200px',
+                backdropFilter: 'blur(12px)',
               }}>
                 <input
                   autoFocus value={pageSearch} onChange={(e) => setPageSearch(e.target.value)}
@@ -487,7 +488,7 @@ export function ChatPage() {
               background: totalTokens > 0 ? 'var(--color-primary-light)' : 'transparent',
               transition: 'all 0.3s',
             }}>
-              <Zap size={11} style={{ color: '#A78BFA' }} />
+              <Zap size={11} style={{ color: 'var(--color-primary)' }} />
               <span className="hidden sm:inline" style={{ color: totalTokens > 0 ? 'var(--color-text-secondary)' : 'var(--color-text-muted)' }}>
                 {totalTokens > 0 ? formatTokens(totalTokens) : formattedBalance}
               </span>
@@ -502,7 +503,7 @@ export function ChatPage() {
                 <MoreHorizontal size={16} />
               </button>
               {showMoreMenu && (
-                <div className="absolute right-0 top-full z-50" style={{ marginTop: '4px', background: 'var(--chat-surface)', border: '1px solid var(--chat-border)', borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', padding: '4px 0', minWidth: '180px' }}>
+                <div className="absolute right-0 top-full z-50 context-menu-enter" style={{ marginTop: '4px', background: 'var(--chat-surface)', border: '1px solid var(--chat-border)', borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.4)', padding: '4px 0', minWidth: '180px', backdropFilter: 'blur(12px)' }}>
                   <button onClick={handleClear} className="w-full flex items-center gap-2"
                     style={{ padding: '8px 12px', fontSize: '13px', color: 'var(--color-text-secondary)', background: 'none', border: 'none', cursor: 'pointer', transition: 'all 150ms' }}
                     onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--chat-border)'; e.currentTarget.style.color = 'var(--color-text-primary)' }}
@@ -544,13 +545,14 @@ export function ChatPage() {
           {/* Model badge — permanently visible in corner after a response */}
           {lastResponseModel && (
             <div
+              className="animate-fade-in"
               style={{
                 position: 'absolute', bottom: '12px', right: '16px', zIndex: 10,
                 padding: '4px 10px', borderRadius: '20px',
                 backgroundColor: 'var(--chat-surface)', border: '1px solid var(--chat-border)',
                 fontSize: '11px', color: 'var(--color-text-muted)',
                 fontFamily: 'monospace', letterSpacing: '0.02em',
-                pointerEvents: 'none',
+                pointerEvents: 'none', backdropFilter: 'blur(8px)',
               }}
             >
               model · {lastResponseModel}

@@ -274,9 +274,11 @@ export function MessageInput({
 
         {/* Error banner */}
         {fileError && (
-          <div className="flex items-center gap-2" style={{ padding: '8px 12px', marginBottom: '8px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '12px', fontSize: '13px', color: '#EF4444' }}>
+          <div className="flex items-center gap-2 error-banner-enter" role="alert" style={{ padding: '8px 14px', marginBottom: '8px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '12px', fontSize: '13px', color: 'var(--color-danger)' }}>
             <span className="flex-1">{fileError}</span>
-            <button onClick={() => setFileError(null)} style={{ color: 'rgba(239,68,68,0.5)', background: 'none', border: 'none', cursor: 'pointer' }}>
+            <button onClick={() => setFileError(null)} style={{ color: 'rgba(239,68,68,0.5)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px', borderRadius: '4px', transition: 'color 150ms' }}
+              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-danger)'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(239,68,68,0.5)'}>
               <X size={14} />
             </button>
           </div>
@@ -286,11 +288,11 @@ export function MessageInput({
         <div className="chat-input-box" style={{
           display: 'flex', flexDirection: 'column',
           backgroundColor: 'var(--chat-input-bg)', borderRadius: '24px',
-          border: inputFocused ? '1px solid rgba(124,58,237,0.4)' : '1px solid var(--chat-border)',
+          border: inputFocused ? '1px solid var(--color-primary)' : '1px solid var(--chat-border)',
           boxShadow: inputFocused
-            ? '0 0 0 3px rgba(124,58,237,0.08), 0 4px 16px rgba(0,0,0,0.25)'
-            : '0 2px 12px rgba(0,0,0,0.15)',
-          transition: 'all 200ms ease',
+            ? '0 0 0 3px var(--color-primary-glow), 0 4px 16px rgba(0,0,0,0.2)'
+            : '0 2px 12px rgba(0,0,0,0.1)',
+          transition: 'border-color 200ms ease, box-shadow 200ms ease',
           cursor: 'text', maxWidth: '100%', overflowX: 'hidden',
         }}
         onClick={() => textareaRef.current?.focus()}
@@ -308,10 +310,10 @@ export function MessageInput({
           {attachedFiles.length > 0 && (
             <div style={{ padding: '12px 16px 0', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {attachedFiles.map((af, idx) => (
-                <div key={idx}>
+                <div key={idx} className="file-chip">
                   {af.type === 'image' && af.preview && (
                     <div className="relative inline-block">
-                      <img src={af.preview} alt="Attached" style={{ height: '70px', width: 'auto', borderRadius: '10px', border: '1px solid var(--chat-border)', objectFit: 'cover' }} />
+                      <img src={af.preview} alt={`Attached file ${idx + 1}`} style={{ height: '70px', width: 'auto', borderRadius: '10px', border: '1px solid var(--chat-border)', objectFit: 'cover' }} />
                       <button onClick={() => removeFile(idx)} className="absolute flex items-center justify-center"
                         style={{ top: '-6px', right: '-6px', width: '20px', height: '20px', borderRadius: '50%', background: 'var(--chat-border)', border: '1px solid var(--color-border-hover)', color: 'var(--chat-text-secondary)', cursor: 'pointer' }}>
                         <X size={10} />
@@ -438,19 +440,19 @@ export function MessageInput({
                 style={{
                   width: '38px', height: '38px', borderRadius: '12px', flexShrink: 0,
                   background: isLoading
-                    ? 'rgba(239,68,68,0.1)'
+                    ? 'rgba(239,68,68,0.08)'
                     : canSend
-                      ? 'linear-gradient(135deg, #7C3AED, #6D28D9)'
+                      ? 'linear-gradient(135deg, var(--color-primary), var(--color-primary-hover))'
                       : 'var(--chat-surface)',
-                  border: isLoading ? '1px solid rgba(239,68,68,0.3)' : canSend ? 'none' : '1px solid var(--chat-border)',
+                  border: isLoading ? '1px solid rgba(239,68,68,0.25)' : canSend ? 'none' : '1px solid var(--chat-border)',
                   cursor: (canSend || isLoading) ? 'pointer' : 'not-allowed',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   transition: 'all 200ms ease',
-                  boxShadow: canSend && !isLoading ? '0 2px 8px rgba(124,58,237,0.4)' : 'none',
+                  boxShadow: canSend && !isLoading ? '0 2px 8px rgba(16,163,127,0.35)' : 'none',
                 }}
               >
                 {isLoading || fileLoading ? (
-                  <Square size={14} style={{ color: '#EF4444', fill: '#EF4444' }} />
+                  <Square size={14} style={{ color: 'var(--color-danger)', fill: 'var(--color-danger)' }} />
                 ) : (
                   <ArrowUp size={18} style={{ color: canSend ? '#FFFFFF' : 'var(--chat-text-dim)' }} />
                 )}

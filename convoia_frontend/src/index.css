@@ -152,6 +152,12 @@ html.light select option {
   --chat-code-header: #2A2A2A;
   --chat-input-bg: #2F2F2F;
   --chat-user-bubble: #303030;
+  --chat-code-border: rgba(255,255,255,0.08);
+  --chat-code-btn-text: rgba(255,255,255,0.5);
+  --chat-code-btn-border: rgba(255,255,255,0.12);
+  --chat-code-btn-hover: rgba(255,255,255,0.8);
+  --chat-code-lang: rgba(255,255,255,0.55);
+  --chat-code-icon: rgba(255,255,255,0.3);
 }
 
 html.light {
@@ -168,6 +174,12 @@ html.light {
   --chat-code-header: #ECECEC;
   --chat-input-bg: #F4F4F4;
   --chat-user-bubble: #F4F4F4;
+  --chat-code-border: #E5E5E5;
+  --chat-code-btn-text: #64748B;
+  --chat-code-btn-border: #E2E8F0;
+  --chat-code-btn-hover: #475569;
+  --chat-code-lang: #64748B;
+  --chat-code-icon: #94A3B8;
 }
 
 /* ─── Chat textarea scrollbar (visible, thin, ChatGPT-style) ─── */
@@ -451,6 +463,39 @@ pre {
 .animate-spin-slow { animation: spin-slow 8s linear infinite; }
 .animate-message-in { animation: messageIn 200ms ease-out; }
 .message-enter { animation: fadeSlideIn 200ms ease-out forwards; }
+
+/* ─── Scroll-to-bottom button ─── */
+.scroll-btn-enter { animation: fade-in 0.15s ease-out, slide-up 0.15s ease-out; }
+
+/* ─── Suggestion card hover glow ─── */
+.suggestion-card {
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.suggestion-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+
+/* ─── File chip remove animation ─── */
+@keyframes chipFadeIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+.file-chip { animation: chipFadeIn 150ms ease-out; }
+
+/* ─── Context menu entrance ─── */
+@keyframes menuIn {
+  from { opacity: 0; transform: scale(0.95) translateY(-4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.context-menu-enter { animation: menuIn 120ms ease-out; }
+
+/* ─── Error banner slide ─── */
+@keyframes slideInBanner {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.error-banner-enter { animation: slideInBanner 200ms ease-out; }
 
 /* ─── Glass utility ─── */
 .glass {

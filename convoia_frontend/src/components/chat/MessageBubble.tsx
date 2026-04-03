@@ -138,16 +138,18 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
   if (message.isLoading) {
     const hasContent = message.content && message.content.length > 0;
     return (
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '32px', animation: 'fadeSlideIn 200ms ease-out' }}>
-        <div style={{
-          width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
-          backgroundColor: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '14px', color: 'white',
+      <div className="ai-message-row" style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '28px', animation: 'fadeSlideIn 200ms ease-out' }}>
+        <div className="ai-avatar" style={{
+          width: '32px', height: '32px', borderRadius: '10px', flexShrink: 0,
+          background: 'linear-gradient(135deg, var(--color-primary-light), rgba(16,163,127,0.08))',
+          border: '1px solid rgba(16,163,127,0.25)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '16px', color: 'var(--color-primary)',
         }}>✦</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '85%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, minWidth: 0 }}>
           {/* Show accumulated content (e.g. thinking result) while still loading */}
           {hasContent && (
-            <div style={{ fontSize: '14px', lineHeight: '1.65', color: 'var(--chat-text)' }}>
+            <div className="message-content" style={{ fontSize: '15px', lineHeight: '1.75', color: 'var(--chat-text)' }}>
               <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{message.content}</ReactMarkdown>
             </div>
           )}
@@ -155,22 +157,23 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
           {/* Status indicator with animated pulse bar */}
           {message.statusText ? (
             <div style={{
-              display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px',
+              display: 'inline-flex', alignItems: 'center', gap: '10px', padding: '10px 16px',
               borderRadius: '12px', background: 'var(--chat-surface)',
               border: '1px solid var(--chat-border)', fontSize: '13px', color: 'var(--chat-text-secondary)',
+              width: 'fit-content',
             }}>
               <div style={{
-                width: '18px', height: '18px', borderRadius: '50%', flexShrink: 0,
-                border: '2.5px solid var(--color-primary)', borderTopColor: 'transparent',
+                width: '16px', height: '16px', borderRadius: '50%', flexShrink: 0,
+                border: '2px solid var(--color-primary)', borderTopColor: 'transparent',
                 animation: 'spin 0.7s linear infinite',
               }} />
               <span style={{ fontWeight: 500 }}>{message.statusText}</span>
             </div>
           ) : (
-            <div style={{ display: 'flex', gap: '4px', padding: '4px 0' }}>
+            <div style={{ display: 'flex', gap: '5px', padding: '4px 0' }}>
               {[0, 1, 2].map((i) => (
                 <div key={i} style={{
-                  width: '8px', height: '8px', borderRadius: '50%',
+                  width: '7px', height: '7px', borderRadius: '50%',
                   backgroundColor: 'var(--color-primary)',
                   animation: `bounce 1.4s ease-in-out ${i * 0.16}s infinite`,
                 }} />
@@ -185,18 +188,21 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
   /* ── Error ── */
   if (message.error) {
     return (
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '32px', animation: 'fadeSlideIn 200ms ease-out' }}>
-        <div style={{
-          width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
-          background: 'rgba(239,68,68,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      <div className="ai-message-row" style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '28px', animation: 'fadeSlideIn 200ms ease-out' }}>
+        <div className="ai-avatar" style={{
+          width: '32px', height: '32px', borderRadius: '10px', flexShrink: 0,
+          background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <AlertCircle size={14} style={{ color: '#EF4444' }} />
+          <AlertCircle size={15} style={{ color: 'var(--color-danger)' }} />
         </div>
         <div style={{ flex: 1 }}>
-          <p style={{ fontSize: '15px', lineHeight: '1.6', color: 'var(--chat-text)', margin: 0 }}>{message.error}</p>
+          <p style={{ fontSize: '15px', lineHeight: '1.65', color: 'var(--chat-text)', margin: 0 }}>{message.error}</p>
           {onRetry && (
             <button onClick={onRetry}
-              style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', marginTop: '8px', color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12.5px', marginTop: '10px', color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, transition: 'opacity 150ms' }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}>
               <RefreshCw size={12} /> Try again
             </button>
           )}
@@ -209,7 +215,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
   if (isUser) {
     return (
       <div style={{
-        display: 'flex', justifyContent: 'flex-end', marginBottom: '20px',
+        display: 'flex', justifyContent: 'flex-end', marginBottom: '28px',
         paddingLeft: isEditing ? '0px' : '60px',
         animation: 'fadeSlideIn 200ms ease-out',
       }}
@@ -233,7 +239,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
                   fontFamily: 'inherit',
                   transition: 'border-color 0.2s, box-shadow 0.2s',
                 }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-primary)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(124,58,237,0.1)' }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-primary)'; e.currentTarget.style.boxShadow = '0 0 0 3px var(--color-primary-glow)' }}
                 onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--chat-border)'; e.currentTarget.style.boxShadow = 'none' }}
               />
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
@@ -244,7 +250,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
                   Cancel
                 </button>
                 <button onClick={handleSaveEdit}
-                  style={{ padding: '8px 20px', fontSize: '13px', color: 'white', borderRadius: '10px', background: 'linear-gradient(135deg, #7C3AED, #6D28D9)', border: 'none', cursor: 'pointer', fontWeight: 600, transition: 'all 0.15s', boxShadow: '0 2px 8px rgba(124,58,237,0.3)' }}
+                  style={{ padding: '8px 20px', fontSize: '13px', color: 'white', borderRadius: '10px', background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-hover))', border: 'none', cursor: 'pointer', fontWeight: 600, transition: 'all 0.15s', boxShadow: '0 2px 8px rgba(16,163,127,0.3)' }}
                   onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
                   onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
                   Save & Resend
@@ -258,12 +264,15 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
               {(message.imagePreviews && message.imagePreviews.length > 0) ? (
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                   {message.imagePreviews.map((preview, idx) => (
-                    <img key={idx} src={preview} alt={`Uploaded ${idx + 1}`} style={{
+                    <img key={idx} src={preview} alt={`Uploaded image ${idx + 1}`} loading="lazy" style={{
                       maxWidth: message.imagePreviews!.length > 2 ? '160px' : '220px',
                       maxHeight: message.imagePreviews!.length > 2 ? '140px' : '200px',
                       display: 'block', objectFit: 'cover', borderRadius: '12px',
                       border: '1px solid var(--chat-border)',
-                    }} />
+                      transition: 'transform 150ms',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => window.open(preview, '_blank')} />
                   ))}
                 </div>
               ) : message.imagePreview ? (
@@ -308,7 +317,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
                             if (!inline && (langMatch || codeString.includes('\n'))) {
                               return <CodeBlock language={langMatch ? langMatch[1] : 'text'}>{codeString}</CodeBlock>
                             }
-                            return <code style={{ backgroundColor: 'rgba(255,255,255,0.1)', padding: '1px 4px', borderRadius: '3px', fontSize: '13px' }} {...codeRest}>{codeChildren}</code>
+                            return <code style={{ backgroundColor: 'var(--chat-surface)', padding: '2px 5px', borderRadius: '4px', fontSize: '13px', border: '1px solid var(--chat-border)' }} {...codeRest}>{codeChildren}</code>
                           },
                           pre: ({ children }) => <>{children}</>,
                           p: ({ children }) => <p style={{ marginBottom: '8px', lineHeight: '1.6' }} className="last:mb-0">{children}</p>,
@@ -341,7 +350,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
                         if (!inline && (langMatch || codeString.includes('\n'))) {
                           return <CodeBlock language={langMatch ? langMatch[1] : 'text'}>{codeString}</CodeBlock>
                         }
-                        return <code style={{ backgroundColor: 'rgba(255,255,255,0.1)', padding: '1px 4px', borderRadius: '3px', fontSize: '13px' }} {...codeRest}>{codeChildren}</code>
+                        return <code style={{ backgroundColor: 'var(--chat-surface)', padding: '2px 5px', borderRadius: '4px', fontSize: '13px', border: '1px solid var(--chat-border)' }} {...codeRest}>{codeChildren}</code>
                       },
                       pre: ({ children }) => <>{children}</>,
                       p: ({ children }) => <p style={{ marginBottom: '4px', lineHeight: '1.6' }} className="last:mb-0">{children}</p>,
@@ -387,12 +396,12 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
     onMouseEnter={() => setShowActions(true)} onMouseLeave={() => setShowActions(false)}>
 
       {/* AI Avatar */}
-      <div className="ai-avatar" style={{
+      <div className="ai-avatar assistant-icon" style={{
         width: '32px', height: '32px', borderRadius: '10px', flexShrink: 0,
-        background: 'linear-gradient(135deg, rgba(124,58,237,0.15), rgba(79,70,229,0.15))',
-        border: '1px solid rgba(124,58,237,0.25)',
+        background: 'linear-gradient(135deg, var(--color-primary-light), rgba(16,163,127,0.08))',
+        border: '1px solid rgba(16,163,127,0.25)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '16px', color: '#A78BFA', marginTop: '2px',
+        fontSize: '16px', color: 'var(--color-primary)',
       }}>✦</div>
 
       {/* Text area — no background, no border */}
@@ -413,7 +422,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
                 <div style={{
                   width: '28px', height: '28px', borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #7C3AED, #10B981)',
+                  background: 'linear-gradient(135deg, var(--color-primary), var(--color-accent-end))',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: '13px', color: 'white', flexShrink: 0,
                 }}>✦</div>
@@ -666,13 +675,16 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
         {/* Generated image */}
         {message.imageUrl && (
           <div style={{ marginTop: '12px' }}>
-            <img src={message.imageUrl} alt={message.imagePrompt || 'Generated image'}
-              style={{ maxWidth: '384px', borderRadius: '12px', cursor: 'pointer', border: '1px solid var(--chat-border)' }} />
+            <img src={message.imageUrl} alt={message.imagePrompt || 'Generated image'} loading="lazy"
+              style={{ maxWidth: '100%', width: '384px', borderRadius: '12px', cursor: 'pointer', border: '1px solid var(--chat-border)' }}
+              onClick={() => { if (message.imageUrl) window.open(message.imageUrl, '_blank') }} />
             {message.imagePrompt && (
-              <p style={{ fontSize: '12px', marginTop: '4px', fontStyle: 'italic', color: 'var(--chat-text-muted)' }}>"{message.imagePrompt}"</p>
+              <p style={{ fontSize: '12px', marginTop: '6px', fontStyle: 'italic', color: 'var(--chat-text-muted)' }}>"{message.imagePrompt}"</p>
             )}
             <button onClick={() => downloadImage(message.imageUrl!)}
-              style={{ marginTop: '8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer' }}>
+              style={{ marginTop: '8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, transition: 'opacity 150ms' }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}>
               <Download size={12} /> Download image
             </button>
           </div>
@@ -684,11 +696,13 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
             <video
               controls
               playsInline
-              style={{ maxWidth: '480px', borderRadius: '12px', border: '1px solid var(--chat-border)', background: '#000' }}
+              style={{ maxWidth: '100%', width: '480px', borderRadius: '12px', border: '1px solid var(--chat-border)', background: '#000' }}
               src={message.videoUrl}
             />
             <button onClick={() => { const a = document.createElement('a'); a.href = message.videoUrl!; a.download = 'generated-video.mp4'; a.target = '_blank'; a.click(); }}
-              style={{ marginTop: '8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer' }}>
+              style={{ marginTop: '8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, transition: 'opacity 150ms' }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}>
               <Download size={12} /> Download video
             </button>
           </div>

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Trash2, Pin, PinOff, Pencil, FolderPlus, Folder, ChevronDown, ChevronRight, Download, MoreHorizontal, X, LogOut, Settings, LayoutDashboard, Sun, Moon } from 'lucide-react'
 import { formatRelativeTime, formatCurrency, truncate, groupByDate } from '../../lib/utils'
@@ -35,8 +35,8 @@ function ContextMenu({ x, y, onClose, children }: { x: number; y: number; onClos
   return (
     <div
       ref={ref}
-      className="fixed z-50"
-      style={{ top: y, left: x, background: 'var(--color-surface-3)', border: '1px solid var(--chat-border)', borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', padding: '4px 0', minWidth: '160px' }}
+      className="fixed z-50 context-menu-enter"
+      style={{ top: y, left: x, background: 'var(--color-surface-3)', border: '1px solid var(--chat-border)', borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', padding: '4px 0', minWidth: '170px', backdropFilter: 'blur(12px)' }}
     >
       {children}
     </div>
@@ -47,10 +47,10 @@ function ContextMenuItem({ icon, label, onClick, danger }: { icon: React.ReactNo
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-2"
-      style={{ padding: '6px 12px', fontSize: '13px', color: danger ? '#EF4444' : 'var(--color-text-secondary)', background: 'none', border: 'none', cursor: 'pointer', transition: 'all 150ms' }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = danger ? 'rgba(239,68,68,0.1)' : 'var(--chat-border)'; if (!danger) e.currentTarget.style.color = 'var(--color-text-primary)' }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = danger ? '#EF4444' : 'var(--color-text-secondary)' }}
+      className="w-full flex items-center gap-2.5"
+      style={{ padding: '7px 14px', fontSize: '13px', color: danger ? 'var(--color-danger)' : 'var(--color-text-secondary)', background: 'none', border: 'none', cursor: 'pointer', transition: 'all 150ms', borderRadius: '4px', margin: '0 4px', width: 'calc(100% - 8px)' }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = danger ? 'rgba(239,68,68,0.08)' : 'var(--color-surface-2)'; if (!danger) e.currentTarget.style.color = 'var(--color-text-primary)' }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = danger ? 'var(--color-danger)' : 'var(--color-text-secondary)' }}
     >
       {icon}
       {label}
@@ -73,18 +73,20 @@ export function ConversationList({
   const [newFolderName, setNewFolderName] = useState('')
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
 
-  const filtered = conversations.filter((c) =>
+  const filtered = useMemo(() => conversations.filter((c) =>
     c.title.toLowerCase().includes(search.toLowerCase()) ||
     c.messages.some((m) => m.content.toLowerCase().includes(search.toLowerCase()))
-  )
+  ), [conversations, search])
 
-  const pinned = filtered.filter((c) => c.isPinned)
-  const foldered = folders.map((f) => ({
+  const pinned = useMemo(() => filtered.filter((c) => c.isPinned), [filtered])
+  const foldered = useMemo(() => folders.map((f) => ({
     folder: f,
     convs: filtered.filter((c) => c.folderId === f.id && !c.isPinned),
-  }))
-  const unfolderedUnpinned = filtered.filter((c) => !c.isPinned && !c.folderId)
-  const grouped = groupByDate(unfolderedUnpinned, 'updatedAt')
+  })), [filtered, folders])
+  const grouped = useMemo(() => {
+    const unfolderedUnpinned = filtered.filter((c) => !c.isPinned && !c.folderId)
+    return groupByDate(unfolderedUnpinned, 'updatedAt')
+  }, [filtered])
 
   const handleContextMenu = (e: React.MouseEvent, id: string) => {
     e.preventDefault()
@@ -141,11 +143,12 @@ export function ConversationList({
         key={conv.id}
         onClick={() => onSelect(conv.id)}
         onContextMenu={(e) => handleContextMenu(e, conv.id)}
-        className="group"
+        className="group conversation-item"
         style={{
-          margin: '1px 6px', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer',
+          margin: '1px 6px', padding: '10px 12px', borderRadius: '10px', cursor: 'pointer',
           backgroundColor: isActive ? 'var(--color-surface-3)' : 'transparent',
-          transition: 'all 150ms',
+          borderLeft: isActive ? '2px solid var(--color-primary)' : '2px solid transparent',
+          transition: 'all 150ms ease',
         }}
         onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.backgroundColor = 'var(--color-surface-2)' }}
         onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.backgroundColor = isActive ? 'var(--color-surface-3)' : 'transparent' }}
@@ -222,7 +225,10 @@ export function ConversationList({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search chats..."
-            style={{ width: '100%', padding: '8px 10px 8px 32px', backgroundColor: 'var(--color-surface-2)', border: 'none', borderRadius: '8px', color: 'var(--color-text-primary)', fontSize: '13px', outline: 'none' }}
+            aria-label="Search conversations"
+            style={{ width: '100%', padding: '8px 10px 8px 32px', backgroundColor: 'var(--color-surface-2)', border: '1px solid transparent', borderRadius: '8px', color: 'var(--color-text-primary)', fontSize: '13px', outline: 'none', transition: 'border-color 200ms' }}
+            onFocus={(e) => e.currentTarget.style.borderColor = 'var(--color-primary)'}
+            onBlur={(e) => e.currentTarget.style.borderColor = 'transparent'}
           />
         </div>
       </div>
@@ -297,9 +303,9 @@ export function ConversationList({
       </div>
 
       {/* Navigation + User at bottom */}
-      <div style={{ flexShrink: 0, borderTop: '1px solid var(--color-surface-2)' }}>
+      <div style={{ flexShrink: 0, borderTop: '1px solid var(--color-border-subtle)' }}>
         {/* Quick nav links */}
-        <div style={{ display: 'flex', gap: '2px', padding: '8px 8px 4px' }}>
+        <div style={{ display: 'flex', gap: '4px', padding: '10px 10px 6px' }}>
           <button onClick={() => navigate('/dashboard')} title="Dashboard"
             style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '6px', borderRadius: '8px', background: 'none', border: 'none', color: 'var(--color-text-dim)', cursor: 'pointer', fontSize: '11px', transition: 'all 0.15s' }}
             onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-surface-2)'; e.currentTarget.style.color = 'var(--color-text-primary)' }}

@@ -55,25 +55,25 @@ export function CodeBlock({ language = 'text', children, onRun, onOpenInCanvas }
   const btnStyle: React.CSSProperties = {
     display: 'flex', alignItems: 'center', gap: '5px',
     padding: '4px 10px', borderRadius: '6px',
-    backgroundColor: 'transparent', border: '1px solid rgba(255,255,255,0.12)',
-    color: 'rgba(255,255,255,0.5)', fontSize: '11.5px', cursor: 'pointer',
+    backgroundColor: 'transparent', border: '1px solid var(--chat-code-btn-border)',
+    color: 'var(--chat-code-btn-text)', fontSize: '11.5px', cursor: 'pointer',
     fontFamily: 'Inter, system-ui, sans-serif', transition: 'all 150ms',
   }
 
   return (
     <div style={{
       margin: '16px 0', borderRadius: '12px', overflow: 'hidden',
-      border: '1px solid rgba(255,255,255,0.08)', backgroundColor: '#0D0D0D',
+      border: '1px solid var(--chat-code-border)', backgroundColor: 'var(--chat-code-bg)',
     }}>
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '8px 14px', backgroundColor: '#161616',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        padding: '8px 14px', backgroundColor: 'var(--chat-code-header)',
+        borderBottom: '1px solid var(--chat-code-border)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-          <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px', fontFamily: 'monospace' }}>&lt;/&gt;</span>
-          <span style={{ fontSize: '12.5px', fontWeight: 500, color: 'rgba(255,255,255,0.55)', textTransform: 'capitalize' }}>
+          <span style={{ color: 'var(--chat-code-icon)', fontSize: '12px', fontFamily: 'monospace' }}>&lt;/&gt;</span>
+          <span style={{ fontSize: '12.5px', fontWeight: 500, color: 'var(--chat-code-lang)', textTransform: 'capitalize' }}>
             {displayLang}
           </span>
         </div>
@@ -81,8 +81,8 @@ export function CodeBlock({ language = 'text', children, onRun, onOpenInCanvas }
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           {onRun && (
             <button onClick={onRun} style={btnStyle}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)'; e.currentTarget.style.color = 'rgba(255,255,255,0.8)' }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = 'rgba(255,255,255,0.5)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-primary)'; e.currentTarget.style.color = 'var(--chat-code-btn-hover)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--chat-code-btn-border)'; e.currentTarget.style.color = 'var(--chat-code-btn-text)' }}
             >
               <Play size={11} /> Run
             </button>
@@ -90,17 +90,17 @@ export function CodeBlock({ language = 'text', children, onRun, onOpenInCanvas }
 
           {onOpenInCanvas && (
             <button onClick={() => onOpenInCanvas(children, displayLang)} style={btnStyle}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#7C3AED'; e.currentTarget.style.color = '#A78BFA' }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = 'rgba(255,255,255,0.5)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-primary)'; e.currentTarget.style.color = 'var(--color-primary)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--chat-code-btn-border)'; e.currentTarget.style.color = 'var(--chat-code-btn-text)' }}
             >
               <PanelRight size={11} /> Canvas
             </button>
           )}
 
           <button onClick={handleCopy}
-            style={{ ...btnStyle, color: copied ? '#4ade80' : 'rgba(255,255,255,0.5)' }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)'; if (!copied) e.currentTarget.style.color = 'rgba(255,255,255,0.8)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; if (!copied) e.currentTarget.style.color = 'rgba(255,255,255,0.5)' }}
+            style={{ ...btnStyle, color: copied ? 'var(--color-success)' : 'var(--chat-code-btn-text)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-primary)'; if (!copied) e.currentTarget.style.color = 'var(--chat-code-btn-hover)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--chat-code-btn-border)'; if (!copied) e.currentTarget.style.color = 'var(--chat-code-btn-text)' }}
           >
             {copied ? <><Check size={11} /> Copied</> : <><Copy size={11} /> Copy</>}
           </button>
@@ -114,7 +114,7 @@ export function CodeBlock({ language = 'text', children, onRun, onOpenInCanvas }
         customStyle={{
           margin: 0,
           padding: '16px 18px',
-          backgroundColor: '#0D0D0D',
+          backgroundColor: 'var(--chat-code-bg)',
           fontSize: '13.5px',
           lineHeight: '1.7',
           fontFamily: "'Fira Code', 'Cascadia Code', 'Consolas', monospace",
