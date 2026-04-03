@@ -12,7 +12,7 @@ import { FileProcessingService } from '../services/fileProcessingService.js';
 import { getCachedResponse, setCachedResponse } from '../services/modelRecommendationService.js';
 import { getUserMemoryPrompt } from '../services/userMemoryService.js';
 import { processMemoryForQuery } from '../services/vectorMemoryService.js';
-import { analyzeQuery, getClarificationSystemPrompt, getDeepThinkingSystemPrompt, buildRefinementPrompt } from '../services/thinkingService.js';
+import { analyzeQuery, getClarificationSystemPrompt, getDeepResearchPrompt, buildRefinementPrompt } from '../services/thinkingService.js';
 import logger from '../config/logger.js';
 
 // Image-only models that cannot handle chat/streaming
@@ -568,18 +568,20 @@ export const queryAIStream = async (req: Request, res: Response) => {
       }
     }
 
-    // ── EXTENDED THINKING PIPELINE ──────────────────────────────
-    // When thinking is enabled, run a 3-stage reasoning pipeline:
-    // Stage 1: Analyze query (rule-based, instant)
-    // Stage 2: Clarification (if query is vague — ask questions)
-    // Stage 3: Multi-pass (Pass 1: deep think → Pass 2: refine & stream)
+    // ── DEEP RESEARCH PIPELINE ─────────────────────────────────
+    // 4-stage expert research system (activated when Think button is ON):
+    //
+    // Stage 1: Intent + Depth Detection (instant, rule-based)
+    // Stage 2: Clarification (if query is vague — ask before answering)
+    // Stage 3: Deep Research — Hypothesis + Multi-Angle Reasoning (Pass 1, non-streaming)
+    // Stage 4: Iterative Refinement — Self-Critique + Polish (Pass 2, streaming)
     let pass1ExtraInputTokens = 0;
     let pass1ExtraOutputTokens = 0;
     let useProviderThinking = !!thinkingEnabled;
 
     if (thinkingEnabled) {
       const analysis = analyzeQuery(userQuery, enrichedMessages);
-      logger.info(`Thinking analysis: confidence=${analysis.confidenceScore.toFixed(2)}, task=${analysis.taskType}, clarify=${analysis.needsClarification}`);
+      logger.info(`Deep research: depth=${analysis.depthLevel}, task=${analysis.taskType}, confidence=${analysis.confidenceScore.toFixed(2)}, hypotheses=${analysis.hypotheses.length}, clarify=${analysis.needsClarification}`);
 
       if (analysis.needsClarification) {
         // ── Stage 2: Clarification — ask smart questions instead of guessing ──
@@ -591,16 +593,29 @@ export const queryAIStream = async (req: Request, res: Response) => {
           topP: 0.9,
           name: agentConfig?.name || 'AI',
         };
-        useProviderThinking = false; // no native thinking for clarification
+        useProviderThinking = false;
 
       } else {
-        // ── Stage 3: Multi-pass reasoning ──
-        res.write(`data: ${JSON.stringify({ type: 'status', content: 'Thinking deeply...' })}\n\n`);
+        // ── Stage 3 + 4: Deep Research → Refinement ──
+        res.write(`data: ${JSON.stringify({ type: 'status', content: 'Identifying problem scope...' })}\n\n`);
 
         try {
-          // Pass 1: Deep thinking (non-streaming) — get full analysis
-          const thinkingPrompt = getDeepThinkingSystemPrompt(analysis.taskType);
-          const pass1MaxTokens = Math.min(Math.floor(streamMaxOutput * 0.4), 4096);
+          // Brief pause for UX (shows status before heavy processing)
+          await new Promise(r => setTimeout(r, 300));
+
+          if (analysis.hypotheses.length > 0 && !streamEnded) {
+            res.write(`data: ${JSON.stringify({ type: 'status', content: 'Building hypotheses...' })}\n\n`);
+            await new Promise(r => setTimeout(r, 400));
+          }
+
+          res.write(`data: ${JSON.stringify({ type: 'status', content: 'Researching from multiple angles...' })}\n\n`);
+
+          // Pass 1: Deep Research (non-streaming)
+          // Combines hypothesis building + multi-angle analysis in one call
+          const researchPrompt = getDeepResearchPrompt(analysis);
+          const pass1MaxTokens = analysis.depthLevel === 'research'
+            ? Math.min(Math.floor(streamMaxOutput * 0.5), 6144)
+            : Math.min(Math.floor(streamMaxOutput * 0.4), 4096);
 
           const pass1Result = await AIGatewayService.sendMessage({
             userId: user.id,
@@ -608,7 +623,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
             modelId: finalModelId,
             messages: enrichedMessages,
             agentConfig: {
-              systemPrompt: thinkingPrompt,
+              systemPrompt: researchPrompt,
               temperature: 0.3,
               maxTokens: pass1MaxTokens,
               topP: 0.9,
@@ -622,44 +637,42 @@ export const queryAIStream = async (req: Request, res: Response) => {
           pass1ExtraInputTokens = pass1Result.inputTokens;
           pass1ExtraOutputTokens = pass1Result.outputTokens;
 
-          // Send thinking to client (collapsible in UI)
+          // Send research to client (collapsible in UI)
           if (pass1Result.response && !streamEnded) {
-            const thinkingSummary = pass1Result.response.length > 3000
-              ? pass1Result.response.substring(0, 3000) + '\n\n[...truncated for refinement]'
+            const researchSummary = pass1Result.response.length > 4000
+              ? pass1Result.response.substring(0, 4000) + '\n\n[...analysis continues in refinement]'
               : pass1Result.response;
             res.write(`data: ${JSON.stringify({
               type: 'thinking_result',
-              content: thinkingSummary,
+              content: researchSummary,
             })}\n\n`);
           }
 
-          // Prepare Pass 2: Refinement — replace last user message with refinement prompt
-          res.write(`data: ${JSON.stringify({ type: 'status', content: 'Refining answer...' })}\n\n`);
+          // Stage 4: Iterative Refinement — self-critique + polish
+          res.write(`data: ${JSON.stringify({ type: 'status', content: 'Validating and refining...' })}\n\n`);
 
           const refinementPrompt = buildRefinementPrompt(pass1Result.response, userQuery);
           enrichedMessages = [
-            ...enrichedMessages.slice(0, -1), // keep conversation history
+            ...enrichedMessages.slice(0, -1),
             { role: 'user', content: refinementPrompt },
           ];
 
-          // Override agent config for refinement pass
           agentConfig = {
-            systemPrompt: 'You are an expert who delivers precise, well-structured, actionable answers. Use markdown formatting. Be thorough but concise — every sentence must add value.',
+            systemPrompt: 'You are a senior expert delivering a polished, consultant-grade response. Follow the output format exactly. Use markdown. Be thorough but concise — every sentence must earn its place.',
             temperature: 0.4,
             maxTokens: agentConfig?.maxTokens || 16384,
             topP: 0.9,
             name: agentConfig?.name || 'AI',
           };
-          useProviderThinking = false; // no native thinking on refinement pass
+          useProviderThinking = false;
 
-          logger.info(`Pass 1 complete: ${pass1Result.response.length} chars, ${pass1ExtraInputTokens + pass1ExtraOutputTokens} tokens. Starting Pass 2 refinement.`);
+          logger.info(`Deep research Pass 1 complete: ${pass1Result.response.length} chars, ${pass1ExtraInputTokens + pass1ExtraOutputTokens} tokens, depth=${analysis.depthLevel}. Starting refinement.`);
 
         } catch (pass1Err: any) {
           // Pass 1 failed — fall back to normal streaming with thinking enabled
-          logger.error(`Pass 1 failed, falling back to single-pass: ${pass1Err.message}`);
+          logger.error(`Deep research Pass 1 failed, falling back to single-pass: ${pass1Err.message}`);
           res.write(`data: ${JSON.stringify({ type: 'status', content: 'Processing...' })}\n\n`);
           useProviderThinking = true;
-          // enrichedMessages and agentConfig unchanged — falls through to normal streaming
         }
       }
     }

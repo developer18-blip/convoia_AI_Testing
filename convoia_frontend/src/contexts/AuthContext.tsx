@@ -36,17 +36,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const storedToken = localStorage.getItem('convoia_token')
     const storedUser = localStorage.getItem('convoia_user')
-    if (storedToken && storedUser) {
-      try {
-        setToken(storedToken)
-        setUser(JSON.parse(storedUser))
-      } catch {
-        localStorage.removeItem('convoia_token')
-        localStorage.removeItem('convoia_refresh_token')
-        localStorage.removeItem('convoia_user')
-      }
+
+    if (!storedToken || !storedUser) {
+      setIsLoading(false)
+      return
     }
-    setIsLoading(false)
+
+    // Restore state from localStorage, then verify with server.
+    // If the access token is expired, the axios interceptor will
+    // auto-refresh it using the refresh token (7-day lifetime).
+    let parsedUser: User | null = null
+    try {
+      parsedUser = JSON.parse(storedUser)
+    } catch {
+      localStorage.removeItem('convoia_token')
+      localStorage.removeItem('convoia_refresh_token')
+      localStorage.removeItem('convoia_user')
+      setIsLoading(false)
+      return
+    }
+
+    // Set state immediately so the UI doesn't flash login page
+    setToken(storedToken)
+    setUser(parsedUser)
+
+    // Verify in background — if token expired, interceptor auto-refreshes
+    // If refresh also fails, interceptor redirects to /login
+    api.get('/auth/profile')
+      .then((res) => {
+        // Got fresh user data from server — update local state
+        const freshUser = res.data.data?.user || res.data.data
+        if (freshUser?.id) {
+          setUser(freshUser)
+          localStorage.setItem('convoia_user', JSON.stringify(freshUser))
+        }
+        // Also update token in case interceptor refreshed it
+        const currentToken = localStorage.getItem('convoia_token')
+        if (currentToken && currentToken !== storedToken) {
+          setToken(currentToken)
+        }
+      })
+      .catch(() => {
+        // Interceptor already handled the 401 → refresh → redirect flow
+        // If we're still here, something else failed — just clear state
+        setToken(null)
+        setUser(null)
+      })
+      .finally(() => {
+        setIsLoading(false)
+      })
   }, [])
 
   const redirectByRole = useCallback(
