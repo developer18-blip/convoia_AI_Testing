@@ -402,9 +402,9 @@ export const queryAIStream = async (req: Request, res: Response) => {
           description: `Video generation (Google Veo 2)`,
         });
 
-        // Send video result
+        // Send video result — video player rendered by frontend MessageBubble (not markdown)
         const enhancementsList = result.enhancementsApplied.join(', ');
-        const videoContent = `\n\n**Generated Video:**\n\n<video controls width="480" src="${result.videoUrl}"></video>\n\n*Enhancements applied: ${enhancementsList}*\n\n*"${result.revisedPrompt.substring(0, 150)}..."*\n\n[Download video](${result.videoUrl})`;
+        const videoContent = `**Generated Video**\n\n*Enhancements: ${enhancementsList}*\n\n*"${result.revisedPrompt.substring(0, 150)}..."*`;
         res.write(`data: ${JSON.stringify({ type: 'chunk', content: videoContent })}\n\n`);
 
         res.write(`data: ${JSON.stringify({
