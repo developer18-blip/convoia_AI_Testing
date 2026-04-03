@@ -360,11 +360,57 @@ export const queryAIStream = async (req: Request, res: Response) => {
       res.flushHeaders();
 
       try {
-        res.write(`data: ${JSON.stringify({ type: 'status', content: 'Analyzing your idea...' })}\n\n`);
+        let videoPrompt = videoIntent.extractedSubject || lastUserText;
+        let videoThinkTokens = 0; // extra tokens from AI prompt enhancement
+
+        // ── THINK MODE: Use AI to craft a pro-level cinematic prompt ──
+        if (thinkingEnabled) {
+          res.write(`data: ${JSON.stringify({ type: 'status', content: 'Thinking about your vision...' })}\n\n`);
+          try {
+            const directorResult = await AIGatewayService.sendMessage({
+              userId: user.id,
+              organizationId,
+              modelId: finalModelId,
+              messages: [{ role: 'user', content: videoPrompt }],
+              agentConfig: {
+                systemPrompt: `You are an elite AI film director and cinematographer. The user wants to generate a video.
+
+Your job: Transform their idea into a DETAILED cinematic video prompt that will produce stunning visuals.
+
+Include SPECIFIC details about:
+- Camera work (tracking shot, drone aerial, steadicam, dolly zoom, crane shot, handheld)
+- Lighting (golden hour, rim lighting, volumetric fog, lens flares, chiaroscuro)
+- Color palette (teal and orange, desaturated, warm tones, neon accents)
+- Motion (slow motion 120fps, time-lapse, parallax, whip pan)
+- Atmosphere (rain droplets, dust particles, smoke, mist, bokeh)
+- Composition (rule of thirds, leading lines, depth of field, foreground elements)
+
+Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Just the cinematic description in one paragraph, under 200 words.`,
+                temperature: 0.7,
+                maxTokens: 300,
+                topP: 0.9,
+                name: 'Director',
+              },
+              maxOutputTokens: 300,
+            });
+
+            if (directorResult.response && directorResult.response.length > 20) {
+              videoPrompt = directorResult.response.trim();
+              // Track the thinking tokens for billing
+              videoThinkTokens = (directorResult.inputTokens || 0) + (directorResult.outputTokens || 0);
+              logger.info(`Think mode enhanced video prompt: "${videoPrompt.substring(0, 100)}..."`);
+              res.write(`data: ${JSON.stringify({ type: 'thinking_result', content: `**Director's Vision:**\n\n${videoPrompt}` })}\n\n`);
+            }
+          } catch (thinkErr: any) {
+            logger.warn(`Video think mode failed, using original prompt: ${thinkErr.message}`);
+          }
+        } else {
+          res.write(`data: ${JSON.stringify({ type: 'status', content: 'Analyzing your idea...' })}\n\n`);
+        }
 
         // Build request
         const mediaRequest: MediaRequest = {
-          prompt: videoIntent.extractedSubject || lastUserText,
+          prompt: videoPrompt,
           mediaType: videoIntent.mediaType,
           userId: user.id,
         };
@@ -391,15 +437,16 @@ export const queryAIStream = async (req: Request, res: Response) => {
         const veoModelId = veoModel?.id || finalModelId;
         const videoOutputPrice = veoModel?.outputTokenPrice || 0.0025;
         const videoMarkup = veoModel?.markupPercentage || 25;
+        const totalVideoTokens = VIDEO_TOKEN_COST + videoThinkTokens;
         const providerCost = VIDEO_TOKEN_COST * videoOutputPrice;
         const videoCustomerPrice = providerCost * (1 + videoMarkup / 100);
 
-        // Deduct tokens
+        // Deduct tokens (video gen + thinking if used)
         await TokenWalletService.deductTokens({
           userId: user.id,
-          tokens: VIDEO_TOKEN_COST,
+          tokens: totalVideoTokens,
           reference: `video-gen-${Date.now()}`,
-          description: `Video generation (Google Veo 2)`,
+          description: `Video generation (Google Veo 2)${videoThinkTokens > 0 ? ' + AI director' : ''}`,
         });
 
         // Send video result — video player rendered by frontend MessageBubble (not markdown)
@@ -409,8 +456,8 @@ export const queryAIStream = async (req: Request, res: Response) => {
 
         res.write(`data: ${JSON.stringify({
           type: 'done',
-          tokens: { input: 0, output: VIDEO_TOKEN_COST, total: VIDEO_TOKEN_COST },
-          tokensUsed: VIDEO_TOKEN_COST,
+          tokens: { input: videoThinkTokens, output: VIDEO_TOKEN_COST, total: totalVideoTokens },
+          tokensUsed: totalVideoTokens,
           cost: { charged: videoCustomerPrice.toFixed(6) },
           model: veoModel?.name || 'Google Veo 2',
           provider: 'google',
@@ -427,7 +474,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
             modelId: veoModelId,
             prompt: lastUserText.substring(0, 500),
             response: `[Video: ${result.revisedPrompt.substring(0, 200)}]`,
-            tokensInput: 0, tokensOutput: VIDEO_TOKEN_COST, totalTokens: VIDEO_TOKEN_COST,
+            tokensInput: videoThinkTokens, tokensOutput: VIDEO_TOKEN_COST, totalTokens: totalVideoTokens,
             providerCost,
             markupPercentage: videoMarkup,
             customerPrice: videoCustomerPrice,
