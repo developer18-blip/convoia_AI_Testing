@@ -215,7 +215,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
       res.status(401).json({ success: false, message: 'Unauthorized' });
       return;
     }
-    const { modelId, messages, industry, agentId, thinkingEnabled, referenceImage } = req.body;
+    const { modelId, messages, industry, agentId, thinkingEnabled, referenceImage, referenceImages } = req.body;
     if (!modelId || !messages || messages.length === 0) {
       res.status(400).json({ success: false, message: 'modelId and messages are required' });
       return;
@@ -565,6 +565,44 @@ export const queryAIStream = async (req: Request, res: Response) => {
         }
       } catch (err: any) {
         logger.error(`Web search error: ${err.message}`);
+      }
+    }
+
+    // ── INJECT IMAGES INTO MESSAGES (multi-image support) ──────
+    // Convert base64 images into multimodal content blocks in the last user message.
+    // Works with all providers: OpenAI (image_url), Anthropic (image), Google (inlineData).
+    const allImages: string[] = referenceImages?.length > 0
+      ? referenceImages
+      : referenceImage ? [referenceImage] : [];
+
+    if (allImages.length > 0) {
+      const lastIdx = enrichedMessages.length - 1;
+      if (enrichedMessages[lastIdx]?.role === 'user') {
+        const textContent = enrichedMessages[lastIdx].content;
+        // Build multimodal content array: text + all images
+        const contentParts: any[] = [{ type: 'text', text: textContent }];
+        for (const imgBase64 of allImages) {
+          // Detect mime type from base64 header or default to jpeg
+          let mimeType = 'image/jpeg';
+          let rawBase64 = imgBase64;
+          if (imgBase64.startsWith('data:')) {
+            const match = imgBase64.match(/^data:(image\/\w+);base64,/);
+            if (match) {
+              mimeType = match[1];
+              rawBase64 = imgBase64.replace(/^data:image\/\w+;base64,/, '');
+            }
+          }
+          contentParts.push({
+            type: 'image_url',
+            image_url: { url: imgBase64.startsWith('data:') ? imgBase64 : `data:${mimeType};base64,${rawBase64}` },
+            // Anthropic/Google format (handled by provider routing)
+            _base64: rawBase64,
+            _mimeType: mimeType,
+          });
+        }
+        enrichedMessages = [...enrichedMessages];
+        enrichedMessages[lastIdx] = { ...enrichedMessages[lastIdx], content: contentParts };
+        logger.info(`Injected ${allImages.length} image(s) into last user message for vision analysis`);
       }
     }
 

@@ -166,6 +166,7 @@ export interface Message {
   imageUrl?: string
   imagePrompt?: string
   imagePreview?: string
+  imagePreviews?: string[] // multiple images (base64)
   fileAttachment?: {
     name: string
     type: 'image' | 'document' | 'audio' | 'video'

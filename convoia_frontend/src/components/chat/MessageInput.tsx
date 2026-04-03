@@ -41,7 +41,7 @@ interface MessageInputProps {
   onStop?: () => void
   onFileProcessed?: (data: FileProcessedData) => void
   onImageGenerated?: (data: ImageGeneratedData) => void
-  onSendWithContext?: (text: string, systemContext: string | null, extras?: { fileAttachment?: { name: string; type: 'image' | 'document' | 'audio' | 'video'; size: number }; imagePreview?: string }) => void
+  onSendWithContext?: (text: string, systemContext: string | null, extras?: { fileAttachment?: { name: string; type: 'image' | 'document' | 'audio' | 'video'; size: number }; imagePreview?: string; imagePreviews?: string[] }) => void
   onError?: (message: string) => void
 }
 
@@ -178,17 +178,22 @@ export function MessageInput({
       for (const audio of audios) {
         if (audio.transcript) contextParts.push(`[Audio transcript: ${audio.file.name}]\n${audio.transcript}`)
       }
-      // For multiple images, send the first one as image and include others as context note
+      // Send ALL images to the model (not just the first)
       if (images.length > 0 && images[0].preview) {
-        if (images.length > 1) contextParts.push(`[${images.length} images attached — analyzing first image]`)
-        const firstImage = images[0]
+        const allPreviews = images.map(img => img.preview).filter(Boolean) as string[]
         if (onSendWithContext) {
           const combinedContext = contextParts.length > 0 ? contextParts.join('\n\n---\n\n') : null
-          const question = value.trim() || (docs.length > 0 ? 'Analyze these documents' : 'Analyze this')
+          const question = value.trim() || (images.length > 1 ? `Analyze these ${images.length} images` : 'Analyze this image')
+          const fileNames = images.map(img => img.file.name).join(', ')
+          const totalSize = images.reduce((s, img) => s + img.file.size, 0)
           onSendWithContext(
             combinedContext ? `${question}\n\n${combinedContext}` : question,
             null,
-            { fileAttachment: { name: firstImage.file.name, type: 'image', size: firstImage.file.size }, imagePreview: firstImage.preview },
+            {
+              fileAttachment: { name: fileNames, type: 'image', size: totalSize },
+              imagePreview: allPreviews[0],
+              imagePreviews: allPreviews.length > 1 ? allPreviews : undefined,
+            },
           )
         }
       } else if (contextParts.length > 0) {

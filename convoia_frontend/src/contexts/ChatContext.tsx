@@ -476,8 +476,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const token = localStorage.getItem('convoia_token')
       const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
-      // Find the most recent image from conversation (including current message)
-      const lastImage = [...messages, userMsg].reverse().find((m) => m.imagePreview)?.imagePreview
+      // Collect ALL images from the current message (supports multiple image uploads)
+      const currentMsg = userMsg
+      let referenceImages: string[] = []
+      if (currentMsg.imagePreviews && currentMsg.imagePreviews.length > 0) {
+        referenceImages = currentMsg.imagePreviews
+      } else if (currentMsg.imagePreview) {
+        referenceImages = [currentMsg.imagePreview]
+      }
 
       const response = await fetch(`${baseUrl}/ai/query/stream`, {
         method: 'POST',
@@ -485,7 +491,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ modelId, messages: messagesForAPI, industry, agentId, thinkingEnabled, ...(lastImage ? { referenceImage: lastImage } : {}) }),
+        body: JSON.stringify({
+          modelId, messages: messagesForAPI, industry, agentId, thinkingEnabled,
+          ...(referenceImages.length === 1 ? { referenceImage: referenceImages[0] } : {}),
+          ...(referenceImages.length > 1 ? { referenceImages } : {}),
+        }),
       })
 
       if (!response.ok) {

@@ -6,12 +6,25 @@ import prisma from '../config/db.js';
 
 // Smart context windowing — keeps conversation within model limits
 // Always keeps: first 2 messages (for context) + system prompt + last N messages
-function trimToContextWindow(messages: Array<{ role: string; content: string }>, maxTokens: number): Array<{ role: string; content: string }> {
+// Helper: get text length from content (handles string or multimodal array)
+function contentLength(content: any): number {
+  if (typeof content === 'string') return content.length;
+  if (Array.isArray(content)) {
+    return content.reduce((sum: number, part: any) => {
+      if (part.type === 'text') return sum + (part.text?.length || 0);
+      if (part.type === 'image_url') return sum + 1000; // rough estimate per image
+      return sum;
+    }, 0);
+  }
+  return 0;
+}
+
+function trimToContextWindow(messages: Array<{ role: string; content: any }>, maxTokens: number): Array<{ role: string; content: any }> {
   // Estimate ~4 chars per token, reserve 30% for output
   const maxInputTokens = Math.floor(maxTokens * 0.7);
 
   let totalChars = 0;
-  for (const m of messages) totalChars += m.content.length;
+  for (const m of messages) totalChars += contentLength(m.content);
   const estimatedTokens = Math.ceil(totalChars / 4);
 
   // If within limits, send everything
@@ -20,14 +33,14 @@ function trimToContextWindow(messages: Array<{ role: string; content: string }>,
   // Keep first 2 messages (context anchor) + as many recent messages as fit
   const first = messages.slice(0, 2);
   const rest = messages.slice(2);
-  const firstChars = first.reduce((s, m) => s + m.content.length, 0);
+  const firstChars = first.reduce((s, m) => s + contentLength(m.content), 0);
   const budget = (maxInputTokens * 4) - firstChars - 200; // 200 char buffer
 
   // Walk backwards through remaining messages
-  const kept: Array<{ role: string; content: string }> = [];
+  const kept: Array<{ role: string; content: any }> = [];
   let used = 0;
   for (let i = rest.length - 1; i >= 0; i--) {
-    const msgChars = rest[i].content.length;
+    const msgChars = contentLength(rest[i].content);
     if (used + msgChars > budget) break;
     kept.unshift(rest[i]);
     used += msgChars;
@@ -61,6 +74,50 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   'llama-3.3-70b-versatile': 128000, 'llama-3.1-8b-instant': 128000,
   'mixtral-8x7b-32768': 32768,
 };
+
+// ── Multimodal message formatting per provider ──────────────────────
+// Converts our generic format (OpenAI-style image_url with _base64/_mimeType extras)
+// into each provider's expected format.
+
+function formatMessagesForOpenAI(messages: any[]): any[] {
+  return messages.map((m: any) => {
+    if (!Array.isArray(m.content)) return m;
+    // OpenAI accepts image_url natively — just strip our extra fields
+    const parts = m.content.map((p: any) => {
+      if (p.type === 'image_url') return { type: 'image_url', image_url: p.image_url };
+      return p;
+    });
+    return { ...m, content: parts };
+  });
+}
+
+function formatMessagesForAnthropic(messages: any[]): any[] {
+  return messages.map((m: any) => {
+    if (!Array.isArray(m.content)) return m;
+    const parts = m.content.map((p: any) => {
+      if (p.type === 'image_url') {
+        return {
+          type: 'image',
+          source: { type: 'base64', media_type: p._mimeType || 'image/jpeg', data: p._base64 || '' },
+        };
+      }
+      return p;
+    });
+    return { ...m, content: parts };
+  });
+}
+
+function formatPartsForGoogle(content: any): any[] {
+  if (typeof content === 'string') return [{ text: content }];
+  if (!Array.isArray(content)) return [{ text: String(content) }];
+  return content.map((p: any) => {
+    if (p.type === 'text') return { text: p.text };
+    if (p.type === 'image_url') {
+      return { inlineData: { mimeType: p._mimeType || 'image/jpeg', data: p._base64 || '' } };
+    }
+    return { text: String(p.text || '') };
+  });
+}
 
 interface AgentConfig {
   systemPrompt: string;
@@ -276,7 +333,7 @@ async function callAnthropic(modelId: string, messages: any[], systemPrompt: str
 async function callGoogle(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
   const contents = messages.map((m) => ({
     role: m.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: m.content }],
+    parts: formatPartsForGoogle(m.content),
   }));
 
   const response = await axios.post(
@@ -480,13 +537,18 @@ async function routeToProvider(aiModel: any, rawMessages: any[], systemPrompt: s
   const sysMsgs = rawMessages.filter((m: any) => m.role === 'system');
   let messages = rawMessages.filter((m: any) => m.role !== 'system');
   if (sysMsgs.length > 0) {
-    const docCtx = sysMsgs.map((m: any) => m.content).join('\n\n---\n\n');
+    const docCtx = sysMsgs.map((m: any) => typeof m.content === 'string' ? m.content : '').join('\n\n---\n\n');
     let lastIdx = -1;
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i].role === 'user') { lastIdx = i; break; }
     }
     if (lastIdx >= 0) {
-      messages[lastIdx] = { ...messages[lastIdx], content: docCtx + '\n\n---\n\nUser question: ' + messages[lastIdx].content };
+      const existing = messages[lastIdx].content;
+      if (typeof existing === 'string') {
+        messages[lastIdx] = { ...messages[lastIdx], content: docCtx + '\n\n---\n\nUser question: ' + existing };
+      } else if (Array.isArray(existing)) {
+        messages[lastIdx] = { ...messages[lastIdx], content: [{ type: 'text', text: docCtx + '\n\n---\n\nUser question: ' }, ...existing] };
+      }
     } else {
       messages.push({ role: 'user', content: docCtx });
     }
@@ -495,11 +557,11 @@ async function routeToProvider(aiModel: any, rawMessages: any[], systemPrompt: s
   switch (provider) {
     case 'openai':
       if (!config.apiKeys.openai) throw new AppError('OpenAI API key not configured', 500);
-      return await callOpenAI(modelId, messages, systemPrompt, config.apiKeys.openai, overrides);
+      return await callOpenAI(modelId, formatMessagesForOpenAI(messages), systemPrompt, config.apiKeys.openai, overrides);
 
     case 'anthropic':
       if (!config.apiKeys.anthropic) throw new AppError('Anthropic API key not configured', 500);
-      return await callAnthropic(modelId, messages, systemPrompt, config.apiKeys.anthropic, overrides);
+      return await callAnthropic(modelId, formatMessagesForAnthropic(messages), systemPrompt, config.apiKeys.anthropic, overrides);
 
     case 'google':
       if (!config.apiKeys.google) throw new AppError('Google API key not configured', 500);
@@ -507,15 +569,15 @@ async function routeToProvider(aiModel: any, rawMessages: any[], systemPrompt: s
 
     case 'groq':
       if (!config.apiKeys.groq) throw new AppError('Groq API key not configured', 500);
-      return await callGroq(modelId, messages, systemPrompt, config.apiKeys.groq, overrides);
+      return await callGroq(modelId, formatMessagesForOpenAI(messages), systemPrompt, config.apiKeys.groq, overrides);
 
     case 'mistral':
       if (!config.apiKeys.mistral) throw new AppError('Mistral API key not configured', 500);
-      return await callMistral(modelId, messages, systemPrompt, config.apiKeys.mistral, overrides);
+      return await callMistral(modelId, formatMessagesForOpenAI(messages), systemPrompt, config.apiKeys.mistral, overrides);
 
     case 'deepseek':
       if (!config.apiKeys.deepseek) throw new AppError('DeepSeek API key not configured', 500);
-      return await callDeepSeek(modelId, messages, systemPrompt, config.apiKeys.deepseek, overrides);
+      return await callDeepSeek(modelId, formatMessagesForOpenAI(messages), systemPrompt, config.apiKeys.deepseek, overrides);
 
     default:
       throw new AppError(`Unsupported provider: ${provider}`, 400);
@@ -580,10 +642,11 @@ function callOpenAIStream(
   const reasoning = isReasoningModel(modelId);
   const systemRole = reasoning ? 'developer' : 'system';
   const thinkingEnabled = !!overrides?.thinkingEnabled;
+  const formattedMsgs = formatMessagesForOpenAI(messages);
 
   const body: Record<string, any> = {
     model: modelId,
-    messages: [{ role: systemRole, content: systemPrompt }, ...messages],
+    messages: [{ role: systemRole, content: systemPrompt }, ...formattedMsgs],
     stream: true,
     stream_options: { include_usage: true },
   };
@@ -766,11 +829,12 @@ function callAnthropicStream(
   modelId: string, messages: any[], systemPrompt: string,
   apiKey: string, callbacks: StreamCallbacks, overrides?: ProviderOverrides
 ): Promise<void> {
+  const formattedMsgs = formatMessagesForAnthropic(messages);
   const body: Record<string, any> = {
     model: modelId,
     max_tokens: overrides?.maxTokens ?? 16384,
     system: systemPrompt,
-    messages,
+    messages: formattedMsgs,
     stream: true,
   };
 
@@ -885,10 +949,11 @@ function callOpenAICompatibleStream(
   apiKey: string, callbacks: StreamCallbacks, overrides?: ProviderOverrides
 ): Promise<void> {
   const isDeepSeekReasoner = modelId === 'deepseek-reasoner';
+  const formattedMsgs = formatMessagesForOpenAI(messages);
 
   const body: Record<string, any> = {
     model: modelId,
-    messages: [{ role: 'system', content: systemPrompt }, ...messages],
+    messages: [{ role: 'system', content: systemPrompt }, ...formattedMsgs],
     stream: true,
     stream_options: { include_usage: true },
   };
@@ -981,17 +1046,19 @@ async function routeToProviderStream(
   const systemMsgs = rawMessages.filter((m: any) => m.role === 'system');
   let cleaned = rawMessages.filter((m: any) => m.role !== 'system');
   if (systemMsgs.length > 0) {
-    const docContext = systemMsgs.map((m: any) => m.content).join('\n\n---\n\n');
-    // Prepend document context to the LAST user message (the current question)
+    const docContext = systemMsgs.map((m: any) => typeof m.content === 'string' ? m.content : '').join('\n\n---\n\n');
     let lastUserIdx = -1;
     for (let i = cleaned.length - 1; i >= 0; i--) {
       if (cleaned[i].role === 'user') { lastUserIdx = i; break; }
     }
     if (lastUserIdx >= 0) {
-      cleaned[lastUserIdx] = {
-        ...cleaned[lastUserIdx],
-        content: docContext + '\n\n---\n\nUser question: ' + cleaned[lastUserIdx].content,
-      };
+      const existing = cleaned[lastUserIdx].content;
+      if (typeof existing === 'string') {
+        cleaned[lastUserIdx] = { ...cleaned[lastUserIdx], content: docContext + '\n\n---\n\nUser question: ' + existing };
+      } else if (Array.isArray(existing)) {
+        // Multimodal content — prepend doc context as text part
+        cleaned[lastUserIdx] = { ...cleaned[lastUserIdx], content: [{ type: 'text', text: docContext + '\n\n---\n\nUser question: ' }, ...existing] };
+      }
     } else {
       cleaned.push({ role: 'user', content: docContext });
     }
