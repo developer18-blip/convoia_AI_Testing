@@ -23,7 +23,7 @@ export function ChatPage() {
   const { models } = useModels()
   const { agents, createAgent } = useAgents()
   const { user: authUser } = useAuth()
-  const { tokenBalance, formattedBalance } = useTokens()
+  const { tokenBalance, formattedBalance, hasTokens } = useTokens()
   const toast = useToast()
   const {
     conversations, folders, activeConversationId, activeConversation, messages, isStreaming, stopStreaming,
@@ -584,10 +584,25 @@ export function ChatPage() {
           </div>
         )}
 
+        {/* Zero-token persistent banner */}
+        {!hasTokens && (
+          <div style={{
+            padding: '10px 16px', textAlign: 'center', fontSize: '13px', fontWeight: 500,
+            background: 'rgba(239,68,68,0.08)', borderTop: '1px solid rgba(239,68,68,0.15)',
+            color: 'var(--color-danger)',
+          }}>
+            {authUser?.organizationId && authUser?.role !== 'org_owner'
+              ? 'You have no tokens assigned. Contact your admin or manager for tokens.'
+              : <>No tokens remaining. <button onClick={() => navigate('/tokens/buy')} style={{ color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, textDecoration: 'underline' }}>Buy tokens</button> to continue.</>
+            }
+          </div>
+        )}
+
         {/* Input */}
         <MessageInput
           onSend={handleSend}
           isLoading={isStreaming}
+          disabled={!hasTokens}
           onStop={stopStreaming}
           selectedModelId={selectedModelId}
           onFileProcessed={handleFileProcessed}

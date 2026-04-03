@@ -92,17 +92,19 @@ export class TokenWalletService {
     tokens: number;
     reference: string;
     description: string;
+    organizationId?: string;
   }): Promise<number> {
-    const { userId, tokens, reference, description } = params;
+    const { userId, tokens, reference, description, organizationId } = params;
 
     try {
       return await prisma.$transaction(async (tx) => {
         const wallet = await tx.tokenWallet.findUnique({ where: { userId } });
         if (!wallet || wallet.tokenBalance <= 0) {
-          logger.warn(`Token deduction skipped — wallet empty: userId=${userId} requested=${tokens}`);
+          logger.warn(`Token deduction BLOCKED — wallet empty: userId=${userId} orgId=${organizationId || 'none'} requested=${tokens}`);
           return 0;
         }
 
+        const balanceBefore = wallet.tokenBalance;
         // Deduct up to what's available — never let a query go completely free
         const actualDeduct = Math.min(tokens, wallet.tokenBalance);
 
@@ -126,8 +128,10 @@ export class TokenWalletService {
         });
 
         if (actualDeduct < tokens) {
-          logger.warn(`Partial deduction: userId=${userId} requested=${tokens} actual=${actualDeduct} remaining=0`);
+          logger.warn(`Partial deduction: userId=${userId} orgId=${organizationId || 'none'} requested=${tokens} actual=${actualDeduct} remaining=0`);
         }
+
+        logger.info(`Token deduction: userId=${userId} orgId=${organizationId || 'none'} before=${balanceBefore} deducted=${actualDeduct} after=${updated.tokenBalance}`);
 
         return actualDeduct;
       });

@@ -9,6 +9,7 @@ interface TokenContextType {
   totalUsed: number
   allocatedTokens: number
   isLoading: boolean
+  hasTokens: boolean           // true if tokenBalance > 0
   refresh: () => Promise<void>
   hasEnoughTokens: (needed: number) => boolean
 }
@@ -80,6 +81,7 @@ export function TokenProvider({ children }: { children: ReactNode }) {
       totalUsed,
       allocatedTokens,
       isLoading,
+      hasTokens: tokenBalance > 0,
       refresh,
       hasEnoughTokens,
     }}>

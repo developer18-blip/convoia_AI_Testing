@@ -160,12 +160,13 @@ export const queryAI = asyncHandler(async (req: Request, res: Response) => {
     },
   });
 
-  // Deduct tokens from wallet
+  // Deduct tokens from wallet — always from user's personal balance, never org pool
   await TokenWalletService.deductTokens({
     userId: user.id,
     tokens: aiResponse.totalTokens,
     reference: aiResponse.aiModel.id,
     description: `Query: ${aiResponse.aiModel.name}`,
+    organizationId,
   });
 
   // Check for low balance and notify (fire and forget)
@@ -241,6 +242,39 @@ export const queryAIStream = async (req: Request, res: Response) => {
       return;
     }
     if (streamModelCheck && IMAGE_ONLY_MODELS.has(streamModelCheck.modelId)) {
+      // ── TOKEN ENFORCEMENT: Check balance BEFORE image generation ──
+      const imgTokenBalance = await TokenWalletService.getBalance(req.user.userId);
+      const imageTokenMin = 1500; // Conservative estimate (Gemini=1300, DALL-E=1000)
+      if (imgTokenBalance.tokenBalance <= 0) {
+        const imgUser = await prisma.user.findUnique({ where: { id: req.user.userId }, select: { organizationId: true, role: true } });
+        const isOrgMember = !!imgUser?.organizationId;
+        res.status(402).json({
+          success: false,
+          code: 'NO_TOKENS',
+          message: isOrgMember
+            ? 'You have no tokens remaining. Contact your manager for more tokens.'
+            : 'You have no tokens remaining.',
+          currentBalance: 0,
+          canBuyTokens: !isOrgMember || imgUser?.role === 'org_owner',
+        });
+        return;
+      }
+      if (imgTokenBalance.tokenBalance < imageTokenMin) {
+        const imgUser = await prisma.user.findUnique({ where: { id: req.user.userId }, select: { organizationId: true, role: true } });
+        const isOrgMember = !!imgUser?.organizationId;
+        res.status(402).json({
+          success: false,
+          code: 'INSUFFICIENT_TOKENS',
+          message: isOrgMember
+            ? `Insufficient tokens for image generation. You have ${TokenWalletService.formatTokens(imgTokenBalance.tokenBalance)} tokens. Contact your manager.`
+            : `You need more tokens for image generation. You have ${TokenWalletService.formatTokens(imgTokenBalance.tokenBalance)} tokens remaining.`,
+          currentBalance: imgTokenBalance.tokenBalance,
+          estimatedRequired: imageTokenMin,
+          canBuyTokens: !isOrgMember || imgUser?.role === 'org_owner',
+        });
+        return;
+      }
+
       const lastMsg = messages[messages.length - 1]?.content || '';
       // Build contextual prompt from conversation history
       // If the latest message is a short follow-up (e.g., "with different angle", "make it darker"),
@@ -270,7 +304,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
         const imageProvider = providerMap[streamModelCheck.modelId] || 'gemini';
         const result = await FileProcessingService.generateImage(imagePrompt, '1024x1024', 'standard', imageProvider, referenceImage);
         const imageTokenCost = result.provider === 'gemini' ? 1300 : 1000;
-        await TokenWalletService.deductTokens({ userId: req.user.userId, tokens: imageTokenCost, reference: `image-gen-${Date.now()}`, description: `Image generation (${streamModelCheck.name})` });
+        await TokenWalletService.deductTokens({ userId: req.user.userId, tokens: imageTokenCost, reference: `image-gen-${Date.now()}`, description: `Image generation (${streamModelCheck.name})`, organizationId: imgUser?.organizationId || undefined });
         const imageContent = `\n\n![Generated Image](${result.imageUrl})\n\n*"${result.revisedPrompt}"*\n\n[Download image](${result.imageUrl})`;
         res.write(`data: ${JSON.stringify({ type: 'chunk', content: imageContent })}\n\n`);
         const imgCustomerPrice = imageTokenCost * 0.000002; // ~$0.002 per 1K tokens
@@ -480,12 +514,13 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
         const providerCost = VIDEO_TOKEN_COST * videoOutputPrice;
         const videoCustomerPrice = providerCost * (1 + videoMarkup / 100);
 
-        // Deduct tokens (video gen + thinking if used)
+        // Deduct tokens (video gen + thinking if used) — from user's personal balance only
         await TokenWalletService.deductTokens({
           userId: user.id,
           tokens: totalVideoTokens,
           reference: `video-gen-${Date.now()}`,
           description: `Video generation (Google Veo 2)${videoThinkTokens > 0 ? ' + AI director' : ''}`,
+          organizationId,
         });
 
         // Send video result — video player rendered by frontend MessageBubble (not markdown)
@@ -559,13 +594,14 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
         // Generate image (Gemini first, DALL-E fallback) — pass reference image if available
         const result = await FileProcessingService.generateImage(enhancedPrompt, '1024x1024', 'standard', undefined, referenceImage);
 
-        // Deduct tokens (flat cost for image gen)
+        // Deduct tokens (flat cost for image gen) — from user's personal balance only
         const imageTokenCost = result.provider === 'gemini' ? 1300 : 1000;
         await TokenWalletService.deductTokens({
           userId: user.id,
           tokens: imageTokenCost,
           reference: `image-gen-${Date.now()}`,
           description: `Image generation (${result.provider === 'gemini' ? 'Gemini' : 'DALL-E'})`,
+          organizationId,
         });
 
         // Send image result via SSE
@@ -981,13 +1017,14 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
                 logger.error(`Direct usageLog creation FAILED: ${logErr.message}`, logErr);
               }
 
-              // 2. Deduct tokens from TokenWallet
+              // 2. Deduct tokens from user's personal TokenWallet — never from org pool
               try {
                 await TokenWalletService.deductTokens({
                   userId: user.id,
                   tokens: totalTokensUsed,
                   reference: aiModel.id,
                   description: `Query: ${aiModel.name}${pass1ExtraInputTokens > 0 ? ' (deep think)' : ''}`,
+                  organizationId,
                 });
               } catch (deductErr) {
                 logger.error('Token deduction failed:', deductErr);
@@ -1077,20 +1114,26 @@ export const compareModels = asyncHandler(async (req: Request, res: Response) =>
   const estimatedTotal = estimatedPerModel * modelIds.length;
 
   if (compareTokenBal.tokenBalance <= 0) {
+    const isOrgMember = !!user.organizationId;
     return res.status(402).json({
       success: false,
       code: 'NO_TOKENS',
-      message: 'You have no tokens remaining.',
+      message: isOrgMember
+        ? 'You have no tokens remaining. Contact your manager for more tokens.'
+        : 'You have no tokens remaining.',
       currentBalance: 0,
+      canBuyTokens: !isOrgMember || user.role === 'org_owner',
     });
   }
   if (compareTokenBal.tokenBalance < estimatedTotal) {
+    const isOrgMember = !!user.organizationId;
     return res.status(402).json({
       success: false,
       code: 'INSUFFICIENT_TOKENS',
       message: `Comparing ${modelIds.length} models requires ~${TokenWalletService.formatTokens(estimatedTotal)} tokens. You have ${TokenWalletService.formatTokens(compareTokenBal.tokenBalance)}.`,
       currentBalance: compareTokenBal.tokenBalance,
       estimatedRequired: estimatedTotal,
+      canBuyTokens: !isOrgMember || user.role === 'org_owner',
     });
   }
   const startTime = Date.now();
@@ -1115,12 +1158,13 @@ export const compareModels = asyncHandler(async (req: Request, res: Response) =>
           aiResponse.customerPrice,
           aiResponse.markupPercentage
         );
-        // Deduct tokens for this model's response
+        // Deduct tokens for this model's response — from user's personal balance only
         await TokenWalletService.deductTokens({
           userId: user.id,
           tokens: aiResponse.totalTokens,
           reference: aiResponse.aiModel.id,
           description: `Compare: ${aiResponse.aiModel.name}`,
+          organizationId,
         });
         return {
           modelId: id,

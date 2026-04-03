@@ -371,7 +371,7 @@ export function MessageInput({
             }}
             onFocus={() => setInputFocused(true)}
             onBlur={() => setInputFocused(false)}
-            placeholder="Message ConvoiaAI..."
+            placeholder={disabled ? "No tokens available — contact your admin or purchase tokens" : "Message ConvoiaAI..."}
             rows={1}
             disabled={disabled || fileLoading}
             aria-label="Message input"
@@ -398,12 +398,14 @@ export function MessageInput({
                 onChange={handleFileInputChange}
               />
               <button
-                onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click() }}
-                title="Attach file"
+                onClick={(e) => { e.stopPropagation(); if (!disabled) fileInputRef.current?.click() }}
+                title={disabled ? "No tokens available" : "Attach file"}
+                disabled={disabled}
                 style={{
                   width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'transparent',
                   border: 'none', color: 'var(--chat-text-muted)', display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', cursor: 'pointer', flexShrink: 0, transition: 'all 150ms',
+                  justifyContent: 'center', cursor: disabled ? 'not-allowed' : 'pointer', flexShrink: 0, transition: 'all 150ms',
+                  opacity: disabled ? 0.4 : 1,
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--chat-border)'; e.currentTarget.style.color = 'var(--chat-text)' }}
                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--chat-text-muted)' }}
