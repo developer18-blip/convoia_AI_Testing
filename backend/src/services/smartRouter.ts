@@ -98,36 +98,59 @@ export async function smartRoute(params: {
     // e.g. "Web Researcher" agent → always search first
   }
 
+  // ── Extract the user's ACTUAL question (strip embedded document content) ──
+  // When documents are attached, the message looks like:
+  //   "User question\n\n[DOCUMENT 1: ...]\n...[full PDF text]..."
+  // We must only run intent detection on the user's question, not PDF content.
+  let userQuestion = message;
+  if (hasDocumentContext) {
+    // Extract question before document blocks
+    const docMarker = message.indexOf('\n\n═══ DOCUMENT ');
+    const legacyMarker = message.indexOf('\n\n[Document: ');
+    const marker = docMarker !== -1 ? docMarker : legacyMarker;
+    if (marker !== -1) {
+      userQuestion = message.substring(0, marker).trim();
+    }
+    // Also strip "[N files attached: ...]" instruction suffix
+    userQuestion = userQuestion.replace(/\n\n\[\d+ files attached:.*?\]/s, '').trim();
+  }
+
   // ── 2. Video detection (highest priority after agent override) ──
-  const videoIntent = detectVideoIntent(message, hasImageAttachment);
-  if (videoIntent.isVideoRequest) {
-    logger.info(`Smart router: video intent (${videoIntent.confidence}) → "${message.substring(0, 60)}"`);
-    return {
-      action: 'video',
-      confidence: videoIntent.confidence,
-      video: {
-        mediaType: videoIntent.mediaType,
-        extractedSubject: videoIntent.extractedSubject,
-        forceThinking: false,
-      },
-    };
+  // SKIP video/image detection entirely when documents are attached — PDF text
+  // contains words like "video", "animation", "diagram" that trigger false positives
+  if (!hasDocumentContext) {
+    const videoIntent = detectVideoIntent(userQuestion, hasImageAttachment);
+    if (videoIntent.isVideoRequest) {
+      logger.info(`Smart router: video intent (${videoIntent.confidence}) → "${userQuestion.substring(0, 60)}"`);
+      return {
+        action: 'video',
+        confidence: videoIntent.confidence,
+        video: {
+          mediaType: videoIntent.mediaType,
+          extractedSubject: videoIntent.extractedSubject,
+          forceThinking: false,
+        },
+      };
+    }
   }
 
   // ── 3. Image detection ──
-  const imageIntent = detectImageIntent(message, conversationMessages);
-  if (imageIntent.isImageRequest) {
-    logger.info(`Smart router: image intent (${imageIntent.confidence}) → "${message.substring(0, 60)}"`);
-    return {
-      action: 'image',
-      confidence: imageIntent.confidence,
-      image: {
-        extractedSubject: imageIntent.extractedSubject,
-      },
-    };
+  if (!hasDocumentContext) {
+    const imageIntent = detectImageIntent(userQuestion, conversationMessages);
+    if (imageIntent.isImageRequest) {
+      logger.info(`Smart router: image intent (${imageIntent.confidence}) → "${userQuestion.substring(0, 60)}"`);
+      return {
+        action: 'image',
+        confidence: imageIntent.confidence,
+        image: {
+          extractedSubject: imageIntent.extractedSubject,
+        },
+      };
+    }
   }
 
   // ── 4. Web search detection ──
-  if (message && needsWebSearch(message, hasDocumentContext)) {
+  if (userQuestion && needsWebSearch(userQuestion, hasDocumentContext)) {
     logger.info(`Smart router: web search → "${message.substring(0, 60)}"`);
     return {
       action: 'web_search_chat',
@@ -137,6 +160,9 @@ export async function smartRoute(params: {
   }
 
   // ── 5. Default: normal chat ──
+  if (hasDocumentContext) {
+    logger.info(`Smart router: document analysis (forced chat) → "${userQuestion.substring(0, 80)}"`);
+  }
   return {
     action: 'chat',
     confidence: 'high',

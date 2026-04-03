@@ -163,17 +163,26 @@ export function MessageInput({
 
       // ── UNIFIED MULTI-FILE PATH ──
       // ALL file combinations go through one path: images as base64, docs/audio as text context
+      // CRITICAL: Each document gets a NUMBERED boundary — never merged into one blob
       const contextParts: string[] = []
       const allImagePreviews: string[] = []
+      let docIndex = 0
 
-      // Collect document text
+      // Collect document text — each as a clearly separated, numbered block
       for (const doc of docs) {
-        if (doc.extractedText) contextParts.push(`[Document: ${doc.file.name}]\n${doc.extractedText}`)
+        if (doc.extractedText) {
+          docIndex++
+          const docName = doc.file.name.replace(/\.[^.]+$/, '') // strip extension
+          contextParts.push(`═══ DOCUMENT ${docIndex}: ${docName} ═══\n${doc.extractedText}\n═══ END DOCUMENT ${docIndex} ═══`)
+        }
       }
 
       // Collect audio transcripts
       for (const audio of audios) {
-        if (audio.transcript) contextParts.push(`[Audio transcript: ${audio.file.name}]\n${audio.transcript}`)
+        if (audio.transcript) {
+          docIndex++
+          contextParts.push(`═══ DOCUMENT ${docIndex}: ${audio.file.name} (Audio Transcript) ═══\n${audio.transcript}\n═══ END DOCUMENT ${docIndex} ═══`)
+        }
       }
 
       // Collect image previews (base64)
@@ -181,8 +190,8 @@ export function MessageInput({
         if (img.preview) allImagePreviews.push(img.preview)
       }
 
-      // Build the message
-      const combinedContext = contextParts.length > 0 ? contextParts.join('\n\n---\n\n') : null
+      // Build the message with clear document boundaries
+      const combinedContext = contextParts.length > 0 ? contextParts.join('\n\n') : null
       const totalFiles = images.length + docs.length + audios.length
       const defaultQuestion = totalFiles > 1
         ? `Analyze these ${totalFiles} files`
@@ -197,13 +206,18 @@ export function MessageInput({
       const primaryType = images.length > 0 ? 'image' as const : 'document' as const
 
       if (onSendWithContext) {
-        // Multi-file instruction for the model
+        // Multi-file instruction — tells the model how many documents and what to do
         const multiFileInstruction = totalFiles > 1
-          ? `\n\n[${totalFiles} files attached: ${images.length > 0 ? `${images.length} image(s)` : ''}${docs.length > 0 ? `${images.length > 0 ? ', ' : ''}${docs.length} document(s)` : ''}${audios.length > 0 ? `${(images.length + docs.length) > 0 ? ', ' : ''}${audios.length} audio file(s)` : ''}. Analyze ALL files together — compare, summarize, and find connections between them.]`
+          ? `\n\n[${totalFiles} files attached: ${images.length > 0 ? `${images.length} image(s)` : ''}${docs.length > 0 ? `${images.length > 0 ? ', ' : ''}${docs.length} document(s)` : ''}${audios.length > 0 ? `${(images.length + docs.length) > 0 ? ', ' : ''}${audios.length} audio file(s)` : ''}]`
+          : ''
+
+        // Add multi-document system instruction when 2+ documents present
+        const multiDocInstruction = docIndex >= 2
+          ? `\n\nYou have received ${docIndex} separate documents. Treat each document independently — they are NOT one combined document. Always refer to them by their document number and name. When comparing, analyze each document first, then identify differences and similarities.`
           : ''
 
         onSendWithContext(
-          combinedContext ? `${question}${multiFileInstruction}\n\n${combinedContext}` : `${question}${multiFileInstruction}`,
+          combinedContext ? `${question}${multiFileInstruction}${multiDocInstruction}\n\n${combinedContext}` : `${question}${multiFileInstruction}`,
           null,
           {
             fileAttachment: { name: allFileNames, type: primaryType, size: totalSize },

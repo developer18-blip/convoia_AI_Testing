@@ -36,6 +36,24 @@ function downloadImage(url: string) {
   a.click()
 }
 
+/** Strip embedded document content from user message for display.
+ *  When PDFs are attached, the message contains the full document text
+ *  but the UI shows document chips instead — so hide the raw text. */
+function getDisplayContent(content: string, hasFileAttachment: boolean): string {
+  if (!hasFileAttachment) return content
+  // Strip new-format document blocks: ═══ DOCUMENT N: ... ═══ ... ═══ END DOCUMENT N ═══
+  let display = content.replace(/\n*═══ DOCUMENT \d+:[\s\S]*?═══ END DOCUMENT \d+ ═══\n*/g, '')
+  // Strip legacy format: [Document: filename]\n...content...
+  display = display.replace(/\n*\[Document: [^\]]+\]\n[\s\S]*?(?=\n\n\[Document: |\n*$)/g, '')
+  // Strip multi-file instruction brackets
+  display = display.replace(/\n*\[\d+ files attached:.*?\]\n*/g, '')
+  // Strip multi-doc system instruction
+  display = display.replace(/\n*You have received \d+ separate documents\..*?similarities\.\n*/g, '')
+  // Clean up separator artifacts
+  display = display.replace(/\n*---\n*/g, '\n').trim()
+  return display || content // fallback to original if stripping removed everything
+}
+
 export const MessageBubble = memo(function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRunCode, onOpenInCanvas }: MessageBubbleProps) {
   const isUser = message.role === 'user'
   const [copied, setCopied] = useState(false)
@@ -289,11 +307,30 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
                 wordBreak: 'break-word', maxWidth: '100%',
                 border: '1px solid var(--chat-border)',
               }}>
-                {/* File chips */}
+                {/* File chips — show each document separately */}
                 {message.fileAttachment && message.fileAttachment.type === 'document' && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--chat-border)', borderRadius: '8px', padding: '8px 12px', marginBottom: '8px', fontSize: '13px', color: 'var(--chat-text)' }}>
-                    <FileText size={14} /><span>{message.fileAttachment.name}</span>
-                    <span style={{ color: 'var(--chat-text-muted)', fontSize: '11px' }}>{formatFileSize(message.fileAttachment.size)}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
+                    {message.fileAttachment.name.includes(', ') ? (
+                      // Multiple documents — render each as its own chip
+                      <>
+                        <div style={{ fontSize: '11px', color: 'var(--chat-text-muted)', fontWeight: 600, marginBottom: '2px' }}>
+                          {message.fileAttachment.name.split(', ').length} documents attached
+                        </div>
+                        {message.fileAttachment.name.split(', ').map((name, i) => (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--chat-surface)', borderRadius: '8px', padding: '7px 12px', fontSize: '12.5px', color: 'var(--chat-text)', border: '1px solid var(--chat-border)' }}>
+                            <FileText size={13} style={{ color: 'var(--color-info)', flexShrink: 0 }} />
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                          </div>
+                        ))}
+                      </>
+                    ) : (
+                      // Single document
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--chat-surface)', borderRadius: '8px', padding: '8px 12px', fontSize: '13px', color: 'var(--chat-text)', border: '1px solid var(--chat-border)' }}>
+                        <FileText size={14} style={{ color: 'var(--color-info)', flexShrink: 0 }} />
+                        <span>{message.fileAttachment.name}</span>
+                        <span style={{ color: 'var(--chat-text-muted)', fontSize: '11px' }}>{formatFileSize(message.fileAttachment.size)}</span>
+                      </div>
+                    )}
                   </div>
                 )}
                 {message.fileAttachment && message.fileAttachment.type === 'audio' && (
@@ -301,63 +338,67 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
                     <Music size={14} /><span>{message.fileAttachment.name}</span>
                   </div>
                 )}
-                {message.content.length > 500 ? (
-                  // Long messages: show as collapsible doc-style block
-                  <div>
-                    <div style={{
-                      maxHeight: showFullUserMsg ? 'none' : '120px', overflow: 'hidden',
-                      position: 'relative', whiteSpace: 'pre-wrap',
-                    }}>
-                      <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}
-                        components={{
-                          code(codeProps: ComponentPropsWithoutRef<'code'> & { inline?: boolean; className?: string }) {
-                            const { inline, className, children: codeChildren, ...codeRest } = codeProps
-                            const langMatch = /language-(\w+)/.exec(className || '')
-                            const codeString = String(codeChildren).replace(/\n$/, '')
-                            if (!inline && (langMatch || codeString.includes('\n'))) {
-                              return <CodeBlock language={langMatch ? langMatch[1] : 'text'}>{codeString}</CodeBlock>
-                            }
-                            return <code style={{ backgroundColor: 'var(--chat-surface)', padding: '2px 5px', borderRadius: '4px', fontSize: '13px', border: '1px solid var(--chat-border)' }} {...codeRest}>{codeChildren}</code>
-                          },
-                          pre: ({ children }) => <>{children}</>,
-                          p: ({ children }) => <p style={{ marginBottom: '8px', lineHeight: '1.6' }} className="last:mb-0">{children}</p>,
-                        }}>
-                        {message.content}
-                      </ReactMarkdown>
-                      {!showFullUserMsg && (
+                {(() => {
+                  const displayText = getDisplayContent(message.content, !!message.fileAttachment)
+                  if (displayText.length > 500) {
+                    return (
+                      <div>
                         <div style={{
-                          position: 'absolute', bottom: 0, left: 0, right: 0, height: '50px',
-                          background: 'linear-gradient(transparent, var(--chat-user-bubble))',
-                        }} />
-                      )}
-                    </div>
-                    <button onClick={() => setShowFullUserMsg(!showFullUserMsg)}
-                      style={{
-                        background: 'none', border: 'none', color: 'var(--color-primary)',
-                        fontSize: '12px', fontWeight: 600, cursor: 'pointer', padding: '4px 0', marginTop: '4px',
+                          maxHeight: showFullUserMsg ? 'none' : '120px', overflow: 'hidden',
+                          position: 'relative', whiteSpace: 'pre-wrap',
+                        }}>
+                          <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}
+                            components={{
+                              code(codeProps: ComponentPropsWithoutRef<'code'> & { inline?: boolean; className?: string }) {
+                                const { inline, className, children: codeChildren, ...codeRest } = codeProps
+                                const langMatch = /language-(\w+)/.exec(className || '')
+                                const codeString = String(codeChildren).replace(/\n$/, '')
+                                if (!inline && (langMatch || codeString.includes('\n'))) {
+                                  return <CodeBlock language={langMatch ? langMatch[1] : 'text'}>{codeString}</CodeBlock>
+                                }
+                                return <code style={{ backgroundColor: 'var(--chat-surface)', padding: '2px 5px', borderRadius: '4px', fontSize: '13px', border: '1px solid var(--chat-border)' }} {...codeRest}>{codeChildren}</code>
+                              },
+                              pre: ({ children }) => <>{children}</>,
+                              p: ({ children }) => <p style={{ marginBottom: '8px', lineHeight: '1.6' }} className="last:mb-0">{children}</p>,
+                            }}>
+                            {displayText}
+                          </ReactMarkdown>
+                          {!showFullUserMsg && (
+                            <div style={{
+                              position: 'absolute', bottom: 0, left: 0, right: 0, height: '50px',
+                              background: 'linear-gradient(transparent, var(--chat-user-bubble))',
+                            }} />
+                          )}
+                        </div>
+                        <button onClick={() => setShowFullUserMsg(!showFullUserMsg)}
+                          style={{
+                            background: 'none', border: 'none', color: 'var(--color-primary)',
+                            fontSize: '12px', fontWeight: 600, cursor: 'pointer', padding: '4px 0', marginTop: '4px',
+                          }}>
+                          {showFullUserMsg ? 'Show less' : `Show more (${displayText.length} chars)`}
+                        </button>
+                      </div>
+                    )
+                  }
+                  return (
+                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}
+                      components={{
+                        code(codeProps: ComponentPropsWithoutRef<'code'> & { inline?: boolean; className?: string }) {
+                          const { inline, className, children: codeChildren, ...codeRest } = codeProps
+                          const langMatch = /language-(\w+)/.exec(className || '')
+                          const codeString = String(codeChildren).replace(/\n$/, '')
+                          if (!inline && (langMatch || codeString.includes('\n'))) {
+                            return <CodeBlock language={langMatch ? langMatch[1] : 'text'}>{codeString}</CodeBlock>
+                          }
+                          return <code style={{ backgroundColor: 'var(--chat-surface)', padding: '2px 5px', borderRadius: '4px', fontSize: '13px', border: '1px solid var(--chat-border)' }} {...codeRest}>{codeChildren}</code>
+                        },
+                        pre: ({ children }) => <>{children}</>,
+                        p: ({ children }) => <p style={{ marginBottom: '4px', lineHeight: '1.6' }} className="last:mb-0">{children}</p>,
                       }}>
-                      {showFullUserMsg ? 'Show less' : `Show more (${message.content.length} chars)`}
-                    </button>
-                  </div>
-                ) : (
-                  // Short messages: render with basic markdown
-                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}
-                    components={{
-                      code(codeProps: ComponentPropsWithoutRef<'code'> & { inline?: boolean; className?: string }) {
-                        const { inline, className, children: codeChildren, ...codeRest } = codeProps
-                        const langMatch = /language-(\w+)/.exec(className || '')
-                        const codeString = String(codeChildren).replace(/\n$/, '')
-                        if (!inline && (langMatch || codeString.includes('\n'))) {
-                          return <CodeBlock language={langMatch ? langMatch[1] : 'text'}>{codeString}</CodeBlock>
-                        }
-                        return <code style={{ backgroundColor: 'var(--chat-surface)', padding: '2px 5px', borderRadius: '4px', fontSize: '13px', border: '1px solid var(--chat-border)' }} {...codeRest}>{codeChildren}</code>
-                      },
-                      pre: ({ children }) => <>{children}</>,
-                      p: ({ children }) => <p style={{ marginBottom: '4px', lineHeight: '1.6' }} className="last:mb-0">{children}</p>,
-                    }}>
-                    {message.content}
-                  </ReactMarkdown>
-                )}
+                      {displayText}
+                    </ReactMarkdown>
+                  )
+                })()}
               </div>
             </div>
           )}
