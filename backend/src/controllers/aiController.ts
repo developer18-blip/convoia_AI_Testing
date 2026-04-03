@@ -342,6 +342,32 @@ export const queryAIStream = async (req: Request, res: Response) => {
       }
     }
 
+    // ── AUTO-ROUTE LONG INPUTS TO LARGER MODEL ──────────────────
+    // If input exceeds the selected model's context window, auto-route
+    // to the largest available model instead of truncating and losing data.
+    const selectedModel = await prisma.aIModel.findUnique({ where: { id: finalModelId }, select: { modelId: true, contextWindow: true, name: true } });
+    const modelContextWindow = selectedModel?.contextWindow || 128000;
+    const maxInputForModel = Math.floor(modelContextWindow * 0.7);
+
+    if (estimatedInputTokens > maxInputForModel) {
+      // Find the largest active model that can fit this input
+      const largerModel = await prisma.aIModel.findFirst({
+        where: { isActive: true, contextWindow: { gte: Math.ceil(estimatedInputTokens / 0.7) } },
+        orderBy: [{ contextWindow: 'asc' }], // smallest model that fits (cost efficient)
+        select: { id: true, modelId: true, name: true, contextWindow: true },
+      });
+
+      if (largerModel && largerModel.id !== finalModelId) {
+        logger.info(`Auto-routing: input ~${estimatedInputTokens} tokens exceeds ${selectedModel?.name} (${modelContextWindow}). Routing to ${largerModel.name} (${largerModel.contextWindow}).`);
+        finalModelId = largerModel.id;
+        autoDowngraded = true;
+        autoDowngradeReason = `Your input (~${TokenWalletService.formatTokens(estimatedInputTokens)} tokens) exceeds ${selectedModel?.name}'s context window. Auto-routed to **${largerModel.name}** (${TokenWalletService.formatTokens(largerModel.contextWindow)} context) to process your full content.`;
+      } else if (!largerModel) {
+        // No model can fit — will be truncated by trimToContextWindow
+        logger.warn(`No model with context window >= ${Math.ceil(estimatedInputTokens / 0.7)} tokens. Input will be truncated.`);
+      }
+    }
+
     // ── VIDEO + IMAGE INTENT DETECTION ──────────────────────────
     const lastUserMessage = [...messages].reverse().find((m: any) => m.role === 'user');
     const lastUserText = typeof lastUserMessage?.content === 'string' ? lastUserMessage.content : '';
