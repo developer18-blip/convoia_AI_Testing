@@ -238,13 +238,24 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
           ) : (
             /* ── Normal display — image separate, text in bubble ── */
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
-              {/* Image — standalone, no background, no border, just rounded corners */}
-              {message.imagePreview && (
+              {/* Uploaded images — show ALL, not just first */}
+              {(message.imagePreviews && message.imagePreviews.length > 0) ? (
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  {message.imagePreviews.map((preview, idx) => (
+                    <img key={idx} src={preview} alt={`Uploaded ${idx + 1}`} style={{
+                      maxWidth: message.imagePreviews!.length > 2 ? '160px' : '220px',
+                      maxHeight: message.imagePreviews!.length > 2 ? '140px' : '200px',
+                      display: 'block', objectFit: 'cover', borderRadius: '12px',
+                      border: '1px solid var(--chat-border)',
+                    }} />
+                  ))}
+                </div>
+              ) : message.imagePreview ? (
                 <img src={message.imagePreview} alt="Uploaded" style={{
                   maxWidth: '280px', maxHeight: '240px', display: 'block',
                   objectFit: 'cover', borderRadius: '16px',
                 }} />
-              )}
+              ) : null}
 
               {/* Text bubble — clean ChatGPT-style, no harsh blue */}
               <div style={{
