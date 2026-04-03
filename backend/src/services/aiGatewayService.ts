@@ -22,6 +22,7 @@ function contentLength(content: any): number {
 function trimToContextWindow(messages: Array<{ role: string; content: any }>, maxTokens: number): Array<{ role: string; content: any }> {
   // Estimate ~4 chars per token, reserve 30% for output
   const maxInputTokens = Math.floor(maxTokens * 0.7);
+  const maxInputChars = maxInputTokens * 4;
 
   let totalChars = 0;
   for (const m of messages) totalChars += contentLength(m.content);
@@ -30,11 +31,36 @@ function trimToContextWindow(messages: Array<{ role: string; content: any }>, ma
   // If within limits, send everything
   if (estimatedTokens <= maxInputTokens) return messages;
 
-  // Keep first 2 messages (context anchor) + as many recent messages as fit
+  // SINGLE MESSAGE CASE: if there's only 1-2 messages and they're too long, truncate the content
+  if (messages.length <= 2) {
+    return messages.map(m => {
+      const len = contentLength(m.content);
+      if (len <= maxInputChars) return m;
+      // Truncate the message content
+      if (typeof m.content === 'string') {
+        const truncated = m.content.substring(0, maxInputChars - 200);
+        const droppedChars = m.content.length - truncated.length;
+        logger.warn(`Truncated single message from ${len} to ${maxInputChars - 200} chars (dropped ${droppedChars} chars to fit ${maxTokens} token context window)`);
+        return { ...m, content: truncated + `\n\n[Content truncated — ${Math.ceil(droppedChars / 4)} tokens exceeded the model's context window. The first ~${Math.ceil(truncated.length / 4)} tokens are included above.]` };
+      }
+      // Array content (multimodal) — truncate text parts
+      if (Array.isArray(m.content)) {
+        return { ...m, content: m.content.map((part: any) => {
+          if (part.type === 'text' && part.text && part.text.length > maxInputChars) {
+            return { ...part, text: part.text.substring(0, maxInputChars - 200) + '\n\n[Content truncated to fit context window]' };
+          }
+          return part;
+        })};
+      }
+      return m;
+    });
+  }
+
+  // MULTI-MESSAGE CASE: keep first 2 messages (context anchor) + as many recent messages as fit
   const first = messages.slice(0, 2);
   const rest = messages.slice(2);
   const firstChars = first.reduce((s, m) => s + contentLength(m.content), 0);
-  const budget = (maxInputTokens * 4) - firstChars - 200; // 200 char buffer
+  const budget = maxInputChars - firstChars - 200;
 
   // Walk backwards through remaining messages
   const kept: Array<{ role: string; content: any }> = [];
