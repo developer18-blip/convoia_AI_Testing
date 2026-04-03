@@ -443,6 +443,20 @@ pre {
   }
 }
 
+/* ─── Capacitor / Native app adjustments ─── */
+
+/* When native keyboard opens, shrink the layout */
+body.keyboard-open .chat-input-container {
+  padding-bottom: 4px !important;
+}
+body.keyboard-open .chat-messages-container {
+  scroll-padding-bottom: 60px;
+}
+
+/* Safe area padding for iOS notch / home indicator */
+.native-safe-top { padding-top: env(safe-area-inset-top, 0px); }
+.native-safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
 /* Reduce motion for performance on mobile */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

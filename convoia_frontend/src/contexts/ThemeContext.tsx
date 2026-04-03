@@ -1,4 +1,5 @@
 import { createContext, useEffect, useState, type ReactNode } from 'react'
+import { setStatusBarTheme } from '../lib/capacitor'
 
 type Theme = 'dark' | 'light'
 
@@ -30,6 +31,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     root.classList.add(theme)
     root.style.colorScheme = theme
     localStorage.setItem('convoia_theme', theme)
+    // Update native status bar color to match theme
+    setStatusBarTheme(theme === 'dark')
   }, [theme])
 
   const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
