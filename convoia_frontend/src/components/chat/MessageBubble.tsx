@@ -134,8 +134,9 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
     setIsEditing(false)
   }
 
-  /* ── Loading ── */
+  /* ── Loading — Rich visual state with progress steps ── */
   if (message.isLoading) {
+    const hasContent = message.content && message.content.length > 0;
     return (
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '32px', animation: 'fadeSlideIn 200ms ease-out' }}>
         <div style={{
@@ -143,14 +144,29 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
           backgroundColor: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: '14px', color: 'white',
         }}>✦</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {message.statusText && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
-              <div style={{ width: '16px', height: '16px', border: '2px solid var(--color-primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-              {message.statusText}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '85%' }}>
+          {/* Show accumulated content (e.g. thinking result) while still loading */}
+          {hasContent && (
+            <div style={{ fontSize: '14px', lineHeight: '1.65', color: 'var(--chat-text)' }}>
+              <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{message.content}</ReactMarkdown>
             </div>
           )}
-          {!message.statusText && (
+
+          {/* Status indicator with animated pulse bar */}
+          {message.statusText ? (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px',
+              borderRadius: '12px', background: 'var(--chat-surface)',
+              border: '1px solid var(--chat-border)', fontSize: '13px', color: 'var(--chat-text-secondary)',
+            }}>
+              <div style={{
+                width: '18px', height: '18px', borderRadius: '50%', flexShrink: 0,
+                border: '2.5px solid var(--color-primary)', borderTopColor: 'transparent',
+                animation: 'spin 0.7s linear infinite',
+              }} />
+              <span style={{ fontWeight: 500 }}>{message.statusText}</span>
+            </div>
+          ) : (
             <div style={{ display: 'flex', gap: '4px', padding: '4px 0' }}>
               {[0, 1, 2].map((i) => (
                 <div key={i} style={{
