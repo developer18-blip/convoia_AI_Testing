@@ -7,9 +7,10 @@ import { getOrCreatePersonalOrg } from '../utils/orgHelper.js';
 import { TokenWalletService } from '../services/tokenWalletService.js';
 import { NotificationService } from '../services/notificationService.js';
 import { needsWebSearch, searchWeb } from '../services/webSearchService.js';
-import { detectImageIntent, enhanceImagePrompt } from '../services/imageIntentService.js';
+import { enhanceImagePrompt } from '../services/imageIntentService.js';
 import { FileProcessingService } from '../services/fileProcessingService.js';
-import { detectVideoIntent, generateVideo as generateVideoFn, VIDEO_TOKEN_COST, type MediaRequest } from '../services/mediaGenerationService.js';
+import { generateVideo as generateVideoFn, VIDEO_TOKEN_COST, type MediaRequest } from '../services/mediaGenerationService.js';
+import { smartRoute } from '../services/smartRouter.js';
 import { getCachedResponse, setCachedResponse } from '../services/modelRecommendationService.js';
 import { getUserMemoryPrompt } from '../services/userMemoryService.js';
 import { processMemoryForQuery } from '../services/vectorMemoryService.js';
@@ -368,29 +369,22 @@ export const queryAIStream = async (req: Request, res: Response) => {
       }
     }
 
-    // ── VIDEO + IMAGE INTENT DETECTION ──────────────────────────
+    // ── SMART ROUTER — unified intent detection ─────────────────
     const lastUserMessage = [...messages].reverse().find((m: any) => m.role === 'user');
     const lastUserText = typeof lastUserMessage?.content === 'string' ? lastUserMessage.content : '';
 
-    // Video detection runs FIRST (priority over image)
-    const hasImageAttachment = !!referenceImage || (referenceImages && referenceImages.length > 0);
-    const videoIntent = detectVideoIntent(lastUserText, hasImageAttachment);
+    const route = await smartRoute({
+      message: lastUserText,
+      hasImageAttachment: !!referenceImage || (referenceImages && referenceImages.length > 0),
+      hasDocumentContext: lastUserText.includes('Here is the attached document content:'),
+      agentId,
+      conversationMessages: messages,
+      prisma,
+    });
 
-    // Movie Director agent: ALWAYS route to video generation regardless of keywords
-    const isMovieDirectorAgent = agentId ? await (async () => {
-      const agent = await (prisma as any).agent.findUnique({ where: { id: agentId }, select: { name: true } });
-      return agent?.name === 'Movie Director';
-    })() : false;
-
-    if (isMovieDirectorAgent) {
-      videoIntent.isVideoRequest = true;
-      videoIntent.confidence = 'high';
-      videoIntent.mediaType = hasImageAttachment ? 'image-to-video' : 'text-to-video';
-      videoIntent.extractedSubject = lastUserText; // use full message as the scene description
-    }
-
-    if (videoIntent.isVideoRequest) {
-      logger.info(`Video intent detected (${videoIntent.confidence}): type=${videoIntent.mediaType}, "${lastUserText.substring(0, 80)}"`);
+    if (route.action === 'video' && route.video) {
+      const isMovieDirectorAgent = route.video.forceThinking;
+      logger.info(`Smart route → video (${route.confidence}): type=${route.video.mediaType}, "${lastUserText.substring(0, 80)}"`);
 
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
@@ -399,7 +393,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
       res.flushHeaders();
 
       try {
-        let videoPrompt = videoIntent.extractedSubject || lastUserText;
+        let videoPrompt = route.video.extractedSubject || lastUserText;
         let videoThinkTokens = 0; // extra tokens from AI prompt enhancement
 
         // ── THINK MODE: Use AI to craft a pro-level cinematic prompt ──
@@ -452,12 +446,12 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
         // Build request
         const mediaRequest: MediaRequest = {
           prompt: videoPrompt,
-          mediaType: videoIntent.mediaType,
+          mediaType: route.video!.mediaType,
           userId: user.id,
         };
 
         // If image attached for image-to-video
-        if (videoIntent.mediaType === 'image-to-video' && referenceImage) {
+        if (route.video!.mediaType === 'image-to-video' && referenceImage) {
           const match = referenceImage.match(/^data:(image\/\w+);base64,(.+)/);
           if (match) {
             mediaRequest.inputImageBase64 = match[2];
@@ -535,11 +529,10 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
       return;
     }
 
-    // ── IMAGE INTENT DETECTION ──────────────────────────────────
-    const imageIntent = detectImageIntent(lastUserText, messages);
-
-    if (imageIntent.isImageRequest) {
-      logger.info(`Image intent detected (${imageIntent.confidence}): "${lastUserText.substring(0, 80)}"`);
+    // ── IMAGE INTENT (from smart router) ────────────────────────
+    if (route.action === 'image' && route.image) {
+      const imageIntent = { isImageRequest: true, confidence: route.confidence, extractedSubject: route.image.extractedSubject, originalMessage: lastUserText };
+      logger.info(`Smart route → image (${route.confidence}): "${lastUserText.substring(0, 80)}"`);
 
       // Set up SSE for image generation
       res.setHeader('Content-Type', 'text/event-stream');
