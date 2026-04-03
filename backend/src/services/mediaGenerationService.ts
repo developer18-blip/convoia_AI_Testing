@@ -392,8 +392,15 @@ export async function generateVideo(
     || result?.generatedSamples?.[0]?.video;
 
   if (!generatedVideo) {
+    // Check if video was blocked by safety filters
+    const filtered = videoResponse?.raiMediaFilteredCount || result?.raiMediaFilteredCount;
+    const filterReasons = videoResponse?.raiMediaFilteredReasons || result?.raiMediaFilteredReasons;
+    if (filtered && filtered > 0) {
+      logger.warn(`Veo content filtered: ${JSON.stringify(filterReasons)}`);
+      throw new Error(`Video was blocked by Google's content safety filter. Try simplifying your prompt — avoid brand names, text overlays, real people, or violent content.`);
+    }
     logger.error(`Veo response structure: ${JSON.stringify(result).substring(0, 300)}`);
-    throw new Error('Veo API returned no video data');
+    throw new Error('Veo API returned no video data. Try a different prompt.');
   }
 
   // Save video to disk
