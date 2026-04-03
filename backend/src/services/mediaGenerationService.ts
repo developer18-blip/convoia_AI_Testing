@@ -416,7 +416,27 @@ export async function generateVideo(
     throw new Error('Veo API returned unrecognized video format');
   }
 
-  logger.info(`Veo video generated: ${videoUrl} for user ${request.userId}`);
+  logger.info(`Silent video saved: ${videoUrl} for user ${request.userId}`);
+
+  // ── Step 5: AI Audio Generation + Merge ──────────────────────────
+  // Use Google Lyria 3 to generate matching music, then ffmpeg to merge
+  onProgress?.('Generating AI soundtrack...');
+  try {
+    const videoWithAudio = await addAudioToVideo(videoUrl, request.prompt, intent, apiKey, onProgress);
+    if (videoWithAudio) {
+      enhancementsApplied.push('AI-generated soundtrack (Lyria 3)');
+      logger.info(`Final video with audio: ${videoWithAudio}`);
+      return {
+        videoUrl: videoWithAudio,
+        revisedPrompt: enhancedPrompt,
+        provider: 'google-veo',
+        durationSeconds: request.durationSeconds || 8,
+        enhancementsApplied,
+      };
+    }
+  } catch (audioErr: any) {
+    logger.warn(`Audio generation failed (returning silent video): ${audioErr.message}`);
+  }
 
   return {
     videoUrl,
@@ -425,6 +445,130 @@ export async function generateVideo(
     durationSeconds: request.durationSeconds || 8,
     enhancementsApplied,
   };
+}
+
+// ── Step 5: AI Audio Generation (Lyria 3) + FFmpeg Merge ─────────────
+
+const AUDIO_DIR = path.join(process.cwd(), 'uploads', 'audio');
+
+/**
+ * Generate matching AI music using Google Lyria 3, then merge with video via ffmpeg.
+ * Returns the new video URL with audio, or null if audio generation fails.
+ */
+async function addAudioToVideo(
+  silentVideoUrl: string,
+  originalPrompt: string,
+  intent: VideoEnhancement,
+  apiKey: string,
+  onProgress?: (status: string) => void,
+): Promise<string | null> {
+  // Build a music prompt from the video context
+  const musicPrompt = buildMusicPrompt(originalPrompt, intent);
+  logger.info(`Lyria music prompt: "${musicPrompt.substring(0, 100)}..."`);
+
+  // Generate music with Lyria 3
+  const musicRes = await axios.post(
+    'https://generativelanguage.googleapis.com/v1beta/models/lyria-3-pro-preview:generateContent',
+    {
+      contents: [{ parts: [{ text: musicPrompt }] }],
+      generationConfig: { responseModalities: ['AUDIO'] },
+    },
+    { params: { key: apiKey }, timeout: 60000 }
+  );
+
+  const audioPart = musicRes.data?.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData?.mimeType?.startsWith('audio/'));
+  if (!audioPart?.inlineData?.data) {
+    logger.warn('Lyria returned no audio data');
+    return null;
+  }
+
+  // Save audio to disk
+  if (!fs.existsSync(AUDIO_DIR)) fs.mkdirSync(AUDIO_DIR, { recursive: true });
+  const audioExt = audioPart.inlineData.mimeType === 'audio/mpeg' ? 'mp3' : 'wav';
+  const audioFilename = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${audioExt}`;
+  const audioPath = path.join(AUDIO_DIR, audioFilename);
+  const audioBuffer = Buffer.from(audioPart.inlineData.data, 'base64');
+  fs.writeFileSync(audioPath, new Uint8Array(audioBuffer.buffer, audioBuffer.byteOffset, audioBuffer.byteLength));
+  logger.info(`Lyria audio saved: ${audioPath} (${(audioPart.inlineData.data.length * 0.75 / 1024).toFixed(0)}KB)`);
+
+  onProgress?.('Merging audio with video...');
+
+  // Merge with ffmpeg — trim audio to video length, mix at appropriate volume
+  const videoPath = path.join(process.cwd(), silentVideoUrl.replace('/api/uploads/', 'uploads/'));
+  const outputFilename = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}-final.mp4`;
+  const outputPath = path.join(UPLOADS_DIR, outputFilename);
+
+  const { execSync } = await import('child_process');
+  try {
+    // ffmpeg: take video (no audio) + audio, trim audio to video length, encode
+    execSync(
+      `ffmpeg -y -i "${videoPath}" -i "${audioPath}" -c:v copy -c:a aac -b:a 192k -shortest -map 0:v:0 -map 1:a:0 "${outputPath}"`,
+      { timeout: 30000, stdio: 'pipe' }
+    );
+
+    const outputUrl = `/api/uploads/videos/${outputFilename}`;
+    logger.info(`FFmpeg merge complete: ${outputUrl}`);
+
+    // Clean up silent video and audio files
+    try { fs.unlinkSync(videoPath); } catch { /* ok */ }
+    try { fs.unlinkSync(audioPath); } catch { /* ok */ }
+
+    return outputUrl;
+  } catch (ffmpegErr: any) {
+    logger.error(`FFmpeg merge failed: ${ffmpegErr.message?.substring(0, 200)}`);
+    // Clean up audio file, return null to use silent video
+    try { fs.unlinkSync(audioPath); } catch { /* ok */ }
+    return null;
+  }
+}
+
+/**
+ * Build a music prompt from video context.
+ * AI determines the best music style based on the video content.
+ */
+function buildMusicPrompt(videoPrompt: string, intent: VideoEnhancement): string {
+  const parts: string[] = [];
+
+  // Mood → music style
+  const moodMusic: Record<string, string> = {
+    'dramatic': 'dramatic cinematic orchestral music with deep bass, powerful strings, and building tension',
+    'calm': 'peaceful ambient music with gentle piano, soft strings, and nature-inspired melodies',
+    'mysterious': 'dark atmospheric music with eerie pads, subtle percussion, and suspenseful tones',
+    'energetic': 'high-energy electronic music with driving beats, powerful synths, and adrenaline-pumping rhythm',
+    'romantic': 'romantic orchestral music with warm strings, gentle harp, and emotional piano melodies',
+    'melancholic': 'melancholic piano music with emotional strings, soft reverb, and nostalgic melody',
+    'futuristic': 'futuristic electronic music with cyberpunk synths, deep bass, and sci-fi atmospherics',
+    'joyful': 'uplifting happy music with bright acoustic guitar, cheerful ukulele, and positive vibes',
+  };
+
+  if (intent.mood && moodMusic[intent.mood]) {
+    parts.push(moodMusic[intent.mood]);
+  } else {
+    // Infer from prompt content
+    if (/\b(car|race|drift|chase|sport|action)\b/i.test(videoPrompt)) {
+      parts.push('intense cinematic action music with driving percussion, powerful orchestral hits, and adrenaline-fueled energy');
+    } else if (/\b(ocean|sea|beach|sunset|sunrise|nature)\b/i.test(videoPrompt)) {
+      parts.push('ambient nature-inspired music with gentle waves, soft piano, and atmospheric pads');
+    } else if (/\b(city|urban|night|neon|street)\b/i.test(videoPrompt)) {
+      parts.push('modern cinematic urban music with electronic beats, atmospheric synths, and city vibes');
+    } else if (/\b(space|galaxy|star|universe|cosmic)\b/i.test(videoPrompt)) {
+      parts.push('epic space ambient music with cosmic synths, deep reverb, and ethereal choir');
+    } else if (/\b(forest|mountain|landscape|valley)\b/i.test(videoPrompt)) {
+      parts.push('cinematic orchestral nature music with sweeping strings, gentle woodwinds, and majestic horns');
+    } else {
+      parts.push('cinematic background music with emotional orchestral arrangement, suitable for a film scene');
+    }
+  }
+
+  // Pacing
+  if (intent.pacing === 'fast-paced') parts.push('fast tempo around 140 BPM');
+  else if (intent.pacing === 'slow contemplative') parts.push('slow tempo around 70 BPM');
+  else parts.push('moderate cinematic tempo');
+
+  // Duration
+  parts.push('instrumental only, no vocals, 8 seconds');
+
+  return parts.join(', ');
 }
 
 // ── Token Cost ───────────────────────────────────────────────────────
