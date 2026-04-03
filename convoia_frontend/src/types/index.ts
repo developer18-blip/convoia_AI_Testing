@@ -198,6 +198,7 @@ export interface Conversation {
   updatedAt: string
   isPinned?: boolean
   folderId?: string
+  _draft?: boolean // not yet synced to backend (created locally, no messages sent)
 }
 
 export interface Agent {

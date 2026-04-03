@@ -234,7 +234,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           const totalTokens = messages.reduce((s, m) => s + (m.tokensInput || 0) + (m.tokensOutput || 0), 0)
           const firstUserMsg = messages.find((m) => m.role === 'user')
           const title = c.title !== 'New Chat' ? c.title : (firstUserMsg ? firstUserMsg.content.slice(0, 50) : 'New Chat')
-          return { ...c, messages, totalCost, totalTokens, title, updatedAt: new Date().toISOString() }
+          // If this was a draft, mark it as synced now that it has messages
+          const wasDraft = c._draft
+          const updated = { ...c, messages, totalCost, totalTokens, title, updatedAt: new Date().toISOString(), _draft: undefined }
+          // Sync draft conversation to backend on first message
+          if (wasDraft) syncConversationToBackend(updated)
+          return updated
         })
       )
 
@@ -283,11 +288,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       totalTokens: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      _draft: true, // NOT synced to backend until first message
     }
     setConversations((prev) => [conv, ...prev])
     setActiveId(conv.id)
     setMessages([])
-    syncConversationToBackend(conv)
+    // DO NOT sync to backend here — deferred until first message is sent
     return conv
   }, [])
 

@@ -25,9 +25,12 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
     },
   });
 
+  // Filter out empty conversations (no messages ever sent)
+  const nonEmpty = conversations.filter((c: any) => c._count.messages > 0);
+
   res.json({
     success: true,
-    data: conversations.map((c: any) => ({
+    data: nonEmpty.map((c: any) => ({
       ...c,
       messageCount: c._count.messages,
       _count: undefined,
