@@ -75,6 +75,11 @@ const allowedOrigins = [
   process.env.CORS_ORIGIN,
   process.env.FRONTEND_URL,
   'https://intellect.convoia.com',
+  // Capacitor native app origins (Android uses https://localhost, iOS uses capacitor://localhost)
+  'https://localhost',
+  'capacitor://localhost',
+  'ionic://localhost',
+  'http://localhost',
   // Development origins — excluded in production
   ...(isDev ? [
     'http://localhost:5173',
@@ -90,8 +95,8 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-      // Allow all ngrok domains, convoia.com subdomains + configured origins
-      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.convoia.com') || origin.endsWith('.ngrok-free.dev') || origin.endsWith('.ngrok.io')) {
+      // Allow: ngrok domains, convoia.com subdomains, Capacitor native, configured origins
+      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.convoia.com') || origin.endsWith('.ngrok-free.dev') || origin.endsWith('.ngrok.io') || origin.startsWith('capacitor://') || origin.startsWith('ionic://')) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));

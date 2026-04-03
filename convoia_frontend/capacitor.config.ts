@@ -35,7 +35,7 @@ const config: CapacitorConfig = {
 
   // Android-specific
   android: {
-    allowMixedContent: false,    // block HTTP on HTTPS pages
+    allowMixedContent: true,     // allow HTTP API calls from HTTPS WebView (needed for local dev)
     backgroundColor: '#0D0D0D',
     buildOptions: {
       keystorePath: undefined,   // set when signing for release
