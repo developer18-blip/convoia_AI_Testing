@@ -386,12 +386,20 @@ export const queryAIStream = async (req: Request, res: Response) => {
           }
         });
 
+        // Look up Veo model for proper pricing
+        const veoModel = await prisma.aIModel.findFirst({ where: { modelId: 'veo-2.0-generate-001' } });
+        const veoModelId = veoModel?.id || finalModelId;
+        const videoOutputPrice = veoModel?.outputTokenPrice || 0.0025;
+        const videoMarkup = veoModel?.markupPercentage || 25;
+        const providerCost = VIDEO_TOKEN_COST * videoOutputPrice;
+        const videoCustomerPrice = providerCost * (1 + videoMarkup / 100);
+
         // Deduct tokens
         await TokenWalletService.deductTokens({
           userId: user.id,
           tokens: VIDEO_TOKEN_COST,
           reference: `video-gen-${Date.now()}`,
-          description: 'Video generation (Google Veo)',
+          description: `Video generation (Google Veo 2)`,
         });
 
         // Send video result
@@ -399,32 +407,34 @@ export const queryAIStream = async (req: Request, res: Response) => {
         const videoContent = `\n\n**Generated Video:**\n\n<video controls width="480" src="${result.videoUrl}"></video>\n\n*Enhancements applied: ${enhancementsList}*\n\n*"${result.revisedPrompt.substring(0, 150)}..."*\n\n[Download video](${result.videoUrl})`;
         res.write(`data: ${JSON.stringify({ type: 'chunk', content: videoContent })}\n\n`);
 
-        const videoCustomerPrice = VIDEO_TOKEN_COST * 0.000002;
         res.write(`data: ${JSON.stringify({
           type: 'done',
           tokens: { input: 0, output: VIDEO_TOKEN_COST, total: VIDEO_TOKEN_COST },
           tokensUsed: VIDEO_TOKEN_COST,
           cost: { charged: videoCustomerPrice.toFixed(6) },
-          model: 'Google Veo 2',
-          provider: 'google-veo',
+          model: veoModel?.name || 'Google Veo 2',
+          provider: 'google',
           videoGenerated: true,
           videoUrl: result.videoUrl,
         })}\n\n`);
         res.write('data: [DONE]\n\n');
         res.end();
 
-        // Log usage
+        // Log usage with correct Veo model ID
         await prisma.usageLog.create({
           data: {
             userId: user.id, organizationId,
-            modelId: finalModelId,
+            modelId: veoModelId,
             prompt: lastUserText.substring(0, 500),
             response: `[Video: ${result.revisedPrompt.substring(0, 200)}]`,
             tokensInput: 0, tokensOutput: VIDEO_TOKEN_COST, totalTokens: VIDEO_TOKEN_COST,
-            providerCost: 0, markupPercentage: 20, customerPrice: videoCustomerPrice,
+            providerCost,
+            markupPercentage: videoMarkup,
+            customerPrice: videoCustomerPrice,
             status: 'completed',
           },
         });
+        logger.info(`Video billed: ${VIDEO_TOKEN_COST} tokens, $${videoCustomerPrice.toFixed(4)} to user ${user.id}`);
       } catch (err: any) {
         logger.error(`Video generation failed: ${err.message}`);
         if (!res.writableEnded) {
