@@ -414,7 +414,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Clear throttle timer and apply final state
+      // Clear throttle timer BEFORE final state (prevents overwriting videoUrl/imageUrl)
       if (_ft) clearTimeout(_ft)
       setMessages((prev) => prev.map((m) =>
         m.id === assistantId ? {
@@ -567,6 +567,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      // Clear throttle timer BEFORE final state (prevents overwriting videoUrl/imageUrl)
+      if (_ft) clearTimeout(_ft)
       setMessages((prev) => prev.map((m) =>
         m.id === assistantId ? {
           ...m,
