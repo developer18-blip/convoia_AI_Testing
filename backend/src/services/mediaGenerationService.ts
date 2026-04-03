@@ -99,11 +99,14 @@ export function detectVideoIntent(
   // Check direct video generation patterns
   for (const pattern of VIDEO_INTENT_PATTERNS) {
     if (pattern.test(message)) {
-      // Extract subject — strip intent keywords, keep the core description
-      const subject = message
+      // Extract subject — strip ALL intent/production keywords to get the core description
+      let subject = message
         .replace(/\b(gen[ea]r[ea]te|create|make|produce|render|animate)\s+(a\s+)?(cinematic\s+)?(video|clip|animation|motion|footage|sequence|scene|shot)\s*(of|about|showing|with|featuring)?\s*/i, '')
         .replace(/\b(text.to.video|t2v)\s*/i, '')
-        .trim() || message;
+        .replace(/,?\s*captured with\b.*$/i, '') // strip production instructions (they'll be auto-added by enhancer)
+        .replace(/,?\s*(photorealistic|4k|professional|cinematic)\s*(quality|resolution|color grading|lighting|natural lighting)?\s*/gi, '')
+        .trim();
+      if (!subject || subject.length < 5) subject = message; // fallback to original if over-stripped
 
       const mediaType: MediaType = hasImageAttachment ? 'image-to-video' : 'text-to-video';
       return { isVideoRequest: true, confidence: 'high', mediaType, extractedSubject: subject };
@@ -318,31 +321,28 @@ export async function generateVideo(
   logger.info(`Veo request: type=${request.mediaType}, enhanced="${enhancedPrompt.substring(0, 120)}..."`);
   onProgress?.('Enhancing cinematic details...');
 
-  // Build request body
-  const generateBody: Record<string, any> = {
-    model: `models/${model}`,
-    generateVideoConfig: {
-      prompt: { text: enhancedPrompt },
-      config: {
-        personGeneration: 'allow_adult',
-        aspectRatio: request.aspectRatio || '16:9',
-        numberOfVideos: 1,
-      },
-    },
-  };
+  // Build request body — Veo uses predictLongRunning with instances[] + parameters{}
+  const instance: Record<string, any> = { prompt: enhancedPrompt };
 
   // Image-to-video: include reference image
   if (request.mediaType === 'image-to-video' && request.inputImageBase64) {
-    generateBody.generateVideoConfig.image = {
-      imageBytes: request.inputImageBase64,
-      mimeType: request.inputImageMimeType || 'image/jpeg',
-    };
+    instance.image = { bytesBase64Encoded: request.inputImageBase64, mimeType: request.inputImageMimeType || 'image/jpeg' };
   }
 
-  // Step 1: Submit generation request
+  const generateBody = {
+    instances: [instance],
+    parameters: {
+      sampleCount: 1,
+      aspectRatio: request.aspectRatio || '16:9',
+      personGeneration: 'allow_adult',
+      durationSeconds: request.durationSeconds || 8,
+    },
+  };
+
+  // Step 1: Submit generation request (predictLongRunning)
   onProgress?.('Generating video...');
   const submitRes = await axios.post(
-    `${baseUrl}/models/${model}:generateVideos`,
+    `${baseUrl}/models/${model}:predictLongRunning`,
     generateBody,
     { params: { key: apiKey }, timeout: 30000 }
   );
@@ -385,11 +385,14 @@ export async function generateVideo(
   }
 
   // Step 3: Extract video data
-  const generatedVideo = result?.generatedSamples?.[0]?.video
-    || result?.generatedVideos?.[0]?.video
-    || result?.generatedVideos?.[0];
+  // Response format: { generateVideoResponse: { generatedSamples: [{ video: { uri } }] } }
+  const videoResponse = result?.generateVideoResponse || result;
+  const generatedVideo = videoResponse?.generatedSamples?.[0]?.video
+    || videoResponse?.generatedVideos?.[0]?.video
+    || result?.generatedSamples?.[0]?.video;
 
   if (!generatedVideo) {
+    logger.error(`Veo response structure: ${JSON.stringify(result).substring(0, 300)}`);
     throw new Error('Veo API returned no video data');
   }
 
@@ -398,11 +401,15 @@ export async function generateVideo(
   let videoUrl: string;
 
   if (generatedVideo.uri) {
-    // GCS URI — download first
-    const downloadRes = await axios.get(generatedVideo.uri, { responseType: 'arraybuffer', timeout: 60000 });
+    // Veo returns a download URI that requires the API key
+    const downloadUrl = generatedVideo.uri.includes('?')
+      ? `${generatedVideo.uri}&key=${apiKey}`
+      : `${generatedVideo.uri}?key=${apiKey}`;
+    logger.info(`Downloading video from: ${generatedVideo.uri.substring(0, 80)}...`);
+    const downloadRes = await axios.get(downloadUrl, { responseType: 'arraybuffer', timeout: 120000 });
     videoUrl = saveVideoToDisk(Buffer.from(downloadRes.data));
+    logger.info(`Video saved: ${videoUrl} (${(downloadRes.data.length / 1024 / 1024).toFixed(1)}MB)`);
   } else if (generatedVideo.videoBytes || generatedVideo.bytesBase64Encoded) {
-    // Base64 encoded video
     const base64 = generatedVideo.videoBytes || generatedVideo.bytesBase64Encoded;
     videoUrl = saveVideoToDisk(Buffer.from(base64, 'base64'));
   } else {
