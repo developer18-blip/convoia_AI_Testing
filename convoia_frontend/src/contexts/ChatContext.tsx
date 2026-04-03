@@ -191,7 +191,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         })
         // Add any local-only conversations not on backend
         const backendIds = new Set(backendConvs.map(c => c.id))
-        const localOnly = local.filter(c => !backendIds.has(c.id))
+        // Add local-only conversations that have actual messages (skip empty drafts)
+        const localOnly = local.filter(c => !backendIds.has(c.id) && c.messages && c.messages.length > 0 && !c._draft)
         const all = [...merged, ...localOnly]
           .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime())
         setConversations(all)
@@ -203,7 +204,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!userId) return
     try {
-      localStorage.setItem(storageKey(userId), JSON.stringify(trimForStorage(conversations)))
+      // Only persist conversations that have messages (skip empty drafts)
+      const toSave = conversations.filter(c => !c._draft && c.messages && c.messages.length > 0)
+      localStorage.setItem(storageKey(userId), JSON.stringify(trimForStorage(toSave)))
     } catch (err) {
       console.error('Failed to save conversations:', err)
       if (conversations.length > 10) {
