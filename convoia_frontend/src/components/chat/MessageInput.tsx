@@ -53,16 +53,17 @@ export function MessageInput({
   disabled,
   hasActiveSession,
   tokenCount,
-  selectedModelId,
+  selectedModelId: _selectedModelId,
   onStop,
-  onFileProcessed,
+  onFileProcessed: _onFileProcessed,
   onImageGenerated,
   onSendWithContext,
-  onError,
+  onError: _onError,
 }: MessageInputProps) {
+  void _selectedModelId; void _onFileProcessed; void _onError;
   const [value, setValue] = useState('')
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
-  const [fileLoading, setFileLoading] = useState(false)
+  const [fileLoading, _setFileLoading] = useState(false); void _setFileLoading;
   const [fileError, setFileError] = useState<string | null>(null)
   const [imageGenOpen, setImageGenOpen] = useState(false)
   const [inputFocused, setInputFocused] = useState(false)
@@ -160,56 +161,60 @@ export function MessageInput({
       const docs = attachedFiles.filter(f => f.type === 'document')
       const audios = attachedFiles.filter(f => f.type === 'audio')
 
-      // Single image — use existing image flow
-      if (images.length === 1 && docs.length === 0 && audios.length === 0) {
-        const success = await sendWithImage(value.trim(), images[0])
-        if (!success) return
-        setValue('')
-        setAttachedFiles([])
-        if (textareaRef.current) textareaRef.current.style.height = 'auto'
-        return
-      }
-
-      // Multiple files or mixed — combine all extracted text as context
+      // ── UNIFIED MULTI-FILE PATH ──
+      // ALL file combinations go through one path: images as base64, docs/audio as text context
       const contextParts: string[] = []
+      const allImagePreviews: string[] = []
+
+      // Collect document text
       for (const doc of docs) {
         if (doc.extractedText) contextParts.push(`[Document: ${doc.file.name}]\n${doc.extractedText}`)
       }
+
+      // Collect audio transcripts
       for (const audio of audios) {
         if (audio.transcript) contextParts.push(`[Audio transcript: ${audio.file.name}]\n${audio.transcript}`)
       }
-      // Send ALL images to the model (not just the first)
-      if (images.length > 0 && images[0].preview) {
-        const allPreviews = images.map(img => img.preview).filter(Boolean) as string[]
-        if (onSendWithContext) {
-          const combinedContext = contextParts.length > 0 ? contextParts.join('\n\n---\n\n') : null
-          const question = value.trim() || (images.length > 1 ? `Analyze these ${images.length} images` : 'Analyze this image')
-          const fileNames = images.map(img => img.file.name).join(', ')
-          const totalSize = images.reduce((s, img) => s + img.file.size, 0)
-          onSendWithContext(
-            combinedContext ? `${question}\n\n${combinedContext}` : question,
-            null,
-            {
-              fileAttachment: { name: fileNames, type: 'image', size: totalSize },
-              imagePreview: allPreviews[0],
-              imagePreviews: allPreviews.length > 1 ? allPreviews : undefined,
-            },
-          )
-        }
-      } else if (contextParts.length > 0) {
-        // Documents/audio only — combine contexts
-        const combinedContext = contextParts.join('\n\n---\n\n')
-        const question = value.trim() || 'Analyze these files'
-        const fileNames = [...docs, ...audios].map(f => f.file.name).join(', ')
-        console.log('[PDF Send] Context length:', combinedContext.length, 'chars, question:', question)
-        if (onSendWithContext) {
-          onSendWithContext(question, combinedContext, { fileAttachment: { name: fileNames, type: 'document', size: [...docs, ...audios].reduce((s, f) => s + f.file.size, 0) } })
-        } else {
-          onSend(`${question}\n\n${combinedContext}`)
-        }
-      } else {
-        console.log('[PDF Send] No context extracted from docs:', docs.map(d => ({ name: d.file.name, hasText: !!d.extractedText, textLen: d.extractedText?.length })))
-        if (value.trim()) onSend(value.trim())
+
+      // Collect image previews (base64)
+      for (const img of images) {
+        if (img.preview) allImagePreviews.push(img.preview)
+      }
+
+      // Build the message
+      const combinedContext = contextParts.length > 0 ? contextParts.join('\n\n---\n\n') : null
+      const totalFiles = images.length + docs.length + audios.length
+      const defaultQuestion = totalFiles > 1
+        ? `Analyze these ${totalFiles} files`
+        : images.length === 1 ? 'Analyze this image'
+        : docs.length === 1 ? 'Analyze this document'
+        : 'Analyze this file'
+      const question = value.trim() || defaultQuestion
+
+      // Build file attachment info
+      const allFileNames = attachedFiles.map(f => f.file.name).join(', ')
+      const totalSize = attachedFiles.reduce((s, f) => s + f.file.size, 0)
+      const primaryType = images.length > 0 ? 'image' as const : 'document' as const
+
+      if (onSendWithContext) {
+        // Multi-file instruction for the model
+        const multiFileInstruction = totalFiles > 1
+          ? `\n\n[${totalFiles} files attached: ${images.length > 0 ? `${images.length} image(s)` : ''}${docs.length > 0 ? `${images.length > 0 ? ', ' : ''}${docs.length} document(s)` : ''}${audios.length > 0 ? `${(images.length + docs.length) > 0 ? ', ' : ''}${audios.length} audio file(s)` : ''}. Analyze ALL files together — compare, summarize, and find connections between them.]`
+          : ''
+
+        onSendWithContext(
+          combinedContext ? `${question}${multiFileInstruction}\n\n${combinedContext}` : `${question}${multiFileInstruction}`,
+          null,
+          {
+            fileAttachment: { name: allFileNames, type: primaryType, size: totalSize },
+            imagePreview: allImagePreviews[0],
+            imagePreviews: allImagePreviews.length > 1 ? allImagePreviews : undefined,
+          },
+        )
+      } else if (combinedContext) {
+        onSend(`${question}\n\n${combinedContext}`)
+      } else if (value.trim()) {
+        onSend(value.trim())
       }
 
       setValue('')
@@ -223,113 +228,6 @@ export function MessageInput({
     onSend(trimmed)
     setValue('')
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
-  }
-
-  // Detect if the user wants to generate/edit an image (not analyze it)
-  const isImageGenIntent = (text: string): boolean => {
-    const lower = text.toLowerCase()
-    const genPatterns = [
-      /generate/i, /create/i, /make\s+(a|an|me|this|the|it)/i, /design/i, /draw/i,
-      /similar\s+to/i, /like\s+this/i, /modify/i, /change/i, /edit/i, /transform/i,
-      /convert/i, /remake/i, /redo/i, /zoomed/i, /zoom/i, /resize/i, /crop/i,
-      /add\s+\w+\s+to/i, /remove\s+\w+\s+from/i, /replace/i, /swap/i,
-      /make\s+it/i, /turn\s+(this|it)/i, /improve/i, /enhance/i, /upscale/i,
-    ]
-    return genPatterns.some((p) => p.test(lower))
-  }
-
-  const sendWithImage = async (question: string, attached: AttachedFile): Promise<boolean> => {
-    // If the user wants to generate/edit based on this image, send the text
-    // through the normal chat flow. The image preview (base64) is passed via
-    // onSendWithContext so ChatContext includes it as referenceImage.
-    if (question && isImageGenIntent(question)) {
-      setAttachedFiles([])
-      setFileLoading(false)
-      if (onSendWithContext) {
-        // Pass image as system context so the backend gets it as referenceImage
-        onSendWithContext(
-          question,
-          null,
-          { fileAttachment: { name: attached.file.name, type: 'image', size: attached.file.size }, imagePreview: attached.preview },
-        )
-      } else {
-        onSend(question)
-      }
-      return true
-    }
-
-    setFileLoading(true)
-    setFileError(null)
-    try {
-      const formData = new FormData()
-      formData.append('file', attached.file)
-      formData.append('prompt', question || 'Analyze this image')
-      if (selectedModelId) formData.append('modelId', selectedModelId)
-
-      const token = localStorage.getItem('convoia_token')
-      const res = await fetch(`${API_URL}/files/upload`, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: formData,
-      })
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => null)
-        const errorMsg = errorData?.message || `Upload failed (${res.status})`
-        setFileError(errorMsg)
-        onError?.(errorMsg)
-        /* keep files on error for retry */
-        return false
-      }
-
-      const data = await res.json().catch(() => null)
-      if (!data || !data.success) {
-        const errorMsg = data?.message || 'Image processing failed'
-        setFileError(errorMsg)
-        onError?.(errorMsg)
-        /* keep files on error for retry */
-        return false
-      }
-
-      const result = data?.data
-      if (!result || !result.type) {
-        const errorMsg = data?.message || 'Invalid response from server'
-        setFileError(errorMsg)
-        onError?.(errorMsg)
-        /* keep files on error for retry */
-        return false
-      }
-
-      if (result.type === 'image_analysis') {
-        onFileProcessed?.({
-          userContent: question || 'Analyze this image',
-          assistantContent: result.response || 'Image analyzed successfully.',
-          cost: result.cost || 0,
-          tokens: { input: result.tokensInput || 0, output: result.tokensOutput || 0 },
-          imagePreview: attached.preview,
-          fileAttachment: { name: attached.file.name, type: 'image', size: attached.file.size },
-          model: result.model,
-          provider: result.provider,
-        })
-        window.dispatchEvent(new Event('wallet:refresh'))
-        window.dispatchEvent(new Event('tokens:refresh'))
-        setAttachedFiles([])
-        return true
-      } else {
-        setFileError('Unexpected response from server')
-        onError?.('Unexpected response from server')
-        /* keep files on error for retry */
-        return false
-      }
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to upload image. Check your connection.'
-      setFileError(errorMsg)
-      onError?.(errorMsg)
-      /* keep files on error for retry */
-      return false
-    } finally {
-      setFileLoading(false)
-    }
   }
 
   const handleKeyDown = (e: KeyboardEvent) => {
