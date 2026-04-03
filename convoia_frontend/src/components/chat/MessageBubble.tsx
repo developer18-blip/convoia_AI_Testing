@@ -651,6 +651,22 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
           </div>
         )}
 
+        {/* Generated video */}
+        {message.videoUrl && (
+          <div style={{ marginTop: '12px' }}>
+            <video
+              controls
+              playsInline
+              style={{ maxWidth: '480px', borderRadius: '12px', border: '1px solid var(--chat-border)', background: '#000' }}
+              src={message.videoUrl}
+            />
+            <button onClick={() => { const a = document.createElement('a'); a.href = message.videoUrl!; a.download = 'generated-video.mp4'; a.target = '_blank'; a.click(); }}
+              style={{ marginTop: '8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer' }}>
+              <Download size={12} /> Download video
+            </button>
+          </div>
+        )}
+
         {/* File attachment */}
         {message.fileAttachment && (
           <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', background: 'var(--chat-surface)', border: '1px solid var(--chat-border)', color: 'var(--chat-text-secondary)' }}>

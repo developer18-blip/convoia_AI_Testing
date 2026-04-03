@@ -358,7 +358,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const decoder = new TextDecoder()
       let buffer = ''
       let accumulated = ''
-      let metadata: { model?: string; provider?: string; tokens?: { input: number; output: number }; cost?: { charged: string } } = {}
+      let metadata: { model?: string; provider?: string; tokens?: { input: number; output: number }; cost?: { charged: string }; imageUrl?: string; videoUrl?: string; videoGenerated?: boolean; imageGenerated?: boolean } = {}
       let _ft: ReturnType<typeof setTimeout> | null = null
       const _flush = () => { const s = accumulated; setMessages((p) => p.map((m) => m.id === assistantId ? { ...m, content: s, isLoading: false } : m)) }
 
@@ -426,6 +426,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           cost: Number(metadata.cost?.charged || 0) || 0,
           model: metadata.model || modelId,
           provider: metadata.provider,
+          ...(metadata.imageUrl ? { imageUrl: metadata.imageUrl } : {}),
+          ...(metadata.videoUrl ? { videoUrl: metadata.videoUrl } : {}),
         } : m
       ))
 
@@ -509,7 +511,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const decoder = new TextDecoder()
       let buffer = ''
       let accumulated = ''
-      let metadata: { model?: string; provider?: string; tokens?: { input: number; output: number }; cost?: { charged: string } } = {}
+      let metadata: { model?: string; provider?: string; tokens?: { input: number; output: number }; cost?: { charged: string }; imageUrl?: string; videoUrl?: string; videoGenerated?: boolean; imageGenerated?: boolean } = {}
       let _ft: ReturnType<typeof setTimeout> | null = null
       const _flush = () => { const s = accumulated; setMessages((p) => p.map((m) => m.id === assistantId ? { ...m, content: s, isLoading: false } : m)) }
 
@@ -575,6 +577,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           cost: Number(metadata.cost?.charged || 0) || 0,
           model: metadata.model || modelId,
           provider: metadata.provider,
+          ...(metadata.imageUrl ? { imageUrl: metadata.imageUrl } : {}),
+          ...(metadata.videoUrl ? { videoUrl: metadata.videoUrl } : {}),
         } : m
       ))
 

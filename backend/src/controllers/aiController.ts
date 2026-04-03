@@ -9,6 +9,7 @@ import { NotificationService } from '../services/notificationService.js';
 import { needsWebSearch, searchWeb } from '../services/webSearchService.js';
 import { detectImageIntent, enhanceImagePrompt } from '../services/imageIntentService.js';
 import { FileProcessingService } from '../services/fileProcessingService.js';
+import { detectVideoIntent, generateVideo as generateVideoFn, VIDEO_TOKEN_COST, type MediaRequest } from '../services/mediaGenerationService.js';
 import { getCachedResponse, setCachedResponse } from '../services/modelRecommendationService.js';
 import { getUserMemoryPrompt } from '../services/userMemoryService.js';
 import { processMemoryForQuery } from '../services/vectorMemoryService.js';
@@ -341,11 +342,102 @@ export const queryAIStream = async (req: Request, res: Response) => {
       }
     }
 
-    // ── IMAGE INTENT DETECTION ──────────────────────────────────
-    // Check if the latest user message is requesting image generation.
-    // If so, route to image pipeline instead of chat model.
+    // ── VIDEO + IMAGE INTENT DETECTION ──────────────────────────
     const lastUserMessage = [...messages].reverse().find((m: any) => m.role === 'user');
     const lastUserText = typeof lastUserMessage?.content === 'string' ? lastUserMessage.content : '';
+
+    // Video detection runs FIRST (priority over image)
+    const hasImageAttachment = !!referenceImage || (referenceImages && referenceImages.length > 0);
+    const videoIntent = detectVideoIntent(lastUserText, hasImageAttachment);
+
+    if (videoIntent.isVideoRequest) {
+      logger.info(`Video intent detected (${videoIntent.confidence}): type=${videoIntent.mediaType}, "${lastUserText.substring(0, 80)}"`);
+
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.flushHeaders();
+
+      try {
+        res.write(`data: ${JSON.stringify({ type: 'status', content: 'Analyzing your idea...' })}\n\n`);
+
+        // Build request
+        const mediaRequest: MediaRequest = {
+          prompt: videoIntent.extractedSubject || lastUserText,
+          mediaType: videoIntent.mediaType,
+          userId: user.id,
+        };
+
+        // If image attached for image-to-video
+        if (videoIntent.mediaType === 'image-to-video' && referenceImage) {
+          const match = referenceImage.match(/^data:(image\/\w+);base64,(.+)/);
+          if (match) {
+            mediaRequest.inputImageBase64 = match[2];
+            mediaRequest.inputImageMimeType = match[1];
+          } else {
+            mediaRequest.inputImageBase64 = referenceImage;
+          }
+        }
+
+        const result = await generateVideoFn(mediaRequest, (status) => {
+          if (!res.writableEnded) {
+            res.write(`data: ${JSON.stringify({ type: 'status', content: status })}\n\n`);
+          }
+        });
+
+        // Deduct tokens
+        await TokenWalletService.deductTokens({
+          userId: user.id,
+          tokens: VIDEO_TOKEN_COST,
+          reference: `video-gen-${Date.now()}`,
+          description: 'Video generation (Google Veo)',
+        });
+
+        // Send video result
+        const enhancementsList = result.enhancementsApplied.join(', ');
+        const videoContent = `\n\n**Generated Video:**\n\n<video controls width="480" src="${result.videoUrl}"></video>\n\n*Enhancements applied: ${enhancementsList}*\n\n*"${result.revisedPrompt.substring(0, 150)}..."*\n\n[Download video](${result.videoUrl})`;
+        res.write(`data: ${JSON.stringify({ type: 'chunk', content: videoContent })}\n\n`);
+
+        const videoCustomerPrice = VIDEO_TOKEN_COST * 0.000002;
+        res.write(`data: ${JSON.stringify({
+          type: 'done',
+          tokens: { input: 0, output: VIDEO_TOKEN_COST, total: VIDEO_TOKEN_COST },
+          tokensUsed: VIDEO_TOKEN_COST,
+          cost: { charged: videoCustomerPrice.toFixed(6) },
+          model: 'Google Veo 2',
+          provider: 'google-veo',
+          videoGenerated: true,
+          videoUrl: result.videoUrl,
+        })}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+
+        // Log usage
+        await prisma.usageLog.create({
+          data: {
+            userId: user.id, organizationId,
+            modelId: finalModelId,
+            prompt: lastUserText.substring(0, 500),
+            response: `[Video: ${result.revisedPrompt.substring(0, 200)}]`,
+            tokensInput: 0, tokensOutput: VIDEO_TOKEN_COST, totalTokens: VIDEO_TOKEN_COST,
+            providerCost: 0, markupPercentage: 20, customerPrice: videoCustomerPrice,
+            status: 'completed',
+          },
+        });
+      } catch (err: any) {
+        logger.error(`Video generation failed: ${err.message}`);
+        if (!res.writableEnded) {
+          res.write(`data: ${JSON.stringify({ type: 'chunk', content: `\n\nVideo generation failed: ${err.message}` })}\n\n`);
+          res.write(`data: ${JSON.stringify({ type: 'done', tokens: { input: 0, output: 0, total: 0 }, tokensUsed: 0, cost: { charged: '0' }, model: 'Google Veo 2', provider: 'google-veo' })}\n\n`);
+          res.write('data: [DONE]\n\n');
+          res.end();
+        }
+      }
+      return;
+    }
+
+    // ── IMAGE INTENT DETECTION ──────────────────────────────────
     const imageIntent = detectImageIntent(lastUserText, messages);
 
     if (imageIntent.isImageRequest) {
