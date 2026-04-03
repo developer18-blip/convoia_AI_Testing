@@ -55,13 +55,24 @@ export interface VideoResult {
 // ── Step 1: Input Detection ──────────────────────────────────────────
 
 const VIDEO_INTENT_PATTERNS = [
-  /\b(generate|create|make|produce|render)\s+(a\s+)?(video|clip|animation|motion|footage)\b/i,
+  // Direct: "generate/create a video/clip/animation"
+  /\b(gen[ea]r[ea]te|create|make|produce|render)\s+(a\s+)?(video|clip|animation|motion|footage)\b/i,
+  // "video of X", "footage of X"
   /\b(video|clip|animation|footage)\s+(of|about|showing|with|featuring)\b/i,
+  // Motion keywords
   /\b(animate|bring to life|make it move|add motion)\b/i,
-  /\b(text.to.video|t2v|create.*(cinematic|movie|film))\b/i,
+  // Explicit: "text to video", "t2v"
+  /\b(text.to.video|t2v)\b/i,
+  // "create/generate a cinematic sequence/scene/shot" (core fix — catches "cinematic" + action verb)
+  /\b(gen[ea]r[ea]te|create|make|produce)\s+(a\s+)?(cinematic|movie|film)\s*(sequence|scene|shot|clip|video|footage)?\b/i,
+  // Standalone cinematic production terms
+  /\b(cinematic\s+(sequence|scene|shot|footage)|movie\s+scene|short\s+film)\b/i,
+  // Conversion: "turn X into video"
   /\b(turn|convert|transform)\s+.*(into|to|as)\s+(a\s+)?(video|animation|clip)\b/i,
-  /\b(short\s+film|movie\s+scene|cinematic\s+shot)\b/i,
-  /\b(slow\s*motion|time\s*lapse|timelapse)\s+(video|of|clip)\b/i,
+  // Motion effects + video context
+  /\b(slow\s*motion|time\s*lapse|timelapse)\s+(video|of|clip|sequence)\b/i,
+  // "generate a ... sequence" with production keywords
+  /\b(gen[ea]r[ea]te|create)\b.*\b(sequence|scene)\b.*\b(tracking|camera|lighting|4k|cinematic)\b/i,
 ];
 
 const VIDEO_ANTI_PATTERNS = [
@@ -88,9 +99,9 @@ export function detectVideoIntent(
   // Check direct video generation patterns
   for (const pattern of VIDEO_INTENT_PATTERNS) {
     if (pattern.test(message)) {
-      // Extract subject — remove the intent keywords to get what they want
+      // Extract subject — strip intent keywords, keep the core description
       const subject = message
-        .replace(/\b(generate|create|make|produce|render|animate)\s+(a\s+)?(video|clip|animation|motion|footage)\s*(of|about|showing|with|featuring)?\s*/i, '')
+        .replace(/\b(gen[ea]r[ea]te|create|make|produce|render|animate)\s+(a\s+)?(cinematic\s+)?(video|clip|animation|motion|footage|sequence|scene|shot)\s*(of|about|showing|with|featuring)?\s*/i, '')
         .replace(/\b(text.to.video|t2v)\s*/i, '')
         .trim() || message;
 
