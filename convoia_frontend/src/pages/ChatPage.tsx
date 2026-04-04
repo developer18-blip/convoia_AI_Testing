@@ -314,7 +314,7 @@ export function ChatPage() {
   const totalCost = messages.reduce((s, m) => s + (m.cost || 0), 0)
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', backgroundColor: 'var(--chat-bg)', color: 'var(--chat-text)', fontFamily: "'Inter', sans-serif" }}>
+    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden', backgroundColor: 'var(--chat-bg)', color: 'var(--chat-text)', fontFamily: "'Inter', sans-serif" }}>
 
       {/* LEFT PANEL — Desktop sidebar */}
       <div
@@ -339,7 +339,7 @@ export function ChatPage() {
       />
       <div
         className="fixed left-0 z-40 flex flex-col transition-transform duration-300 ease-in-out md:hidden"
-        style={{ top: 0, height: '100%', width: 'min(280px, calc(100vw - 48px))', background: 'var(--color-surface)', transform: mobileLeftOpen ? 'translateX(0)' : 'translateX(-100%)' }}
+        style={{ top: 0, height: '100%', width: 'min(300px, calc(100vw - 56px))', background: 'var(--color-surface)', transform: mobileLeftOpen ? 'translateX(0)' : 'translateX(-100%)', paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
         <ConversationList
           conversations={conversations} folders={folders} activeId={activeConversationId}
@@ -353,14 +353,14 @@ export function ChatPage() {
       {/* CENTER PANEL — main chat */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: 'var(--chat-bg)', minWidth: 0 }}>
         {/* Top bar — clean, no border like ChatGPT */}
-        <div className="flex items-center gap-2" style={{
-          height: '48px', padding: '0 16px', flexShrink: 0,
+        <div className="flex items-center gap-1.5 sm:gap-2" style={{
+          height: '52px', padding: '0 10px 0 6px', flexShrink: 0,
           backgroundColor: 'var(--chat-bg)',
         }}>
           {/* Mobile hamburger */}
-          <button onClick={() => setMobileLeftOpen(true)} className="md:hidden"
-            style={{ padding: '6px', borderRadius: '8px', backgroundColor: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer' }}>
-            <Menu size={18} />
+          <button onClick={() => setMobileLeftOpen(true)} className="md:hidden chat-topbar-btn"
+            style={{ padding: '10px', borderRadius: '10px', backgroundColor: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Menu size={20} />
           </button>
           {/* Desktop sidebar toggle */}
           <button onClick={() => setLeftOpen(!leftOpen)} className="hidden md:flex" title={leftOpen ? 'Hide conversations' : 'Show conversations'}
@@ -406,9 +406,10 @@ export function ChatPage() {
           <button
             onClick={() => setThinkingEnabled(!thinkingEnabled)}
             title={thinkingEnabled ? 'Extended thinking ON — deeper reasoning' : 'Enable extended thinking'}
+            className="chat-topbar-btn"
             style={{
               display: 'flex', alignItems: 'center', gap: '5px',
-              padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
+              padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
               cursor: 'pointer', transition: 'all 200ms', flexShrink: 0,
               background: thinkingEnabled ? 'var(--color-primary)' : 'var(--chat-surface)',
               color: thinkingEnabled ? 'white' : 'var(--chat-text-muted)',
@@ -497,7 +498,8 @@ export function ChatPage() {
             {/* More menu */}
             <div className="relative">
               <button onClick={() => setShowMoreMenu(!showMoreMenu)}
-                style={{ padding: '6px', borderRadius: '8px', backgroundColor: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', transition: 'all 150ms' }}
+                className="chat-topbar-btn"
+                style={{ padding: '10px', borderRadius: '10px', backgroundColor: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', transition: 'all 150ms', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--chat-surface)'; e.currentTarget.style.color = 'var(--color-text-primary)' }}
                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--color-text-muted)' }}>
                 <MoreHorizontal size={16} />

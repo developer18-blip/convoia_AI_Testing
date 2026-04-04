@@ -283,7 +283,7 @@ export function MessageInput({
   const canSend = (value.trim() || attachedFiles.length > 0) && !isLoading && !disabled && !fileLoading && !anyUploading
 
   return (
-    <div className="chat-input-container" style={{ flexShrink: 0, padding: '0 16px 16px', backgroundColor: 'var(--chat-bg)' }}>
+    <div className="chat-input-container" style={{ flexShrink: 0, padding: '0 10px 12px', backgroundColor: 'var(--chat-bg)' }}>
       <div style={{ maxWidth: '900px', margin: '0 auto', width: '100%' }}>
 
         {/* Error banner */}
@@ -394,7 +394,7 @@ export function MessageInput({
               color: 'var(--chat-text)', fontSize: '15px', lineHeight: '1.6', resize: 'none',
               height: '56px', /* controlled by useEffect */
               fontFamily: 'Inter, system-ui, sans-serif',
-              padding: '16px 20px 8px', overflowWrap: 'break-word', wordBreak: 'break-word',
+              padding: '14px 16px 8px', overflowWrap: 'break-word', wordBreak: 'break-word',
               overflowY: 'auto', scrollbarWidth: 'thin', scrollbarColor: 'var(--chat-border) transparent',
             }}
           />
@@ -479,7 +479,7 @@ export function MessageInput({
       </div>
 
       {/* Hint below input */}
-      <p style={{ textAlign: 'center', fontSize: '11px', color: 'var(--chat-text-dim)', marginTop: '8px', opacity: 0.6 }}>
+      <p className="hidden sm:block" style={{ textAlign: 'center', fontSize: '11px', color: 'var(--chat-text-dim)', marginTop: '6px', opacity: 0.5 }}>
         ConvoiaAI can make mistakes. Check important info.
       </p>
 

@@ -384,26 +384,42 @@ pre {
 }
 
 /* ═══════════════════════════════════════════════════════
-   MOBILE RESPONSIVE — Touch-friendly, clean mobile UX
+   MOBILE RESPONSIVE — Touch-friendly, native-app UX
    ═══════════════════════════════════════════════════════ */
 
-/* Minimum touch target size */
+/* ─── Safe areas for notch, status bar, home indicator ─── */
+#root {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  min-height: 100dvh;
+}
+
+/* Use dynamic viewport height (accounts for mobile address bar) */
+.h-screen { height: 100dvh !important; }
+
+/* Minimum touch target size (44px = iOS/Android standard) */
 @media (max-width: 768px) {
-  button, a, input, select, textarea {
-    min-height: 40px;
+  button, a, select {
+    min-height: 44px;
+  }
+  /* Inputs taller on mobile */
+  input, textarea {
+    min-height: 44px;
+    font-size: 16px !important; /* Prevents iOS zoom on focus */
   }
 
   /* Larger font on mobile for readability */
   body { font-size: 15px; }
 
   /* Chat messages take more width on mobile */
-  .message-content { font-size: 14px !important; line-height: 1.7 !important; }
+  .message-content { font-size: 14.5px !important; line-height: 1.7 !important; }
 
   /* User bubble wider on mobile */
-  .user-msg-container { max-width: 85% !important; }
+  .user-msg-container { max-width: 90% !important; }
 
   /* AI avatar smaller on mobile */
-  .ai-avatar { width: 24px !important; height: 24px !important; font-size: 12px !important; }
+  .ai-avatar { width: 26px !important; height: 26px !important; font-size: 13px !important; border-radius: 8px !important; }
 
   /* Less gap in messages on mobile */
   .ai-message-row { gap: 10px !important; margin-bottom: 20px !important; }
@@ -412,13 +428,21 @@ pre {
   .table-wrapper { -webkit-overflow-scrolling: touch; }
 
   /* Fix notification panel on mobile */
-  .notification-panel { width: calc(100vw - 24px) !important; max-width: 360px !important; right: 12px !important; }
+  .notification-panel { width: calc(100vw - 32px) !important; max-width: 340px !important; right: 16px !important; }
+
+  /* Top bar controls need minimum touch size but inline layout */
+  .chat-topbar-btn {
+    min-height: 36px !important;
+    min-width: 36px !important;
+    padding: 8px !important;
+  }
 }
 
 /* Small phones (< 400px) */
 @media (max-width: 400px) {
   body { font-size: 14px; }
   .message-content { font-size: 13.5px !important; }
+  .user-msg-container { max-width: 95% !important; }
 }
 
 /* Thin elegant scrollbar */
@@ -439,7 +463,7 @@ pre {
 /* Safe area for devices with notch */
 @supports (padding: env(safe-area-inset-bottom)) {
   .chat-input-container {
-    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
   }
 }
 
@@ -453,9 +477,24 @@ body.keyboard-open .chat-messages-container {
   scroll-padding-bottom: 60px;
 }
 
-/* Safe area padding for iOS notch / home indicator */
-.native-safe-top { padding-top: env(safe-area-inset-top, 0px); }
-.native-safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+/* Prevent pull-to-refresh / overscroll bounce in native app */
+html, body {
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Disable text selection on UI elements (native feel) */
+@media (max-width: 768px) {
+  button, label, nav, header, .chat-topbar-btn {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  /* But allow text selection in message content */
+  .message-content, textarea, input {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+}
 
 /* Reduce motion for performance on mobile */
 @media (prefers-reduced-motion: reduce) {

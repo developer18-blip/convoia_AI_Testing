@@ -81,7 +81,7 @@ export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, o
 
   if (messages.length === 0) {
     return (
-      <div style={{ height: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 24px 140px', backgroundColor: 'var(--chat-bg)' }}>
+      <div style={{ height: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 16px 120px', backgroundColor: 'var(--chat-bg)' }}>
         {/* Welcome heading — big, clean, ChatGPT-style */}
         <div style={{ animation: 'fade-in 0.4s ease-out', textAlign: 'center', marginBottom: '36px' }}>
           <div style={{
@@ -128,7 +128,7 @@ export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, o
   return (
     <div style={{ height: '100%', position: 'relative' }}>
       <div ref={containerRef} className="chat-messages-container" style={{ height: '100%', overflowY: 'auto', overflowX: 'hidden', backgroundColor: 'var(--chat-bg)' }}>
-        <div style={{ maxWidth: '900px', margin: '0 auto', padding: '20px 24px 0', width: '100%' }}>
+        <div style={{ maxWidth: '900px', margin: '0 auto', padding: '16px 12px 0', width: '100%' }}>
           {messages.map((msg) => (
             <MessageBubble key={msg.id} message={msg}
               onRetry={msg.error ? onRetry : undefined}

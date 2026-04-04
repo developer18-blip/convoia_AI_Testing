@@ -72,10 +72,10 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-dvh flex">
       {/* Left — Form Side */}
-      <div className="flex-1 flex flex-col justify-center px-6 sm:px-12 lg:px-20 bg-background relative">
-        <div className="absolute top-5 right-5 z-10">
+      <div className="flex-1 flex flex-col justify-center px-5 sm:px-12 lg:px-20 py-8 bg-background relative">
+        <div className="absolute top-5 right-5 z-10" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
           <ThemeToggle />
         </div>
 
@@ -109,7 +109,7 @@ export function LoginPage() {
               theme="outline"
               shape="rectangular"
               size="large"
-              width="420"
+              width="360"
               text="continue_with"
             />
           </div>
