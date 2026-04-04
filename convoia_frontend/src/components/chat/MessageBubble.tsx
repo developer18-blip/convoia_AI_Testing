@@ -234,11 +234,11 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
     return (
       <div style={{
         display: 'flex', justifyContent: 'flex-end', marginBottom: '28px',
-        paddingLeft: isEditing ? '0px' : '60px',
+        paddingLeft: isEditing ? '0px' : '20%',
         animation: 'fadeSlideIn 200ms ease-out',
       }}
       onMouseEnter={() => setShowActions(true)} onMouseLeave={() => setShowActions(false)}>
-        <div className="user-msg-container" style={{ maxWidth: isEditing ? '100%' : '75%', width: isEditing ? '100%' : 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+        <div className="user-msg-container" style={{ maxWidth: isEditing ? '100%' : '80%', width: isEditing ? '100%' : 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
           {isEditing ? (
             /* ── Edit mode — full-width like ChatGPT ── */
             <div style={{
@@ -295,7 +295,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
                 </div>
               ) : message.imagePreview ? (
                 <img src={message.imagePreview} alt="Uploaded" style={{
-                  maxWidth: '280px', maxHeight: '240px', display: 'block',
+                  maxWidth: '100%', width: '280px', maxHeight: '240px', display: 'block',
                   objectFit: 'cover', borderRadius: '16px',
                 }} />
               ) : null}
@@ -431,8 +431,8 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
   /* ── AI MESSAGE — no bubble, text flows on dark bg ── */
   return (
     <div className="ai-message-row" style={{
-      display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '28px',
-      paddingRight: '40px', animation: 'fadeSlideIn 200ms ease-out',
+      display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '28px',
+      paddingRight: '8px', animation: 'fadeSlideIn 200ms ease-out',
     }}
     onMouseEnter={() => setShowActions(true)} onMouseLeave={() => setShowActions(false)}>
 

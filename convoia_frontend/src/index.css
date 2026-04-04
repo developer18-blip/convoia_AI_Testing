@@ -499,6 +499,18 @@ html, body {
   -webkit-overflow-scrolling: touch;
 }
 
+/* Eliminate 300ms tap delay on mobile — makes buttons feel instant */
+button, a, input, select, textarea, [role="button"] {
+  touch-action: manipulation;
+}
+
+/* Prevent long-press context menu on native app UI elements */
+@media (max-width: 768px) {
+  img, a, button {
+    -webkit-touch-callout: none;
+  }
+}
+
 /* Disable text selection on UI elements (native feel) */
 @media (max-width: 768px) {
   button, label, nav, header, .chat-topbar-btn {

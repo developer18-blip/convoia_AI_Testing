@@ -146,7 +146,7 @@ export function Header({ onMenuClick }: HeaderProps) {
         <button
           onClick={onMenuClick}
           className="lg:hidden"
-          style={{ padding: '8px', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '10px' }}
+          style={{ padding: '12px', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
           <Menu size={20} />
         </button>
@@ -234,7 +234,7 @@ export function Header({ onMenuClick }: HeaderProps) {
           whileTap={{ scale: 0.9 }}
           onClick={toggleTheme}
           aria-label="Toggle theme"
-          style={{ padding: '8px', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '10px' }}
+          style={{ padding: '10px', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
           {theme === 'dark' ? <Sun size={18} style={{ color: 'var(--color-warning)' }} /> : <Moon size={18} style={{ color: 'var(--color-accent-end)' }} />}
         </motion.button>
@@ -244,7 +244,7 @@ export function Header({ onMenuClick }: HeaderProps) {
           <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={() => setShowNotifs(prev => !prev)}
-            style={{ padding: '8px', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '10px' }}
+            style={{ padding: '10px', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
             <Bell size={18} />
             {unreadCount > 0 && (
@@ -265,7 +265,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -4, scale: 0.95 }}
                 style={{
-                  position: 'absolute', top: '110%', right: 0, width: '340px', zIndex: 50,
+                  position: 'absolute', top: '110%', right: '-8px', width: 'min(340px, calc(100vw - 32px))', zIndex: 50,
                   background: 'var(--chat-bg)', border: '1px solid var(--chat-border)',
                   borderRadius: '14px', overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
                 }}

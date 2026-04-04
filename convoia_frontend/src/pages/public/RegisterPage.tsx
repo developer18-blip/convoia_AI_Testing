@@ -189,7 +189,7 @@ export function RegisterPage() {
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6 }}
-          className="w-full max-w-[440px] mx-auto py-10"
+          className="w-full max-w-[400px] mx-auto py-10"
         >
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2.5 mb-8">
@@ -275,7 +275,7 @@ export function RegisterPage() {
                   theme="outline"
                   shape="rectangular"
                   size="large"
-                  width="420"
+                  width="360"
                   text="signup_with"
                 />
               </div>

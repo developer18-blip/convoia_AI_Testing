@@ -83,7 +83,7 @@ export function LoginPage() {
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6 }}
-          className="w-full max-w-[420px] mx-auto"
+          className="w-full max-w-[400px] mx-auto"
         >
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2.5 mb-10">
