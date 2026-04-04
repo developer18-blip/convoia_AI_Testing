@@ -11,7 +11,7 @@ export function AppShell() {
   const isChat = location.pathname === '/chat'
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex bg-background overflow-hidden" style={{ height: '100dvh' }}>
       {/* Desktop sidebar — hidden on chat (chat has its own sidebar) */}
       {!isChat && (
         <div className="hidden lg:flex">

@@ -438,11 +438,27 @@ pre {
   }
 }
 
+/* ─── Chat input pill: slimmer on mobile ─── */
+@media (max-width: 768px) {
+  .chat-input-box {
+    border-radius: 20px !important;
+  }
+  .chat-input-box textarea {
+    padding: 12px 14px 6px !important;
+    font-size: 15px !important;
+  }
+  /* Suggestion cards: single column on small screens */
+  .suggestion-card {
+    min-height: 0 !important;
+  }
+}
+
 /* Small phones (< 400px) */
 @media (max-width: 400px) {
   body { font-size: 14px; }
   .message-content { font-size: 13.5px !important; }
   .user-msg-container { max-width: 95% !important; }
+  .chat-input-box { border-radius: 18px !important; }
 }
 
 /* Thin elegant scrollbar */

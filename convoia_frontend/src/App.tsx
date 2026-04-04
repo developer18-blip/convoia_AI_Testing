@@ -12,6 +12,7 @@ import { AppShell } from './components/layout/AppShell'
 import { LoadingPage } from './components/shared/LoadingPage'
 import { useAuth } from './hooks/useAuth'
 import { useToast } from './hooks/useToast'
+import { isNative } from './lib/capacitor'
 
 // Lazy-loaded pages
 const LandingPage = lazy(() => import('./pages/public/LandingPage'))
@@ -111,12 +112,22 @@ function SessionGuard() {
   return <Outlet />
 }
 
+/** On native mobile app, skip the marketing landing page — go straight to login or chat */
+function NativeHomeRedirect() {
+  const { isAuthenticated, isLoading } = useAuth()
+  if (isNative) {
+    if (isLoading) return <LoadingPage />
+    return <Navigate to={isAuthenticated ? '/chat' : '/login'} replace />
+  }
+  return <LandingPage />
+}
+
 function AppRoutes() {
   return (
     <Suspense fallback={<LoadingPage />}>
       <Routes>
         {/* Public */}
-        <Route path="/" element={<LandingPage />} />
+        <Route path="/" element={<NativeHomeRedirect />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
