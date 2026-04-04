@@ -1,29 +1,43 @@
 /**
  * Capacitor Native Bridge
  * Initializes native plugins when running inside a Capacitor shell (Android/iOS).
- * No-ops gracefully on web — all code here is safe to import in any environment.
+ * Uses dynamic imports so it builds fine on servers without Capacitor installed.
  */
 
-import { Capacitor } from '@capacitor/core'
-import { StatusBar, Style } from '@capacitor/status-bar'
-import { Keyboard } from '@capacitor/keyboard'
-import { SplashScreen } from '@capacitor/splash-screen'
-import { App } from '@capacitor/app'
+/** Detect native platform without importing @capacitor/core at top level */
+function detectNative(): boolean {
+  try {
+    // Capacitor injects this on the window in native shells
+    return !!(window as any).Capacitor?.isNativePlatform?.()
+  } catch {
+    return false
+  }
+}
+
+function detectPlatform(): string {
+  try {
+    return (window as any).Capacitor?.getPlatform?.() || 'web'
+  } catch {
+    return 'web'
+  }
+}
 
 /** True when running inside the native Android/iOS shell */
-export const isNative = Capacitor.isNativePlatform()
-export const isAndroid = Capacitor.getPlatform() === 'android'
-export const isIOS = Capacitor.getPlatform() === 'ios'
+export const isNative = detectNative()
+export const isAndroid = detectPlatform() === 'android'
+export const isIOS = detectPlatform() === 'ios'
 
 /**
  * Initialize all native plugins. Call once on app startup.
+ * Uses dynamic import() so the app builds even without Capacitor packages.
  */
 export async function initNativeBridge() {
   if (!isNative) return
 
   // ── Status Bar ──
   try {
-    await StatusBar.setStyle({ style: Style.Dark }) // light text on dark bg
+    const { StatusBar, Style } = await import('@capacitor/status-bar')
+    await StatusBar.setStyle({ style: Style.Dark })
     await StatusBar.setBackgroundColor({ color: '#0D0D0D' })
     if (isAndroid) {
       await StatusBar.setOverlaysWebView({ overlay: false })
@@ -34,7 +48,7 @@ export async function initNativeBridge() {
 
   // ── Keyboard ──
   try {
-    // Scroll the chat input into view when keyboard opens
+    const { Keyboard } = await import('@capacitor/keyboard')
     Keyboard.addListener('keyboardWillShow', () => {
       document.body.classList.add('keyboard-open')
     })
@@ -47,7 +61,7 @@ export async function initNativeBridge() {
 
   // ── Splash Screen ──
   try {
-    // Hide splash after app is ready (auto-hide may already handle this)
+    const { SplashScreen } = await import('@capacitor/splash-screen')
     await SplashScreen.hide()
   } catch {
     // SplashScreen not available
@@ -55,11 +69,11 @@ export async function initNativeBridge() {
 
   // ── Back Button (Android) ──
   try {
-    App.addListener('backButton', ({ canGoBack }) => {
+    const { App } = await import('@capacitor/app')
+    App.addListener('backButton', ({ canGoBack }: { canGoBack: boolean }) => {
       if (canGoBack) {
         window.history.back()
       } else {
-        // At root — minimize app instead of closing
         App.minimizeApp()
       }
     })
@@ -70,11 +84,11 @@ export async function initNativeBridge() {
 
 /**
  * Set status bar style based on theme.
- * Call when user toggles dark/light mode.
  */
 export async function setStatusBarTheme(isDark: boolean) {
   if (!isNative) return
   try {
+    const { StatusBar, Style } = await import('@capacitor/status-bar')
     await StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light })
     await StatusBar.setBackgroundColor({ color: isDark ? '#0D0D0D' : '#FFFFFF' })
   } catch {
