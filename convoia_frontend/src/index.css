@@ -494,14 +494,6 @@ body.keyboard-open .chat-messages-container { scroll-padding-bottom: 60px; }
   img { -webkit-touch-callout: none; }
 }
 
-/* ── Desktop: fix agent dropdown back to normal dropdown ── */
-@media (min-width: 641px) {
-  .sm\:absolute { position: absolute !important; }
-  .sm\:inset-x-auto { left: auto !important; right: auto !important; }
-  .sm\:top-full { top: 100% !important; }
-  .sm\:bottom-auto { bottom: auto !important; }
-}
-
 /* ── Small phones (≤ 400px) ── */
 @media (max-width: 400px) {
   body { font-size: 14px; }
