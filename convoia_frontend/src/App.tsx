@@ -9,12 +9,13 @@ import { ChatProvider } from './contexts/ChatContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ToastContainer } from './components/ui/Toast'
 import { AppShell } from './components/layout/AppShell'
+import { MobileAppShell } from './components/mobile/MobileAppShell'
 import { LoadingPage } from './components/shared/LoadingPage'
 import { useAuth } from './hooks/useAuth'
 import { useToast } from './hooks/useToast'
 import { isNative } from './lib/capacitor'
 
-// Lazy-loaded pages
+// Lazy-loaded pages — desktop
 const LandingPage = lazy(() => import('./pages/public/LandingPage'))
 const LoginPage = lazy(() => import('./pages/public/LoginPage'))
 const RegisterPage = lazy(() => import('./pages/public/RegisterPage'))
@@ -22,6 +23,12 @@ const VerifyEmailPage = lazy(() => import('./pages/public/VerifyEmailPage'))
 const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'))
 const ChatPage = lazy(() => import('./pages/ChatPage'))
 const ModelsPage = lazy(() => import('./pages/ModelsPage'))
+
+// Lazy-loaded pages — mobile only (not in desktop bundle)
+const MobileHomePage = lazy(() => import('./pages/mobile/MobileHomePage'))
+const MobileChatPage = lazy(() => import('./pages/mobile/MobileChatPage'))
+const MobileAgentsPage = lazy(() => import('./pages/mobile/MobileAgentsPage'))
+const MobileWalletPage = lazy(() => import('./pages/mobile/MobileWalletPage'))
 const UsagePage = lazy(() => import('./pages/UsagePage'))
 const SessionsPage = lazy(() => import('./pages/SessionsPage'))
 const TeamPage = lazy(() => import('./pages/TeamPage'))
@@ -64,7 +71,9 @@ function ProtectedRoute() {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" replace />
-  return <AppShell />
+
+  // Native app → mobile shell with bottom tabs; desktop → standard sidebar shell
+  return isNative ? <MobileAppShell /> : <AppShell />
 }
 
 function RoleGuard({ allowedRoles }: { allowedRoles: string[] }) {
@@ -117,7 +126,7 @@ function NativeHomeRedirect() {
   const { isAuthenticated, isLoading } = useAuth()
   if (isNative) {
     if (isLoading) return <LoadingPage />
-    return <Navigate to={isAuthenticated ? '/chat' : '/login'} replace />
+    return <Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />
   }
   return <LandingPage />
 }
@@ -138,15 +147,15 @@ function AppRoutes() {
 
         {/* Protected */}
         <Route element={<ProtectedRoute />}>
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/chat" element={<ChatPage />} />
-          <Route path="/models" element={<ModelsPage />} />
+          <Route path="/dashboard" element={isNative ? <MobileHomePage /> : <DashboardPage />} />
+          <Route path="/chat" element={isNative ? <MobileChatPage /> : <ChatPage />} />
+          <Route path="/models" element={isNative ? <MobileAgentsPage /> : <ModelsPage />} />
           <Route path="/usage" element={<UsagePage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/api-docs" element={<ApiDocsPage />} />
           {/* Token purchase — only freelancers + org_owner + platform_admin */}
           <Route element={<TokenBuyGuard />}>
-            <Route path="/tokens/buy" element={<TokenStorePage />} />
+            <Route path="/tokens/buy" element={isNative ? <MobileWalletPage /> : <TokenStorePage />} />
           </Route>
           <Route path="/payment/success" element={<PaymentSuccessPage />} />
           <Route path="/payment/cancel" element={<PaymentCancelPage />} />

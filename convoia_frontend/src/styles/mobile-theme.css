@@ -1,0 +1,114 @@
+/* ═══════════════════════════════════════════════════════
+   MOBILE APP THEME — Purple, light background
+   Applied via .mobile-app class on MobileAppShell root.
+   Only active inside the Capacitor native shell.
+   Desktop website is COMPLETELY UNAFFECTED.
+   ═══════════════════════════════════════════════════════ */
+
+.mobile-app {
+  /* ── Primary: Purple ── */
+  --color-primary: #7C3AED !important;
+  --color-primary-hover: #6D28D9 !important;
+  --color-primary-light: rgba(124, 58, 237, 0.10) !important;
+  --color-primary-glow: rgba(124, 58, 237, 0.06) !important;
+
+  --color-accent-start: #7C3AED !important;
+  --color-accent-mid: #8B5CF6 !important;
+  --color-accent-end: #A78BFA !important;
+
+  /* ── Light background ── */
+  --color-background: #F8F7FF !important;
+  --color-surface: #FFFFFF !important;
+  --color-surface-2: #F3F0FF !important;
+  --color-surface-3: #EBE5FF !important;
+
+  /* ── Borders ── */
+  --color-border: #E8E5F0 !important;
+  --color-border-subtle: #F0EDF8 !important;
+  --color-border-hover: #C4B5FD !important;
+
+  /* ── Text: dark on light ── */
+  --color-text-primary: #1A1A2E !important;
+  --color-text-secondary: #4A4A6A !important;
+  --color-text-muted: #8E8EA0 !important;
+  --color-text-meta: #8E8EA0 !important;
+  --color-text-dim: #B0B0C0 !important;
+
+  /* ── Chat-specific ── */
+  --chat-bg: #F8F7FF !important;
+  --chat-sidebar-bg: #FFFFFF !important;
+  --chat-surface: #F0EDF8 !important;
+  --chat-hover: #E8E5F0 !important;
+  --chat-border: #E0DCF0 !important;
+  --chat-text: #1A1A2E !important;
+  --chat-text-secondary: #4A4A6A !important;
+  --chat-text-muted: #8E8EA0 !important;
+  --chat-text-dim: #B0B0C0 !important;
+  --chat-code-bg: #F5F3FF !important;
+  --chat-code-header: #EBE5FF !important;
+  --chat-input-bg: #FFFFFF !important;
+  --chat-user-bubble: #7C3AED !important;
+
+  /* ── Glass ── */
+  --color-glass: rgba(255, 255, 255, 0.92) !important;
+  --color-glass-border: rgba(124, 58, 237, 0.08) !important;
+
+  /* ── Force light color scheme ── */
+  color-scheme: light !important;
+  background-color: #F8F7FF !important;
+  color: #1A1A2E !important;
+}
+
+/* ── Mobile user bubble: white text on purple ── */
+.mobile-app .user-msg-container {
+  color: #FFFFFF;
+}
+.mobile-app .user-msg-container * {
+  color: #FFFFFF !important;
+}
+.mobile-app .user-msg-container code {
+  background: rgba(255,255,255,0.15) !important;
+  border-color: rgba(255,255,255,0.2) !important;
+}
+
+/* ── Mobile inputs ── */
+.mobile-app input,
+.mobile-app textarea,
+.mobile-app select {
+  color-scheme: light;
+  color: #1A1A2E;
+}
+.mobile-app input::placeholder,
+.mobile-app textarea::placeholder {
+  color: #B0B0C0;
+}
+
+/* ── Mobile scrollbar ── */
+.mobile-app * {
+  scrollbar-width: none;
+}
+.mobile-app ::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Mobile code blocks ── */
+.mobile-app code:not(pre code) {
+  background: #F0EDF8 !important;
+  color: #5B21B6 !important;
+  border: 1px solid #E0DCF0 !important;
+}
+
+/* ── Mobile bottom tab safe area ── */
+.mobile-tab-bar {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ── Hide tab bar when keyboard opens ── */
+body.keyboard-open .mobile-tab-bar {
+  display: none !important;
+}
+
+/* ── Mobile main content: account for tab bar height ── */
+.mobile-app-content {
+  padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+}
