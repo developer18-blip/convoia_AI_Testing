@@ -36,6 +36,7 @@ export async function initNativeBridge() {
 
   // ── Status Bar ──
   try {
+    // @ts-ignore — Capacitor packages only installed in mobile builds
     const { StatusBar, Style } = await import('@capacitor/status-bar')
     await StatusBar.setStyle({ style: Style.Dark })
     await StatusBar.setBackgroundColor({ color: '#0D0D0D' })
@@ -48,6 +49,7 @@ export async function initNativeBridge() {
 
   // ── Keyboard ──
   try {
+    // @ts-ignore — Capacitor packages only installed in mobile builds
     const { Keyboard } = await import('@capacitor/keyboard')
     Keyboard.addListener('keyboardWillShow', () => {
       document.body.classList.add('keyboard-open')
@@ -61,6 +63,7 @@ export async function initNativeBridge() {
 
   // ── Splash Screen ──
   try {
+    // @ts-ignore — Capacitor packages only installed in mobile builds
     const { SplashScreen } = await import('@capacitor/splash-screen')
     await SplashScreen.hide()
   } catch {
@@ -69,6 +72,7 @@ export async function initNativeBridge() {
 
   // ── Back Button (Android) ──
   try {
+    // @ts-ignore — Capacitor packages only installed in mobile builds
     const { App } = await import('@capacitor/app')
     App.addListener('backButton', ({ canGoBack }: { canGoBack: boolean }) => {
       if (canGoBack) {
@@ -88,6 +92,7 @@ export async function initNativeBridge() {
 export async function setStatusBarTheme(isDark: boolean) {
   if (!isNative) return
   try {
+    // @ts-ignore — Capacitor packages only installed in mobile builds
     const { StatusBar, Style } = await import('@capacitor/status-bar')
     await StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light })
     await StatusBar.setBackgroundColor({ color: isDark ? '#0D0D0D' : '#FFFFFF' })
