@@ -16,13 +16,13 @@ interface TabsProps {
 
 export function Tabs({ tabs, activeTab, onChange, className }: TabsProps) {
   return (
-    <div className={cn('flex gap-1 bg-surface border border-border rounded-2xl p-1', className)}>
+    <div className={cn('flex gap-1 bg-surface border border-border rounded-2xl p-1 overflow-x-auto', className)} style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
       {tabs.map((tab) => (
         <button
           key={tab.id}
           onClick={() => onChange(tab.id)}
           className={cn(
-            'relative px-4 py-2 text-sm font-medium rounded-xl transition-colors',
+            'relative px-4 py-2 text-sm font-medium rounded-xl transition-colors whitespace-nowrap flex-shrink-0',
             activeTab === tab.id
               ? 'text-white'
               : 'text-text-secondary hover:text-text-primary hover:bg-surface-2'

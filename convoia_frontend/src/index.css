@@ -438,6 +438,9 @@ pre {
   }
 }
 
+/* ─── Hide scrollbar on horizontally scrollable tabs ─── */
+.overflow-x-auto::-webkit-scrollbar { display: none; }
+
 /* ─── Chat input pill: slimmer on mobile ─── */
 @media (max-width: 768px) {
   .chat-input-box {

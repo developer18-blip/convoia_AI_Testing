@@ -60,7 +60,7 @@ function ModelDrawer({ model, onClose, allModels }: { model: AIModel; onClose: (
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-surface border-l border-border h-full overflow-y-auto animate-in slide-in-from-right">
+      <div className="relative w-full max-w-lg sm:max-w-lg max-sm:max-w-full bg-surface border-l border-border h-full overflow-y-auto animate-in slide-in-from-right">
         {/* Header */}
         <div className="sticky top-0 bg-surface border-b border-border px-6 py-4 z-10">
           <div className="flex items-center justify-between">

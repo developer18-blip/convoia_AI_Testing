@@ -238,7 +238,7 @@ function BoardView({ tasks, onTaskClick, onStatusChange }: {
   const byStatus = (key: string) => tasks.filter(t => t.status === key)
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${STATUSES.length}, 1fr)`, gap: '12px', height: '100%', minHeight: '400px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${STATUSES.length}, minmax(200px, 1fr))`, gap: '12px', height: '100%', minHeight: '400px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' as any }}>
       {STATUSES.map(col => {
         const colTasks = byStatus(col.key)
         const Icon = col.icon

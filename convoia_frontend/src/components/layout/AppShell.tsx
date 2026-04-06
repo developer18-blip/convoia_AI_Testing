@@ -28,7 +28,7 @@ export function AppShell() {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {!isChat && <Header onMenuClick={() => setMobileMenuOpen(true)} />}
-        <main className={`flex-1 overflow-y-auto ${isChat ? 'p-0' : 'p-4 lg:p-6'}`}>
+        <main className={`flex-1 overflow-y-auto overflow-x-hidden ${isChat ? 'p-0' : 'px-3 py-4 sm:p-4 lg:p-6'}`}>
           <Outlet />
         </main>
       </div>

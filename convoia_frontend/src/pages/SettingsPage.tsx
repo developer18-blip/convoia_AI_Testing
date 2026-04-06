@@ -115,7 +115,7 @@ export function SettingsPage() {
   const strength = passwordStrength(newPassword)
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6 max-w-2xl w-full">
       <h2 className="text-2xl font-semibold text-text-primary">Settings</h2>
 
       <Tabs tabs={[
