@@ -115,8 +115,8 @@ export function SettingsPage() {
   const strength = passwordStrength(newPassword)
 
   return (
-    <div className="space-y-6 max-w-2xl w-full">
-      <h2 className="text-2xl font-semibold text-text-primary">Settings</h2>
+    <div className="space-y-5 max-w-2xl w-full mx-auto">
+      <h2 className="text-xl sm:text-2xl font-semibold text-text-primary">Settings</h2>
 
       <Tabs tabs={[
         { id: 'profile', label: 'Profile' },
@@ -129,7 +129,7 @@ export function SettingsPage() {
       {tab === 'profile' && (
         <div className="space-y-6">
           <Card padding="lg">
-            <div className="flex items-start gap-5 mb-6">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-5 mb-6">
               {/* Avatar with upload overlay */}
               <div className="relative group">
                 {user && <Avatar name={user.name} src={user.avatar} size="xl" />}
@@ -175,7 +175,7 @@ export function SettingsPage() {
           {/* Built-in avatars */}
           <Card padding="lg">
             <h3 className="text-sm font-semibold text-text-primary mb-3">Or choose an avatar</h3>
-            <div className="grid grid-cols-6 gap-3">
+            <div className="grid grid-cols-4 sm:grid-cols-6 gap-3">
               {BUILT_IN_AVATARS.map((avatar) => {
                 const isSelected = user?.avatar === avatar.src
                 return (

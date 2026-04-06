@@ -136,10 +136,10 @@ export function TasksPage() {
   if (isLoading) return <div className="flex items-center justify-center h-[60vh]"><div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" /></div>
 
   return (
-    <div className="flex-1 overflow-hidden" style={{ height: 'calc(100vh - 60px)' }}>
+    <div className="flex-1 overflow-hidden" style={{ height: 'calc(100dvh - 60px)' }}>
       {/* Header */}
-      <div style={{ padding: '20px 24px 0', borderBottom: '1px solid var(--color-border)' }}>
-        <div className="flex items-center justify-between" style={{ marginBottom: '16px' }}>
+      <div style={{ padding: '16px 16px 0', borderBottom: '1px solid var(--color-border)' }}>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3" style={{ marginBottom: '12px' }}>
           <div>
             <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>Tasks</h1>
             <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
@@ -170,7 +170,7 @@ export function TasksPage() {
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-3" style={{ paddingBottom: '12px' }}>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3" style={{ paddingBottom: '12px' }}>
           <div style={{ position: 'relative', flex: 1, maxWidth: '280px' }}>
             <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
             <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
@@ -203,7 +203,7 @@ export function TasksPage() {
       </div>
 
       {/* Content */}
-      <div style={{ height: 'calc(100% - 130px)', overflow: 'auto', padding: '16px 24px' }}>
+      <div style={{ height: 'calc(100% - 130px)', overflow: 'auto', padding: '12px' }}>
         {view === 'board' ? (
           <BoardView tasks={filtered} onTaskClick={fetchDetail} onStatusChange={updateStatus} />
         ) : (

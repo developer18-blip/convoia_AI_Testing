@@ -291,7 +291,7 @@ export function ModelsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-text-primary">AI Models</h2>
+          <h2 className="text-xl sm:text-2xl font-semibold text-text-primary">AI Models</h2>
           <p className="text-sm text-text-muted mt-1">{models.filter((m) => m.isActive).length} models available across {providerTabs.length - 1} providers</p>
         </div>
         <div className="relative w-full sm:w-64">
