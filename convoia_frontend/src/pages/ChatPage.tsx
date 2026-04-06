@@ -5,7 +5,8 @@ import { MessageArea } from '../components/chat/MessageArea'
 import { MessageInput } from '../components/chat/MessageInput'
 import { CodeInterpreter } from '../components/chat/CodeInterpreter'
 import { CanvasPanel } from '../components/chat/CanvasPanel'
-import { CostEstimator } from '../components/chat/CostEstimator'
+// CostEstimator moved to more menu on desktop
+// import { CostEstimator } from '../components/chat/CostEstimator'
 import { ModelSelector } from '../components/shared/ModelSelector'
 import { AgentSelector } from '../components/shared/AgentSelector'
 import { useChat } from '../hooks/useChat'
@@ -17,7 +18,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useTokens } from '../contexts/TokenContext'
 import { formatTokens } from '../lib/utils'
 import { useNavigate } from 'react-router-dom'
-import { Zap, PanelLeftClose, PanelLeft, MoreHorizontal, Trash2, Download, Menu, Search } from 'lucide-react'
+import { Zap, PanelLeftClose, PanelLeft, MoreHorizontal, Trash2, Download, Menu } from 'lucide-react'
 
 export function ChatPage() {
   const { models } = useModels()
@@ -43,21 +44,7 @@ export function ChatPage() {
   const [leftOpen, setLeftOpen] = useState(true)
   const [mobileLeftOpen, setMobileLeftOpen] = useState(false)
   const [showMoreMenu, setShowMoreMenu] = useState(false)
-  const [pageSearch, setPageSearch] = useState('')
-  const [showPageSearch, setShowPageSearch] = useState(false)
   const navigate = useNavigate()
-  const pageSearchRef = useRef<HTMLDivElement>(null)
-  const searchPages = [
-    { label: 'Dashboard', path: '/dashboard' },
-    { label: 'Models', path: '/models' },
-    { label: 'Buy Tokens', path: '/tokens/buy' },
-    { label: 'Usage', path: '/usage' },
-    { label: 'Settings', path: '/settings' },
-    { label: 'Team', path: '/team' },
-    { label: 'API Keys', path: '/api-keys' },
-    { label: 'Tasks', path: '/tasks' },
-  ]
-  const filteredPages = pageSearch ? searchPages.filter(p => p.label.toLowerCase().includes(pageSearch.toLowerCase())) : searchPages
   const [codeInterpreter, setCodeInterpreter] = useState<{ code: string; language: string } | null>(null)
 
   // Canvas state
@@ -78,16 +65,7 @@ export function ChatPage() {
     prevStreaming.current = isStreaming
   }, [isStreaming, messages])
 
-  // Close page search on click outside
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (pageSearchRef.current && !pageSearchRef.current.contains(e.target as Node)) {
-        setShowPageSearch(false); setPageSearch('')
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
+
 
   const handleModelChange = (id: string) => {
     setSelectedModelId(id)
@@ -352,143 +330,44 @@ export function ChatPage() {
 
       {/* CENTER PANEL — main chat */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: 'var(--chat-bg)', minWidth: 0 }}>
-        {/* Top bar — clean, no border like ChatGPT */}
-        <div className="flex items-center gap-1.5 sm:gap-2" style={{
-          height: '52px', padding: '0 10px 0 6px', flexShrink: 0,
-          backgroundColor: 'var(--chat-bg)',
-        }}>
-          {/* Mobile hamburger */}
-          <button onClick={() => setMobileLeftOpen(true)} className="md:hidden chat-topbar-btn"
-            style={{ padding: '10px', borderRadius: '10px', backgroundColor: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Menu size={20} />
-          </button>
-          {/* Desktop sidebar toggle */}
-          <button onClick={() => setLeftOpen(!leftOpen)} className="hidden md:flex" title={leftOpen ? 'Hide conversations' : 'Show conversations'}
-            style={{ padding: '6px', borderRadius: '8px', backgroundColor: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', transition: 'all 150ms' }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--chat-surface)'; e.currentTarget.style.color = 'var(--color-text-primary)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--color-text-muted)' }}>
-            {leftOpen ? <PanelLeftClose size={18} /> : <PanelLeft size={18} />}
-          </button>
+        {/* Top bar — two rows on mobile for breathing room */}
+        <div style={{ flexShrink: 0, backgroundColor: 'var(--chat-bg)', borderBottom: '1px solid var(--chat-border)' }}>
+          {/* Row 1: hamburger, model, spacer, tokens, more */}
+          <div className="flex items-center" style={{ height: '48px', padding: '0 8px', gap: '4px' }}>
+            {/* Mobile hamburger */}
+            <button onClick={() => setMobileLeftOpen(true)} className="md:hidden"
+              style={{ padding: '8px', borderRadius: '10px', backgroundColor: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Menu size={20} />
+            </button>
+            {/* Desktop sidebar toggle */}
+            <button onClick={() => setLeftOpen(!leftOpen)} className="hidden md:flex" title={leftOpen ? 'Hide conversations' : 'Show conversations'}
+              style={{ padding: '6px', borderRadius: '8px', backgroundColor: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', transition: 'all 150ms' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--chat-surface)'; e.currentTarget.style.color = 'var(--color-text-primary)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--color-text-muted)' }}>
+              {leftOpen ? <PanelLeftClose size={18} /> : <PanelLeft size={18} />}
+            </button>
 
-          {/* Model selector — ChatGPT style text */}
-          {models.length > 0 ? (
-            <ModelSelector models={models} selectedId={selectedModelId} onChange={handleModelChange} />
-          ) : (
-            <span style={{ fontSize: '14px', color: 'var(--chat-text-muted)', padding: '6px 8px' }}>
-              Loading models...
-            </span>
-          )}
-
-          {/* Industry — hidden unless xl screen */}
-          <select
-            value={industry}
-            onChange={(e) => setIndustry(e.target.value)}
-            className="hidden xl:block"
-            style={{ padding: '5px 8px', backgroundColor: 'var(--chat-surface)', border: '1px solid var(--chat-border)', borderRadius: '8px', color: 'var(--color-text-secondary)', fontSize: '11px', outline: 'none', cursor: 'pointer' }}
-          >
-            {industries.map((i) => (
-              <option key={i.value} value={i.value}>{i.label}</option>
-            ))}
-          </select>
-
-          {/* Agent selector — always visible, compact on mobile */}
-          <AgentSelector
-            agents={agents}
-            models={models}
-            selectedId={selectedAgent?.id || null}
-            onChange={handleAgentChange}
-            onCreateAgent={createAgent}
-          />
-
-          {/* Think toggle — compact on mobile */}
-          <button
-            onClick={() => setThinkingEnabled(!thinkingEnabled)}
-            title={thinkingEnabled ? 'Extended thinking ON — deeper reasoning' : 'Enable extended thinking'}
-            className="chat-topbar-btn"
-            style={{
-              display: 'flex', alignItems: 'center', gap: '5px',
-              padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
-              cursor: 'pointer', transition: 'all 200ms', flexShrink: 0,
-              background: thinkingEnabled ? 'var(--color-primary)' : 'var(--chat-surface)',
-              color: thinkingEnabled ? 'white' : 'var(--chat-text-muted)',
-              border: thinkingEnabled ? '1px solid var(--color-primary)' : '1px solid var(--chat-border)',
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2a8 8 0 0 0-8 8c0 3.5 2 6 4 7.5V20h8v-2.5c2-1.5 4-4 4-7.5a8 8 0 0 0-8-8z"/>
-              <path d="M9 20h6v1a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-1z"/>
-              {thinkingEnabled && <path d="M12 6v4l2 2" stroke="currentColor" strokeWidth="1.5"/>}
-            </svg>
-            <span className="hidden sm:inline">Think</span>
-          </button>
-
-          {/* Page search — compact, in header */}
-          <div className="hidden md:block relative ml-auto" ref={pageSearchRef}>
-            <div
-              onClick={() => setShowPageSearch(true)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '6px',
-                padding: '5px 12px', borderRadius: '8px', cursor: 'pointer',
-                background: 'var(--chat-surface)', border: '1px solid var(--chat-border)',
-                fontSize: '12px', color: 'var(--color-text-dim)', minWidth: '160px',
-                transition: 'all 0.15s',
-              }}>
-              <Search size={12} />
-              <span>Search pages...</span>
-            </div>
-            {showPageSearch && (
-              <div className="context-menu-enter" style={{
-                position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', zIndex: 50,
-                background: 'var(--chat-surface)', border: '1px solid var(--chat-border)',
-                borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', padding: '4px', minWidth: '200px',
-                backdropFilter: 'blur(12px)',
-              }}>
-                <input
-                  autoFocus value={pageSearch} onChange={(e) => setPageSearch(e.target.value)}
-                  placeholder="Search..."
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') { setShowPageSearch(false); setPageSearch('') }
-                    if (e.key === 'Enter' && filteredPages.length > 0) { navigate(filteredPages[0].path); setShowPageSearch(false); setPageSearch('') }
-                  }}
-                  style={{ width: '100%', padding: '6px 10px', border: 'none', background: 'transparent', color: 'var(--color-text-primary)', fontSize: '13px', outline: 'none', borderBottom: '1px solid var(--chat-border)' }}
-                />
-                {filteredPages.map(p => (
-                  <button key={p.path}
-                    onMouseDown={(e) => { e.preventDefault(); navigate(p.path); setShowPageSearch(false); setPageSearch('') }}
-                    style={{ display: 'block', width: '100%', padding: '8px 10px', border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: '13px', cursor: 'pointer', textAlign: 'left', borderRadius: '6px' }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--chat-hover)'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
-                    {p.label}
-                  </button>
-                ))}
-                {filteredPages.length === 0 && (
-                  <div style={{ padding: '8px 10px', fontSize: '12px', color: 'var(--color-text-dim)', textAlign: 'center' }}>No pages found</div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            {/* Per-conversation spend — shows after first AI response */}
-            <div className="hidden md:flex items-center gap-1" style={{ fontSize: '11px', color: 'var(--color-text-dim)', fontFamily: 'monospace' }}>
-              <span style={{ color: 'var(--color-text-muted)' }}>
-                {totalCost > 0 ? `~$${totalCost.toFixed(4)}/query` : ''}
-              </span>
-            </div>
-            {totalCost === 0 && (
-              <div className="hidden md:block"><CostEstimator model={selectedModel} /></div>
+            {/* Model selector */}
+            {models.length > 0 ? (
+              <ModelSelector models={models} selectedId={selectedModelId} onChange={handleModelChange} />
+            ) : (
+              <span style={{ fontSize: '14px', color: 'var(--chat-text-muted)', padding: '6px 8px' }}>Loading models...</span>
             )}
 
-            {/* Token counter — shows conversation tokens OR wallet balance */}
+            {/* Spacer */}
+            <div style={{ flex: 1 }} />
+
+            {/* Token balance — ALWAYS visible */}
             <div className="flex items-center gap-1" style={{
               fontSize: '12px', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums',
               color: 'var(--color-text-muted)',
-              padding: '3px 8px', borderRadius: '6px',
-              background: totalTokens > 0 ? 'var(--color-primary-light)' : 'transparent',
-              transition: 'all 0.3s',
+              padding: '4px 10px', borderRadius: '8px',
+              background: totalTokens > 0 ? 'var(--color-primary-light)' : 'var(--chat-surface)',
+              border: '1px solid var(--chat-border)',
+              transition: 'all 0.3s', flexShrink: 0,
             }}>
-              <Zap size={11} style={{ color: 'var(--color-primary)' }} />
-              <span className="hidden sm:inline" style={{ color: totalTokens > 0 ? 'var(--color-text-secondary)' : 'var(--color-text-muted)' }}>
+              <Zap size={12} style={{ color: 'var(--color-primary)' }} />
+              <span style={{ color: totalTokens > 0 ? 'var(--color-text-secondary)' : 'var(--color-text-muted)' }}>
                 {totalTokens > 0 ? formatTokens(totalTokens) : formattedBalance}
               </span>
             </div>
@@ -496,47 +375,75 @@ export function ChatPage() {
             {/* More menu */}
             <div className="relative">
               <button onClick={() => setShowMoreMenu(!showMoreMenu)}
-                className="chat-topbar-btn"
-                style={{ padding: '10px', borderRadius: '10px', backgroundColor: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', transition: 'all 150ms', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--chat-surface)'; e.currentTarget.style.color = 'var(--color-text-primary)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--color-text-muted)' }}>
-                <MoreHorizontal size={16} />
+                style={{ padding: '8px', borderRadius: '10px', backgroundColor: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <MoreHorizontal size={18} />
               </button>
               {showMoreMenu && (
                 <div className="absolute right-0 top-full z-50 context-menu-enter" style={{ marginTop: '4px', background: 'var(--chat-surface)', border: '1px solid var(--chat-border)', borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.4)', padding: '4px 0', minWidth: '180px', backdropFilter: 'blur(12px)' }}>
                   <button onClick={handleClear} className="w-full flex items-center gap-2"
-                    style={{ padding: '8px 12px', fontSize: '13px', color: 'var(--color-text-secondary)', background: 'none', border: 'none', cursor: 'pointer', transition: 'all 150ms' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--chat-border)'; e.currentTarget.style.color = 'var(--color-text-primary)' }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--color-text-secondary)' }}>
+                    style={{ padding: '8px 12px', fontSize: '13px', color: 'var(--color-text-secondary)', background: 'none', border: 'none', cursor: 'pointer' }}>
                     <Trash2 size={14} /> Clear conversation
                   </button>
                   <button onClick={handleExport} className="w-full flex items-center gap-2"
-                    style={{ padding: '8px 12px', fontSize: '13px', color: 'var(--color-text-secondary)', background: 'none', border: 'none', cursor: 'pointer', transition: 'all 150ms' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--chat-border)'; e.currentTarget.style.color = 'var(--color-text-primary)' }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--color-text-secondary)' }}>
+                    style={{ padding: '8px 12px', fontSize: '13px', color: 'var(--color-text-secondary)', background: 'none', border: 'none', cursor: 'pointer' }}>
                     <Download size={14} /> Export (Markdown)
                   </button>
-                  <div style={{ borderTop: '1px solid var(--chat-border)', margin: '4px 0' }} />
-                  <div style={{ padding: '8px 12px', fontSize: '11px', color: 'var(--color-text-dim)' }}>
-                    <p style={{ fontWeight: 500, marginBottom: '4px', color: 'var(--color-text-muted)' }}>Shortcuts</p>
-                    <p style={{ margin: '1px 0' }}>Ctrl+N — New chat</p>
-                    <p style={{ margin: '1px 0' }}>Enter — Send</p>
-                    <p style={{ margin: '1px 0' }}>Shift+Enter — New line</p>
-                  </div>
-
-                  {/* Session stats */}
                   {messages.length > 0 && (
                     <>
                       <div style={{ borderTop: '1px solid var(--chat-border)', margin: '4px 0' }} />
                       <div style={{ padding: '8px 12px', fontSize: '11px', color: 'var(--color-text-dim)' }}>
-                        <div className="flex justify-between"><span>Messages</span><span style={{ color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>{messages.length}</span></div>
-                        <div className="flex justify-between"><span>Tokens used</span><span style={{ color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>{formatTokens(totalTokens)}</span></div>
+                        <div className="flex justify-between"><span>Messages</span><span style={{ fontFamily: 'monospace' }}>{messages.length}</span></div>
+                        <div className="flex justify-between"><span>Tokens</span><span style={{ fontFamily: 'monospace' }}>{formatTokens(totalTokens)}</span></div>
                       </div>
                     </>
                   )}
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Row 2: agent, think, industry — compact pills */}
+          <div className="flex items-center gap-2" style={{ padding: '0 10px 8px', overflowX: 'auto' }}>
+            <AgentSelector
+              agents={agents}
+              models={models}
+              selectedId={selectedAgent?.id || null}
+              onChange={handleAgentChange}
+              onCreateAgent={createAgent}
+            />
+            <button
+              onClick={() => setThinkingEnabled(!thinkingEnabled)}
+              title={thinkingEnabled ? 'Extended thinking ON' : 'Enable extended thinking'}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '4px',
+                padding: '5px 12px', borderRadius: '16px', fontSize: '11px', fontWeight: 600,
+                cursor: 'pointer', transition: 'all 200ms', flexShrink: 0,
+                background: thinkingEnabled ? 'var(--color-primary)' : 'var(--chat-surface)',
+                color: thinkingEnabled ? 'white' : 'var(--chat-text-muted)',
+                border: thinkingEnabled ? '1px solid var(--color-primary)' : '1px solid var(--chat-border)',
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2a8 8 0 0 0-8 8c0 3.5 2 6 4 7.5V20h8v-2.5c2-1.5 4-4 4-7.5a8 8 0 0 0-8-8z"/>
+                <path d="M9 20h6v1a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-1z"/>
+              </svg>
+              Think
+            </button>
+            <select
+              value={industry}
+              onChange={(e) => setIndustry(e.target.value)}
+              className="hidden sm:block"
+              style={{ padding: '5px 8px', backgroundColor: 'var(--chat-surface)', border: '1px solid var(--chat-border)', borderRadius: '16px', color: 'var(--color-text-secondary)', fontSize: '11px', outline: 'none', cursor: 'pointer', flexShrink: 0 }}
+            >
+              {industries.map((i) => (
+                <option key={i.value} value={i.value}>{i.label}</option>
+              ))}
+            </select>
+            {totalCost > 0 && (
+              <span className="hidden sm:inline" style={{ fontSize: '11px', color: 'var(--color-text-dim)', fontFamily: 'monospace', flexShrink: 0 }}>
+                ~${totalCost.toFixed(4)}/query
+              </span>
+            )}
           </div>
         </div>
 
