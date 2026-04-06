@@ -28,6 +28,27 @@ function formatFileSize(bytes: number): string {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
+/**
+ * Resolve media URLs: relative paths like /api/uploads/images/x.png
+ * need the full server origin when running in Capacitor (mobile app).
+ * On web, relative URLs work fine. On mobile, the origin is https://localhost.
+ */
+function resolveMediaUrl(url: string): string {
+  if (!url) return url
+  // Already absolute (https://..., data:..., blob:...)
+  if (url.startsWith('http') || url.startsWith('data:') || url.startsWith('blob:')) return url
+  // Relative URL — prepend the API base
+  const apiBase = import.meta.env.VITE_API_URL || ''
+  if (apiBase.startsWith('http')) {
+    // apiBase is like https://intellect.convoia.com/api
+    // URL is like /api/uploads/images/x.png
+    // We need https://intellect.convoia.com/api/uploads/images/x.png
+    const origin = new URL(apiBase).origin
+    return `${origin}${url}`
+  }
+  return url
+}
+
 function downloadImage(url: string) {
   const a = document.createElement('a')
   a.href = url
@@ -671,9 +692,9 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
               ),
               img: ({ src, alt }) => (
                 <div style={{ margin: '16px 0' }}>
-                  <img src={src} alt={alt || 'Generated image'}
+                  <img src={src ? resolveMediaUrl(src) : ''} alt={alt || 'Generated image'}
                     style={{ maxWidth: '100%', maxHeight: '512px', borderRadius: '12px', border: '1px solid var(--chat-border)', objectFit: 'contain', cursor: 'pointer' }}
-                    onClick={() => { if (src) window.open(src, '_blank') }}
+                    onClick={() => { if (src) window.open(resolveMediaUrl(src), '_blank') }}
                   />
                   {alt && alt !== 'Generated image' && alt !== 'Generated Image' && (
                     <p style={{ fontSize: '12px', color: 'var(--chat-text-muted)', marginTop: '6px', fontStyle: 'italic' }}>{alt}</p>
@@ -716,13 +737,13 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
         {/* Generated image */}
         {message.imageUrl && (
           <div style={{ marginTop: '12px' }}>
-            <img src={message.imageUrl} alt={message.imagePrompt || 'Generated image'} loading="lazy"
+            <img src={resolveMediaUrl(message.imageUrl)} alt={message.imagePrompt || 'Generated image'} loading="lazy"
               style={{ maxWidth: '100%', width: '384px', borderRadius: '12px', cursor: 'pointer', border: '1px solid var(--chat-border)' }}
-              onClick={() => { if (message.imageUrl) window.open(message.imageUrl, '_blank') }} />
+              onClick={() => { if (message.imageUrl) window.open(resolveMediaUrl(message.imageUrl), '_blank') }} />
             {message.imagePrompt && (
               <p style={{ fontSize: '12px', marginTop: '6px', fontStyle: 'italic', color: 'var(--chat-text-muted)' }}>"{message.imagePrompt}"</p>
             )}
-            <button onClick={() => downloadImage(message.imageUrl!)}
+            <button onClick={() => downloadImage(resolveMediaUrl(message.imageUrl!))}
               style={{ marginTop: '8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, transition: 'opacity 150ms' }}
               onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
               onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}>
@@ -738,9 +759,9 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
               controls
               playsInline
               style={{ maxWidth: '100%', width: '480px', borderRadius: '12px', border: '1px solid var(--chat-border)', background: '#000' }}
-              src={message.videoUrl}
+              src={resolveMediaUrl(message.videoUrl)}
             />
-            <button onClick={() => { const a = document.createElement('a'); a.href = message.videoUrl!; a.download = 'generated-video.mp4'; a.target = '_blank'; a.click(); }}
+            <button onClick={() => { const a = document.createElement('a'); a.href = resolveMediaUrl(message.videoUrl!); a.download = 'generated-video.mp4'; a.target = '_blank'; a.click(); }}
               style={{ marginTop: '8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, transition: 'opacity 150ms' }}
               onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
               onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}>
