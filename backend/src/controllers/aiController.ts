@@ -305,7 +305,8 @@ export const queryAIStream = async (req: Request, res: Response) => {
         const result = await FileProcessingService.generateImage(imagePrompt, '1024x1024', 'standard', imageProvider, referenceImage);
         const imageTokenCost = result.provider === 'gemini' ? 1300 : 1000;
         await TokenWalletService.deductTokens({ userId: req.user.userId, tokens: imageTokenCost, reference: `image-gen-${Date.now()}`, description: `Image generation (${streamModelCheck.name})`, organizationId: imgUser?.organizationId || undefined });
-        const imageContent = `\n\n![Generated Image](${result.imageUrl})\n\n*"${result.revisedPrompt}"*\n\n[Download image](${result.imageUrl})`;
+        // Send description only — the actual image renders via imageUrl in the done event
+        const imageContent = `**Image generated:** "${result.revisedPrompt}"`;
         res.write(`data: ${JSON.stringify({ type: 'chunk', content: imageContent })}\n\n`);
         const imgCustomerPrice = imageTokenCost * 0.000002; // ~$0.002 per 1K tokens
         res.write(`data: ${JSON.stringify({ type: 'done', tokens: { input: 0, output: imageTokenCost, total: imageTokenCost }, tokensUsed: imageTokenCost, cost: { charged: imgCustomerPrice.toFixed(6) }, model: streamModelCheck.name, provider: 'openai', imageGenerated: true, imageUrl: result.imageUrl })}\n\n`);
@@ -604,13 +605,8 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
           organizationId,
         });
 
-        // Send image result via SSE
-        const imageContent = [
-          `\n\n![Generated Image](${result.imageUrl})`,
-          `\n\n*"${result.revisedPrompt}"*`,
-          `\n\n[Download image](${result.imageUrl})`,
-        ].join('');
-
+        // Send description only — the actual image renders via imageUrl in the done event
+        const imageContent = `**Image generated:** "${result.revisedPrompt}"`;
         res.write(`data: ${JSON.stringify({ type: 'chunk', content: imageContent })}\n\n`);
 
         // Log usage — find the actual image model ID
