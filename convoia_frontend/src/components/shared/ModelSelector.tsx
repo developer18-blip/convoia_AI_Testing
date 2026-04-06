@@ -83,7 +83,7 @@ export function ModelSelector({ models, selectedId, onChange, className }: Model
           display: 'flex', alignItems: 'center', gap: '6px',
           backgroundColor: 'transparent', border: 'none', cursor: 'pointer',
           padding: '6px 8px', borderRadius: '8px',
-          fontSize: '16px', fontWeight: 600, color: 'var(--chat-text)',
+          fontSize: '14px', fontWeight: 600, color: 'var(--chat-text)',
           transition: 'background-color 150ms',
         }}
         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--chat-hover)'}
@@ -92,17 +92,20 @@ export function ModelSelector({ models, selectedId, onChange, className }: Model
         {selected && isImageModel(selected) && (
           <ImageIcon size={14} style={{ color: '#F59E0B' }} />
         )}
-        {selected?.name ?? 'Select model'}
-        <ChevronDown size={16} style={{ color: 'var(--chat-text-muted)' }} />
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 'min(180px, 35vw)' }}>
+          {selected?.name ?? 'Select model'}
+        </span>
+        <ChevronDown size={14} style={{ color: 'var(--chat-text-muted)', flexShrink: 0 }} />
       </button>
 
       {/* Dropdown */}
       {isOpen && (
         <div className="absolute top-full left-0 z-50" style={{
-          marginTop: '4px', minWidth: '300px',
+          marginTop: '4px', minWidth: '0', width: 'min(320px, calc(100vw - 24px))',
           backgroundColor: 'var(--chat-surface)', border: '1px solid var(--chat-border)',
           borderRadius: '12px', padding: '6px',
           boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+          maxHeight: '70vh', overflowY: 'auto',
         }}>
           {/* Search */}
           <div className="relative" style={{ marginBottom: '6px' }}>

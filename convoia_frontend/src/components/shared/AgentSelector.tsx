@@ -45,37 +45,38 @@ export function AgentSelector({ agents, models, selectedId, onChange, onCreateAg
       {/* Trigger button */}
       <button
         onClick={() => { setIsOpen(!isOpen); setShowCreate(false); setSearch('') }}
-        className="hidden sm:flex items-center gap-1.5"
+        className="flex items-center gap-1.5 chat-topbar-btn"
         style={{
           padding: '6px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 500, cursor: 'pointer',
           background: selected ? 'var(--color-primary-light)' : 'var(--chat-surface)',
           color: selected ? 'var(--color-primary)' : 'var(--color-text-muted)',
           border: selected ? '1px solid var(--color-primary)' : '1px solid var(--chat-border)',
-          transition: 'all 150ms',
+          transition: 'all 150ms', flexShrink: 0,
         }}
       >
         {selected ? (
           <>
             <span>{selected.avatar}</span>
-            <span>{selected.name}</span>
+            <span className="hidden sm:inline">{selected.name}</span>
           </>
         ) : (
           <>
-            <Zap size={12} />
-            <span>Agent</span>
+            <Zap size={13} />
+            <span className="hidden sm:inline">Agent</span>
           </>
         )}
-        <ChevronDown size={10} />
+        <ChevronDown size={10} className="hidden sm:inline" />
       </button>
 
       {/* Dropdown */}
       {isOpen && !showCreate && (
-        <div className="absolute top-full left-0 z-50" style={{
-          marginTop: '4px', minWidth: '300px',
+        <div className="absolute top-full z-50" style={{
+          marginTop: '4px', minWidth: '280px', width: 'min(320px, calc(100vw - 24px))',
+          left: 'max(-100px, calc(-50vw + 50%))',
           backgroundColor: 'var(--chat-surface)', border: '1px solid var(--chat-border)',
           borderRadius: '12px', padding: '6px',
           boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-          maxHeight: '420px', display: 'flex', flexDirection: 'column',
+          maxHeight: '70vh', display: 'flex', flexDirection: 'column',
         }}>
           {/* Search bar */}
           <div style={{ padding: '4px 4px 6px', position: 'sticky', top: 0, background: 'var(--chat-surface)', zIndex: 1 }}>

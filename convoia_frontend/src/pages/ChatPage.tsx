@@ -391,16 +391,14 @@ export function ChatPage() {
             ))}
           </select>
 
-          {/* Agent selector — hidden on small mobile */}
-          <div className="hidden sm:block">
-            <AgentSelector
-              agents={agents}
-              models={models}
-              selectedId={selectedAgent?.id || null}
-              onChange={handleAgentChange}
-              onCreateAgent={createAgent}
-            />
-          </div>
+          {/* Agent selector — always visible, compact on mobile */}
+          <AgentSelector
+            agents={agents}
+            models={models}
+            selectedId={selectedAgent?.id || null}
+            onChange={handleAgentChange}
+            onCreateAgent={createAgent}
+          />
 
           {/* Think toggle — compact on mobile */}
           <button
