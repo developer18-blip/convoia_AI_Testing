@@ -1,13 +1,13 @@
 /**
  * Capacitor Native Bridge
  * Initializes native plugins when running inside a Capacitor shell (Android/iOS).
- * Uses dynamic imports so it builds fine on servers without Capacitor installed.
+ * Uses fully dynamic imports that the bundler cannot statically analyze,
+ * so the app builds on servers that don't have Capacitor packages installed.
  */
 
-/** Detect native platform without importing @capacitor/core at top level */
+/** Detect native platform via window.Capacitor (injected by native shell) */
 function detectNative(): boolean {
   try {
-    // Capacitor injects this on the window in native shells
     return !!(window as any).Capacitor?.isNativePlatform?.()
   } catch {
     return false
@@ -28,52 +28,50 @@ export const isAndroid = detectPlatform() === 'android'
 export const isIOS = detectPlatform() === 'ios'
 
 /**
+ * Dynamically import a Capacitor plugin by name.
+ * Uses string concatenation so Vite/Rolldown cannot statically resolve it —
+ * this prevents build failures on servers without @capacitor/* installed.
+ */
+function capImport(plugin: string): Promise<any> {
+  return import(/* @vite-ignore */ '@capacitor/' + plugin)
+}
+
+/**
  * Initialize all native plugins. Call once on app startup.
- * Uses dynamic import() so the app builds even without Capacitor packages.
  */
 export async function initNativeBridge() {
   if (!isNative) return
 
   // ── Status Bar ──
   try {
-    // @ts-ignore — Capacitor packages only installed in mobile builds
-    const { StatusBar, Style } = await import('@capacitor/status-bar')
+    const { StatusBar, Style } = await capImport('status-bar')
     await StatusBar.setStyle({ style: Style.Dark })
     await StatusBar.setBackgroundColor({ color: '#0D0D0D' })
     if (isAndroid) {
       await StatusBar.setOverlaysWebView({ overlay: false })
     }
-  } catch {
-    // StatusBar not available
-  }
+  } catch { /* not available */ }
 
   // ── Keyboard ──
   try {
-    // @ts-ignore — Capacitor packages only installed in mobile builds
-    const { Keyboard } = await import('@capacitor/keyboard')
+    const { Keyboard } = await capImport('keyboard')
     Keyboard.addListener('keyboardWillShow', () => {
       document.body.classList.add('keyboard-open')
     })
     Keyboard.addListener('keyboardWillHide', () => {
       document.body.classList.remove('keyboard-open')
     })
-  } catch {
-    // Keyboard plugin not available
-  }
+  } catch { /* not available */ }
 
   // ── Splash Screen ──
   try {
-    // @ts-ignore — Capacitor packages only installed in mobile builds
-    const { SplashScreen } = await import('@capacitor/splash-screen')
+    const { SplashScreen } = await capImport('splash-screen')
     await SplashScreen.hide()
-  } catch {
-    // SplashScreen not available
-  }
+  } catch { /* not available */ }
 
   // ── Back Button (Android) ──
   try {
-    // @ts-ignore — Capacitor packages only installed in mobile builds
-    const { App } = await import('@capacitor/app')
+    const { App } = await capImport('app')
     App.addListener('backButton', ({ canGoBack }: { canGoBack: boolean }) => {
       if (canGoBack) {
         window.history.back()
@@ -81,9 +79,7 @@ export async function initNativeBridge() {
         App.minimizeApp()
       }
     })
-  } catch {
-    // App plugin not available
-  }
+  } catch { /* not available */ }
 }
 
 /**
@@ -92,11 +88,8 @@ export async function initNativeBridge() {
 export async function setStatusBarTheme(isDark: boolean) {
   if (!isNative) return
   try {
-    // @ts-ignore — Capacitor packages only installed in mobile builds
-    const { StatusBar, Style } = await import('@capacitor/status-bar')
+    const { StatusBar, Style } = await capImport('status-bar')
     await StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light })
     await StatusBar.setBackgroundColor({ color: isDark ? '#0D0D0D' : '#FFFFFF' })
-  } catch {
-    // silent
-  }
+  } catch { /* silent */ }
 }
