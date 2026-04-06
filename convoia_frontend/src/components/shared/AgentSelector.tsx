@@ -68,16 +68,25 @@ export function AgentSelector({ agents, models, selectedId, onChange, onCreateAg
         <ChevronDown size={10} className="hidden sm:inline" />
       </button>
 
+      {/* Backdrop for mobile bottom sheet */}
+      {isOpen && (
+        <div className="fixed inset-0 z-40 sm:hidden" style={{ background: 'rgba(0,0,0,0.5)' }}
+          onClick={() => { setIsOpen(false); setShowCreate(false) }} />
+      )}
+
       {/* Dropdown */}
       {isOpen && !showCreate && (
-        <div className="absolute top-full z-50" style={{
-          marginTop: '4px', minWidth: '280px', width: 'min(320px, calc(100vw - 24px))',
-          left: 'max(-100px, calc(-50vw + 50%))',
+        <div className="fixed sm:absolute inset-x-0 sm:inset-x-auto bottom-0 sm:bottom-auto sm:top-full z-50" style={{
+          marginTop: '0', width: '100%',
           backgroundColor: 'var(--chat-surface)', border: '1px solid var(--chat-border)',
-          borderRadius: '12px', padding: '6px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-          maxHeight: '70vh', display: 'flex', flexDirection: 'column',
+          borderRadius: '16px 16px 0 0', padding: '6px',
+          boxShadow: '0 -8px 32px rgba(0,0,0,0.5)',
+          maxHeight: '75vh', display: 'flex', flexDirection: 'column',
         }}>
+          {/* Drag handle for mobile bottom sheet */}
+          <div className="sm:hidden" style={{ display: 'flex', justifyContent: 'center', padding: '6px 0 4px' }}>
+            <div style={{ width: '36px', height: '4px', borderRadius: '2px', background: 'var(--chat-border)' }} />
+          </div>
           {/* Search bar */}
           <div style={{ padding: '4px 4px 6px', position: 'sticky', top: 0, background: 'var(--chat-surface)', zIndex: 1 }}>
             <div style={{
@@ -266,12 +275,12 @@ function CreateAgentForm({ models, onClose, onCreate }: {
   }
 
   return (
-    <div className="absolute top-full left-0 z-50" style={{
-      marginTop: '4px', width: '380px',
+    <div className="fixed sm:absolute inset-x-0 sm:inset-x-auto bottom-0 sm:bottom-auto sm:top-full z-50" style={{
+      marginTop: '0', width: '100%', maxWidth: '380px',
       backgroundColor: 'var(--chat-surface)', border: '1px solid var(--chat-border)',
-      borderRadius: '12px', padding: '16px',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-      maxHeight: '500px', overflowY: 'auto',
+      borderRadius: '16px 16px 0 0', padding: '16px',
+      boxShadow: '0 -8px 32px rgba(0,0,0,0.5)',
+      maxHeight: '80vh', overflowY: 'auto',
     }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
