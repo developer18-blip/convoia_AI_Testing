@@ -8,7 +8,7 @@ import { useAgents } from '../../hooks/useAgents'
 import { useAuth } from '../../hooks/useAuth'
 import { useTokens } from '../../contexts/TokenContext'
 import { useToast } from '../../hooks/useToast'
-import { MoreHorizontal, Plus, X, Clock } from 'lucide-react'
+import { Menu, Plus, X, Clock } from 'lucide-react'
 import type { Message } from '../../types'
 
 export function MobileChatPage() {
@@ -39,10 +39,8 @@ export function MobileChatPage() {
       toast.error(authUser?.organizationId ? 'No tokens. Contact your admin.' : 'No tokens remaining.')
       return
     }
-    let convId = activeConversationId
-    if (!convId) {
-      const conv = createConversation(selectedModelId, selectedModel?.name || 'AI')
-      convId = conv.id
+    if (!activeConversationId) {
+      createConversation(selectedModelId, selectedModel?.name || 'AI')
     }
     await sendMessage(content, selectedModelId, undefined, undefined, thinkingEnabled)
   }
@@ -58,20 +56,25 @@ export function MobileChatPage() {
 
   const handleImageGenerated = (data: { url: string; prompt: string }) => {
     if (!activeConversationId) createConversation(selectedModelId, selectedModel?.name || 'AI')
-    const userMsg: Message = { id: uuidv4(), role: 'user', content: `Generate image: ${data.prompt}`, timestamp: new Date().toISOString() }
-    const assistantMsg: Message = { id: uuidv4(), role: 'assistant', content: `Here's the generated image for: "${data.prompt}"`, imageUrl: data.url, imagePrompt: data.prompt, model: 'dall-e-3', provider: 'openai', timestamp: new Date().toISOString() }
-    addMessages([userMsg, assistantMsg])
+    addMessages([
+      { id: uuidv4(), role: 'user', content: `Generate image: ${data.prompt}`, timestamp: new Date().toISOString() },
+      { id: uuidv4(), role: 'assistant', content: `Here's the generated image for: "${data.prompt}"`, imageUrl: data.url, imagePrompt: data.prompt, model: 'dall-e-3', provider: 'openai', timestamp: new Date().toISOString() },
+    ])
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--chat-bg)' }}>
-      {/* History drawer overlay */}
+    <div style={{
+      display: 'flex', flexDirection: 'column',
+      height: 'calc(100dvh - env(safe-area-inset-top, 0px) - 60px - env(safe-area-inset-bottom, 0px))',
+      background: 'var(--chat-bg)',
+    }}>
+      {/* History drawer */}
       {showHistory && (
         <>
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 60 }} onClick={() => setShowHistory(false)} />
           <div style={{ position: 'fixed', top: 0, bottom: 0, left: 0, width: 'min(300px, 80vw)', zIndex: 70, background: 'var(--color-surface)', display: 'flex', flexDirection: 'column', paddingTop: 'env(safe-area-inset-top, 0px)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderBottom: '1px solid var(--color-border)' }}>
-              <h2 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: 'var(--color-text-primary)' }}>Chat History</h2>
+              <h2 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: 'var(--color-text-primary)' }}>History</h2>
               <button onClick={() => setShowHistory(false)} style={{ padding: '6px', borderRadius: '8px', border: 'none', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
@@ -83,11 +86,8 @@ export function MobileChatPage() {
               </button>
               {conversations.filter(c => c.messages?.length > 0).map(conv => (
                 <button key={conv.id} onClick={() => { setActiveConversation(conv.id); setShowHistory(false) }}
-                  style={{
-                    width: '100%', padding: '12px', borderRadius: '12px', border: 'none', textAlign: 'left', cursor: 'pointer', marginBottom: '4px',
-                    background: conv.id === activeConversationId ? 'var(--color-primary-light)' : 'transparent',
-                    transition: 'background 150ms',
-                  }}>
+                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: 'none', textAlign: 'left', cursor: 'pointer', marginBottom: '4px',
+                    background: conv.id === activeConversationId ? 'var(--color-primary-light)' : 'transparent' }}>
                   <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.title}</p>
                   <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: '4px 0 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <Clock size={10} /> {new Date(conv.updatedAt).toLocaleDateString()}
@@ -100,36 +100,36 @@ export function MobileChatPage() {
       )}
 
       {/* Top bar */}
-      <div style={{ flexShrink: 0, padding: '12px 16px 8px', borderBottom: '1px solid var(--color-border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div style={{ flexShrink: 0, padding: '10px 12px 6px', borderBottom: '1px solid var(--color-border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button onClick={() => setShowHistory(true)}
               style={{ padding: '6px', borderRadius: '8px', border: 'none', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', cursor: 'pointer' }}>
-              <MoreHorizontal size={18} />
+              <Menu size={18} />
             </button>
-            <h1 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '180px' }}>
+            <h1 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '160px' }}>
               {activeConversationId ? (conversations.find(c => c.id === activeConversationId)?.title || 'Chat') : 'New chat'}
             </h1>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '6px' }}>
             <button onClick={() => setThinkingEnabled(!thinkingEnabled)}
-              style={{ padding: '6px 12px', borderRadius: '14px', fontSize: '11px', fontWeight: 600, border: 'none', cursor: 'pointer',
+              style={{ padding: '5px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 600, border: 'none', cursor: 'pointer',
                 background: thinkingEnabled ? '#7C3AED' : 'var(--color-surface-2)', color: thinkingEnabled ? 'white' : 'var(--color-text-muted)' }}>
-              🧠 Think
+              🧠
             </button>
             <button onClick={() => setActiveConversation(null)}
-              style={{ padding: '6px 12px', borderRadius: '14px', fontSize: '11px', fontWeight: 600, border: 'none', cursor: 'pointer', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)' }}>
-              <Plus size={14} /> New
+              style={{ padding: '5px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 600, border: 'none', cursor: 'pointer', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Plus size={13} />
             </button>
           </div>
         </div>
 
         {/* Model pills */}
-        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
-          {models.filter(m => m.isActive).slice(0, 8).map(m => (
+        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px', scrollbarWidth: 'none' }}>
+          {models.filter(m => m.isActive).slice(0, 10).map(m => (
             <button key={m.id} onClick={() => setSelectedModelId(m.id)}
               style={{
-                padding: '6px 14px', borderRadius: '16px', fontSize: '12px', fontWeight: 600,
+                padding: '5px 12px', borderRadius: '14px', fontSize: '11px', fontWeight: 600,
                 border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
                 background: selectedModelId === m.id ? '#7C3AED' : 'var(--color-surface-2)',
                 color: selectedModelId === m.id ? 'white' : 'var(--color-text-secondary)',
@@ -140,36 +140,55 @@ export function MobileChatPage() {
         </div>
       </div>
 
-      {/* Messages */}
+      {/* Messages — clean empty state on mobile (no suggestion cards) */}
       <div style={{ flex: 1, minHeight: 0 }}>
-        <MessageArea
-          messages={messages}
-          isLoading={isStreaming}
-          onRetry={() => retryLastMessage(selectedModelId, undefined, undefined)}
-          onSuggestedPrompt={handleSend}
-          onEditMessage={(id, content) => editAndResend(id, content, selectedModelId, undefined, undefined)}
-          onDeleteMessage={deleteMessage}
-        />
+        {messages.length === 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '24px', textAlign: 'center', background: 'var(--chat-bg)' }}>
+            <div style={{
+              width: '48px', height: '48px', borderRadius: '14px', marginBottom: '16px',
+              background: 'linear-gradient(135deg, var(--color-primary-light), rgba(124,58,237,0.05))',
+              border: '1px solid rgba(124,58,237,0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '22px', color: 'var(--color-primary)',
+            }}>✦</div>
+            <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--color-text-primary)', margin: '0 0 6px' }}>
+              Start a conversation
+            </h2>
+            <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: 0, maxWidth: '260px' }}>
+              Type a message below to chat with {selectedModel?.name || 'AI'}
+            </p>
+          </div>
+        ) : (
+          <MessageArea
+            messages={messages}
+            isLoading={isStreaming}
+            onRetry={() => retryLastMessage(selectedModelId)}
+            onEditMessage={(id, content) => editAndResend(id, content, selectedModelId)}
+            onDeleteMessage={deleteMessage}
+          />
+        )}
       </div>
 
       {/* No tokens banner */}
       {!hasTokens && (
-        <div style={{ padding: '8px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 500, background: 'rgba(239,68,68,0.08)', color: '#EF4444', borderTop: '1px solid rgba(239,68,68,0.15)' }}>
-          No tokens remaining. Buy tokens to continue.
+        <div style={{ padding: '6px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 500, background: 'rgba(239,68,68,0.08)', color: '#EF4444', flexShrink: 0 }}>
+          No tokens remaining.
         </div>
       )}
 
-      {/* Input */}
-      <MessageInput
-        onSend={handleSend}
-        isLoading={isStreaming}
-        disabled={!hasTokens}
-        onStop={stopStreaming}
-        selectedModelId={selectedModelId}
-        onImageGenerated={handleImageGenerated}
-        onSendWithContext={handleSendWithContext}
-        onError={(msg) => toast.error(msg)}
-      />
+      {/* Input — always at bottom, above tab bar */}
+      <div style={{ flexShrink: 0 }}>
+        <MessageInput
+          onSend={handleSend}
+          isLoading={isStreaming}
+          disabled={!hasTokens}
+          onStop={stopStreaming}
+          selectedModelId={selectedModelId}
+          onImageGenerated={handleImageGenerated}
+          onSendWithContext={handleSendWithContext}
+          onError={(msg) => toast.error(msg)}
+        />
+      </div>
     </div>
   )
 }
