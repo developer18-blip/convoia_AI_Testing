@@ -1,13 +1,25 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Search } from 'lucide-react'
 import { useAgents } from '../../hooks/useAgents'
+import { useChat } from '../../hooks/useChat'
+import { useToast } from '../../hooks/useToast'
 
 const CATEGORIES = ['All', 'Chat', 'Image', 'Code', 'Research']
 
 export function MobileAgentsPage() {
   const { agents, loading: isLoading } = useAgents()
+  const { setAgentMode } = useChat()
+  const navigate = useNavigate()
+  const toast = useToast()
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All')
+
+  const handleSelectAgent = (agent: any) => {
+    setAgentMode(true)
+    toast.success(`${agent.name} selected — start chatting!`)
+    navigate('/chat')
+  }
 
   const filtered = agents.filter(a => {
     if (!a.isActive) return false
@@ -77,7 +89,7 @@ export function MobileAgentsPage() {
           </div>
         ) : (
           filtered.map(agent => (
-            <div key={agent.id} style={{
+            <div key={agent.id} onClick={() => handleSelectAgent(agent)} style={{
               background: 'var(--color-surface)', borderRadius: '16px', padding: '16px',
               border: '1px solid var(--color-border)', cursor: 'pointer',
               transition: 'all 200ms',

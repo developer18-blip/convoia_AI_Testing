@@ -1,4 +1,4 @@
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { MobileBottomTabs } from './MobileBottomTabs'
 
 /**
@@ -8,6 +8,10 @@ import { MobileBottomTabs } from './MobileBottomTabs'
  * - No desktop header or sidebar
  */
 export function MobileAppShell() {
+  const location = useLocation()
+  // Chat page manages its own full-bleed layout
+  const isChat = location.pathname === '/chat'
+
   return (
     <div className="mobile-app" style={{
       display: 'flex', flexDirection: 'column',
@@ -18,7 +22,8 @@ export function MobileAppShell() {
     }}>
       {/* Page content — scrollable, accounts for tab bar */}
       <main className="mobile-app-content" style={{
-        flex: 1, overflowY: 'auto', overflowX: 'hidden',
+        flex: 1, overflowY: isChat ? 'hidden' : 'auto', overflowX: 'hidden',
+        padding: isChat ? 0 : undefined,
       }}>
         <Outlet />
       </main>
