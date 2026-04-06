@@ -330,13 +330,13 @@ export function ChatPage() {
 
       {/* CENTER PANEL — main chat */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: 'var(--chat-bg)', minWidth: 0 }}>
-        {/* Top bar — two rows on mobile for breathing room */}
-        <div style={{ flexShrink: 0, backgroundColor: 'var(--chat-bg)', borderBottom: '1px solid var(--chat-border)' }}>
-          {/* Row 1: hamburger, model, spacer, tokens, more */}
-          <div className="flex items-center" style={{ height: '48px', padding: '0 8px', gap: '4px' }}>
+        {/* Top bar — single row on desktop (original), two rows on mobile */}
+        <div style={{ flexShrink: 0, backgroundColor: 'var(--chat-bg)' }}>
+          {/* Main row: all controls in one line on desktop */}
+          <div className="flex items-center gap-2" style={{ height: '48px', padding: '0 16px', }}>
             {/* Mobile hamburger */}
             <button onClick={() => setMobileLeftOpen(true)} className="md:hidden"
-              style={{ padding: '8px', borderRadius: '10px', backgroundColor: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              style={{ padding: '8px', borderRadius: '8px', backgroundColor: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <Menu size={20} />
             </button>
             {/* Desktop sidebar toggle */}
@@ -354,19 +354,40 @@ export function ChatPage() {
               <span style={{ fontSize: '14px', color: 'var(--chat-text-muted)', padding: '6px 8px' }}>Loading models...</span>
             )}
 
+            {/* Desktop-only: agent, think, industry inline */}
+            <div className="hidden md:flex items-center gap-2">
+              <AgentSelector agents={agents} models={models} selectedId={selectedAgent?.id || null} onChange={handleAgentChange} onCreateAgent={createAgent} />
+              <button onClick={() => setThinkingEnabled(!thinkingEnabled)} title={thinkingEnabled ? 'Extended thinking ON' : 'Enable extended thinking'}
+                style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', transition: 'all 200ms', flexShrink: 0,
+                  background: thinkingEnabled ? 'var(--color-primary)' : 'var(--chat-surface)', color: thinkingEnabled ? 'white' : 'var(--chat-text-muted)',
+                  border: thinkingEnabled ? '1px solid var(--color-primary)' : '1px solid var(--chat-border)', }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2a8 8 0 0 0-8 8c0 3.5 2 6 4 7.5V20h8v-2.5c2-1.5 4-4 4-7.5a8 8 0 0 0-8-8z"/><path d="M9 20h6v1a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-1z"/>
+                  {thinkingEnabled && <path d="M12 6v4l2 2" stroke="currentColor" strokeWidth="1.5"/>}
+                </svg>
+                Think
+              </button>
+              <select value={industry} onChange={(e) => setIndustry(e.target.value)}
+                className="hidden xl:block"
+                style={{ padding: '5px 8px', backgroundColor: 'var(--chat-surface)', border: '1px solid var(--chat-border)', borderRadius: '8px', color: 'var(--color-text-secondary)', fontSize: '11px', outline: 'none', cursor: 'pointer' }}>
+                {industries.map((i) => <option key={i.value} value={i.value}>{i.label}</option>)}
+              </select>
+            </div>
+
             {/* Spacer */}
             <div style={{ flex: 1 }} />
 
-            {/* Token balance — ALWAYS visible */}
+            {/* Desktop cost display */}
+            {totalCost > 0 && (
+              <span className="hidden md:inline" style={{ fontSize: '11px', color: 'var(--color-text-dim)', fontFamily: 'monospace' }}>~${totalCost.toFixed(4)}/query</span>
+            )}
+
+            {/* Token balance */}
             <div className="flex items-center gap-1" style={{
-              fontSize: '12px', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums',
-              color: 'var(--color-text-muted)',
-              padding: '4px 10px', borderRadius: '8px',
-              background: totalTokens > 0 ? 'var(--color-primary-light)' : 'var(--chat-surface)',
-              border: '1px solid var(--chat-border)',
-              transition: 'all 0.3s', flexShrink: 0,
+              fontSize: '12px', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: 'var(--color-text-muted)',
+              padding: '3px 8px', borderRadius: '6px', background: totalTokens > 0 ? 'var(--color-primary-light)' : 'transparent', transition: 'all 0.3s', flexShrink: 0,
             }}>
-              <Zap size={12} style={{ color: 'var(--color-primary)' }} />
+              <Zap size={11} style={{ color: 'var(--color-primary)' }} />
               <span style={{ color: totalTokens > 0 ? 'var(--color-text-secondary)' : 'var(--color-text-muted)' }}>
                 {totalTokens > 0 ? formatTokens(totalTokens) : formattedBalance}
               </span>
@@ -375,25 +396,38 @@ export function ChatPage() {
             {/* More menu */}
             <div className="relative">
               <button onClick={() => setShowMoreMenu(!showMoreMenu)}
-                style={{ padding: '8px', borderRadius: '10px', backgroundColor: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <MoreHorizontal size={18} />
+                style={{ padding: '6px', borderRadius: '8px', backgroundColor: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', transition: 'all 150ms' }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--chat-surface)'; e.currentTarget.style.color = 'var(--color-text-primary)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--color-text-muted)' }}>
+                <MoreHorizontal size={16} />
               </button>
               {showMoreMenu && (
                 <div className="absolute right-0 top-full z-50 context-menu-enter" style={{ marginTop: '4px', background: 'var(--chat-surface)', border: '1px solid var(--chat-border)', borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.4)', padding: '4px 0', minWidth: '180px', backdropFilter: 'blur(12px)' }}>
                   <button onClick={handleClear} className="w-full flex items-center gap-2"
-                    style={{ padding: '8px 12px', fontSize: '13px', color: 'var(--color-text-secondary)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                    style={{ padding: '8px 12px', fontSize: '13px', color: 'var(--color-text-secondary)', background: 'none', border: 'none', cursor: 'pointer', transition: 'all 150ms' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--chat-border)'; e.currentTarget.style.color = 'var(--color-text-primary)' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--color-text-secondary)' }}>
                     <Trash2 size={14} /> Clear conversation
                   </button>
                   <button onClick={handleExport} className="w-full flex items-center gap-2"
-                    style={{ padding: '8px 12px', fontSize: '13px', color: 'var(--color-text-secondary)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                    style={{ padding: '8px 12px', fontSize: '13px', color: 'var(--color-text-secondary)', background: 'none', border: 'none', cursor: 'pointer', transition: 'all 150ms' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--chat-border)'; e.currentTarget.style.color = 'var(--color-text-primary)' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--color-text-secondary)' }}>
                     <Download size={14} /> Export (Markdown)
                   </button>
+                  <div style={{ borderTop: '1px solid var(--chat-border)', margin: '4px 0' }} />
+                  <div style={{ padding: '8px 12px', fontSize: '11px', color: 'var(--color-text-dim)' }}>
+                    <p style={{ fontWeight: 500, marginBottom: '4px', color: 'var(--color-text-muted)' }}>Shortcuts</p>
+                    <p style={{ margin: '1px 0' }}>Ctrl+N — New chat</p>
+                    <p style={{ margin: '1px 0' }}>Enter — Send</p>
+                    <p style={{ margin: '1px 0' }}>Shift+Enter — New line</p>
+                  </div>
                   {messages.length > 0 && (
                     <>
                       <div style={{ borderTop: '1px solid var(--chat-border)', margin: '4px 0' }} />
                       <div style={{ padding: '8px 12px', fontSize: '11px', color: 'var(--color-text-dim)' }}>
-                        <div className="flex justify-between"><span>Messages</span><span style={{ fontFamily: 'monospace' }}>{messages.length}</span></div>
-                        <div className="flex justify-between"><span>Tokens</span><span style={{ fontFamily: 'monospace' }}>{formatTokens(totalTokens)}</span></div>
+                        <div className="flex justify-between"><span>Messages</span><span style={{ color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>{messages.length}</span></div>
+                        <div className="flex justify-between"><span>Tokens used</span><span style={{ color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>{formatTokens(totalTokens)}</span></div>
                       </div>
                     </>
                   )}
@@ -402,48 +436,18 @@ export function ChatPage() {
             </div>
           </div>
 
-          {/* Row 2: agent, think, industry — compact pills */}
-          <div className="flex items-center gap-2" style={{ padding: '0 10px 8px', overflowX: 'auto' }}>
-            <AgentSelector
-              agents={agents}
-              models={models}
-              selectedId={selectedAgent?.id || null}
-              onChange={handleAgentChange}
-              onCreateAgent={createAgent}
-            />
-            <button
-              onClick={() => setThinkingEnabled(!thinkingEnabled)}
-              title={thinkingEnabled ? 'Extended thinking ON' : 'Enable extended thinking'}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '4px',
-                padding: '5px 12px', borderRadius: '16px', fontSize: '11px', fontWeight: 600,
-                cursor: 'pointer', transition: 'all 200ms', flexShrink: 0,
-                background: thinkingEnabled ? 'var(--color-primary)' : 'var(--chat-surface)',
-                color: thinkingEnabled ? 'white' : 'var(--chat-text-muted)',
-                border: thinkingEnabled ? '1px solid var(--color-primary)' : '1px solid var(--chat-border)',
-              }}
-            >
+          {/* Mobile-only Row 2: agent, think — compact pills */}
+          <div className="flex md:hidden items-center gap-2" style={{ padding: '0 10px 8px', overflowX: 'auto' }}>
+            <AgentSelector agents={agents} models={models} selectedId={selectedAgent?.id || null} onChange={handleAgentChange} onCreateAgent={createAgent} />
+            <button onClick={() => setThinkingEnabled(!thinkingEnabled)}
+              style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 12px', borderRadius: '16px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', flexShrink: 0,
+                background: thinkingEnabled ? 'var(--color-primary)' : 'var(--chat-surface)', color: thinkingEnabled ? 'white' : 'var(--chat-text-muted)',
+                border: thinkingEnabled ? '1px solid var(--color-primary)' : '1px solid var(--chat-border)', }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2a8 8 0 0 0-8 8c0 3.5 2 6 4 7.5V20h8v-2.5c2-1.5 4-4 4-7.5a8 8 0 0 0-8-8z"/>
-                <path d="M9 20h6v1a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-1z"/>
+                <path d="M12 2a8 8 0 0 0-8 8c0 3.5 2 6 4 7.5V20h8v-2.5c2-1.5 4-4 4-7.5a8 8 0 0 0-8-8z"/><path d="M9 20h6v1a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-1z"/>
               </svg>
               Think
             </button>
-            <select
-              value={industry}
-              onChange={(e) => setIndustry(e.target.value)}
-              className="hidden sm:block"
-              style={{ padding: '5px 8px', backgroundColor: 'var(--chat-surface)', border: '1px solid var(--chat-border)', borderRadius: '16px', color: 'var(--color-text-secondary)', fontSize: '11px', outline: 'none', cursor: 'pointer', flexShrink: 0 }}
-            >
-              {industries.map((i) => (
-                <option key={i.value} value={i.value}>{i.label}</option>
-              ))}
-            </select>
-            {totalCost > 0 && (
-              <span className="hidden sm:inline" style={{ fontSize: '11px', color: 'var(--color-text-dim)', fontFamily: 'monospace', flexShrink: 0 }}>
-                ~${totalCost.toFixed(4)}/query
-              </span>
-            )}
           </div>
         </div>
 
