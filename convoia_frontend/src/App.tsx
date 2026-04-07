@@ -124,6 +124,34 @@ function SessionGuard() {
   return <Outlet />
 }
 
+/** Handles Google OAuth redirect back to mobile app */
+function AuthCallbackPage() {
+  const { useEffect } = require('react')
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const token = params.get('token')
+    const refreshToken = params.get('refreshToken')
+    const userStr = params.get('user')
+
+    if (token && userStr) {
+      try {
+        const user = JSON.parse(userStr)
+        localStorage.setItem('convoia_token', token)
+        if (refreshToken) localStorage.setItem('convoia_refresh_token', refreshToken)
+        localStorage.setItem('convoia_user', JSON.stringify(user))
+        window.location.href = '/dashboard'
+      } catch {
+        window.location.href = '/login?error=auth_failed'
+      }
+    } else {
+      window.location.href = '/login?error=no_token'
+    }
+  }, [])
+
+  return <LoadingPage />
+}
+
 /** On native mobile app, skip the marketing landing page — go straight to login or chat */
 function NativeHomeRedirect() {
   const { isAuthenticated, isLoading } = useAuth()
@@ -142,6 +170,7 @@ function AppRoutes() {
         <Route path="/" element={<NativeHomeRedirect />} />
         <Route path="/login" element={isNative ? <MobileLoginPage /> : <LoginPage />} />
         <Route path="/register" element={isNative ? <MobileRegisterPage /> : <RegisterPage />} />
+        <Route path="/auth-callback" element={<AuthCallbackPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/join" element={<JoinPage />} />
         <Route path="/privacy" element={<PrivacyPolicyPage />} />

@@ -306,6 +306,59 @@ export const googleAuth = asyncHandler(async (req: Request, res: Response) => {
   });
 });
 
+// ─── Mobile Google OAuth (server-side redirect flow) ───────────────────
+// Google's GIS library blocks WebViews, so mobile uses server-side OAuth.
+// Flow: mobile opens /auth/google/mobile → Google consent → /auth/google/callback → redirect to app
+import config from '../config/env.js';
+import { OAuth2Client } from 'google-auth-library';
+
+const mobileOAuthClient = new OAuth2Client(
+  config.googleClientId,
+  config.googleClientSecret,
+  // Callback URL — must match Google Cloud Console redirect URI
+  `${process.env.BACKEND_URL || 'https://intellect.convoia.com'}/api/auth/google/callback`
+);
+
+export const googleMobileRedirect = asyncHandler(async (_req: Request, res: Response) => {
+  const authorizeUrl = mobileOAuthClient.generateAuthUrl({
+    access_type: 'offline',
+    scope: ['openid', 'email', 'profile'],
+    prompt: 'select_account',
+  });
+  res.redirect(authorizeUrl);
+});
+
+export const googleCallback = asyncHandler(async (req: Request, res: Response) => {
+  const { code } = req.query;
+  if (!code || typeof code !== 'string') {
+    res.redirect('https://localhost/login?error=google_failed');
+    return;
+  }
+
+  try {
+    // Exchange code for tokens
+    const { tokens } = await mobileOAuthClient.getToken(code);
+    const idToken = tokens.id_token;
+    if (!idToken) {
+      res.redirect('https://localhost/login?error=no_token');
+      return;
+    }
+
+    // Reuse existing googleAuth service
+    const result = await AuthService.googleAuth(idToken);
+
+    // Redirect back to mobile app with JWT token
+    // Capacitor intercepts https://localhost URLs
+    const params = new URLSearchParams();
+    params.set('token', result.token);
+    params.set('refreshToken', result.refreshToken || '');
+    params.set('user', JSON.stringify({ id: result.user.id, name: result.user.name, email: result.user.email, role: result.user.role, avatar: result.user.avatar }));
+    res.redirect(`https://localhost/auth-callback?${params.toString()}`);
+  } catch (err: any) {
+    res.redirect(`https://localhost/login?error=${encodeURIComponent(err.message || 'google_failed')}`);
+  }
+});
+
 export const refreshToken = asyncHandler(async (req: Request, res: Response) => {
   // Accept refresh token from body or cookie
   const token = req.body.refreshToken || req.cookies?.refreshToken;
