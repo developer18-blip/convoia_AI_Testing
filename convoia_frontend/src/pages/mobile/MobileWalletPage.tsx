@@ -88,25 +88,39 @@ export function MobileWalletPage() {
 
       {/* Token Packages */}
       <div>
-        <h2 style={{ fontSize: '14px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-muted)', margin: '0 0 12px' }}>Token Packages</h2>
-        <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '8px', scrollbarWidth: 'none' }}>
-          {packages.map(pkg => (
+        <h2 style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#8E8EA0', margin: '0 0 12px' }}>Token Packages</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+          {packages.slice(0, 6).map(pkg => (
             <div key={pkg.id} onClick={() => handleBuy(pkg)}
               style={{
-                minWidth: '130px', padding: '16px', borderRadius: '16px', cursor: 'pointer',
-                background: pkg.popular ? 'var(--color-primary-light)' : 'var(--color-surface)',
-                border: pkg.popular ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
-                position: 'relative', flexShrink: 0,
+                padding: '16px 12px', borderRadius: '16px', cursor: 'pointer',
+                background: pkg.popular ? 'linear-gradient(135deg, #7C3AED, #6D28D9)' : 'white',
+                border: pkg.popular ? 'none' : '0.5px solid rgba(0,0,0,0.08)',
+                boxShadow: pkg.popular ? '0 4px 20px rgba(124,58,237,0.3)' : '0 1px 4px rgba(0,0,0,0.04)',
+                position: 'relative', textAlign: 'center',
               }}>
               {pkg.popular && (
-                <span style={{ position: 'absolute', top: '-8px', left: '12px', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', padding: '2px 8px', borderRadius: '6px', background: '#7C3AED', color: 'white', letterSpacing: '0.05em' }}>
-                  Popular
+                <span style={{
+                  position: 'absolute', top: '-9px', left: '50%', transform: 'translateX(-50%)',
+                  fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', padding: '3px 10px',
+                  borderRadius: '100px', background: '#10B981', color: 'white', letterSpacing: '0.04em',
+                  whiteSpace: 'nowrap',
+                }}>
+                  Best Value
                 </span>
               )}
-              <p style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-text-primary)', margin: '0 0 2px' }}>{formatTokens(pkg.tokens)}</p>
-              <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: '0 0 8px' }}>tokens</p>
-              <p style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-primary)', margin: 0 }}>${pkg.price}</p>
-              {pkg.savings && <p style={{ fontSize: '10px', color: '#10B981', fontWeight: 600, margin: '2px 0 0' }}>{pkg.savings}</p>}
+              <p style={{ fontSize: '18px', fontWeight: 800, color: pkg.popular ? 'white' : '#1A1A2E', margin: '0 0 2px', letterSpacing: '-0.5px' }}>
+                {formatTokens(pkg.tokens)}
+              </p>
+              <p style={{ fontSize: '10px', color: pkg.popular ? 'rgba(255,255,255,0.7)' : '#8E8EA0', margin: '0 0 10px', fontWeight: 500 }}>tokens</p>
+              <p style={{ fontSize: '22px', fontWeight: 800, color: pkg.popular ? 'white' : '#7C3AED', margin: 0, letterSpacing: '-0.5px' }}>
+                ${pkg.price}
+              </p>
+              {pkg.savings && (
+                <p style={{ fontSize: '10px', color: pkg.popular ? 'rgba(255,255,255,0.8)' : '#10B981', fontWeight: 700, margin: '4px 0 0' }}>
+                  {pkg.savings}
+                </p>
+              )}
             </div>
           ))}
         </div>
