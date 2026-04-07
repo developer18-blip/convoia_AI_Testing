@@ -103,7 +103,7 @@ export function TokenStorePage() {
           refresh()
           window.dispatchEvent(new Event('tokens:refresh'))
         })
-        .catch(err => {
+        .catch(() => {
           toast.error('Could not verify payment. Please refresh the page.')
           setTimeout(() => { refresh(); window.dispatchEvent(new Event('tokens:refresh')) }, 3000)
         })

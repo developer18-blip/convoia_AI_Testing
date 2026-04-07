@@ -309,7 +309,7 @@ function OrgSettingsCard() {
     try {
       setSaving(true)
       await api.put('/org', { name: orgName, industry: orgIndustry })
-      updateUser({ organization: { ...user?.organization, name: orgName, industry: orgIndustry } })
+      updateUser({ organization: { ...user!.organization!, name: orgName, industry: orgIndustry } })
       toast.success('Organization updated')
     } catch { toast.error('Failed to update organization') }
     finally { setSaving(false) }
