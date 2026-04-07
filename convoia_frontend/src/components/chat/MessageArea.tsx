@@ -25,7 +25,6 @@ export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, o
   const bottomRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const userScrolledUp = useRef(false)
-  const lastScrollTime = useRef(0)
   const [showScrollBtn, setShowScrollBtn] = useState(false)
 
   const scrollToBottom = () => {
