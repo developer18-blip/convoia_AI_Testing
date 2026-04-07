@@ -42,7 +42,8 @@ export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, o
       const distanceFromBottom = scrollHeight - scrollTop - clientHeight
       // User is "at bottom" if within 150px
       userScrolledUp.current = distanceFromBottom > 150
-      setShowScrollBtn(distanceFromBottom > 300)
+      // Show scroll button earlier on mobile (100px vs 300px)
+      setShowScrollBtn(distanceFromBottom > 100)
     }
 
     container.addEventListener('scroll', handleScroll, { passive: true })
@@ -66,18 +67,19 @@ export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, o
     }
   }, [messages.length])
 
-  // During streaming: auto-scroll ONLY if user hasn't scrolled up
+  // During streaming: auto-scroll on an interval while loading
   useEffect(() => {
     if (!isLoading || userScrolledUp.current) return
-    const now = Date.now()
-    if (now - lastScrollTime.current > 250) {
-      lastScrollTime.current = now
-      requestAnimationFrame(() => {
+    // Immediately scroll once
+    bottomRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior })
+    // Then keep scrolling every 200ms while streaming
+    const interval = setInterval(() => {
+      if (!userScrolledUp.current) {
         bottomRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior })
-      })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, messages.length, messages[messages.length - 1]?.content?.length])
+      }
+    }, 200)
+    return () => clearInterval(interval)
+  }, [isLoading])
 
   if (messages.length === 0) {
     return (
@@ -135,7 +137,7 @@ export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, o
               onEdit={onEditMessage} onDelete={onDeleteMessage} onRunCode={onRunCode}
               onOpenInCanvas={onOpenInCanvas} />
           ))}
-          <div ref={bottomRef} style={{ height: '20px' }} />
+          <div ref={bottomRef} style={{ height: '80px' }} />
         </div>
       </div>
 
@@ -146,18 +148,16 @@ export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, o
           className="scroll-btn-enter"
           aria-label="Scroll to bottom"
           style={{
-            position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)',
-            width: '36px', height: '36px', borderRadius: '50%',
-            background: 'var(--chat-surface)', border: '1px solid var(--chat-border)',
-            color: 'var(--color-text-muted)', cursor: 'pointer',
+            position: 'absolute', bottom: '12px', left: '50%', transform: 'translateX(-50%)',
+            width: '40px', height: '40px', borderRadius: '50%',
+            background: 'var(--color-primary)', border: 'none',
+            color: 'white', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 2px 12px rgba(0,0,0,0.2)', transition: 'background 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s',
-            zIndex: 10, backdropFilter: 'blur(8px)',
+            boxShadow: '0 4px 16px rgba(124,58,237,0.4)', transition: 'all 0.2s',
+            zIndex: 10,
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-primary)'; e.currentTarget.style.color = 'white'; e.currentTarget.style.borderColor = 'var(--color-primary)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(16,163,127,0.3)' }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--chat-surface)'; e.currentTarget.style.color = 'var(--color-text-muted)'; e.currentTarget.style.borderColor = 'var(--chat-border)'; e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.2)' }}
         >
-          <ArrowDown size={18} />
+          <ArrowDown size={20} />
         </button>
       )}
     </div>
