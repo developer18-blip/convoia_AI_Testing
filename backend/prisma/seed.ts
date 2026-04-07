@@ -246,10 +246,11 @@ const aiModels = [
     contextWindow: 2097152,
   },
   {
-    name: 'Gemini 3 Pro',
+    name: 'Gemini 3 Pro (Deprecated)',
     provider: 'google',
     modelId: 'gemini-3-pro-preview',
-    description: 'Google advanced model with excellent coding',
+    description: 'Deprecated March 9, 2026 — use Gemini 3.1 Pro instead',
+    isActive: false,
     inputTokenPrice: 0.00000125,   // $1.25 / 1M input
     outputTokenPrice: 0.000005,    // $5.00 / 1M output
     capabilities: ['chat', 'vision', 'function_calling', 'json_mode'],
@@ -308,10 +309,11 @@ const aiModels = [
     contextWindow: 1048576,
   },
   {
-    name: 'Gemini 3 Pro Image',
+    name: 'Gemini 3 Pro Image (Deprecated)',
     provider: 'google',
     modelId: 'gemini-3-pro-image-preview',
-    description: 'Advanced image generation with Gemini 3 Pro quality',
+    description: 'Deprecated March 9, 2026 — use Gemini 3.1 Flash Image instead',
+    isActive: false,
     inputTokenPrice: 0.00000125,   // $1.25 / 1M input
     outputTokenPrice: 0.000005,    // $5.00 / 1M output
     capabilities: ['image_generation', 'vision'],

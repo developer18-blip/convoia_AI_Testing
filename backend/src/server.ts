@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import { config } from './config/env.js';
 import logger from './config/logger.js';
+import prisma from './config/db.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import morganMiddleware from './middleware/loggingMiddleware.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
@@ -266,9 +267,83 @@ app.use('*', (req: Request, res: Response) => {
 app.use(errorHandler);
 
 
+// ============== MODEL HEALTH CHECK ==============
+// Runs on startup: deactivates models whose provider has no API key,
+// and deprecated models that will 404. Re-activates if key is added later.
+async function validateModels() {
+  try {
+    const providerKeys: Record<string, boolean> = {
+      openai: !!config.apiKeys.openai,
+      anthropic: !!config.apiKeys.anthropic,
+      google: !!config.apiKeys.google,
+      deepseek: !!config.apiKeys.deepseek,
+      mistral: !!config.apiKeys.mistral,
+      groq: !!config.apiKeys.groq,
+    };
+
+    // Deprecated model IDs that providers have shut down
+    const DEPRECATED_MODELS = [
+      'gemini-3-pro-preview',       // Deprecated by Google March 9, 2026
+      'gemini-3-pro-image-preview', // Deprecated with Gemini 3 Pro
+    ];
+
+    // 1. Deactivate models without API keys
+    const providersWithoutKeys = Object.entries(providerKeys)
+      .filter(([, hasKey]) => !hasKey)
+      .map(([provider]) => provider);
+
+    if (providersWithoutKeys.length > 0) {
+      const result = await prisma.aIModel.updateMany({
+        where: { provider: { in: providersWithoutKeys }, isActive: true },
+        data: { isActive: false },
+      });
+      if (result.count > 0) {
+        logger.warn(`Model validation: deactivated ${result.count} model(s) — no API keys for: ${providersWithoutKeys.join(', ')}`);
+      }
+    }
+
+    // 2. Re-activate models for providers that DO have keys (in case key was added)
+    const providersWithKeys = Object.entries(providerKeys)
+      .filter(([, hasKey]) => hasKey)
+      .map(([provider]) => provider);
+
+    if (providersWithKeys.length > 0) {
+      const reactivated = await prisma.aIModel.updateMany({
+        where: {
+          provider: { in: providersWithKeys },
+          isActive: false,
+          modelId: { notIn: DEPRECATED_MODELS },
+        },
+        data: { isActive: true },
+      });
+      if (reactivated.count > 0) {
+        logger.info(`Model validation: re-activated ${reactivated.count} model(s) for providers with keys`);
+      }
+    }
+
+    // 3. Deactivate deprecated models regardless of API key
+    const deprecated = await prisma.aIModel.updateMany({
+      where: { modelId: { in: DEPRECATED_MODELS }, isActive: true },
+      data: { isActive: false },
+    });
+    if (deprecated.count > 0) {
+      logger.warn(`Model validation: deactivated ${deprecated.count} deprecated model(s): ${DEPRECATED_MODELS.join(', ')}`);
+    }
+
+    // Summary
+    const activeCount = await prisma.aIModel.count({ where: { isActive: true } });
+    const totalCount = await prisma.aIModel.count();
+    logger.info(`Model validation complete: ${activeCount}/${totalCount} models active`);
+  } catch (err: any) {
+    logger.error(`Model validation failed (non-fatal): ${err.message}`);
+  }
+}
+
 // ============== START SERVER ==============
 const startServer = async (): Promise<void> => {
   try {
+    await validateModels();
+
     const server = app.listen(config.port, () => {
       logger.info(`🚀 Server is running on port ${config.port}`);
       logger.info(`📝 Environment: ${config.nodeEnv}`);

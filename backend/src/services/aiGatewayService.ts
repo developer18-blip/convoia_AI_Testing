@@ -684,30 +684,32 @@ async function routeToProvider(aiModel: any, rawMessages: any[], systemPrompt: s
     }
   }
 
+  const apiKey = config.apiKeys[provider as keyof typeof config.apiKeys];
+  if (!apiKey) {
+    throw new AppError(
+      `${provider.charAt(0).toUpperCase() + provider.slice(1)} is not available — API key not configured. Please select a different model.`,
+      503
+    );
+  }
+
   switch (provider) {
     case 'openai':
-      if (!config.apiKeys.openai) throw new AppError('OpenAI API key not configured', 500);
-      return await callOpenAI(modelId, formatMessagesForOpenAI(messages), systemPrompt, config.apiKeys.openai, overrides);
+      return await callOpenAI(modelId, formatMessagesForOpenAI(messages), systemPrompt, apiKey, overrides);
 
     case 'anthropic':
-      if (!config.apiKeys.anthropic) throw new AppError('Anthropic API key not configured', 500);
-      return await callAnthropic(modelId, formatMessagesForAnthropic(messages), systemPrompt, config.apiKeys.anthropic, overrides);
+      return await callAnthropic(modelId, formatMessagesForAnthropic(messages), systemPrompt, apiKey, overrides);
 
     case 'google':
-      if (!config.apiKeys.google) throw new AppError('Google API key not configured', 500);
-      return await callGoogle(modelId, messages, systemPrompt, config.apiKeys.google, overrides);
+      return await callGoogle(modelId, messages, systemPrompt, apiKey, overrides);
 
     case 'groq':
-      if (!config.apiKeys.groq) throw new AppError('Groq API key not configured', 500);
-      return await callGroq(modelId, formatMessagesForOpenAI(messages), systemPrompt, config.apiKeys.groq, overrides);
+      return await callGroq(modelId, formatMessagesForOpenAI(messages), systemPrompt, apiKey, overrides);
 
     case 'mistral':
-      if (!config.apiKeys.mistral) throw new AppError('Mistral API key not configured', 500);
-      return await callMistral(modelId, formatMessagesForOpenAI(messages), systemPrompt, config.apiKeys.mistral, overrides);
+      return await callMistral(modelId, formatMessagesForOpenAI(messages), systemPrompt, apiKey, overrides);
 
     case 'deepseek':
-      if (!config.apiKeys.deepseek) throw new AppError('DeepSeek API key not configured', 500);
-      return await callDeepSeek(modelId, formatMessagesForOpenAI(messages), systemPrompt, config.apiKeys.deepseek, overrides);
+      return await callDeepSeek(modelId, formatMessagesForOpenAI(messages), systemPrompt, apiKey, overrides);
 
     default:
       throw new AppError(`Unsupported provider: ${provider}`, 400);
@@ -717,18 +719,20 @@ async function routeToProvider(aiModel: any, rawMessages: any[], systemPrompt: s
 async function routeVisionToProvider(aiModel: any, prompt: string, imageBase64: string, mimeType: string, maxTokens?: number) {
   const { provider, modelId } = aiModel;
 
+  const apiKey = config.apiKeys[provider as keyof typeof config.apiKeys];
+
   switch (provider) {
     case 'openai':
-      if (!config.apiKeys.openai) throw new AppError('OpenAI API key not configured', 500);
-      return await callOpenAIVision(modelId, prompt, imageBase64, mimeType, config.apiKeys.openai, maxTokens);
+      if (!apiKey) throw new AppError('OpenAI is not available — API key not configured.', 503);
+      return await callOpenAIVision(modelId, prompt, imageBase64, mimeType, apiKey, maxTokens);
 
     case 'anthropic':
-      if (!config.apiKeys.anthropic) throw new AppError('Anthropic API key not configured', 500);
-      return await callAnthropicVision(modelId, prompt, imageBase64, mimeType, config.apiKeys.anthropic, maxTokens);
+      if (!apiKey) throw new AppError('Anthropic is not available — API key not configured.', 503);
+      return await callAnthropicVision(modelId, prompt, imageBase64, mimeType, apiKey, maxTokens);
 
     case 'google':
-      if (!config.apiKeys.google) throw new AppError('Google API key not configured', 500);
-      return await callGoogleVision(modelId, prompt, imageBase64, mimeType, config.apiKeys.google, maxTokens);
+      if (!apiKey) throw new AppError('Google is not available — API key not configured.', 503);
+      return await callGoogleVision(modelId, prompt, imageBase64, mimeType, apiKey, maxTokens);
 
     default:
       // Groq, Mistral, DeepSeek don't have vision — find best available vision model
@@ -1196,42 +1200,44 @@ async function routeToProviderStream(
 
   const messages = trimToContextWindow(cleaned, contextWindow);
 
+  const apiKey = config.apiKeys[provider as keyof typeof config.apiKeys];
+  if (!apiKey) {
+    throw new AppError(
+      `${provider.charAt(0).toUpperCase() + provider.slice(1)} is not available — API key not configured. Please select a different model.`,
+      503
+    );
+  }
+
   switch (provider) {
     case 'openai':
-      if (!config.apiKeys.openai) throw new AppError('OpenAI API key not configured', 500);
-      return callOpenAIStream(modelId, messages, systemPrompt, config.apiKeys.openai, callbacks, overrides);
+      return callOpenAIStream(modelId, messages, systemPrompt, apiKey, callbacks, overrides);
 
     case 'anthropic':
-      if (!config.apiKeys.anthropic) throw new AppError('Anthropic API key not configured', 500);
-      return callAnthropicStream(modelId, messages, systemPrompt, config.apiKeys.anthropic, callbacks, overrides);
+      return callAnthropicStream(modelId, messages, systemPrompt, apiKey, callbacks, overrides);
 
     case 'groq':
-      if (!config.apiKeys.groq) throw new AppError('Groq API key not configured', 500);
       return callOpenAICompatibleStream(
         'https://api.groq.com/openai/v1/chat/completions',
-        modelId, messages, systemPrompt, config.apiKeys.groq, callbacks, overrides
+        modelId, messages, systemPrompt, apiKey, callbacks, overrides
       );
 
     case 'mistral':
-      if (!config.apiKeys.mistral) throw new AppError('Mistral API key not configured', 500);
       return callOpenAICompatibleStream(
         'https://api.mistral.ai/v1/chat/completions',
-        modelId, messages, systemPrompt, config.apiKeys.mistral, callbacks, overrides
+        modelId, messages, systemPrompt, apiKey, callbacks, overrides
       );
 
     case 'deepseek':
-      if (!config.apiKeys.deepseek) throw new AppError('DeepSeek API key not configured', 500);
       return callOpenAICompatibleStream(
         'https://api.deepseek.com/v1/chat/completions',
-        modelId, messages, systemPrompt, config.apiKeys.deepseek, callbacks, overrides
+        modelId, messages, systemPrompt, apiKey, callbacks, overrides
       );
 
     case 'google':
       // Google Gemini streaming uses a different format; fall back to non-streaming
       // and emit the full response as a single chunk
-      if (!config.apiKeys.google) throw new AppError('Google API key not configured', 500);
       try {
-        const result = await callGoogle(modelId, messages, systemPrompt, config.apiKeys.google, overrides);
+        const result = await callGoogle(modelId, messages, systemPrompt, apiKey, overrides);
         callbacks.onChunk(result.response);
         callbacks.onDone(result.inputTokens, result.outputTokens);
       } catch (err: any) {
