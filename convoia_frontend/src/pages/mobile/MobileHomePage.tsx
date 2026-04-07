@@ -78,11 +78,11 @@ export function MobileHomePage() {
           {isEmployee ? 'Your Token Budget' : 'Available Tokens'}
         </p>
         <p style={{ fontSize: '40px', fontWeight: 800, margin: '0 0 6px', letterSpacing: '-1px', lineHeight: 1 }}>
-          {tokenBalance.toLocaleString()}
+          {(tokenBalance ?? 0).toLocaleString()}
         </p>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
           <p style={{ fontSize: '12px', opacity: 0.7, margin: 0 }}>
-            {totalUsed > 0 ? `${totalUsed.toLocaleString()} used total` : 'Ready to use'}
+            {(totalUsed ?? 0) > 0 ? `${(totalUsed ?? 0).toLocaleString()} used total` : 'Ready to use'}
           </p>
           {!isEmployee && (
             <button onClick={() => navigate('/tokens/buy')}
