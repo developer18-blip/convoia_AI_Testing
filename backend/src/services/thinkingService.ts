@@ -1,11 +1,11 @@
 /**
  * Deep Research Service — 4-Stage Expert Research Pipeline
  *
- * Simulates how a human expert researches a problem:
+ * Simulates how a senior human expert researches a problem:
  *
  * Stage 1: Intent + Depth Detection (instant, rule-based)
- * Stage 2: Clarification (if query is vague — ask before answering)
- * Stage 3: Deep Research — Hypothesis Building + Multi-Angle Reasoning (Pass 1)
+ * Stage 2: Clarification (if query is vague — ask BEFORE answering)
+ * Stage 3: Deep Research — Hypothesis + Multi-Angle Reasoning (Pass 1, non-streaming)
  * Stage 4: Iterative Refinement — Self-Critique + Polish (Pass 2, streaming)
  *
  * The AI should feel like a consultant, researcher, and strategist — not a chatbot.
@@ -16,7 +16,7 @@ import logger from '../config/logger.js';
 // ── Types ────────────────────────────────────────────────────────────
 
 export type DepthLevel = 'surface' | 'deep' | 'research';
-export type TaskType = 'factual' | 'analytical' | 'research' | 'coding' | 'creative' | 'strategic' | 'general';
+export type TaskType = 'factual' | 'analytical' | 'research' | 'coding' | 'creative' | 'strategic' | 'troubleshooting' | 'general';
 
 export interface QueryAnalysis {
   needsClarification: boolean;
@@ -31,9 +31,9 @@ export interface QueryAnalysis {
 
 /**
  * Analyze a user query to determine:
- * - What kind of task is it? (factual, analytical, research, coding, creative, strategic)
+ * - What kind of task is it? (factual, analytical, research, coding, creative, strategic, troubleshooting)
  * - How deep should we go? (surface, deep, research)
- * - Is clarification needed? (confidence < 0.6)
+ * - Is clarification needed? (confidence too low)
  * - What are possible interpretations? (hypothesis building)
  *
  * Rule-based — no model call, instant.
@@ -48,135 +48,171 @@ export function analyzeQuery(
 
   const words = query.trim().split(/\s+/);
   const wordCount = words.length;
-  const hasConversationContext = messageHistory.filter(m => m.role === 'user').length > 1;
+  const userMessages = messageHistory.filter(m => m.role === 'user');
+  const hasConversationContext = userMessages.length > 1;
   const hasDocumentContext = query.includes('Here is the attached document content:');
   const queryLower = query.toLowerCase();
 
   // ── Task type detection ──
   let taskType: TaskType = 'general';
 
-  if (/\b(code|function|class|api|bug|error|debug|implement|refactor|regex|sql|query|script|deploy|docker|git|build|compile|test|migrate)\b/i.test(query)) {
+  if (/\b(code|function|class|api|bug|error|debug|implement|refactor|regex|sql|query|script|deploy|docker|git|build|compile|test|migrate|npm|pip|webpack|vite)\b/i.test(query)) {
     taskType = 'coding';
-  } else if (/\b(strategy|scale|grow|monetize|pricing|positioning|market|compete|business model|roadmap|launch|pivot|hire|fundrais)\b/i.test(query)) {
+  } else if (/\b(fix|solve|resolve|not working|broken|issue|problem|crash|fail|stuck|troubleshoot|diagnose)\b/i.test(query)) {
+    taskType = 'troubleshooting';
+  } else if (/\b(strategy|scale|grow|monetize|pricing|positioning|market|compete|business model|roadmap|launch|pivot|hire|fundrais|revenue|profit|expansion)\b/i.test(query)) {
     taskType = 'strategic';
-  } else if (/\b(analyze|compare|evaluate|assess|benchmark|audit|review|performance|metrics|data|statistics|trend|trade-?off|pros|cons)\b/i.test(query)) {
+  } else if (/\b(analyze|compare|evaluate|assess|benchmark|audit|review|performance|metrics|data|statistics|trend|trade-?off|pros|cons|impact|roi)\b/i.test(query)) {
     taskType = 'analytical';
-  } else if (/\b(research|investigate|find out|explore|study|deep dive|how does|how do|why does|why do|explain.*work|explain.*mechanism)\b/i.test(query)) {
+  } else if (/\b(research|investigate|find out|explore|study|deep dive|how does|how do|why does|why do|explain.*work|explain.*mechanism|understand)\b/i.test(query)) {
     taskType = 'research';
   } else if (/\b(what is|who is|when did|where is|define|meaning of)\b/i.test(query) && wordCount < 15) {
     taskType = 'factual';
-  } else if (/\b(write|create|draft|design|brainstorm|generate|story|poem|content|marketing|email|blog|copy)\b/i.test(query)) {
+  } else if (/\b(write|create|draft|design|brainstorm|generate|story|poem|content|marketing|email|blog|copy|outline|template)\b/i.test(query)) {
     taskType = 'creative';
   }
 
   // ── Depth level detection ──
   let depthLevel: DepthLevel = 'deep'; // default for thinking mode
 
-  // Surface: simple factual queries
-  if (taskType === 'factual' && wordCount < 12) {
+  // Surface: simple factual queries with short input
+  if (taskType === 'factual' && wordCount < 10) {
     depthLevel = 'surface';
   }
 
   // Research: complex multi-faceted problems
   const RESEARCH_SIGNALS = [
-    /\b(how (to|should|can|do I)|best (way|approach|practice|strategy))\b/i,
-    /\b(compare|versus|vs|trade-?off|alternative|which is better)\b/i,
-    /\b(architecture|design|system|infrastructure|scale|optimize|strategy|plan)\b/i,
-    /\b(why (is|are|does|do|should|would)|what causes|root cause)\b/i,
-    /\b(comprehensive|in-?depth|detailed|thorough|complete|full)\b/i,
+    /\b(how (to|should|can|do I)|best (way|approach|practice|strategy|method))\b/i,
+    /\b(compare|versus|vs|trade-?off|alternative|which is better|difference between)\b/i,
+    /\b(architecture|design|system|infrastructure|scale|optimize|strategy|plan|framework)\b/i,
+    /\b(why (is|are|does|do|should|would)|what causes|root cause|reason for)\b/i,
+    /\b(comprehensive|in-?depth|detailed|thorough|complete|full|everything about)\b/i,
+    /\b(step.by.step|walkthrough|guide|tutorial|explain in detail)\b/i,
+    /\b(consider|evaluate|weigh|decision|choose between|recommend)\b/i,
   ];
   const researchSignalCount = RESEARCH_SIGNALS.filter(p => p.test(query)).length;
-  if (researchSignalCount >= 2 || (researchSignalCount >= 1 && wordCount >= 20)) {
+  if (researchSignalCount >= 2 || (researchSignalCount >= 1 && wordCount >= 15)) {
     depthLevel = 'research';
   }
-  if (taskType === 'strategic') depthLevel = 'research';
+  if (taskType === 'strategic' || taskType === 'troubleshooting') depthLevel = 'research';
+
+  // Long queries (40+ words) always get research depth
+  if (wordCount >= 40) depthLevel = 'research';
 
   // ── Hypothesis building (possible interpretations) ──
   if (/\b(scale|scaling)\b/i.test(queryLower)) {
-    hypotheses.push('Technical scaling (infrastructure, performance, load)');
+    hypotheses.push('Technical scaling (infrastructure, performance, load handling)');
     hypotheses.push('Business scaling (revenue, team, market expansion)');
     hypotheses.push('Operational scaling (processes, automation, efficiency)');
   }
-  if (/\b(optimize|improve|enhance)\b/i.test(queryLower)) {
-    hypotheses.push('Performance optimization (speed, efficiency)');
-    hypotheses.push('Cost optimization (reduce spending)');
-    hypotheses.push('Quality optimization (better output, fewer errors)');
+  if (/\b(optimize|improve|enhance|better)\b/i.test(queryLower)) {
+    hypotheses.push('Performance optimization (speed, latency, throughput)');
+    hypotheses.push('Cost optimization (reduce spending, better ROI)');
+    hypotheses.push('Quality optimization (accuracy, reliability, UX)');
   }
-  if (/\b(best|recommend|choose|pick|select)\b/i.test(queryLower)) {
-    hypotheses.push('Best for the user\'s specific use case and constraints');
-    hypotheses.push('Best in general / industry standard');
-    hypotheses.push('Best for cost-effectiveness');
+  if (/\b(best|recommend|choose|pick|select|which)\b/i.test(queryLower)) {
+    hypotheses.push('Best for the user\'s specific constraints and context');
+    hypotheses.push('Best in general / industry standard choice');
+    hypotheses.push('Best for cost-effectiveness and practicality');
   }
-  if (/\b(build|create|make|develop)\b/i.test(queryLower) && taskType !== 'creative') {
+  if (/\b(build|create|make|develop|implement)\b/i.test(queryLower) && taskType !== 'creative') {
     hypotheses.push('Build from scratch vs. use existing tools/frameworks');
-    hypotheses.push('MVP approach vs. production-grade');
+    hypotheses.push('MVP / prototype approach vs. production-grade');
+    hypotheses.push('Solo developer vs. team implementation');
   }
-  if (/\b(fix|solve|resolve|debug)\b/i.test(queryLower)) {
-    hypotheses.push('Quick fix vs. root cause analysis');
-    hypotheses.push('Workaround vs. proper solution');
+  if (/\b(fix|solve|resolve|debug|troubleshoot)\b/i.test(queryLower)) {
+    hypotheses.push('Quick fix / workaround vs. proper root cause solution');
+    hypotheses.push('Configuration issue vs. code/logic bug');
+    hypotheses.push('Environment-specific vs. universal problem');
+  }
+  if (/\b(security|secure|protect|vulnerable|attack|hack)\b/i.test(queryLower)) {
+    hypotheses.push('Application-level security (auth, input validation, XSS)');
+    hypotheses.push('Infrastructure security (network, firewall, encryption)');
+    hypotheses.push('Data security (PII, compliance, access control)');
+  }
+  if (/\b(cost|price|pricing|expensive|cheap|budget|afford)\b/i.test(queryLower)) {
+    hypotheses.push('Upfront cost vs. total cost of ownership');
+    hypotheses.push('Cost reduction strategies');
+    hypotheses.push('Value-based pricing vs. competitive pricing');
   }
 
-  // ── Document context: always proceed (user uploaded a file) ──
+  // ── Document context: still analyze depth, but don't ask clarification ──
   if (hasDocumentContext) {
-    return { needsClarification: false, confidenceScore: 0.9, depthLevel: 'deep', taskType, reasons: ['document context provided'], hypotheses };
-  }
-
-  // ── Follow-up in conversation: relaxed requirements ──
-  if (hasConversationContext && wordCount >= 3) {
-    return { needsClarification: false, confidenceScore: 0.85, depthLevel, taskType, reasons: ['follow-up with conversation context'], hypotheses };
+    return { needsClarification: false, confidenceScore: 0.9, depthLevel: Math.max(depthLevel === 'surface' ? 0 : depthLevel === 'deep' ? 1 : 2, 1) === 2 ? 'research' : 'deep' as DepthLevel, taskType, reasons: ['document context provided'], hypotheses };
   }
 
   // ── Confidence scoring ──
 
-  // Very short standalone queries
-  if (wordCount < 5 && !hasConversationContext) {
-    confidence -= 0.3;
-    reasons.push('query is very short — may need more detail');
-  } else if (wordCount < 10 && !hasConversationContext) {
+  // Very short standalone queries — high chance of ambiguity
+  if (wordCount < 4 && !hasConversationContext) {
+    confidence -= 0.35;
+    reasons.push('query is very short — likely needs more context');
+  } else if (wordCount < 5 && !hasConversationContext) {
+    confidence -= 0.25;
+    reasons.push('query is short — may need more detail');
+  } else if (wordCount < 8 && !hasConversationContext) {
     confidence -= 0.1;
+  }
+
+  // Short queries even IN conversation context
+  if (wordCount < 4 && hasConversationContext) {
+    confidence -= 0.15;
+    reasons.push('very short follow-up — may need clarification on what aspect to address');
   }
 
   // Vague action words without specific target
   const VAGUE_PATTERNS = [
-    { pattern: /^(optimize|improve|fix|enhance|update|change|make better)\b/i, reason: 'vague action — what specifically should be optimized/improved?' },
-    { pattern: /^(help me|help with|I need help)\b/i, reason: 'request for help without specific problem statement' },
-    { pattern: /^(tell me about|what about|how about)\b/i, reason: 'open-ended question — could be more specific' },
+    { pattern: /^(optimize|improve|fix|enhance|update|change|make better)\b/i, penalty: 0.25, reason: 'vague action — what specifically should be optimized/improved?' },
+    { pattern: /^(help me|help with|I need help)\b/i, penalty: 0.2, reason: 'request for help without specific problem statement' },
+    { pattern: /^(tell me about|what about|how about)\b/i, penalty: 0.15, reason: 'open-ended question — could benefit from focus' },
+    { pattern: /^(do|can you|is it possible|should I)\b/i, penalty: 0.1, reason: 'yes/no question that likely needs deeper exploration' },
   ];
 
-  for (const { pattern, reason } of VAGUE_PATTERNS) {
+  for (const { pattern, penalty, reason } of VAGUE_PATTERNS) {
     if (pattern.test(query)) {
-      confidence -= 0.2;
+      confidence -= penalty;
       reasons.push(reason);
     }
   }
 
-  // Broad scope
-  if (/\b(everything|all|complete|full|entire)\b/i.test(query) && wordCount < 15) {
+  // Broad scope without specifics
+  if (/\b(everything|all|complete|full|entire|whole)\b/i.test(query) && wordCount < 15) {
     confidence -= 0.15;
-    reasons.push('broad scope — may need to narrow down');
+    reasons.push('very broad scope — narrowing would improve answer quality');
   }
 
   // Missing constraints for coding
-  if (taskType === 'coding' && !/\b(python|javascript|typescript|java|rust|go|react|node|express|sql|html|css|c\+\+|c#|swift|kotlin|php|ruby)\b/i.test(query)) {
+  if (taskType === 'coding' && !/\b(python|javascript|typescript|java|rust|go|react|node|express|sql|html|css|c\+\+|c#|swift|kotlin|php|ruby|vue|angular|next|django|flask|spring|laravel)\b/i.test(query)) {
     confidence -= 0.1;
     reasons.push('no programming language or framework specified');
   }
 
-  // Boosters
+  // Missing context for troubleshooting
+  if (taskType === 'troubleshooting' && wordCount < 15 && !/```/.test(query)) {
+    confidence -= 0.15;
+    reasons.push('troubleshooting without error message or code context');
+  }
+
+  // Boosters — specific, detailed queries increase confidence
   if (wordCount >= 20) confidence += 0.1;
+  if (wordCount >= 40) confidence += 0.1;
   if (/\?$/.test(query.trim())) confidence += 0.05;
   if (/\b(specifically|exactly|precisely|in particular)\b/i.test(query)) confidence += 0.1;
-  if (/```/.test(query)) confidence += 0.15;
-  if (wordCount >= 40) confidence += 0.1; // very detailed query
+  if (/```/.test(query)) confidence += 0.15; // code block = specific context
+  if (/\b(because|since|given that|context|background)\b/i.test(query)) confidence += 0.1; // provides reasoning
 
   confidence = Math.max(0, Math.min(1, confidence));
 
-  const needsClarification = confidence < 0.6 && !hasConversationContext;
+  // Clarification threshold: trigger if confidence is low
+  // Allow clarification even in conversations if the query is very vague (< 0.5)
+  const needsClarification = hasConversationContext
+    ? confidence < 0.5 && wordCount < 5  // stricter in conversations — only for very vague follow-ups
+    : confidence < 0.65;                  // standalone queries — broader threshold
 
   if (needsClarification) {
-    logger.info(`Deep research: needs clarification (confidence=${confidence.toFixed(2)}): "${query.substring(0, 80)}"`);
+    logger.info(`Think mode: needs clarification (confidence=${confidence.toFixed(2)}): "${query.substring(0, 80)}"`);
   } else {
-    logger.info(`Deep research: depth=${depthLevel}, task=${taskType}, confidence=${confidence.toFixed(2)}, hypotheses=${hypotheses.length}`);
+    logger.info(`Think mode: depth=${depthLevel}, task=${taskType}, confidence=${confidence.toFixed(2)}, hypotheses=${hypotheses.length}`);
   }
 
   return { needsClarification, confidenceScore: confidence, depthLevel, taskType, reasons, hypotheses };
@@ -185,27 +221,44 @@ export function analyzeQuery(
 // ── Stage 2: Clarification System Prompt ─────────────────────────────
 
 export function getClarificationSystemPrompt(analysis: QueryAnalysis): string {
-  const reasonsList = analysis.reasons.map(r => `- ${r}`).join('\n');
+  const reasonsList = analysis.reasons.map(r => `• ${r}`).join('\n');
   const hypothesesList = analysis.hypotheses.length > 0
-    ? `\nPOSSIBLE INTERPRETATIONS I DETECTED:\n${analysis.hypotheses.map(h => `- ${h}`).join('\n')}\n`
+    ? `\nI've identified these possible interpretations:\n${analysis.hypotheses.map((h, i) => `${i + 1}. ${h}`).join('\n')}\n`
     : '';
 
-  return `You are a senior expert consultant. The user's query needs clarification before you can provide a precise, high-quality answer.
+  return `You are a premium AI consultant on the ConvoiaAI platform operating in THINK MODE.
 
-DETECTED ISSUES:
+The user's query needs clarification before you can deliver a truly expert-level answer. Think mode is about DEPTH and PRECISION — it's better to ask smart questions than to guess and give a generic answer.
+
+ANALYSIS OF THE QUERY:
 ${reasonsList}
 ${hypothesesList}
-YOUR TASK:
-1. Briefly acknowledge what you think they're asking about
-2. If you detected multiple possible interpretations, mention them
-3. Ask 2–4 specific, targeted questions that will let you give a much better answer
-4. Questions must directly address the gaps — NOT generic questions like "what is your goal?"
+YOUR APPROACH:
+1. Acknowledge their topic — show you understand the general direction
+2. If you identified multiple interpretations, briefly mention the 2–3 most likely ones
+3. Ask 2–3 targeted, specific questions that will dramatically improve your answer
+4. Each question should address a real gap — not generic filler like "what is your goal?"
+
+QUESTION QUALITY RULES:
+- Questions must be SPECIFIC to their domain and query
+- Frame questions as "This vs. That" choices when possible (easier for user to answer)
+- Include context about WHY you're asking (helps user understand the value)
+
+TONE:
+- Confident and expert — like a senior consultant scoping a project
+- Warm but direct — no robotic formality
+- Show genuine intellectual curiosity about their problem
 
 FORMAT:
-Start with: "I want to make sure I give you exactly what you need."
-Then explain possible interpretations if relevant.
-Then list your questions numbered 1-4.
-End with: "Once you answer these, I'll provide a thorough, expert-level response."`;
+- Start with a brief acknowledgment (1-2 sentences about what you think they're exploring)
+- Present possible interpretations if relevant (numbered list)
+- Ask your 2-3 questions (numbered, each with a brief "why I'm asking" context)
+- Close with confidence: "With these details, I'll provide a thorough, expert-level analysis."
+
+DO NOT:
+- Give a generic answer alongside the questions
+- Ask more than 3 questions (respect their time)
+- Use formulaic phrases like "I'd be happy to help" or "Great question"`;
 }
 
 // ── Stage 3: Deep Research Prompt (Pass 1) ───────────────────────────
@@ -220,85 +273,115 @@ export function getDeepResearchPrompt(analysis: QueryAnalysis): string {
     ? `\nPOSSIBLE INTERPRETATIONS TO CONSIDER:\n${analysis.hypotheses.map((h, i) => `${i + 1}. ${h}`).join('\n')}\nAddress the most likely interpretation, but note if others apply.\n`
     : '';
 
-  const BASE = `You are an expert researcher and consultant operating in DEEP RESEARCH MODE.
+  const BASE = `You are an expert researcher operating in DEEP THINK MODE on the ConvoiaAI platform.
 
-Your task is to research this problem like a human expert would — not just answer it.
+Your task: research this problem the way a senior expert would — not just answer it, but UNDERSTAND it from multiple angles before forming a conclusion.
 ${hypothesesSection}
-RESEARCH PROCESS (follow this exactly):
+RESEARCH PROCESS (follow this structure):
 
-## 1. PROBLEM UNDERSTANDING
+## 1. PROBLEM DECOMPOSITION
 - Restate the core problem in your own words
-- Identify what's actually being asked vs. what they might really need
-- Note any ambiguity and how you're interpreting it
+- Break it into sub-problems or components
+- Identify what's actually being asked vs. what they might REALLY need (the question behind the question)
+- Note any ambiguity and state how you're interpreting it
 
-## 2. KEY ASSUMPTIONS
-- List assumptions you're making
+## 2. KEY ASSUMPTIONS & CONSTRAINTS
+- List assumptions you're making explicitly
+- Identify constraints (time, budget, technical, organizational)
 - Flag anything that depends on context you don't have
 
-## 3. MULTI-ANGLE ANALYSIS
-Analyze from EVERY relevant angle:`;
+## 3. MULTI-ANGLE ANALYSIS`;
 
   const ANGLE_MAP: Record<TaskType, string> = {
     coding: `
-- **Technical**: Architecture, implementation approach, code quality
-- **Performance**: Time/space complexity, bottlenecks, optimization opportunities
-- **Security**: Attack vectors, input validation, authentication/authorization
-- **Maintainability**: Code structure, testing strategy, documentation needs
-- **Alternatives**: Other approaches, libraries, or patterns that could work`,
+Analyze from EVERY relevant angle:
+- **Architecture**: Design patterns, component structure, data flow, separation of concerns
+- **Implementation**: Approach, algorithm choice, language/framework considerations
+- **Performance**: Time/space complexity, bottlenecks, optimization opportunities, caching
+- **Security**: Attack vectors, input validation, auth, data exposure risks
+- **Maintainability**: Code structure, testing strategy, documentation, future extensibility
+- **Alternatives**: Other approaches, libraries, or patterns that could solve this differently
+- **Edge Cases**: What could break? Null values, race conditions, scale limits`,
+
+    troubleshooting: `
+Diagnose systematically:
+- **Symptoms vs. Root Cause**: What they're seeing vs. what's actually wrong
+- **Isolation**: Narrow down where the problem occurs (layer, component, timing)
+- **Common Causes**: Most frequent reasons for this type of issue
+- **Uncommon Causes**: Less obvious but possible explanations
+- **Dependencies**: External systems, versions, configurations that could be involved
+- **Verification**: How to confirm which cause is correct before fixing
+- **Prevention**: How to prevent recurrence after fixing`,
 
     strategic: `
-- **Market**: Competitive landscape, positioning, timing, market size
-- **Business Model**: Revenue streams, unit economics, pricing strategy
-- **Execution**: Team requirements, timeline, milestones, resource allocation
-- **Risk**: What could go wrong, mitigation strategies, worst-case scenarios
-- **Growth**: Scaling path, customer acquisition, retention strategy`,
+Analyze from EVERY relevant angle:
+- **Market & Positioning**: Competitive landscape, timing, market size, differentiation
+- **Business Model**: Revenue streams, unit economics, pricing, margins
+- **Execution**: Team requirements, timeline, milestones, resource allocation, dependencies
+- **Risk Assessment**: What could go wrong (quantified where possible), mitigation strategies
+- **Growth Path**: Scaling strategy, customer acquisition, retention, network effects
+- **Financial**: Revenue projections, break-even, funding requirements, burn rate`,
 
     analytical: `
-- **Quantitative**: Numbers, metrics, benchmarks, data-driven insights
-- **Qualitative**: User experience, strategic fit, organizational impact
-- **Comparative**: How alternatives stack up against each other
-- **Temporal**: Short-term vs. long-term implications
-- **Risk/Reward**: Trade-offs, downside risks, upside potential`,
+Analyze from EVERY relevant angle:
+- **Quantitative**: Numbers, metrics, benchmarks, data-driven insights, statistical significance
+- **Qualitative**: User experience, strategic fit, organizational/cultural impact
+- **Comparative**: How alternatives stack up — use a framework (weighted scoring, decision matrix)
+- **Temporal**: Short-term vs. long-term implications, time-value considerations
+- **Risk/Reward**: Trade-offs quantified, downside exposure, upside potential, expected value
+- **Second-Order Effects**: Consequences of consequences — what happens AFTER the decision`,
 
     research: `
-- **Foundational**: Core concepts and principles
-- **Current State**: Latest developments and consensus
-- **Debates**: Areas of disagreement or open questions
-- **Practical**: Real-world applications and implications
-- **Future**: Where this is heading, emerging trends`,
+Research from EVERY relevant angle:
+- **Foundational**: Core concepts, principles, and mental models
+- **Current State**: Latest developments, consensus view, recent breakthroughs
+- **Debates & Open Questions**: Areas of disagreement, unresolved tensions
+- **Practical Applications**: Real-world use cases, implementation considerations
+- **Evidence Quality**: How strong is the evidence? Consensus vs. emerging vs. speculative
+- **Future Direction**: Where this is heading, emerging trends, paradigm shifts`,
 
     factual: `
-- **Core Answer**: The direct, accurate answer
-- **Context**: Why this matters, background
-- **Nuances**: Edge cases, exceptions, common misconceptions
-- **Related**: Connected topics worth knowing about`,
+Verify and contextualize:
+- **Core Answer**: The direct, accurate, verified answer
+- **Context**: Why this matters, historical background, significance
+- **Nuances**: Edge cases, exceptions, common misconceptions to correct
+- **Related Knowledge**: Connected topics that deepen understanding
+- **Practical Relevance**: How this applies to real-world situations`,
 
     creative: `
-- **Strategic**: Why each approach works, target audience alignment
-- **Execution**: Specific, usable content (not just outlines)
-- **Differentiation**: What makes this stand out from generic versions
-- **Iteration**: 2-3 distinct directions with different strengths`,
+Explore from multiple creative angles:
+- **Strategic Alignment**: Why each approach works for the target audience and goals
+- **Execution Quality**: Specific, usable output (not just outlines or placeholders)
+- **Differentiation**: What makes this stand out from generic, AI-generated content
+- **Multiple Directions**: 2-3 distinct creative approaches with different strengths
+- **Refinement Opportunities**: How each direction could be iterated and improved
+- **Audience Psychology**: What resonates emotionally and drives the desired action`,
 
     general: `
-- **Primary**: The most direct and relevant analysis
-- **Alternative**: A different way to think about the problem
-- **Practical**: Real-world considerations and constraints
-- **Meta**: What the user might not have considered`,
+Analyze from multiple perspectives:
+- **Primary Analysis**: The most direct and relevant examination of the question
+- **Alternative Perspective**: A contrarian or different way to think about the problem
+- **Practical Considerations**: Real-world constraints, implementation challenges
+- **Blind Spots**: What the user might not have considered but should
+- **Cross-Domain Insights**: Lessons from other fields that apply here`,
   };
 
   const CLOSING = `
 
-## 4. SYNTHESIS
-- Combine insights from all angles into a coherent answer
-- Prioritize what matters most
-- Be specific — no generic advice
+## 4. SYNTHESIS & PRELIMINARY CONCLUSION
+- Combine insights from all angles into a coherent thesis
+- Rank factors by importance — what matters most?
+- State your preliminary recommendation with confidence level
+- Note what would change your recommendation (sensitivity analysis)
 
-RULES:
-- Think step-by-step, don't jump to conclusions
-- Every claim must have reasoning behind it
-- If you're uncertain, say so and explain why
-- Prefer depth over breadth — better to be thorough on key points than shallow on many
-- Include concrete examples, numbers, or code where relevant`;
+RESEARCH RULES:
+- Think step-by-step — don't jump to conclusions
+- Every claim must have reasoning behind it, not just assertion
+- If you're uncertain about something, say so explicitly and explain why
+- Prefer depth over breadth — better to be thorough on 3 key points than shallow on 10
+- Include concrete examples, numbers, comparisons, or code where relevant
+- Challenge your own assumptions — look for holes in your reasoning
+- This is a RESEARCH document — be rigorous, not conversational`;
 
   return BASE + (ANGLE_MAP[analysis.taskType] || ANGLE_MAP.general) + CLOSING;
 }
@@ -310,47 +393,54 @@ RULES:
  * Takes Pass 1 research output and produces the polished final answer.
  */
 export function buildRefinementPrompt(researchOutput: string, originalQuery: string): string {
-  return `You are a senior expert reviewer and editor. You've received deep research on a user's question. Your job is to transform it into the BEST possible answer.
+  return `You completed a deep research phase on the user's question. Now transform that research into a PREMIUM, consultant-grade response.
 
-ORIGINAL QUESTION:
+═══ ORIGINAL QUESTION ═══
 ${originalQuery}
 
-DEEP RESEARCH (from analysis phase):
+═══ YOUR RESEARCH (from analysis phase) ═══
 ${researchOutput}
 
-─── SELF-CRITIQUE CHECKLIST (apply before writing) ───
-□ Is anything GENERIC that should be SPECIFIC? → Fix it
+═══ SELF-CRITIQUE CHECKLIST (apply before writing) ═══
+□ Is anything GENERIC that should be SPECIFIC? → Replace with concrete details
 □ Is anything MISSING that the user would need? → Add it
-□ Is anything WRONG or poorly reasoned? → Correct it
-□ Is anything REDUNDANT? → Cut it
-□ Is every recommendation ACTIONABLE? → Make it concrete
-□ Would an expert in this field be satisfied with this? → If not, improve it
+□ Is anything WRONG or weakly reasoned? → Correct it with stronger logic
+□ Is anything REDUNDANT or bloated? → Cut mercilessly
+□ Is every recommendation ACTIONABLE? → Include specific steps, tools, or code
+□ Would an expert in this field respect this answer? → If not, elevate it
+□ Does this go BEYOND what a free AI tool would give? → It must
 
-─── OUTPUT FORMAT (follow this structure) ───
+═══ OUTPUT FORMAT (follow this structure) ═══
 
 ### Understanding
-[One clear sentence showing you understand exactly what they need]
-
-### Key Assumptions
-[List any assumptions — skip this section if none]
+[1-2 sentences showing you deeply understand what they need and WHY they need it — not just restating the question]
 
 ### Analysis
-[The deep, multi-angle analysis — organized with clear headers]
+[The deep, multi-angle analysis — organized with clear subheaders]
 [Use tables for comparisons, bullet points for lists, code blocks for code]
 [Every point must be specific and backed by reasoning]
+[Include concrete examples, numbers, or references]
 
 ### Recommendation
-[Clear, actionable final answer — what they should DO]
-[Include specific steps, tools, numbers, or code]
+[Clear, decisive, actionable answer — what they should DO]
+[Include specific steps, tools, numbers, timelines, or code]
+[If there are multiple valid paths, rank them with clear reasoning]
 
-### Go Deeper?
-[One line suggesting 1-2 specific areas you could explore further]
+### Key Takeaway
+[One powerful sentence that captures the essential insight — something they'll remember]
 
-─── RULES ───
+### What would you like to explore deeper?
+[Ask 1-2 specific, intelligent follow-up questions that probe deeper into their situation]
+[These should feel like a senior consultant probing for the next phase of work]
+[Example: "Are you optimizing for speed-to-market or long-term scalability? That changes the architecture significantly."]
+
+═══ RULES ═══
 - Output ONLY the polished answer in the format above
-- Do NOT reference "the research above" or "the analysis phase"
-- Do NOT start with "Here's my analysis" — just start with ### Understanding
+- Do NOT reference "the research" or "the analysis phase" — present as your direct expert answer
+- Do NOT start with filler ("Here's my analysis", "Let me break this down") — jump straight into ### Understanding
 - Be thorough but concise — every sentence must earn its place
-- Use markdown formatting throughout
-- Sound like a senior consultant delivering a report, not a chatbot answering a question`;
+- Sound like a senior consultant delivering a high-value report
+- Use markdown formatting throughout (bold, headers, tables, code blocks)
+- The follow-up questions are MANDATORY — they drive the conversation forward
+- Show genuine expertise — go beyond surface-level advice`;
 }

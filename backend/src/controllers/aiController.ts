@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import AIGatewayService from '../services/aiGatewayService.js';
+import AIGatewayService, { getSystemPrompt } from '../services/aiGatewayService.js';
 import prisma from '../config/db.js';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { afterQueryMiddleware } from '../middleware/tokenTracker.js';
@@ -417,7 +417,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
     // ── AUTO-ROUTE LONG INPUTS TO LARGER MODEL ──────────────────
     // If input exceeds the selected model's context window, auto-route
     // to the largest available model instead of truncating and losing data.
-    const selectedModel = await prisma.aIModel.findUnique({ where: { id: finalModelId }, select: { modelId: true, contextWindow: true, name: true } });
+    const selectedModel = await prisma.aIModel.findUnique({ where: { id: finalModelId }, select: { modelId: true, contextWindow: true, name: true, provider: true } });
     const modelContextWindow = selectedModel?.contextWindow || 128000;
     const maxInputForModel = Math.floor(modelContextWindow * 0.7);
 
@@ -879,18 +879,23 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
 
       } else {
         // ── Stage 3 + 4: Deep Research → Refinement ──
-        res.write(`data: ${JSON.stringify({ type: 'status', content: 'Identifying problem scope...' })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'status', content: 'Decomposing the problem...' })}\n\n`);
 
         try {
           // Brief pause for UX (shows status before heavy processing)
-          await new Promise(r => setTimeout(r, 300));
+          await new Promise(r => setTimeout(r, 400));
 
           if (analysis.hypotheses.length > 0 && !streamEnded) {
-            res.write(`data: ${JSON.stringify({ type: 'status', content: 'Building hypotheses...' })}\n\n`);
-            await new Promise(r => setTimeout(r, 400));
+            res.write(`data: ${JSON.stringify({ type: 'status', content: `Evaluating ${analysis.hypotheses.length} possible interpretations...` })}\n\n`);
+            await new Promise(r => setTimeout(r, 500));
           }
 
-          res.write(`data: ${JSON.stringify({ type: 'status', content: 'Researching from multiple angles...' })}\n\n`);
+          const depthLabels: Record<string, string> = {
+            surface: 'Analyzing key facts...',
+            deep: 'Running deep multi-angle analysis...',
+            research: 'Conducting expert-level research across multiple dimensions...',
+          };
+          res.write(`data: ${JSON.stringify({ type: 'status', content: depthLabels[analysis.depthLevel] || 'Researching...' })}\n\n`);
 
           // Pass 1: Deep Research (non-streaming)
           // Combines hypothesis building + multi-angle analysis in one call
@@ -931,7 +936,9 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
           }
 
           // Stage 4: Iterative Refinement — self-critique + polish
-          res.write(`data: ${JSON.stringify({ type: 'status', content: 'Validating and refining...' })}\n\n`);
+          res.write(`data: ${JSON.stringify({ type: 'status', content: 'Cross-checking assumptions...' })}\n\n`);
+          await new Promise(r => setTimeout(r, 300));
+          res.write(`data: ${JSON.stringify({ type: 'status', content: 'Refining and polishing response...' })}\n\n`);
 
           const refinementPrompt = buildRefinementPrompt(pass1Result.response, userQuery);
           enrichedMessages = [
@@ -939,8 +946,15 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
             { role: 'user', content: refinementPrompt },
           ];
 
+          // CRITICAL: Use the full ConvoiaAI system prompt as base for Pass 2.
+          // Without this, think mode responses lose all identity, formatting rules,
+          // engagement behavior, and model-specific flavor.
+          const thinkIndustry = industry || user.organization?.industry || undefined;
+          const thinkProvider = selectedModel?.provider || undefined;
+          const baseThinkPrompt = getSystemPrompt(thinkIndustry, thinkProvider);
+
           agentConfig = {
-            systemPrompt: 'You are a senior expert delivering a polished, consultant-grade response. Follow the output format exactly. Use markdown. Be thorough but concise — every sentence must earn its place.',
+            systemPrompt: baseThinkPrompt + `\n\n═══ THINK MODE: REFINEMENT PASS ═══\nYou have just completed a deep research phase. Now deliver a polished, consultant-grade response based on that research. Follow the output format in the user's message exactly. Be thorough but concise — every sentence must earn its place. The follow-up questions are MANDATORY.`,
             temperature: 0.4,
             maxTokens: agentConfig?.maxTokens || 16384,
             topP: 0.9,
