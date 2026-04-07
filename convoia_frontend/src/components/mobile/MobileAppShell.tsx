@@ -1,5 +1,6 @@
 import { Outlet, useLocation } from 'react-router-dom'
 import { MobileBottomTabs } from './MobileBottomTabs'
+import { ScreenErrorBoundary } from '../shared/ErrorBoundary'
 
 /**
  * Mobile-only app shell. Replaces AppShell when running in Capacitor.
@@ -25,7 +26,7 @@ export function MobileAppShell() {
         flex: 1, overflowY: isChat ? 'hidden' : 'auto', overflowX: 'hidden',
         padding: isChat ? 0 : undefined,
       }}>
-        <Outlet />
+        <ScreenErrorBoundary><Outlet /></ScreenErrorBoundary>
       </main>
 
       {/* Bottom tab bar */}

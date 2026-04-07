@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { Mail, Lock, Eye, EyeOff, Sparkles, Brain, Zap, Shield } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
+import { hapticSuccess, hapticError } from '../../lib/haptics'
 import api from '../../lib/api'
 
 export function MobileLoginPage() {
@@ -45,10 +46,12 @@ export function MobileLoginPage() {
         }
       } else {
         toast.success('Welcome back!')
+        hapticSuccess()
       }
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Login failed'
       toast.error(msg)
+      hapticError()
     } finally {
       setIsLoading(false)
     }

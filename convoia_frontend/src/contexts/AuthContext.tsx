@@ -1,6 +1,7 @@
 import { createContext, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../lib/api'
+import { setToken as setStorageToken, setRefreshToken as setStorageRefresh, setUserProfile, clearAuth } from '../lib/storage'
 import type { User } from '../types'
 
 interface AuthContextType {
@@ -103,11 +104,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('convoia_token', newToken)
         localStorage.setItem('convoia_refresh_token', refreshToken)
         localStorage.setItem('convoia_user', JSON.stringify(userData))
+        // Also save to @capacitor/preferences on native (secure storage)
+        setStorageToken(newToken); setStorageRefresh(refreshToken); setUserProfile(userData)
         setToken(newToken)
         setUser(userData)
         redirectByRole(userData.role)
       } catch (err: any) {
-        // If email not verified, redirect to verification page
         if (err?.response?.data?.message === 'EMAIL_NOT_VERIFIED') {
           localStorage.setItem('convoia_pending_email', email)
           navigate('/verify-email')
@@ -126,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('convoia_token', newToken)
       localStorage.setItem('convoia_refresh_token', refreshToken)
       localStorage.setItem('convoia_user', JSON.stringify(userData))
+      setStorageToken(newToken); setStorageRefresh(refreshToken); setUserProfile(userData)
       setToken(newToken)
       setUser(userData)
       redirectByRole(userData.role)
@@ -139,7 +142,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { token: newToken, refreshToken, user: userData, requiresVerification } = res.data.data
 
       if (requiresVerification) {
-        // Store email for verification page, redirect there
         localStorage.setItem('convoia_pending_email', userData.email)
         navigate('/verify-email')
         return
@@ -148,6 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('convoia_token', newToken)
       localStorage.setItem('convoia_refresh_token', refreshToken)
       localStorage.setItem('convoia_user', JSON.stringify(userData))
+      setStorageToken(newToken); setStorageRefresh(refreshToken); setUserProfile(userData)
       setToken(newToken)
       setUser(userData)
       redirectByRole(userData.role)
@@ -156,10 +159,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const logout = useCallback(() => {
-    // Only remove auth tokens — NEVER touch conversation history
     localStorage.removeItem('convoia_token')
     localStorage.removeItem('convoia_refresh_token')
     localStorage.removeItem('convoia_user')
+    clearAuth() // Clear @capacitor/preferences on native
     setToken(null)
     setUser(null)
     navigate('/login')

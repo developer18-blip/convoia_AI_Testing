@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { getTokenSync, setToken, setRefreshToken, getRefreshToken, clearAuth } from './storage'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
@@ -8,7 +9,8 @@ const api = axios.create({
 
 // ── Request interceptor: attach token ──
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('convoia_token')
+  // Sync read from cache (native) or localStorage (web) — no await needed
+  const token = getTokenSync() || localStorage.getItem('convoia_token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -77,7 +79,7 @@ api.interceptors.response.use(
     isRefreshing = true
 
     try {
-      const refresh = localStorage.getItem('convoia_refresh_token')
+      const refresh = await getRefreshToken() || localStorage.getItem('convoia_refresh_token')
       if (!refresh) throw new Error('No refresh token')
 
       const res = await axios.post(
@@ -89,10 +91,14 @@ api.interceptors.response.use(
       const newRefreshToken = res.data.data.refreshToken
 
       // Save BOTH new access token AND rotated refresh token
-      localStorage.setItem('convoia_token', newToken)
+      // Uses @capacitor/preferences on native, localStorage on web
+      await setToken(newToken)
       if (newRefreshToken) {
-        localStorage.setItem('convoia_refresh_token', newRefreshToken)
+        await setRefreshToken(newRefreshToken)
       }
+      // Also keep localStorage in sync for backwards compatibility
+      localStorage.setItem('convoia_token', newToken)
+      if (newRefreshToken) localStorage.setItem('convoia_refresh_token', newRefreshToken)
 
       // Process queued requests with new token
       processQueue(null, newToken)
@@ -104,6 +110,7 @@ api.interceptors.response.use(
       processQueue(refreshError, null)
 
       // Refresh failed — clear auth and redirect
+      await clearAuth()
       localStorage.removeItem('convoia_token')
       localStorage.removeItem('convoia_refresh_token')
       localStorage.removeItem('convoia_user')

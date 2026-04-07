@@ -4,8 +4,10 @@ import './index.css'
 import './styles/mobile-theme.css'
 import App from './App.tsx'
 import { initNativeBridge } from './lib/capacitor'
+import { initStorageCache } from './lib/storage'
 
-// Initialize native plugins (no-ops on web)
+// Initialize secure storage cache + native plugins (no-ops on web)
+initStorageCache()
 initNativeBridge()
 
 createRoot(document.getElementById('root')!).render(

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ArrowDownRight, ArrowUpRight } from 'lucide-react'
 import { useTokens } from '../../contexts/TokenContext'
 import { useAuth } from '../../hooks/useAuth'
@@ -69,7 +69,7 @@ export function MobileWalletPage() {
           Token Wallet
         </p>
         <p style={{ fontSize: '44px', fontWeight: 800, margin: '0 0 4px', letterSpacing: '-1.5px', lineHeight: 1 }}>
-          {tokenBalance.toLocaleString()}
+          <AnimatedNumber value={tokenBalance} />
         </p>
         <p style={{ fontSize: '13px', opacity: 0.6, margin: '0 0 20px' }}>
           tokens available · {user?.organizationId ? 'Organization' : 'Personal plan'}
@@ -151,6 +151,31 @@ export function MobileWalletPage() {
       </div>
     </div>
   )
+}
+
+/** Animated count-up number display */
+function AnimatedNumber({ value }: { value: number }) {
+  const [display, setDisplay] = useState(0)
+  const prevValue = useRef(0)
+
+  useEffect(() => {
+    const from = prevValue.current
+    const to = value
+    prevValue.current = value
+    if (from === to) { setDisplay(to); return }
+
+    const duration = 600
+    const start = performance.now()
+    const step = (now: number) => {
+      const progress = Math.min((now - start) / duration, 1)
+      const eased = 1 - Math.pow(1 - progress, 3) // ease-out cubic
+      setDisplay(Math.round(from + (to - from) * eased))
+      if (progress < 1) requestAnimationFrame(step)
+    }
+    requestAnimationFrame(step)
+  }, [value])
+
+  return <>{display.toLocaleString()}</>
 }
 
 export default MobileWalletPage

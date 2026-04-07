@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { useTokens } from '../../contexts/TokenContext'
 import { useDashboard } from '../../hooks/useDashboard'
+import { usePullToRefresh } from '../../hooks/usePullToRefresh'
 import {
   Zap, MessageSquare, Coins, Clock, Users, Building2,
   TrendingUp, ChevronRight, Shield, BarChart3, DollarSign,
@@ -10,9 +11,10 @@ import { Avatar } from '../../components/ui/Avatar'
 
 export function MobileHomePage() {
   const { user } = useAuth()
-  const { tokenBalance, formattedBalance, totalUsed } = useTokens()
-  const { stats, wallet, budget, isLoading } = useDashboard()
+  const { tokenBalance, formattedBalance, totalUsed, refresh: refreshTokens } = useTokens()
+  const { stats, wallet, budget, isLoading, refetch } = useDashboard()
   const navigate = useNavigate()
+  const { isRefreshing, pullProps } = usePullToRefresh(async () => { await refetch(); await refreshTokens() })
 
   const role = user?.role || 'employee'
   const hasOrg = !!user?.organizationId
@@ -41,7 +43,13 @@ export function MobileHomePage() {
   }
 
   return (
-    <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div {...pullProps} style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Pull-to-refresh indicator */}
+      {isRefreshing && (
+        <div style={{ textAlign: 'center', padding: '4px 0', fontSize: '12px', color: 'var(--color-primary)', fontWeight: 600 }}>
+          Refreshing...
+        </div>
+      )}
       {/* Greeting */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>

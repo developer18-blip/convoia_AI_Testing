@@ -232,45 +232,52 @@ export function MobileChatPage() {
           </div>
         </div>
 
-        {/* Row 2: Model + Agent selectors */}
+        {/* Row 2: Horizontal model chips + Agent button */}
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          {/* Model selector button */}
-          <button onClick={() => setShowModelPicker(true)}
-            style={{
-              flex: 1, padding: '8px 12px', borderRadius: '12px', border: '1.5px solid var(--color-border)',
-              background: 'var(--color-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center',
-              justifyContent: 'space-between', minWidth: 0,
-            }}>
-            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                {selectedModel?.name || 'Select model'}
-              </span>
-            </div>
-            <ChevronDown size={14} style={{ flexShrink: 0, color: 'var(--color-text-muted)' }} />
-          </button>
+          {/* Scrollable model chips */}
+          <div style={{ flex: 1, display: 'flex', gap: '6px', overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', minWidth: 0 }}>
+            {activeModels.slice(0, 8).map(m => {
+              const isActive = selectedModelId === m.id
+              const shortName = m.name.replace('Claude ', '').replace('Gemini ', '').replace('GPT-', 'GPT ').replace(' (Groq)', '')
+              return (
+                <button key={m.id} onClick={() => setSelectedModelId(m.id)}
+                  style={{
+                    padding: '6px 12px', borderRadius: '100px', fontSize: '11px', fontWeight: 600,
+                    border: isActive ? '1.5px solid #7C3AED' : '1px solid var(--color-border)',
+                    background: isActive ? '#7C3AED' : 'var(--color-surface)',
+                    color: isActive ? 'white' : 'var(--color-text-muted)',
+                    cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                  }}>
+                  {shortName}
+                </button>
+              )
+            })}
+            {activeModels.length > 8 && (
+              <button onClick={() => setShowModelPicker(true)}
+                style={{
+                  padding: '6px 12px', borderRadius: '100px', fontSize: '11px', fontWeight: 600,
+                  border: '1px solid var(--color-border)', background: 'var(--color-surface)',
+                  color: 'var(--color-text-muted)', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                }}>
+                More...
+              </button>
+            )}
+          </div>
 
           {/* Agent selector button */}
           <button onClick={() => setShowAgentPicker(true)}
             style={{
-              padding: '8px 12px', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
-              border: selectedAgent ? '1.5px solid #7C3AED' : '1.5px solid var(--color-border)',
+              padding: '6px 10px', borderRadius: '100px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
+              border: selectedAgent ? '1.5px solid #7C3AED' : '1px solid var(--color-border)',
               background: selectedAgent ? 'rgba(124,58,237,0.08)' : 'var(--color-surface)',
-              whiteSpace: 'nowrap',
+              whiteSpace: 'nowrap', flexShrink: 0,
             }}>
             {selectedAgent ? (
-              <>
-                <span style={{ fontSize: '14px' }}>{selectedAgent.avatar}</span>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: '#7C3AED', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {selectedAgent.name}
-                </span>
-              </>
+              <span style={{ fontSize: '12px' }}>{selectedAgent.avatar}</span>
             ) : (
-              <>
-                <Sparkles size={13} style={{ color: 'var(--color-text-muted)' }} />
-                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-muted)' }}>Agent</span>
-              </>
+              <Sparkles size={12} style={{ color: 'var(--color-text-muted)' }} />
             )}
-            <ChevronDown size={12} style={{ color: selectedAgent ? '#7C3AED' : 'var(--color-text-muted)' }} />
+            <ChevronDown size={10} style={{ color: selectedAgent ? '#7C3AED' : 'var(--color-text-muted)' }} />
           </button>
         </div>
       </div>
