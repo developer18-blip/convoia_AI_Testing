@@ -10,6 +10,15 @@ export class ScreenErrorBoundary extends Component<Props, State> {
     return { hasError: true, error }
   }
 
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    // Log full stack trace to Logcat so we can find the exact crash location
+    console.error('=== SCREEN CRASH ===')
+    console.error('Error:', error.message)
+    console.error('Stack:', error.stack)
+    console.error('Component Stack:', info.componentStack)
+    console.error('===================')
+  }
+
   render() {
     if (this.state.hasError) {
       if (this.props.fallback) return this.props.fallback
