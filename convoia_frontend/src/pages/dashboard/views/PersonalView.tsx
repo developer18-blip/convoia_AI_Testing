@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MessageSquare, Coins, ArrowRight, Zap, Bot, Plus } from 'lucide-react'
+import { MessageSquare, Coins, ArrowRight, Zap, Bot, Plus, Key } from 'lucide-react'
 import { StatCard } from '../../../components/shared/StatCard'
 import { InsightCard } from '../../../components/shared/InsightCard'
 import { Card } from '../../../components/ui/Card'
@@ -10,18 +10,17 @@ import { AreaChart } from '../../../components/charts/AreaChart'
 import { DonutChart } from '../../../components/charts/DonutChart'
 import { useTokens } from '../../../contexts/TokenContext'
 import { formatNumber, formatTokens, formatDateTime, getGreeting, truncate } from '../../../lib/utils'
-import type { DashboardStats, HourlySession, UsageLog, InsightData } from '../../../types'
+import type { DashboardStats, UsageLog, InsightData } from '../../../types'
 
 interface PersonalViewProps {
   stats: DashboardStats
   wallet: any
-  sessions: HourlySession[]
   recentUsage: UsageLog[]
   insights: InsightData[]
   userName: string
 }
 
-export function PersonalView({ stats, wallet: _wallet, sessions, recentUsage, insights, userName }: PersonalViewProps) {
+export function PersonalView({ stats, wallet: _wallet, recentUsage, insights, userName }: PersonalViewProps) {
   const navigate = useNavigate()
   const { tokenBalance, formattedBalance, totalPurchased, totalUsed } = useTokens()
   const [chartMode, setChartMode] = useState('queries')
@@ -201,7 +200,7 @@ export function PersonalView({ stats, wallet: _wallet, sessions, recentUsage, in
             </button>
           </div>
 
-          {/* Active Sessions Card */}
+          {/* Quick Actions Card */}
           <div
             style={{
               background: 'var(--color-surface)',
@@ -210,29 +209,21 @@ export function PersonalView({ stats, wallet: _wallet, sessions, recentUsage, in
               padding: '20px',
             }}
           >
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Active Sessions</h3>
-              <button
-                onClick={() => navigate('/sessions')}
-                className="text-xs transition-colors"
-                style={{ color: 'var(--color-primary)' }}
-              >
-                Manage
+            <h3 className="text-sm font-medium mb-3" style={{ color: 'var(--color-text-secondary)' }}>Quick Actions</h3>
+            <div className="space-y-2">
+              <button onClick={() => navigate('/chat')} className="w-full flex items-center gap-3 p-3 rounded-lg transition-colors" style={{ background: 'var(--color-surface-2)' }}>
+                <MessageSquare size={16} style={{ color: 'var(--color-primary)' }} />
+                <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>Start New Chat</span>
+              </button>
+              <button onClick={() => navigate('/models')} className="w-full flex items-center gap-3 p-3 rounded-lg transition-colors" style={{ background: 'var(--color-surface-2)' }}>
+                <Bot size={16} style={{ color: 'var(--color-primary)' }} />
+                <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>Browse Models</span>
+              </button>
+              <button onClick={() => navigate('/api-keys')} className="w-full flex items-center gap-3 p-3 rounded-lg transition-colors" style={{ background: 'var(--color-surface-2)' }}>
+                <Key size={16} style={{ color: 'var(--color-primary)' }} />
+                <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>API Keys</span>
               </button>
             </div>
-            {(sessions ?? []).length === 0 ? (
-              <div className="text-center py-2">
-                <Zap size={24} className="mx-auto mb-2" style={{ color: 'var(--color-text-muted)' }} />
-                <p className="text-sm mb-1" style={{ color: 'var(--color-text-muted)' }}>No active sessions</p>
-                <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Start a chat to begin</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {sessions.slice(0, 3).map((s) => (
-                  <ActiveSessionRow key={s.id} session={s} />
-                ))}
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -265,54 +256,3 @@ export function PersonalView({ stats, wallet: _wallet, sessions, recentUsage, in
   )
 }
 
-function ActiveSessionRow({ session }: { session: HourlySession }) {
-  const [timeLeft, setTimeLeft] = useState('')
-
-  useEffect(() => {
-    const update = () => {
-      const end = new Date(session.endTime).getTime()
-      const now = Date.now()
-      const diff = end - now
-      if (diff <= 0) { setTimeLeft('Expired'); return }
-      const h = Math.floor(diff / 3600000)
-      const m = Math.floor((diff % 3600000) / 60000)
-      const s = Math.floor((diff % 60000) / 1000)
-      setTimeLeft(`${h}h ${m}m ${s}s`)
-    }
-    update()
-    const interval = setInterval(update, 1000)
-    return () => clearInterval(interval)
-  }, [session.endTime])
-
-  const total = new Date(session.endTime).getTime() - new Date(session.startTime).getTime()
-  const elapsed = Date.now() - new Date(session.startTime).getTime()
-  const pct = Math.min((elapsed / total) * 100, 100)
-
-  // Bar uses CSS variables for the gradient, falls back to semantic color tokens for warning states
-  const barStyle: React.CSSProperties =
-    pct > 95
-      ? { background: 'var(--color-danger)', width: `${pct}%` }
-      : pct > 80
-      ? { background: 'var(--color-warning)', width: `${pct}%` }
-      : { background: 'linear-gradient(90deg, var(--color-accent-start), var(--color-accent-end))', width: `${pct}%` }
-
-  return (
-    <div
-      style={{
-        background: 'var(--color-surface-2)',
-        borderRadius: '8px',
-        padding: '12px',
-        border: '1px solid var(--color-border-subtle)',
-      }}
-    >
-      <div className="flex items-center justify-between mb-1">
-        <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>{session.model?.name || 'Session'}</p>
-        <Badge variant="success" size="sm">Active</Badge>
-      </div>
-      <p className="text-xs font-mono mb-2" style={{ color: 'var(--color-primary)' }}>{timeLeft}</p>
-      <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
-        <div className="h-full rounded-full transition-all" style={barStyle} />
-      </div>
-    </div>
-  )
-}

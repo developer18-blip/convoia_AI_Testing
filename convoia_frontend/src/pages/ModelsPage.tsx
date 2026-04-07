@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bot, Zap, Star, Crown, Search, X, Check, MessageSquare, Clock } from 'lucide-react'
+import { Bot, Zap, Star, Crown, Search, X, Check, MessageSquare } from 'lucide-react'
 import { useModels } from '../hooks/useModels'
 import { LoadingPage } from '../components/shared/LoadingPage'
 import { ErrorState } from '../components/shared/ErrorState'
@@ -123,9 +123,6 @@ function ModelDrawer({ model, onClose, allModels }: { model: AIModel; onClose: (
               <div className="flex gap-2">
                 <Button className="flex-1" onClick={() => navigate('/chat')}>
                   <MessageSquare size={16} /> Start Chat
-                </Button>
-                <Button variant="secondary" className="flex-1" onClick={() => navigate('/sessions')}>
-                  <Clock size={16} /> Buy Session
                 </Button>
               </div>
             </>
@@ -355,9 +352,6 @@ export function ModelsPage() {
                   <div className="flex gap-2">
                     <Button size="sm" className="flex-1" onClick={(e) => { e.stopPropagation(); navigate('/chat') }}>
                       Start Chat
-                    </Button>
-                    <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); navigate('/sessions') }}>
-                      Buy Session
                     </Button>
                   </div>
                 </Card>

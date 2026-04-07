@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import AIGatewayService from '../services/aiGatewayService.js';
 import prisma from '../config/db.js';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
-import { afterQueryMiddleware, estimateCost } from '../middleware/tokenTracker.js';
+import { afterQueryMiddleware } from '../middleware/tokenTracker.js';
 import { getOrCreatePersonalOrg } from '../utils/orgHelper.js';
 import { TokenWalletService } from '../services/tokenWalletService.js';
 import { NotificationService } from '../services/notificationService.js';
@@ -78,15 +78,6 @@ export const queryAI = asyncHandler(async (req: Request, res: Response) => {
       canBuyTokens: !isOrgMember || user.role === 'org_owner',
     });
   }
-  void await prisma.hourlySession.findFirst({
-    where: {
-      userId: user.id,
-      modelId,
-      isActive: true,
-      isExpired: false,
-      endTime: { gt: new Date() },
-    },
-  });
   let finalModelId = modelId;
   let autoDowngraded = false;
   let autoDowngradeReason: string | undefined;
@@ -108,7 +99,6 @@ export const queryAI = asyncHandler(async (req: Request, res: Response) => {
       });
     }
   }
-  void await estimateCost(finalModelId, inputText);
   // Look up agent config if specified
   let agentConfig: { systemPrompt: string; temperature: number; maxTokens: number; topP: number; name: string } | undefined;
   if (agentId) {
@@ -667,16 +657,6 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
       }
       return;
     }
-
-    // Pre-query cost estimate (for logging/display)
-    const _estimate = await estimateCost(finalModelId, inputText);
-    void _estimate; // used for future budget pre-check
-
-    // Active session check
-    const _activeSession = await prisma.hourlySession.findFirst({
-      where: { userId: user.id, modelId: finalModelId, isActive: true, isExpired: false, endTime: { gt: new Date() } },
-    });
-    void _activeSession; // used for future session-based pricing
 
     // Agent config
     let agentConfig: { systemPrompt: string; temperature: number; maxTokens: number; topP: number; name: string } | undefined;

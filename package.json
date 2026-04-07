@@ -1,5 +1,8 @@
 {
   "devDependencies": {
     "@types/node": "^25.4.0"
+  },
+  "dependencies": {
+    "ffmpeg": "^0.0.4"
   }
 }

@@ -10,7 +10,7 @@ import { AdminView } from './views/AdminView'
 
 export function DashboardPage() {
   const { user } = useAuth()
-  const { stats, wallet, sessions, recentUsage, insights, budget, isLoading, error, refetch } = useDashboard()
+  const { stats, wallet, recentUsage, insights, budget, isLoading, error, refetch } = useDashboard()
 
   if (isLoading) return <LoadingPage />
   if (error) return <ErrorState message={error} onRetry={refetch} />
@@ -65,7 +65,6 @@ export function DashboardPage() {
     <PersonalView
       stats={stats}
       wallet={wallet}
-      sessions={sessions}
       recentUsage={recentUsage}
       insights={insights}
       userName={userName}

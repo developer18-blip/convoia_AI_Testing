@@ -289,17 +289,7 @@ export function SettingsPage() {
       )}
 
       {tab === 'organization' && user?.role === 'org_owner' && (
-        <Card padding="lg">
-          <h3 className="text-lg font-semibold text-text-primary mb-4">Organization Settings</h3>
-          <div className="space-y-4">
-            <Input label="Organization Name" value={user.organization?.name || ''} onChange={() => {}} />
-            <Select label="Industry" value={user.organization?.industry || ''} onChange={() => {}} options={[
-              { value: '', label: 'Select' }, { value: 'legal', label: 'Legal' }, { value: 'healthcare', label: 'Healthcare' },
-              { value: 'finance', label: 'Finance' }, { value: 'hr', label: 'HR' }, { value: 'marketing', label: 'Marketing' },
-            ]} />
-            <Button><Save size={16} /> Save</Button>
-          </div>
-        </Card>
+        <OrgSettingsCard />
       )}
     </div>
   )
@@ -307,5 +297,38 @@ export function SettingsPage() {
 
 
 
+
+function OrgSettingsCard() {
+  const { user, updateUser } = useAuth()
+  const toast = useToast()
+  const [orgName, setOrgName] = useState(user?.organization?.name || '')
+  const [orgIndustry, setOrgIndustry] = useState(user?.organization?.industry || '')
+  const [saving, setSaving] = useState(false)
+
+  const handleSaveOrg = async () => {
+    try {
+      setSaving(true)
+      await api.put('/org', { name: orgName, industry: orgIndustry })
+      updateUser({ organization: { ...user?.organization, name: orgName, industry: orgIndustry } })
+      toast.success('Organization updated')
+    } catch { toast.error('Failed to update organization') }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <Card padding="lg">
+      <h3 className="text-lg font-semibold text-text-primary mb-4">Organization Settings</h3>
+      <div className="space-y-4">
+        <Input label="Organization Name" value={orgName} onChange={(e) => setOrgName(e.target.value)} />
+        <Select label="Industry" value={orgIndustry} onChange={(e) => setOrgIndustry(e.target.value)} options={[
+          { value: '', label: 'Select' }, { value: 'legal', label: 'Legal' }, { value: 'healthcare', label: 'Healthcare' },
+          { value: 'finance', label: 'Finance' }, { value: 'hr', label: 'HR' }, { value: 'marketing', label: 'Marketing' },
+          { value: 'education', label: 'Education' }, { value: 'technology', label: 'Technology' }, { value: 'ecommerce', label: 'E-Commerce' },
+        ]} />
+        <Button onClick={handleSaveOrg} isLoading={saving}><Save size={16} /> Save</Button>
+      </div>
+    </Card>
+  )
+}
 
 export default SettingsPage;

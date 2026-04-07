@@ -27,9 +27,11 @@ router.get('/analytics', requireRole('manager', 'org_owner', 'platform_admin'), 
 // Personal analytics (any authenticated user)
 router.get('/analytics/personal', getPersonalAnalytics);
 
-// Diagnostic: check if usage logs exist for current user
+// Diagnostic: admin-only debug endpoint
 router.get('/analytics/debug', async (req, res) => {
   if (!req.user) { res.status(401).json({ error: 'Unauthorized' }); return; }
+  const debugUser = await (await import('../config/db.js')).default.user.findUnique({ where: { id: req.user.userId }, select: { role: true } });
+  if (debugUser?.role !== 'platform_admin') { res.status(403).json({ error: 'Admin only' }); return; }
   const user = await (await import('../config/db.js')).default.user.findUnique({
     where: { id: req.user.userId },
     select: { id: true, name: true, role: true, organizationId: true },

@@ -104,8 +104,7 @@ export function TokenStorePage() {
           window.dispatchEvent(new Event('tokens:refresh'))
         })
         .catch(err => {
-          console.error('[TokenStore] Verify error:', err?.response?.data || err.message)
-          toast.error('Could not verify payment. Try the dev button below or refresh the page.')
+          toast.error('Could not verify payment. Please refresh the page.')
           setTimeout(() => { refresh(); window.dispatchEvent(new Event('tokens:refresh')) }, 3000)
         })
     } else if (isSuccess) {
