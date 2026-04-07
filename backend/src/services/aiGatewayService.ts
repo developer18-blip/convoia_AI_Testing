@@ -277,10 +277,10 @@ function calculateCosts(inputTokens: number, outputTokens: number, aiModel: any)
 const PROVIDER_MAX_OUTPUT: Record<string, number> = {
   openai: 16384,
   anthropic: 16384,
-  google: 8192,
-  deepseek: 8192,
-  mistral: 8192,
-  groq: 8192,
+  google: 16384,
+  deepseek: 16384,
+  mistral: 16384,
+  groq: 16384,
 };
 
 function clampMaxTokens(provider: string, requested?: number): number {

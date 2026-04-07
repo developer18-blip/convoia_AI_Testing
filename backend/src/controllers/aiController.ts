@@ -704,7 +704,8 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
     }
 
     // Cap output tokens so total (input + output) stays within user's balance
-    const streamMaxOutput = Math.max(streamTokenBalance.tokenBalance - estimatedInputTokens, 200);
+    // Minimum 4096 output tokens so responses are never cut short / unintelligent
+    const streamMaxOutput = Math.max(streamTokenBalance.tokenBalance - estimatedInputTokens, 4096);
 
     // ── RESPONSE CACHE CHECK ──────────────────────────────────
     // If identical prompt + model was recently answered, return cached (ZERO tokens)
