@@ -79,6 +79,28 @@ export async function initNativeBridge() {
         App.minimizeApp()
       }
     })
+
+    // ── Deep Link Handler (Google OAuth callback) ──
+    // Catches convoia://auth?token=xxx&user=xxx from Google OAuth redirect
+    App.addListener('appUrlOpen', ({ url }: { url: string }) => {
+      try {
+        const parsed = new URL(url)
+        if (parsed.host === 'auth') {
+          const token = parsed.searchParams.get('token')
+          const refreshToken = parsed.searchParams.get('refreshToken')
+          const userStr = parsed.searchParams.get('user')
+
+          if (token && userStr) {
+            const user = JSON.parse(userStr)
+            localStorage.setItem('convoia_token', token)
+            if (refreshToken) localStorage.setItem('convoia_refresh_token', refreshToken)
+            localStorage.setItem('convoia_user', JSON.stringify(user))
+            // Reload to pick up the new auth state
+            window.location.href = '/dashboard'
+          }
+        }
+      } catch { /* invalid URL, ignore */ }
+    })
   } catch { /* not available */ }
 }
 

@@ -216,7 +216,7 @@ export function MobileRegisterPage() {
               <button
                 onClick={() => {
                   const baseUrl = import.meta.env.VITE_API_URL || 'https://intellect.convoia.com/api'
-                  window.location.href = `${baseUrl}/auth/google/mobile`
+                  window.open(`${baseUrl}/auth/google/mobile`, '_system')
                 }}
                 style={{
                   width: '100%', padding: '14px', borderRadius: '14px', fontSize: '15px', fontWeight: 600,

@@ -347,15 +347,17 @@ export const googleCallback = asyncHandler(async (req: Request, res: Response) =
     // Reuse existing googleAuth service
     const result = await AuthService.googleAuth(idToken);
 
-    // Redirect back to mobile app with JWT token
-    // Capacitor intercepts https://localhost URLs
+    // Redirect back to mobile app via deep link (convoia://auth?token=xxx)
     const params = new URLSearchParams();
     params.set('token', result.token);
     params.set('refreshToken', result.refreshToken || '');
     params.set('user', JSON.stringify({ id: result.user.id, name: result.user.name, email: result.user.email, role: result.user.role, avatar: result.user.avatar }));
-    res.redirect(`https://localhost/auth-callback?${params.toString()}`);
+    res.redirect(`convoia://auth?${params.toString()}`);
   } catch (err: any) {
-    res.redirect(`https://localhost/login?error=${encodeURIComponent(err.message || 'google_failed')}`);
+    // On failure, show a simple error page (can't deep-link errors reliably)
+    res.status(400).send(`<html><body style="font-family:sans-serif;text-align:center;padding:60px 20px;">
+      <h2>Google Sign-In Failed</h2><p>${err.message || 'Something went wrong'}</p>
+      <p>Please go back to the app and try again.</p></body></html>`);
   }
 });
 

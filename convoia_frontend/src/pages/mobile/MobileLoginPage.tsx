@@ -116,7 +116,8 @@ export function MobileLoginPage() {
             <button
               onClick={() => {
                 const baseUrl = import.meta.env.VITE_API_URL || 'https://intellect.convoia.com/api'
-                window.location.href = `${baseUrl}/auth/google/mobile`
+                // Open in system browser (not WebView) — deep link brings user back
+                window.open(`${baseUrl}/auth/google/mobile`, '_system')
               }}
               style={{
                 width: '100%', padding: '14px', borderRadius: '14px', fontSize: '15px', fontWeight: 600,
