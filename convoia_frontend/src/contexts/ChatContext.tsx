@@ -157,7 +157,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   // Reload conversations when user changes — localStorage is primary, backend supplements
   useEffect(() => {
     if (!userId) {
-      setActiveId(null)
+      // Only clear in-memory state — do NOT clear localStorage
+      // so activeConvId survives the auth-loading phase on refresh
+      setActiveIdRaw(null)
       setMessages([])
       setConversations([])
       setFolders([])
