@@ -253,7 +253,7 @@ export function OrgBillingPage() {
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-mono text-text-primary">${p.amount.toFixed(2)}</p>
+                  <p className="text-sm font-mono text-text-primary">${(Number(p.amount) || 0).toFixed(2)}</p>
                   <p className="text-xs text-text-muted">${p.pricePerMillionTokens}/M</p>
                 </div>
               </div>
