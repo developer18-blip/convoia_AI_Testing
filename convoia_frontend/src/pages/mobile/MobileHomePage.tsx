@@ -114,8 +114,8 @@ export function MobileHomePage() {
                 }} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                <span>{budget.currentUsage.toLocaleString()} used</span>
-                <span>{budget.monthlyCap.toLocaleString()} limit</span>
+                <span>{(Number(budget.currentUsage) || 0).toLocaleString()} used</span>
+                <span>{(Number(budget.monthlyCap) || 0).toLocaleString()} limit</span>
               </div>
               {pct > 80 && (
                 <p style={{ fontSize: '12px', color: '#F59E0B', fontWeight: 600, margin: '8px 0 0' }}>

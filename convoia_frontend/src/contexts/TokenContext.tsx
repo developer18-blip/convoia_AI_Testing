@@ -16,10 +16,11 @@ interface TokenContextType {
 
 const TokenContext = createContext<TokenContextType | null>(null)
 
-function formatTokens(count: number): string {
-  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
-  if (count >= 1_000) return `${(count / 1_000).toFixed(1).replace(/\.0$/, '')}K`
-  return count.toLocaleString()
+function formatTokens(count: number | null | undefined): string {
+  const n = Number(count) || 0
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}K`
+  return n.toLocaleString()
 }
 
 export function TokenProvider({ children }: { children: ReactNode }) {
