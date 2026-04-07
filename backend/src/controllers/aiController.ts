@@ -10,32 +10,31 @@ import { needsWebSearch, searchWeb } from '../services/webSearchService.js';
 import { enhanceImagePrompt } from '../services/imageIntentService.js';
 import { FileProcessingService } from '../services/fileProcessingService.js';
 import { generateVideo as generateVideoFn, VIDEO_TOKEN_COST, type MediaRequest } from '../services/mediaGenerationService.js';
+import { TOKEN_BASE_RATE } from '../config/tokenPackages.js';
 
 // ── COST-AWARE TOKEN ENGINE ──────────────────────────────────────
-// Token base rate: the dollar value of 1 token in the wallet.
-// Matches the Standard package price: $2.00 per 1,000,000 tokens.
-// Expensive models consume MORE tokens because their per-token cost is higher.
-// Cheap models consume FEWER tokens. The system is always profitable.
-const TOKEN_BASE_RATE = 0.000002; // $0.000002 per token = $2/1M
+// TOKEN_BASE_RATE is dynamically derived from the cheapest token package
+// with a 17% platform margin built in. See config/tokenPackages.ts.
+//
+// costAdjustedTokens() converts the query's dollar cost into wallet tokens.
+// Expensive models (Opus, o3) deduct MORE tokens; cheap models (Flash, Mini) deduct FEWER.
+// This guarantees profitability on every query, every model, every package tier.
 
 /**
- * Calculate cost-adjusted tokens for wallet deduction.
- * Instead of deducting raw provider tokens (which ignores model cost),
- * we deduct based on the actual dollar cost of the query.
+ * Convert a query's dollar cost into wallet tokens for deduction.
  *
- * Example:
- *   GPT-4o-mini: 2K raw tokens → $0.00075 cost → 375 adjusted tokens
- *   Claude Opus: 2K raw tokens → $0.030 cost → 15,000 adjusted tokens
+ * Formula: adjustedTokens = customerPrice / TOKEN_BASE_RATE
  *
- * This ensures expensive models consume proportionally more wallet tokens.
+ * Examples (at TOKEN_BASE_RATE ≈ $2.49/1M):
+ *   GPT-4o-mini query ($0.0025 cost)  →  1,004 wallet tokens
+ *   GPT-4o query     ($0.0156 cost)  →  6,265 wallet tokens
+ *   Claude Opus query ($0.0375 cost)  → 15,060 wallet tokens
+ *
  * Falls back to raw tokens if cost calculation fails (safety net).
  */
 function costAdjustedTokens(customerPrice: number, rawTokens: number): number {
   if (!customerPrice || customerPrice <= 0 || !TOKEN_BASE_RATE) return rawTokens;
-  const adjusted = Math.ceil(customerPrice / TOKEN_BASE_RATE);
-  // Safety: never deduct less than raw tokens (prevents exploitation)
-  // and never deduct more than 50x raw tokens (prevents absurd charges)
-  return Math.max(adjusted, Math.ceil(rawTokens * 0.5));
+  return Math.max(Math.ceil(customerPrice / TOKEN_BASE_RATE), 1);
 }
 import { smartRoute } from '../services/smartRouter.js';
 import { getCachedResponse, setCachedResponse } from '../services/modelRecommendationService.js';
@@ -328,7 +327,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
         // Send description only — the actual image renders via imageUrl in the done event
         const imageContent = `**Image generated:** "${result.revisedPrompt}"`;
         res.write(`data: ${JSON.stringify({ type: 'chunk', content: imageContent })}\n\n`);
-        const imgCustomerPrice = imageTokenCost * 0.000002; // ~$0.002 per 1K tokens
+        const imgCustomerPrice = imageTokenCost * TOKEN_BASE_RATE; // ~$0.002 per 1K tokens
         res.write(`data: ${JSON.stringify({ type: 'done', tokens: { input: 0, output: imageTokenCost, total: imageTokenCost }, tokensUsed: imageTokenCost, cost: { charged: imgCustomerPrice.toFixed(6) }, model: streamModelCheck.name, provider: 'openai', imageGenerated: true, imageUrl: result.imageUrl })}\n\n`);
         res.write('data: [DONE]\n\n');
         res.end();
@@ -652,7 +651,7 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
           if (imgModel) imageModelId = imgModel.id;
         } catch { /* use chat model as fallback */ }
 
-        const imgCustomerPrice = imageTokenCost * 0.000002;
+        const imgCustomerPrice = imageTokenCost * TOKEN_BASE_RATE;
 
         // Send done event with metadata including cost
         res.write(`data: ${JSON.stringify({

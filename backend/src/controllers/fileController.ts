@@ -10,6 +10,7 @@ import { TokenWalletService } from '../services/tokenWalletService.js'
 import { config } from '../config/env.js'
 import logger from '../config/logger.js'
 import prisma from '../config/db.js'
+import { TOKEN_BASE_RATE } from '../config/tokenPackages.js'
 
 // OCR scanned/image-based PDFs using AI vision models
 async function ocrPdfWithVision(filePath: string): Promise<string | null> {
@@ -427,7 +428,7 @@ export const generateImage = asyncHandler(async (req: Request, res: Response): P
           prompt: prompt.substring(0, 500),
           response: `[Image generated: ${result.revisedPrompt?.substring(0, 200) || prompt.substring(0, 200)}]`,
           tokensInput: 0, tokensOutput: imageTokenCost, totalTokens: imageTokenCost,
-          providerCost: 0, markupPercentage: 20, customerPrice: imageTokenCost * 0.000002,
+          providerCost: 0, markupPercentage: 20, customerPrice: imageTokenCost * TOKEN_BASE_RATE,
           status: 'completed',
         },
       })
