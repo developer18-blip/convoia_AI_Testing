@@ -92,23 +92,6 @@ function RoleGuard({ allowedRoles }: { allowedRoles: string[] }) {
 }
 
 /**
- * Guard: only allow users who can BUY tokens (freelancers, org_owner, platform_admin)
- * Employees and managers must receive tokens via allocation.
- */
-function TokenBuyGuard() {
-  const { user } = useAuth()
-  const toast = useToast()
-
-  const canBuy = !user?.organizationId || user?.role === 'user' || user?.role === 'org_owner' || user?.role === 'platform_admin'
-  if (!canBuy) {
-    toast.error('Ask your organization owner to allocate tokens.')
-    return <Navigate to="/dashboard" replace />
-  }
-
-  return <Outlet />
-}
-
-/**
  * Guard: only allow users without org OR org_owner/platform_admin
  */
 function SessionGuard() {
@@ -186,9 +169,7 @@ function AppRoutes() {
           <Route path="/settings" element={isNative ? <MobileSettingsPage /> : <SettingsPage />} />
           <Route path="/api-docs" element={<ApiDocsPage />} />
           {/* Token purchase — only freelancers + org_owner + platform_admin */}
-          <Route element={<TokenBuyGuard />}>
-            <Route path="/tokens/buy" element={isNative ? <MobileWalletPage /> : <TokenStorePage />} />
-          </Route>
+          <Route path="/tokens/buy" element={isNative ? <MobileWalletPage /> : <TokenStorePage />} />
           <Route path="/payment/success" element={<PaymentSuccessPage />} />
           <Route path="/payment/cancel" element={<PaymentCancelPage />} />
 

@@ -24,6 +24,8 @@ export function MobileWalletPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const isEmployee = !!user?.organizationId && user?.role !== 'org_owner' && user?.role !== 'platform_admin'
+  const canBuy = !isEmployee
 
   const loadData = async () => {
     try {
@@ -103,19 +105,21 @@ export function MobileWalletPage() {
           tokens available · {user?.organizationId ? 'Organization' : 'Personal plan'}
         </p>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={() => handleBuy(packages.find(p => p.popular) || packages[0])}
-            style={{ flex: 1, padding: '12px', borderRadius: '12px', background: 'white', border: 'none', color: '#7C3AED', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
-            + Buy Tokens
-          </button>
+          {canBuy && (
+            <button onClick={() => handleBuy(packages.find(p => p.popular) || packages[0])}
+              style={{ flex: 1, padding: '12px', borderRadius: '12px', background: 'white', border: 'none', color: '#7C3AED', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
+              + Buy Tokens
+            </button>
+          )}
           <button onClick={() => navigate('/usage')}
-            style={{ flex: 1, padding: '12px', borderRadius: '12px', background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
+            style={{ flex: 1, padding: '12px', borderRadius: '12px', background: canBuy ? 'rgba(255,255,255,0.15)' : 'white', border: '1px solid rgba(255,255,255,0.25)', color: canBuy ? 'white' : '#7C3AED', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
             Usage Stats
           </button>
         </div>
       </div>
 
-      {/* Token Packages */}
-      <div>
+      {/* Token Packages — hidden for employees */}
+      {canBuy && <div>
         <h2 style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#8E8EA0', margin: '0 0 12px' }}>Token Packages</h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
           {packages.slice(0, 6).map(pkg => (
@@ -152,7 +156,7 @@ export function MobileWalletPage() {
             </div>
           ))}
         </div>
-      </div>
+      </div>}
 
       {/* Transaction History */}
       <div>

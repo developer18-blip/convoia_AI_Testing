@@ -175,9 +175,8 @@ export function MobileSettingsPage() {
       {/* ─── GENERAL NAVIGATION — ALL ROLES ─── */}
       <NavSection title="Account">
         <NavItem icon={<Activity size={18} />} label="Usage" sub="Usage statistics" onClick={() => navigate('/usage')} />
-        <NavItem icon={<Key size={18} />} label="API Keys" sub="Manage API access" onClick={() => navigate('/api-keys')} />
-        <NavItem icon={<FileText size={18} />} label="API Docs" sub="Documentation" onClick={() => navigate('/api-docs')} />
-        {!hasOrg && <NavItem icon={<Activity size={18} />} label="Sessions" sub="Active sessions" onClick={() => navigate('/sessions')} />}
+        {!hasOrg && <NavItem icon={<Key size={18} />} label="API Keys" sub="Manage API access" onClick={() => navigate('/api-keys')} />}
+        {!hasOrg && <NavItem icon={<FileText size={18} />} label="API Docs" sub="Documentation" onClick={() => navigate('/api-docs')} />}
         {hasOrg && <NavItem icon={<Briefcase size={18} />} label="My Budget" sub="Your token budget" onClick={() => navigate('/budget')} />}
         <NavItem icon={<FileText size={18} />} label="Tasks" sub="Your tasks" onClick={() => navigate('/tasks')} last />
       </NavSection>
