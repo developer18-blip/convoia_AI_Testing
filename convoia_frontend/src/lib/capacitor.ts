@@ -82,24 +82,37 @@ export async function initNativeBridge() {
 
     // ── Deep Link Handler (Google OAuth callback) ──
     // Catches convoia://auth?token=xxx&user=xxx from Google OAuth redirect
-    App.addListener('appUrlOpen', ({ url }: { url: string }) => {
+    const handleAuthDeepLink = (url: string) => {
       try {
-        const parsed = new URL(url)
-        if (parsed.host === 'auth') {
-          const token = parsed.searchParams.get('token')
-          const refreshToken = parsed.searchParams.get('refreshToken')
-          const userStr = parsed.searchParams.get('user')
+        if (!url.startsWith('convoia://auth')) return false
+        const queryString = url.split('?')[1]
+        if (!queryString) return false
+        const params = new URLSearchParams(queryString)
+        const token = params.get('token')
+        const refreshToken = params.get('refreshToken')
+        const userStr = params.get('user')
 
-          if (token && userStr) {
-            const user = JSON.parse(userStr)
-            localStorage.setItem('convoia_token', token)
-            if (refreshToken) localStorage.setItem('convoia_refresh_token', refreshToken)
-            localStorage.setItem('convoia_user', JSON.stringify(user))
-            // Reload to pick up the new auth state
-            window.location.href = '/dashboard'
-          }
+        if (token && userStr) {
+          const user = JSON.parse(userStr)
+          localStorage.setItem('convoia_token', token)
+          if (refreshToken) localStorage.setItem('convoia_refresh_token', refreshToken)
+          localStorage.setItem('convoia_user', JSON.stringify(user))
+          window.location.href = '/dashboard'
+          return true
         }
-      } catch { /* invalid URL, ignore */ }
+      } catch { /* invalid URL */ }
+      return false
+    }
+
+    // Check if app was LAUNCHED via deep link (cold start)
+    try {
+      const launchUrl = await App.getLaunchUrl()
+      if (launchUrl?.url) handleAuthDeepLink(launchUrl.url)
+    } catch { /* no launch URL */ }
+
+    // Listen for deep links while app is running (warm resume)
+    App.addListener('appUrlOpen', ({ url }: { url: string }) => {
+      handleAuthDeepLink(url)
     })
   } catch { /* not available */ }
 }
