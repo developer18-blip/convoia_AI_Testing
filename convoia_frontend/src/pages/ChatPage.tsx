@@ -357,7 +357,7 @@ export function ChatPage() {
             {/* Desktop-only: agent, think, industry inline */}
             <div className="hidden md:flex items-center gap-2">
               <AgentSelector agents={agents} models={models} selectedId={selectedAgent?.id || null} onChange={handleAgentChange} onCreateAgent={createAgent} />
-              <button onClick={() => setThinkingEnabled(!thinkingEnabled)} title={thinkingEnabled ? 'Extended thinking ON' : 'Enable extended thinking'}
+              <button onClick={() => { const next = !thinkingEnabled; setThinkingEnabled(next); if (next) toast.warning('Thinking mode ON — uses 2x tokens per message') }} title={thinkingEnabled ? 'Extended thinking ON' : 'Enable extended thinking'}
                 style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', transition: 'all 200ms', flexShrink: 0,
                   background: thinkingEnabled ? 'var(--color-primary)' : 'var(--chat-surface)', color: thinkingEnabled ? 'white' : 'var(--chat-text-muted)',
                   border: thinkingEnabled ? '1px solid var(--color-primary)' : '1px solid var(--chat-border)', }}>
@@ -439,7 +439,7 @@ export function ChatPage() {
           {/* Mobile-only Row 2: agent, think — compact pills */}
           <div className="flex md:hidden items-center gap-2" style={{ padding: '0 10px 8px', overflowX: 'auto' }}>
             <AgentSelector agents={agents} models={models} selectedId={selectedAgent?.id || null} onChange={handleAgentChange} onCreateAgent={createAgent} />
-            <button onClick={() => setThinkingEnabled(!thinkingEnabled)}
+            <button onClick={() => { const next = !thinkingEnabled; setThinkingEnabled(next); if (next) toast.warning('Thinking mode ON — uses 2x tokens') }}
               style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 12px', borderRadius: '16px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', flexShrink: 0,
                 background: thinkingEnabled ? 'var(--color-primary)' : 'var(--chat-surface)', color: thinkingEnabled ? 'white' : 'var(--chat-text-muted)',
                 border: thinkingEnabled ? '1px solid var(--color-primary)' : '1px solid var(--chat-border)', }}>

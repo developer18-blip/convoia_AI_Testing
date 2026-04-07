@@ -39,7 +39,8 @@ export function MobileWalletPage() {
     load()
   }, [])
 
-  const handleBuy = async (pkg: TokenPackage) => {
+  const handleBuy = async (pkg: TokenPackage | undefined) => {
+    if (!pkg) { toast.error('No packages available'); return }
     try {
       const res = await api.post('/stripe/purchase-tokens', { packageId: pkg.id })
       if (res.data?.data?.checkoutUrl) {

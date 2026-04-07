@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ConvoiaAI — Business Blueprint & Monetization Strategy</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #1a1a2e; background: #fff; line-height: 1.6;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+
+  @page { margin: 0.7in; size: A4; }
+
+  .cover {
+    min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center;
+    background: linear-gradient(135deg, #7C3AED 0%, #5B21B6 50%, #4C1D95 100%);
+    color: white; text-align: center; padding: 60px 40px;
+    page-break-after: always;
+  }
+  .cover h1 { font-size: 52px; font-weight: 900; letter-spacing: -2px; margin-bottom: 16px; }
+  .cover .subtitle { font-size: 22px; font-weight: 500; opacity: 0.85; margin-bottom: 40px; }
+  .cover .meta { font-size: 14px; opacity: 0.6; }
+  .cover .badge { display: inline-block; padding: 8px 24px; border-radius: 30px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); font-size: 14px; font-weight: 600; margin-bottom: 40px; }
+
+  .page { padding: 40px; max-width: 900px; margin: 0 auto; }
+  .page-break { page-break-before: always; }
+
+  h2 { font-size: 28px; font-weight: 800; color: #7C3AED; margin: 40px 0 20px; letter-spacing: -0.5px; border-bottom: 3px solid #7C3AED; padding-bottom: 10px; }
+  h2:first-child { margin-top: 0; }
+  h3 { font-size: 20px; font-weight: 700; color: #1a1a2e; margin: 28px 0 12px; }
+  h4 { font-size: 16px; font-weight: 700; color: #4A4A6A; margin: 20px 0 8px; }
+  p { margin-bottom: 12px; color: #333; font-size: 14px; }
+  ul { margin: 8px 0 16px 24px; }
+  li { margin-bottom: 6px; font-size: 14px; color: #333; }
+  strong { color: #1a1a2e; }
+
+  .highlight-box {
+    background: linear-gradient(135deg, #F8F7FF, #EDE9FE);
+    border: 1px solid #DDD6FE; border-radius: 16px; padding: 24px;
+    margin: 20px 0;
+  }
+  .highlight-box h4 { color: #7C3AED; margin-top: 0; }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 20px 0; }
+  .stat-card {
+    background: #F8F7FF; border-radius: 14px; padding: 20px; text-align: center;
+    border: 1px solid #EDE9FE;
+  }
+  .stat-card .number { font-size: 36px; font-weight: 900; color: #7C3AED; }
+  .stat-card .label { font-size: 13px; color: #6B7280; font-weight: 600; margin-top: 4px; }
+
+  table { width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 13px; }
+  th { background: #7C3AED; color: white; padding: 10px 12px; text-align: left; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  td { padding: 10px 12px; border-bottom: 1px solid #E5E7EB; }
+  tr:nth-child(even) { background: #FAFAFA; }
+  tr:hover { background: #F3F0FF; }
+
+  .flow-diagram { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0; }
+  .flow-step {
+    flex: 1; min-width: 140px; background: white; border: 2px solid #DDD6FE; border-radius: 14px;
+    padding: 16px; text-align: center; position: relative;
+  }
+  .flow-step .step-num {
+    width: 28px; height: 28px; border-radius: 50%; background: #7C3AED; color: white;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 800; margin-bottom: 8px;
+  }
+  .flow-step .step-title { font-size: 13px; font-weight: 700; color: #1a1a2e; }
+  .flow-step .step-desc { font-size: 11px; color: #6B7280; margin-top: 4px; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 16px 0; }
+
+  .card {
+    background: white; border: 1px solid #E5E7EB; border-radius: 14px; padding: 20px;
+  }
+  .card h4 { margin-top: 0; }
+
+  .toc { list-style: none; margin: 0; padding: 0; }
+  .toc li { padding: 8px 0; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; }
+  .toc li a { color: #7C3AED; text-decoration: none; font-weight: 600; font-size: 15px; }
+  .toc li span { color: #9CA3AF; font-size: 14px; }
+
+  .agent-card {
+    display: inline-block; background: #F8F7FF; border: 1px solid #EDE9FE;
+    border-radius: 12px; padding: 12px 16px; margin: 4px; font-size: 13px;
+  }
+  .agent-card .emoji { font-size: 20px; margin-right: 6px; }
+
+  .profit-highlight {
+    background: linear-gradient(135deg, #10B981, #059669);
+    color: white; border-radius: 16px; padding: 24px; margin: 20px 0; text-align: center;
+  }
+  .profit-highlight .big { font-size: 48px; font-weight: 900; }
+  .profit-highlight .sub { font-size: 16px; opacity: 0.85; }
+
+  @media print {
+    .cover { min-height: 100vh; }
+    .page { padding: 0; }
+    .stat-grid { break-inside: avoid; }
+    table { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════ COVER PAGE ═══════════════════════════════════════════ -->
+<div class="cover">
+  <div class="badge">Confidential — For Internal Use Only</div>
+  <h1>ConvoiaAI</h1>
+  <p class="subtitle">Business Blueprint, Monetization Strategy<br>& Complete Product Flow</p>
+  <p class="meta">Prepared for CEO & Leadership Team<br>April 2026 — Version 1.0</p>
+</div>
+
+<!-- ═══════════════════════════════════════════ TABLE OF CONTENTS ═══════════════════════════════════ -->
+<div class="page">
+  <h2>Table of Contents</h2>
+  <ul class="toc">
+    <li><a href="#exec">1. Executive Summary</a> <span>3</span></li>
+    <li><a href="#what">2. What is ConvoiaAI?</a> <span>4</span></li>
+    <li><a href="#market">3. Market Opportunity — Why People Want This</a> <span>5</span></li>
+    <li><a href="#mvp">4. MVP Feature Set</a> <span>7</span></li>
+    <li><a href="#flow">5. Complete Product Flow</a> <span>9</span></li>
+    <li><a href="#monetization">6. Monetization Strategy</a> <span>11</span></li>
+    <li><a href="#tokens">7. Token Economics Deep Dive</a> <span>13</span></li>
+    <li><a href="#models">8. AI Model Catalog & Pricing</a> <span>15</span></li>
+    <li><a href="#agents">9. AI Agents (Virtual Employees)</a> <span>18</span></li>
+    <li><a href="#roles">10. Role-Based Access & Enterprise</a> <span>19</span></li>
+    <li><a href="#competitive">11. Competitive Advantages</a> <span>21</span></li>
+    <li><a href="#revenue">12. Revenue Model & Projections</a> <span>22</span></li>
+    <li><a href="#growth">13. Growth Strategy & Roadmap</a> <span>24</span></li>
+    <li><a href="#tech">14. Technical Architecture</a> <span>25</span></li>
+  </ul>
+</div>
+
+<!-- ═══════════════════════════════════════════ 1. EXECUTIVE SUMMARY ════════════════════════════════ -->
+<div class="page page-break" id="exec">
+  <h2>1. Executive Summary</h2>
+
+  <div class="highlight-box">
+    <h4>The One-Liner</h4>
+    <p style="font-size:18px; font-weight:700; color:#7C3AED; margin:0;">
+      ConvoiaAI is a <strong>B2B AI Gateway</strong> that gives businesses access to 36+ AI models from 6 providers through a single platform — with team management, budgets, and pay-per-use token pricing.
+    </p>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="number">36+</div>
+      <div class="label">AI Models Available</div>
+    </div>
+    <div class="stat-card">
+      <div class="number">6</div>
+      <div class="label">AI Providers Integrated</div>
+    </div>
+    <div class="stat-card">
+      <div class="number">13</div>
+      <div class="label">Built-in AI Agents</div>
+    </div>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="number">25%</div>
+      <div class="label">Platform Margin</div>
+    </div>
+    <div class="stat-card">
+      <div class="number">$1</div>
+      <div class="label">Minimum Entry Price</div>
+    </div>
+    <div class="stat-card">
+      <div class="number">3</div>
+      <div class="label">Platforms (Web, Android, iOS)</div>
+    </div>
+  </div>
+
+  <h3>The Problem We Solve</h3>
+  <p>Businesses today face a fragmented AI landscape. They need GPT for writing, Claude for analysis, Gemini for search, DALL-E for images, and separate subscriptions for each. Managing this across a team of 10, 50, or 500 people is a nightmare — no visibility, no cost control, no governance.</p>
+
+  <h3>Our Solution</h3>
+  <p><strong>One platform, every model, complete control.</strong> ConvoiaAI unifies all major AI models into a single interface with enterprise-grade team management, token-based budgets, custom AI agents, and usage analytics. Businesses buy tokens once and use any model they want.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════ 2. WHAT IS CONVOIA AI ═══════════════════════════════ -->
+<div class="page page-break" id="what">
+  <h2>2. What is ConvoiaAI?</h2>
+
+  <p>ConvoiaAI is a <strong>unified AI gateway platform</strong> — think of it as the "Stripe for AI models." Just as Stripe lets businesses accept payments from any card without building separate integrations, ConvoiaAI lets businesses use any AI model without managing separate API keys, billing, and access controls.</p>
+
+  <h3>Core Value Propositions</h3>
+
+  <div class="two-col">
+    <div class="card">
+      <h4>🔀 Multi-Model Access</h4>
+      <p>Access GPT-5, Claude Opus, Gemini Pro, DeepSeek, Mistral, LLaMA and 30+ more models through one chat interface. Switch models mid-conversation.</p>
+    </div>
+    <div class="card">
+      <h4>🎨 Beyond Text</h4>
+      <p>Generate images (DALL-E, GPT Image, Gemini Image), create videos (Google Veo), run web searches, process PDFs — all from one place.</p>
+    </div>
+    <div class="card">
+      <h4>👥 Team Management</h4>
+      <p>Invite team members, assign roles (employee, manager, owner), allocate token budgets, and track who uses what — and how much it costs.</p>
+    </div>
+    <div class="card">
+      <h4>🤖 AI Agents</h4>
+      <p>13 pre-built AI specialists (Developer, Legal, Finance, Marketing, etc.) + custom agent creation. Each agent has tuned personality, expertise, and model preferences.</p>
+    </div>
+    <div class="card">
+      <h4>💰 Token Economy</h4>
+      <p>Buy tokens once, use any model. Larger packages = lower cost per token. Organizations buy centrally, allocate to teams, track spend.</p>
+    </div>
+    <div class="card">
+      <h4>📱 Multi-Platform</h4>
+      <p>Full-featured web app, native Android app (Play Store), iOS app (App Store) — all sharing the same backend and real-time sync.</p>
+    </div>
+  </div>
+
+  <h3>Who Is It For?</h3>
+  <table>
+    <tr><th>Segment</th><th>Use Case</th><th>Why ConvoiaAI</th></tr>
+    <tr><td><strong>Freelancers</strong></td><td>Writing, coding, research</td><td>Access all models without 5 subscriptions ($60+/mo savings)</td></tr>
+    <tr><td><strong>SMB Teams (5-50)</strong></td><td>Marketing, support, analysis</td><td>Budget control, team visibility, cost governance</td></tr>
+    <tr><td><strong>Agencies</strong></td><td>Content creation for clients</td><td>Different models for different clients, cost tracking per project</td></tr>
+    <tr><td><strong>Enterprises (50+)</strong></td><td>Company-wide AI deployment</td><td>RBAC, budget caps, auto-downgrade, audit trails</td></tr>
+    <tr><td><strong>Developers</strong></td><td>API access for AI features</td><td>One API key for all models, programmatic access</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════ 3. MARKET OPPORTUNITY ═══════════════════════════════ -->
+<div class="page page-break" id="market">
+  <h2>3. Market Opportunity — Why People Want This</h2>
+
+  <h3>The Pain Points</h3>
+
+  <div class="highlight-box">
+    <h4>🔥 Problem 1: Subscription Sprawl</h4>
+    <p>A typical knowledge worker today has: ChatGPT Plus ($20/mo) + Claude Pro ($20/mo) + Gemini Advanced ($20/mo) + Midjourney ($10/mo) = <strong>$70/month per person.</strong> For a 20-person team, that's <strong>$16,800/year</strong> — with no visibility into actual usage.</p>
+  </div>
+
+  <div class="highlight-box">
+    <h4>🔥 Problem 2: No Cost Control</h4>
+    <p>CTO buys ChatGPT Team for everyone. Marketing uses it daily, engineering barely touches it. The company pays the same $25/seat regardless. <strong>60% of AI spend is wasted on inactive seats.</strong></p>
+  </div>
+
+  <div class="highlight-box">
+    <h4>🔥 Problem 3: Model Lock-In</h4>
+    <p>Teams pick one AI provider and get locked in. When a better or cheaper model launches, switching means rebuilding workflows, retraining staff, and losing conversation history. <strong>No flexibility to use the best model for each task.</strong></p>
+  </div>
+
+  <div class="highlight-box">
+    <h4>🔥 Problem 4: Zero Governance</h4>
+    <p>Managers have no idea what their teams are using AI for. No usage reports, no cost breakdowns, no ability to set limits. This is a <strong>compliance and budget risk</strong> especially in regulated industries.</p>
+  </div>
+
+  <h3>Market Size</h3>
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="number">$65B</div>
+      <div class="label">Enterprise AI Market 2026</div>
+    </div>
+    <div class="stat-card">
+      <div class="number">42%</div>
+      <div class="label">YoY Growth Rate</div>
+    </div>
+    <div class="stat-card">
+      <div class="number">78%</div>
+      <div class="label">Companies Using 2+ AI Tools</div>
+    </div>
+  </div>
+
+  <h3>Market Demand Signals</h3>
+  <ul>
+    <li><strong>Multi-model usage is mainstream:</strong> 78% of companies use more than one AI provider (Gartner 2025)</li>
+    <li><strong>Cost control is #1 concern:</strong> "AI spend visibility" is the top request from CFOs evaluating AI tools</li>
+    <li><strong>Teams need governance:</strong> Regulated industries (legal, healthcare, finance) cannot deploy AI without audit trails</li>
+    <li><strong>Pay-per-use wins:</strong> Usage-based pricing is preferred 3:1 over flat subscriptions for AI tools (a16z AI survey)</li>
+    <li><strong>The "API aggregator" model works:</strong> Stripe ($95B), Twilio ($10B), Plaid ($13B) proved that abstracting providers creates massive value</li>
+  </ul>
+
+  <h3>Competitive Landscape</h3>
+  <table>
+    <tr><th>Competitor</th><th>Models</th><th>Teams</th><th>Budgets</th><th>Agents</th><th>Mobile</th><th>Price</th></tr>
+    <tr><td>ChatGPT Team</td><td>OpenAI only</td><td>Basic</td><td>❌</td><td>GPTs</td><td>✅</td><td>$25/seat/mo</td></tr>
+    <tr><td>Claude Team</td><td>Anthropic only</td><td>Basic</td><td>❌</td><td>❌</td><td>✅</td><td>$25/seat/mo</td></tr>
+    <tr><td>Poe</td><td>Multi</td><td>❌</td><td>❌</td><td>Bots</td><td>✅</td><td>$20/mo</td></tr>
+    <tr><td>TypingMind</td><td>Multi (BYOK)</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>$39 one-time</td></tr>
+    <tr><td style="background:#F3F0FF; font-weight:700;">ConvoiaAI</td><td style="background:#F3F0FF;"><strong>36+ models, 6 providers</strong></td><td style="background:#F3F0FF;"><strong>Full RBAC</strong></td><td style="background:#F3F0FF;"><strong>✅ Per-user</strong></td><td style="background:#F3F0FF;"><strong>13 + Custom</strong></td><td style="background:#F3F0FF;"><strong>✅</strong></td><td style="background:#F3F0FF;"><strong>From $1</strong></td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════ 4. MVP FEATURE SET ═══════════════════════════════════ -->
+<div class="page page-break" id="mvp">
+  <h2>4. MVP Feature Set</h2>
+
+  <p>ConvoiaAI's MVP is already built and deployed. Here's what's live:</p>
+
+  <h3>Core Chat Platform</h3>
+  <table>
+    <tr><th>Feature</th><th>Description</th><th>Status</th></tr>
+    <tr><td>Multi-Model Chat</td><td>36 models from OpenAI, Anthropic, Google, DeepSeek, Mistral, Groq</td><td>✅ Live</td></tr>
+    <tr><td>Streaming Responses</td><td>Real-time token-by-token streaming via SSE</td><td>✅ Live</td></tr>
+    <tr><td>Conversation History</td><td>Persistent chat history with search, pin, folders</td><td>✅ Live</td></tr>
+    <tr><td>Model Comparison</td><td>Compare answers from multiple models side-by-side</td><td>✅ Live</td></tr>
+    <tr><td>Model Recommendation</td><td>AI-powered model suggestion engine (zero cost)</td><td>✅ Live</td></tr>
+    <tr><td>Extended Thinking</td><td>Claude deep reasoning mode with visible thought chain</td><td>✅ Live</td></tr>
+  </table>
+
+  <h3>Content Generation</h3>
+  <table>
+    <tr><th>Feature</th><th>Description</th><th>Status</th></tr>
+    <tr><td>Image Generation</td><td>DALL-E 3, GPT Image 1, Gemini Image models</td><td>✅ Live</td></tr>
+    <tr><td>Video Generation</td><td>Text-to-video & image-to-video via Google Veo</td><td>✅ Live</td></tr>
+    <tr><td>Web Search</td><td>Real-time web search integrated into chat responses</td><td>✅ Live</td></tr>
+    <tr><td>File Processing</td><td>PDF, DOCX, text file upload and analysis</td><td>✅ Live</td></tr>
+    <tr><td>Multi-Image Input</td><td>Upload multiple images for vision model analysis</td><td>✅ Live</td></tr>
+  </table>
+
+  <h3>AI Agents</h3>
+  <table>
+    <tr><th>Feature</th><th>Description</th><th>Status</th></tr>
+    <tr><td>13 Pre-Built Agents</td><td>Dev, Analyst, Designer, Writer, Legal, Marketer, Tutor, HR, Finance, PM, Mailer, Social, General</td><td>✅ Live</td></tr>
+    <tr><td>Custom Agents</td><td>Create agents with custom prompts, temperature, model preferences</td><td>✅ Live</td></tr>
+    <tr><td>Persistent Memory</td><td>Agents remember user preferences across conversations</td><td>✅ Live</td></tr>
+  </table>
+
+  <h3>Enterprise & Teams</h3>
+  <table>
+    <tr><th>Feature</th><th>Description</th><th>Status</th></tr>
+    <tr><td>Organization Management</td><td>Create org, invite members, assign roles</td><td>✅ Live</td></tr>
+    <tr><td>Role-Based Access</td><td>Employee, Manager, Org Owner, Platform Admin</td><td>✅ Live</td></tr>
+    <tr><td>Token Budgets</td><td>Per-user monthly caps with alerts and auto-downgrade</td><td>✅ Live</td></tr>
+    <tr><td>Token Allocation</td><td>Managers allocate tokens to team members</td><td>✅ Live</td></tr>
+    <tr><td>Usage Analytics</td><td>Cost tracking per user, model, time period</td><td>✅ Live</td></tr>
+    <tr><td>Task Management</td><td>Create/assign tasks with priorities and deadlines</td><td>✅ Live</td></tr>
+  </table>
+
+  <h3>Platform & Payments</h3>
+  <table>
+    <tr><th>Feature</th><th>Description</th><th>Status</th></tr>
+    <tr><td>Stripe Integration</td><td>Secure token purchases via Stripe Checkout</td><td>✅ Live</td></tr>
+    <tr><td>6 Token Packages</td><td>$1 to $55 — volume discounts up to 45%</td><td>✅ Live</td></tr>
+    <tr><td>API Key System</td><td>Programmatic access for developers</td><td>✅ Live</td></tr>
+    <tr><td>Google OAuth</td><td>One-click sign-in with Google</td><td>✅ Live</td></tr>
+    <tr><td>Mobile App</td><td>Android & iOS via Capacitor with native UI</td><td>✅ Live</td></tr>
+    <tr><td>Admin Dashboard</td><td>Platform-wide analytics, user management, revenue tracking</td><td>✅ Live</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════ 5. COMPLETE PRODUCT FLOW ════════════════════════════ -->
+<div class="page page-break" id="flow">
+  <h2>5. Complete Product Flow</h2>
+
+  <h3>A. Individual User Journey</h3>
+  <div class="flow-diagram">
+    <div class="flow-step">
+      <div class="step-num">1</div>
+      <div class="step-title">Sign Up</div>
+      <div class="step-desc">Email/Password or Google OAuth. Email verification required.</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">2</div>
+      <div class="step-title">Buy Tokens</div>
+      <div class="step-desc">Choose from 6 packages ($1-$55). Stripe checkout. Tokens credited instantly.</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">3</div>
+      <div class="step-title">Select Model</div>
+      <div class="step-desc">Pick from 36+ models. Or let the recommender choose the best one.</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">4</div>
+      <div class="step-title">Chat</div>
+      <div class="step-desc">Send messages. Stream responses. Upload files. Generate images/videos.</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">5</div>
+      <div class="step-title">Tokens Deducted</div>
+      <div class="step-desc">Actual token usage deducted. Cost tracked per conversation.</div>
+    </div>
+  </div>
+
+  <h3>B. Organization Onboarding Flow</h3>
+  <div class="flow-diagram">
+    <div class="flow-step">
+      <div class="step-num">1</div>
+      <div class="step-title">Owner Signs Up</div>
+      <div class="step-desc">Creates account as "Team/Business". Names the organization.</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">2</div>
+      <div class="step-title">Buys Token Pool</div>
+      <div class="step-desc">Purchases bulk tokens for the entire org. Volume discounts apply.</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">3</div>
+      <div class="step-title">Invites Team</div>
+      <div class="step-desc">Email invites with role assignment. Members join via link.</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">4</div>
+      <div class="step-title">Allocates Budgets</div>
+      <div class="step-desc">Sets monthly token caps per member. Auto-downgrade when exceeded.</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">5</div>
+      <div class="step-title">Team Uses AI</div>
+      <div class="step-desc">Members chat, generate content. All usage tracked per person.</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">6</div>
+      <div class="step-title">Owner Reviews</div>
+      <div class="step-desc">Sees per-user spend, top models, cost trends. Adjusts budgets.</div>
+    </div>
+  </div>
+
+  <h3>C. Token Lifecycle Flow</h3>
+  <div class="flow-diagram">
+    <div class="flow-step">
+      <div class="step-num">💳</div>
+      <div class="step-title">Purchase</div>
+      <div class="step-desc">User/Org buys tokens via Stripe. Tokens added to wallet.</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">📦</div>
+      <div class="step-title">Allocate</div>
+      <div class="step-desc">Org owner distributes tokens to team members from pool.</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">🤖</div>
+      <div class="step-title">Consume</div>
+      <div class="step-desc">AI query → tokens deducted based on actual input/output tokens used.</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">📊</div>
+      <div class="step-title">Track</div>
+      <div class="step-desc">Every transaction logged: who, what model, how many tokens, cost.</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">🔄</div>
+      <div class="step-title">Refill</div>
+      <div class="step-desc">Balance low? Buy more tokens. Budget reset monthly.</div>
+    </div>
+  </div>
+
+  <h3>D. AI Query Processing Flow (Backend)</h3>
+  <div class="flow-diagram">
+    <div class="flow-step">
+      <div class="step-num">1</div>
+      <div class="step-title">Request Received</div>
+      <div class="step-desc">Validate JWT, model ID, message format</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">2</div>
+      <div class="step-title">Token Check</div>
+      <div class="step-desc">Verify user has sufficient token balance</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">3</div>
+      <div class="step-title">Budget Check</div>
+      <div class="step-desc">Check monthly cap. Auto-downgrade model if exceeded.</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">4</div>
+      <div class="step-title">Smart Route</div>
+      <div class="step-desc">Detect intent: chat, image, video, web search. Route accordingly.</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">5</div>
+      <div class="step-title">Agent Inject</div>
+      <div class="step-desc">If agent selected: inject system prompt + memory + personality</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">6</div>
+      <div class="step-title">AI Provider Call</div>
+      <div class="step-desc">Send to OpenAI/Anthropic/Google/etc. Stream response back.</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">7</div>
+      <div class="step-title">Deduct & Log</div>
+      <div class="step-desc">Deduct actual tokens. Log usage. Refresh wallet balance.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ 6. MONETIZATION STRATEGY ════════════════════════════ -->
+<div class="page page-break" id="monetization">
+  <h2>6. Monetization Strategy</h2>
+
+  <h3>Primary Revenue: Token Sales (Usage-Based)</h3>
+  <p>ConvoiaAI operates on a <strong>usage-based pricing model</strong>. Users purchase token packages upfront, and tokens are consumed with each AI interaction. This is the dominant revenue stream.</p>
+
+  <table>
+    <tr><th>Package</th><th>Tokens</th><th>Price</th><th>Per Million</th><th>Discount</th><th>Target User</th></tr>
+    <tr><td>Basic</td><td>500,000</td><td><strong>$1.00</strong></td><td>$2.00</td><td>—</td><td>Trial users</td></tr>
+    <tr><td>Standard</td><td>1,000,000</td><td><strong>$2.00</strong></td><td>$2.00</td><td>—</td><td>Casual users</td></tr>
+    <tr><td>Popular ⭐</td><td>5,000,000</td><td><strong>$8.00</strong></td><td>$1.60</td><td>20%</td><td>Active users</td></tr>
+    <tr><td>Power</td><td>10,000,000</td><td><strong>$14.00</strong></td><td>$1.40</td><td>30%</td><td>Power users</td></tr>
+    <tr><td>Pro</td><td>25,000,000</td><td><strong>$30.00</strong></td><td>$1.20</td><td>40%</td><td>Teams</td></tr>
+    <tr><td>Enterprise</td><td>50,000,000</td><td><strong>$55.00</strong></td><td>$1.10</td><td>45%</td><td>Large orgs</td></tr>
+  </table>
+
+  <div class="profit-highlight">
+    <div class="big">25%</div>
+    <div class="sub">Platform Margin on Every AI Query</div>
+    <p style="margin-top:12px; opacity:0.85;">Every token consumed earns a 25% markup above the provider's cost.<br>This margin is configurable per model (0% to 200%).</p>
+  </div>
+
+  <h3>How the Margin Works</h3>
+  <div class="highlight-box">
+    <h4>Example: User sends 1,000 input tokens + receives 500 output tokens on GPT-5.4</h4>
+    <table>
+      <tr><th>Component</th><th>Calculation</th><th>Amount</th></tr>
+      <tr><td>Input Cost (Provider)</td><td>1,000 × $5.00/1M</td><td>$0.0050</td></tr>
+      <tr><td>Output Cost (Provider)</td><td>500 × $15.00/1M</td><td>$0.0075</td></tr>
+      <tr><td><strong>Total Provider Cost</strong></td><td></td><td><strong>$0.0125</strong></td></tr>
+      <tr><td>Platform Markup (25%)</td><td>$0.0125 × 0.25</td><td>$0.003125</td></tr>
+      <tr><td style="background:#F3F0FF;"><strong>Customer Pays</strong></td><td></td><td style="background:#F3F0FF;"><strong>$0.015625</strong></td></tr>
+      <tr><td style="background:#D1FAE5;"><strong>ConvoiaAI Profit</strong></td><td></td><td style="background:#D1FAE5;"><strong>$0.003125</strong></td></tr>
+    </table>
+  </div>
+
+  <h3>Future Revenue Streams</h3>
+  <table>
+    <tr><th>Stream</th><th>Description</th><th>Potential</th><th>Timing</th></tr>
+    <tr><td><strong>Premium Agents Marketplace</strong></td><td>Sell specialized agents ($10-50/mo each)</td><td>High</td><td>Q3 2026</td></tr>
+    <tr><td><strong>Enterprise Plans</strong></td><td>Custom pricing, SLA, dedicated support, SSO</td><td>Very High</td><td>Q4 2026</td></tr>
+    <tr><td><strong>API Tier Pricing</strong></td><td>Rate limits + priority queue for API users</td><td>Medium</td><td>Q3 2026</td></tr>
+    <tr><td><strong>White-Label</strong></td><td>Rebrandable platform for resellers</td><td>High</td><td>2027</td></tr>
+    <tr><td><strong>Video Gen Premium</strong></td><td>$0.10-0.50 per video generation</td><td>Medium</td><td>Now</td></tr>
+    <tr><td><strong>Fine-Tuning Service</strong></td><td>Custom model training for enterprises</td><td>Very High</td><td>2027</td></tr>
+    <tr><td><strong>Integrations</strong></td><td>Slack, Teams, Zapier connectors ($5-10/mo)</td><td>Medium</td><td>Q4 2026</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════ 7. TOKEN ECONOMICS ═══════════════════════════════════ -->
+<div class="page page-break" id="tokens">
+  <h2>7. Token Economics Deep Dive</h2>
+
+  <h3>What Are Tokens?</h3>
+  <p>Tokens are the universal currency of ConvoiaAI. Every AI interaction — chat messages, image generation, web searches, document analysis — consumes tokens. Roughly <strong>1 token ≈ 4 characters</strong> of text (a word is ~1.3 tokens on average).</p>
+
+  <h3>Token Consumption by Activity</h3>
+  <table>
+    <tr><th>Activity</th><th>Typical Token Usage</th><th>Cost on GPT-5.4 (w/ markup)</th><th>Cost on Gemini Flash</th></tr>
+    <tr><td>Short chat (1 Q&A)</td><td>~500 input + 300 output</td><td>$0.009</td><td>$0.0003</td></tr>
+    <tr><td>Long conversation (10 turns)</td><td>~5,000 input + 3,000 output</td><td>$0.09</td><td>$0.003</td></tr>
+    <tr><td>Document analysis (5 pages)</td><td>~8,000 input + 2,000 output</td><td>$0.09</td><td>$0.003</td></tr>
+    <tr><td>Code generation (complex)</td><td>~2,000 input + 5,000 output</td><td>$0.11</td><td>$0.004</td></tr>
+    <tr><td>Image generation (DALL-E 3)</td><td>Fixed per image</td><td>$0.05</td><td>N/A</td></tr>
+    <tr><td>Web search + response</td><td>~1,500 input + 1,000 output</td><td>$0.03</td><td>$0.001</td></tr>
+  </table>
+
+  <h3>How Far Do Tokens Go?</h3>
+  <p>For a user on the <strong>Popular Package (5M tokens, $8)</strong> using a mix of models:</p>
+  <table>
+    <tr><th>If using mostly...</th><th>Approx. conversations</th><th>Cost per conversation</th></tr>
+    <tr><td>GPT-5.4 (premium)</td><td>~300 conversations</td><td>$0.027</td></tr>
+    <tr><td>Claude Sonnet 4.6 (balanced)</td><td>~500 conversations</td><td>$0.016</td></tr>
+    <tr><td>Gemini 2.5 Flash (budget)</td><td>~5,000+ conversations</td><td>$0.0016</td></tr>
+    <tr><td>Groq LLaMA 3.1 8B (cheapest)</td><td>~30,000+ conversations</td><td>$0.0003</td></tr>
+  </table>
+
+  <h3>Token Wallet Architecture</h3>
+  <ul>
+    <li><strong>Personal Wallet:</strong> Every user has a token balance. Individual users buy directly.</li>
+    <li><strong>Organization Pool:</strong> Org owner buys tokens centrally. Allocates to members.</li>
+    <li><strong>Budget Caps:</strong> Monthly limits per user. Alert at threshold. Auto-downgrade to cheaper model.</li>
+    <li><strong>Transaction Logging:</strong> Every deduction logged with: user, model, tokens, cost, timestamp.</li>
+    <li><strong>Audit Trail:</strong> Full history of purchases, allocations, and usage — visible to owner/admin.</li>
+  </ul>
+
+  <h3>Budget Protection System</h3>
+  <div class="flow-diagram">
+    <div class="flow-step">
+      <div class="step-num">✅</div>
+      <div class="step-title">Under Budget</div>
+      <div class="step-desc">Normal usage. Any model allowed.</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">⚠️</div>
+      <div class="step-title">80% Threshold</div>
+      <div class="step-desc">Alert sent. User warned. Still allowed.</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">🔄</div>
+      <div class="step-title">Budget Exceeded</div>
+      <div class="step-desc">Auto-downgrade to cheaper fallback model.</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">🛑</div>
+      <div class="step-title">Zero Balance</div>
+      <div class="step-desc">Usage blocked. "Contact your admin" message.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ 8. AI MODEL CATALOG ═════════════════════════════════ -->
+<div class="page page-break" id="models">
+  <h2>8. AI Model Catalog & Pricing</h2>
+
+  <h3>OpenAI Models (15)</h3>
+  <table>
+    <tr><th>Model</th><th>Input $/1M</th><th>Output $/1M</th><th>Context</th><th>Best For</th></tr>
+    <tr><td>GPT-5.4</td><td>$5.00</td><td>$15.00</td><td>256K</td><td>Latest flagship, best quality</td></tr>
+    <tr><td>GPT-5.4 Mini</td><td>$0.40</td><td>$1.60</td><td>128K</td><td>Great balance of cost/quality</td></tr>
+    <tr><td>GPT-5.4 Nano</td><td>$0.10</td><td>$0.40</td><td>128K</td><td>Fast, cheap tasks</td></tr>
+    <tr><td>GPT-5</td><td>$5.00</td><td>$15.00</td><td>256K</td><td>Previous flagship</td></tr>
+    <tr><td>GPT-5 Mini</td><td>$0.40</td><td>$1.60</td><td>128K</td><td>Cost-effective</td></tr>
+    <tr><td>GPT-4.1</td><td>$2.00</td><td>$8.00</td><td>1M</td><td>Huge context window</td></tr>
+    <tr><td>GPT-4.1 Mini</td><td>$0.40</td><td>$1.60</td><td>1M</td><td>Large docs, affordable</td></tr>
+    <tr><td>GPT-4.1 Nano</td><td>$0.10</td><td>$0.40</td><td>1M</td><td>Cheapest with 1M context</td></tr>
+    <tr><td>GPT-4o</td><td>$2.50</td><td>$10.00</td><td>128K</td><td>Vision + chat</td></tr>
+    <tr><td>GPT-4o Mini</td><td>$0.15</td><td>$0.60</td><td>128K</td><td>Budget vision tasks</td></tr>
+    <tr><td>o3</td><td>$10.00</td><td>$40.00</td><td>200K</td><td>Deep reasoning (most expensive)</td></tr>
+    <tr><td>o4 Mini</td><td>$1.00</td><td>$4.00</td><td>200K</td><td>Reasoning on a budget</td></tr>
+    <tr><td>o3 Mini</td><td>$1.10</td><td>$4.40</td><td>200K</td><td>Reasoning tasks</td></tr>
+    <tr><td>GPT Image 1</td><td>$5.00</td><td>$40.00</td><td>32K</td><td>Best image generation</td></tr>
+    <tr><td>DALL-E 3</td><td colspan="2">~$0.04-0.08/image</td><td>4K</td><td>Budget image generation</td></tr>
+  </table>
+
+  <h3>Anthropic Claude Models (5)</h3>
+  <table>
+    <tr><th>Model</th><th>Input $/1M</th><th>Output $/1M</th><th>Context</th><th>Best For</th></tr>
+    <tr><td>Claude Opus 4.6</td><td>$5.00</td><td>$25.00</td><td>200K</td><td>Most capable Claude</td></tr>
+    <tr><td>Claude Opus 4.5</td><td>$5.00</td><td>$25.00</td><td>200K</td><td>Previous best Claude</td></tr>
+    <tr><td>Claude Sonnet 4.6</td><td>$3.00</td><td>$15.00</td><td>200K</td><td>Best value Claude</td></tr>
+    <tr><td>Claude Sonnet 4.5</td><td>$3.00</td><td>$15.00</td><td>200K</td><td>Reliable performance</td></tr>
+    <tr><td>Claude Haiku 4.5</td><td>$1.00</td><td>$5.00</td><td>200K</td><td>Fast & affordable Claude</td></tr>
+  </table>
+
+  <h3>Google Gemini Models (8)</h3>
+  <table>
+    <tr><th>Model</th><th>Input $/1M</th><th>Output $/1M</th><th>Context</th><th>Best For</th></tr>
+    <tr><td>Gemini 3.1 Pro</td><td>$1.25</td><td>$5.00</td><td>2.1M</td><td>Largest context window</td></tr>
+    <tr><td>Gemini 3 Pro</td><td>$1.25</td><td>$5.00</td><td>1M</td><td>Great general purpose</td></tr>
+    <tr><td>Gemini 2.5 Pro</td><td>$1.25</td><td>$10.00</td><td>1M</td><td>Reasoning + thinking</td></tr>
+    <tr><td>Gemini 2.5 Flash</td><td>$0.15</td><td>$0.60</td><td>1M</td><td>Fast + cheap + capable</td></tr>
+    <tr><td>Gemini 2.5 Flash Lite</td><td>$0.04</td><td>$0.15</td><td>1M</td><td>Ultra-budget</td></tr>
+    <tr><td>Gemini 2.0 Flash</td><td>$0.10</td><td>$0.40</td><td>1M</td><td>Previous gen budget</td></tr>
+    <tr><td>Gemini 2.5 Flash Image</td><td>$0.15</td><td>$0.60</td><td>1M</td><td>Image generation</td></tr>
+    <tr><td>Gemini 3 Pro Image</td><td>$1.25</td><td>$5.00</td><td>1M</td><td>Premium image gen</td></tr>
+  </table>
+
+  <h3>Open Source & Budget Models (7)</h3>
+  <table>
+    <tr><th>Model</th><th>Provider</th><th>Input $/1M</th><th>Output $/1M</th><th>Context</th></tr>
+    <tr><td>DeepSeek Chat</td><td>DeepSeek</td><td>$0.27</td><td>$1.10</td><td>64K</td></tr>
+    <tr><td>DeepSeek Reasoner</td><td>DeepSeek</td><td>$0.55</td><td>$2.19</td><td>64K</td></tr>
+    <tr><td>Mistral Large</td><td>Mistral</td><td>$2.00</td><td>$6.00</td><td>128K</td></tr>
+    <tr><td>Mistral Small</td><td>Mistral</td><td>$0.10</td><td>$0.30</td><td>128K</td></tr>
+    <tr><td>LLaMA 3.3 70B</td><td>Groq</td><td>$0.59</td><td>$0.79</td><td>128K</td></tr>
+    <tr><td>LLaMA 3.1 8B</td><td>Groq</td><td>$0.05</td><td>$0.08</td><td>128K</td></tr>
+    <tr><td>Mixtral 8x7B</td><td>Groq</td><td>$0.24</td><td>$0.24</td><td>32K</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════ 9. AI AGENTS ════════════════════════════════════════ -->
+<div class="page page-break" id="agents">
+  <h2>9. AI Agents (Virtual Employees)</h2>
+
+  <p>ConvoiaAI comes with <strong>13 pre-built AI agents</strong>, each a specialist with tuned system prompts, personality, and expertise. Users can also create unlimited custom agents.</p>
+
+  <table>
+    <tr><th>#</th><th>Agent</th><th>Role</th><th>Personality</th><th>Temp</th><th>Specialty</th></tr>
+    <tr><td>1</td><td>🤖 General</td><td>AI Assistant</td><td>Friendly</td><td>0.7</td><td>All-purpose: coding, writing, analysis, math</td></tr>
+    <tr><td>2</td><td>👨‍💻 Dev</td><td>Senior Full-Stack Dev</td><td>Professional</td><td>0.2</td><td>React, Node, Python, Go, Rust, DevOps</td></tr>
+    <tr><td>3</td><td>📊 Analyst</td><td>Data Analyst</td><td>Professional</td><td>0.3</td><td>SWOT, Porter's, TAM/SAM, unit economics</td></tr>
+    <tr><td>4</td><td>🎨 Designer</td><td>UI/UX Director</td><td>Creative</td><td>0.65</td><td>Design systems, color theory, WCAG</td></tr>
+    <tr><td>5</td><td>✍️ Alex</td><td>Content Creator</td><td>Creative</td><td>0.8</td><td>Blogs, social, ads, SEO, copywriting</td></tr>
+    <tr><td>6</td><td>⚖️ Legal</td><td>Legal Advisor</td><td>Professional</td><td>0.3</td><td>Contracts, GDPR, compliance, IP</td></tr>
+    <tr><td>7</td><td>📈 Marketer</td><td>Growth Expert</td><td>Creative</td><td>0.6</td><td>SEO, paid ads, funnels, CRO</td></tr>
+    <tr><td>8</td><td>🎓 Tutor</td><td>Teacher</td><td>Friendly</td><td>0.6</td><td>Explains anything simply, Feynman technique</td></tr>
+    <tr><td>9</td><td>👥 HR Pro</td><td>People Ops</td><td>Professional</td><td>0.5</td><td>Hiring, JDs, interviews, policies</td></tr>
+    <tr><td>10</td><td>💰 Finance</td><td>Financial Analyst</td><td>Professional</td><td>0.3</td><td>DCF, modeling, fundraising, SaaS metrics</td></tr>
+    <tr><td>11</td><td>🎯 PM</td><td>Product Manager</td><td>Professional</td><td>0.5</td><td>PRDs, roadmaps, RICE, OKRs</td></tr>
+    <tr><td>12</td><td>📧 Mailer</td><td>Email Specialist</td><td>Creative</td><td>0.7</td><td>Campaigns, cold outreach, sequences</td></tr>
+    <tr><td>13</td><td>📱 Social</td><td>Social Media</td><td>Creative</td><td>0.8</td><td>LinkedIn, Twitter, Instagram, TikTok</td></tr>
+  </table>
+
+  <h3>Custom Agent Creation</h3>
+  <p>Any user can create custom agents with:</p>
+  <ul>
+    <li><strong>System Prompt:</strong> Define the agent's expertise, behavior, and constraints</li>
+    <li><strong>Temperature:</strong> 0.0 (deterministic) to 1.0 (creative)</li>
+    <li><strong>Default Model:</strong> Pre-select which AI model this agent should use</li>
+    <li><strong>Industry:</strong> Tag for categorization (legal, tech, marketing, etc.)</li>
+    <li><strong>Sharing:</strong> Personal or shared across organization</li>
+  </ul>
+</div>
+
+<!-- ═══════════════════════════════════════════ 10. ROLES & ENTERPRISE ══════════════════════════════ -->
+<div class="page page-break" id="roles">
+  <h2>10. Role-Based Access & Enterprise Features</h2>
+
+  <h3>User Hierarchy</h3>
+  <table>
+    <tr><th>Role</th><th>Buy Tokens</th><th>Use AI</th><th>Allocate Tokens</th><th>Manage Team</th><th>View All Analytics</th><th>Admin Panel</th></tr>
+    <tr><td><strong>Personal User</strong></td><td>✅</td><td>✅</td><td>—</td><td>—</td><td>Own only</td><td>—</td></tr>
+    <tr><td><strong>Employee</strong></td><td>❌</td><td>✅</td><td>—</td><td>—</td><td>Own only</td><td>—</td></tr>
+    <tr><td><strong>Manager</strong></td><td>❌</td><td>✅</td><td>✅ Team</td><td>✅ Team</td><td>Team</td><td>—</td></tr>
+    <tr><td><strong>Org Owner</strong></td><td>✅</td><td>✅</td><td>✅ Org-wide</td><td>✅ Full</td><td>Org-wide</td><td>—</td></tr>
+    <tr><td><strong>Platform Admin</strong></td><td>✅</td><td>✅</td><td>✅ All</td><td>✅ All</td><td>All</td><td>✅</td></tr>
+  </table>
+
+  <h3>Enterprise Feature Stack</h3>
+  <div class="two-col">
+    <div class="card">
+      <h4>👥 Organization Management</h4>
+      <ul>
+        <li>Create organization with name & industry</li>
+        <li>Invite members via email link</li>
+        <li>Assign roles (employee/manager)</li>
+        <li>Remove/deactivate members</li>
+        <li>Organization-level analytics</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>💰 Budget Control</h4>
+      <ul>
+        <li>Monthly token cap per user</li>
+        <li>Alert threshold (default 80%)</li>
+        <li>Auto-downgrade to cheaper model</li>
+        <li>Configurable fallback model</li>
+        <li>Budget reset on monthly cycle</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>📊 Analytics & Reporting</h4>
+      <ul>
+        <li>Per-user cost breakdown</li>
+        <li>Model usage distribution</li>
+        <li>Daily/weekly/monthly trends</li>
+        <li>Provider cost vs. revenue</li>
+        <li>Top users by spend</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>🔑 API & Integrations</h4>
+      <ul>
+        <li>Personal API keys</li>
+        <li>Organization API keys</li>
+        <li>Full REST API documentation</li>
+        <li>Programmatic access to all features</li>
+        <li>Webhook support</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ 11. COMPETITIVE ADVANTAGES ══════════════════════════ -->
+<div class="page page-break" id="competitive">
+  <h2>11. Competitive Advantages</h2>
+
+  <div class="highlight-box">
+    <h4>🏆 Moat #1: Multi-Provider Aggregation</h4>
+    <p>No single AI provider can match having GPT-5, Claude Opus, Gemini Pro, DeepSeek, LLaMA, and Mistral under one roof. Users don't need to manage 6 separate accounts, billing systems, and API keys. This is the "Stripe effect" — abstract complexity, provide one interface.</p>
+  </div>
+
+  <div class="highlight-box">
+    <h4>🏆 Moat #2: Enterprise Token Economy</h4>
+    <p>The combination of token budgets + allocation + auto-downgrade + audit trails is unique. No competitor offers per-user budget caps with automatic model fallback. This is a CFO's dream — predictable AI costs with zero waste.</p>
+  </div>
+
+  <div class="highlight-box">
+    <h4>🏆 Moat #3: AI Agent Ecosystem</h4>
+    <p>13 domain-expert agents + unlimited custom agents create a "virtual workforce" that makes the platform sticky. Once a company builds custom agents with institutional knowledge, switching costs become very high.</p>
+  </div>
+
+  <div class="highlight-box">
+    <h4>🏆 Moat #4: Usage-Based Pricing</h4>
+    <p>While competitors charge $20-25/seat/month regardless of usage, ConvoiaAI starts at $1 and scales linearly. A 50-person company where only 10 people use AI daily pays for actual usage — not 50 seats. This is 60-70% cheaper for most organizations.</p>
+  </div>
+
+  <h3>Why Now?</h3>
+  <ul>
+    <li><strong>AI model proliferation:</strong> GPT-5, Claude 4, Gemini 3 all launched in 2025-2026. Companies can't evaluate all of them individually.</li>
+    <li><strong>Enterprise AI adoption:</strong> 78% of Fortune 500 companies have AI policies now. They need governance tools.</li>
+    <li><strong>Cost pressure:</strong> AI spend is growing 40%+ YoY. CFOs demand visibility and control.</li>
+    <li><strong>Open-source quality leap:</strong> LLaMA 3.3, Mixtral, DeepSeek are now competitive with proprietary models. Customers want access to both.</li>
+  </ul>
+</div>
+
+<!-- ═══════════════════════════════════════════ 12. REVENUE MODEL ═══════════════════════════════════ -->
+<div class="page page-break" id="revenue">
+  <h2>12. Revenue Model & Projections</h2>
+
+  <h3>Revenue Formula</h3>
+  <div class="highlight-box">
+    <p style="font-size:18px; text-align:center; font-weight:700; color:#7C3AED;">
+      Revenue = Token Packages Sold × Package Price<br>
+      Gross Profit = Σ (Customer Price - Provider Cost) per query = ~25% of Revenue<br>
+      Net Revenue = Gross Profit - Infrastructure Costs
+    </p>
+  </div>
+
+  <h3>Unit Economics</h3>
+  <table>
+    <tr><th>Metric</th><th>Value</th><th>Notes</th></tr>
+    <tr><td>Gross Margin</td><td><strong>25%</strong></td><td>Configurable 0-200% per model</td></tr>
+    <tr><td>Avg Package Size</td><td><strong>$14</strong> (Power)</td><td>Most popular at volume</td></tr>
+    <tr><td>COGS per query</td><td><strong>~$0.01</strong></td><td>Weighted avg across models</td></tr>
+    <tr><td>Queries per $1</td><td><strong>~80</strong></td><td>On budget models</td></tr>
+    <tr><td>Infra cost/user/mo</td><td><strong>~$0.50</strong></td><td>Server, DB, bandwidth</td></tr>
+  </table>
+
+  <h3>Revenue Scenarios (Monthly)</h3>
+  <table>
+    <tr><th>Scenario</th><th>Users</th><th>Avg Spend/User</th><th>MRR</th><th>Gross Profit (25%)</th><th>ARR</th></tr>
+    <tr><td>Early</td><td>100</td><td>$8</td><td>$800</td><td>$200</td><td>$9,600</td></tr>
+    <tr><td>Growth</td><td>500</td><td>$14</td><td>$7,000</td><td>$1,750</td><td>$84,000</td></tr>
+    <tr><td>Scale</td><td>2,000</td><td>$20</td><td>$40,000</td><td>$10,000</td><td>$480,000</td></tr>
+    <tr><td>Mature</td><td>10,000</td><td>$25</td><td>$250,000</td><td>$62,500</td><td>$3,000,000</td></tr>
+  </table>
+
+  <h3>Key Levers for Revenue Growth</h3>
+  <ol>
+    <li><strong>Increase users:</strong> Marketing, partnerships, referral program</li>
+    <li><strong>Increase ARPU:</strong> Premium features, enterprise plans, agent marketplace</li>
+    <li><strong>Increase margin:</strong> Negotiate volume discounts with providers as scale grows</li>
+    <li><strong>Reduce churn:</strong> Custom agents, memory, team workflows = high switching cost</li>
+    <li><strong>Add revenue streams:</strong> API tier pricing, white-label, consulting</li>
+  </ol>
+</div>
+
+<!-- ═══════════════════════════════════════════ 13. GROWTH STRATEGY ═════════════════════════════════ -->
+<div class="page page-break" id="growth">
+  <h2>13. Growth Strategy & Roadmap</h2>
+
+  <h3>Phase 1: Foundation (Now — Q2 2026)</h3>
+  <ul>
+    <li>✅ MVP complete with 36+ models, teams, budgets, agents</li>
+    <li>✅ Web + Android + iOS apps deployed</li>
+    <li>✅ Stripe payments live</li>
+    <li>🔄 Onboard first 100 paying users</li>
+    <li>🔄 Gather feedback, iterate on UX</li>
+  </ul>
+
+  <h3>Phase 2: Growth (Q3 — Q4 2026)</h3>
+  <ul>
+    <li>Launch agent marketplace (premium agents $10-50/mo)</li>
+    <li>Enterprise tier with custom pricing & SLA</li>
+    <li>API tier pricing (free/pro/enterprise)</li>
+    <li>Slack & Microsoft Teams integrations</li>
+    <li>Referral program (give tokens, get tokens)</li>
+    <li>Content marketing: "AI cost comparison" blog, SEO play</li>
+  </ul>
+
+  <h3>Phase 3: Scale (2027)</h3>
+  <ul>
+    <li>White-label offering for resellers</li>
+    <li>Custom model fine-tuning service</li>
+    <li>Zapier/Make integrations</li>
+    <li>Advanced analytics with AI-powered insights</li>
+    <li>SOC 2 Type II certification</li>
+    <li>International expansion (EU, APAC)</li>
+  </ul>
+
+  <h3>Go-To-Market Channels</h3>
+  <table>
+    <tr><th>Channel</th><th>Strategy</th><th>CAC Target</th></tr>
+    <tr><td>Product Hunt</td><td>Launch for visibility + early adopters</td><td>$0 (organic)</td></tr>
+    <tr><td>SEO</td><td>"Best AI chat for teams", "AI model comparison"</td><td>$5-10</td></tr>
+    <tr><td>LinkedIn</td><td>Thought leadership, case studies, demos</td><td>$15-25</td></tr>
+    <tr><td>App Stores</td><td>Play Store + App Store organic discovery</td><td>$2-5</td></tr>
+    <tr><td>Referral</td><td>Give 1M tokens for each paying referral</td><td>$2 (token cost)</td></tr>
+    <tr><td>Partnerships</td><td>Agency partnerships, tech consultants</td><td>Revenue share</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════ 14. TECHNICAL ARCHITECTURE ══════════════════════════ -->
+<div class="page page-break" id="tech">
+  <h2>14. Technical Architecture</h2>
+
+  <h3>Stack Overview</h3>
+  <div class="two-col">
+    <div class="card">
+      <h4>Backend</h4>
+      <ul>
+        <li><strong>Runtime:</strong> Node.js + Express.js</li>
+        <li><strong>Language:</strong> TypeScript</li>
+        <li><strong>Database:</strong> PostgreSQL + Prisma ORM</li>
+        <li><strong>Auth:</strong> JWT + Google OAuth</li>
+        <li><strong>Payments:</strong> Stripe</li>
+        <li><strong>Email:</strong> AWS SES / Resend</li>
+        <li><strong>Security:</strong> Helmet, bcrypt, rate limiting</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Frontend</h4>
+      <ul>
+        <li><strong>Framework:</strong> React 19 + Vite</li>
+        <li><strong>Language:</strong> TypeScript</li>
+        <li><strong>Styling:</strong> Tailwind CSS + Inline</li>
+        <li><strong>Mobile:</strong> Capacitor (Android/iOS)</li>
+        <li><strong>Charts:</strong> Recharts</li>
+        <li><strong>Markdown:</strong> React Markdown</li>
+        <li><strong>Animation:</strong> Framer Motion</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>AI Provider Integrations</h3>
+  <div class="stat-grid">
+    <div class="stat-card" style="background:#fff3e0;">
+      <div class="number" style="color:#E65100; font-size:24px;">OpenAI</div>
+      <div class="label">15 models (GPT-5.4, o3, DALL-E)</div>
+    </div>
+    <div class="stat-card" style="background:#fce4ec;">
+      <div class="number" style="color:#B71C1C; font-size:24px;">Anthropic</div>
+      <div class="label">5 models (Claude Opus, Sonnet, Haiku)</div>
+    </div>
+    <div class="stat-card" style="background:#e3f2fd;">
+      <div class="number" style="color:#0D47A1; font-size:24px;">Google</div>
+      <div class="label">8 models (Gemini 3, Flash, Veo)</div>
+    </div>
+    <div class="stat-card" style="background:#e8f5e9;">
+      <div class="number" style="color:#1B5E20; font-size:24px;">DeepSeek</div>
+      <div class="label">2 models (Chat, Reasoner)</div>
+    </div>
+    <div class="stat-card" style="background:#fff8e1;">
+      <div class="number" style="color:#F57F17; font-size:24px;">Mistral</div>
+      <div class="label">2 models (Large, Small)</div>
+    </div>
+    <div class="stat-card" style="background:#f3e5f5;">
+      <div class="number" style="color:#6A1B9A; font-size:24px;">Groq</div>
+      <div class="label">3 models (LLaMA, Mixtral)</div>
+    </div>
+  </div>
+
+  <h3>System Architecture</h3>
+  <div class="flow-diagram">
+    <div class="flow-step">
+      <div class="step-num">📱</div>
+      <div class="step-title">Mobile Apps</div>
+      <div class="step-desc">React + Capacitor<br>Android & iOS</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">🌐</div>
+      <div class="step-title">Web App</div>
+      <div class="step-desc">React + Vite<br>intellect.convoia.com</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">⚡</div>
+      <div class="step-title">API Server</div>
+      <div class="step-desc">Express + TypeScript<br>JWT Auth, Rate Limit</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">🗄️</div>
+      <div class="step-title">PostgreSQL</div>
+      <div class="step-desc">Prisma ORM<br>Users, Orgs, Usage</div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">🤖</div>
+      <div class="step-title">AI Gateway</div>
+      <div class="step-desc">Routes to 6 providers<br>36+ models</div>
+    </div>
+  </div>
+
+  <br><br>
+  <div style="text-align:center; padding:40px; border-top: 2px solid #E5E7EB; margin-top:40px;">
+    <p style="font-size: 20px; font-weight: 800; color: #7C3AED;">ConvoiaAI</p>
+    <p style="font-size: 14px; color: #6B7280;">One Platform. Every AI Model. Complete Control.</p>
+    <p style="font-size: 12px; color: #9CA3AF; margin-top: 20px;">
+      Confidential Document — For Internal Use Only<br>
+      Prepared April 2026 — ConvoiaAI Team
+    </p>
+  </div>
+</div>
+
+</body>
+</html>

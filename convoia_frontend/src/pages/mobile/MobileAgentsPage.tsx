@@ -9,13 +9,14 @@ const CATEGORIES = ['All', 'Chat', 'Image', 'Code', 'Research']
 
 export function MobileAgentsPage() {
   const { agents, loading: isLoading } = useAgents()
-  const { setAgentMode } = useChat()
+  const { setAgentMode, setSelectedAgent } = useChat()
   const navigate = useNavigate()
   const toast = useToast()
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All')
 
   const handleSelectAgent = (agent: any) => {
+    setSelectedAgent(agent)
     setAgentMode(true)
     toast.success(`${agent.name} selected — start chatting!`)
     navigate('/chat')

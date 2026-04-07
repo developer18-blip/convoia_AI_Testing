@@ -2,7 +2,7 @@ import { createContext, useCallback, useEffect, useRef, useState, type ReactNode
 import { v4 as uuidv4 } from 'uuid'
 import { useAuth } from '../hooks/useAuth'
 import api from '../lib/api'
-import type { Conversation, Message, ChatFolder } from '../types'
+import type { Agent, Conversation, Message, ChatFolder } from '../types'
 
 const MAX_CONVERSATIONS = 100
 const MAX_MESSAGES_PER_CONV = 500
@@ -101,6 +101,8 @@ export interface ChatContextType {
   stopStreaming: () => void
   agentMode: boolean
   setAgentMode: (v: boolean) => void
+  selectedAgent: Agent | null
+  setSelectedAgent: (agent: Agent | null) => void
   createConversation: (modelId: string, modelName: string, industry?: string) => Conversation
   deleteConversation: (id: string) => void
   setActiveConversation: (id: string | null) => void
@@ -139,6 +141,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const [agentMode, setAgentMode] = useState(false)
+  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
   const stopStreaming = useCallback(() => {
@@ -340,7 +343,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     abortRef.current = controller
 
     try {
-      const allMsgs = [...messages, userMsg].map((m) => ({ role: m.role, content: m.content }))
+      // Cap history to last 20 messages to prevent token explosion in long conversations
+      const MAX_HISTORY = 20
+      const fullHistory = [...messages, userMsg]
+      const cappedHistory = fullHistory.length > MAX_HISTORY ? fullHistory.slice(-MAX_HISTORY) : fullHistory
+      const allMsgs = cappedHistory.map((m) => ({ role: m.role, content: m.content }))
       const token = localStorage.getItem('convoia_token')
       const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
@@ -472,7 +479,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setIsStreaming(true)
 
     try {
-      const history = [...messages, userMsg].map((m) => ({ role: m.role, content: m.content }))
+      // Cap history to last 20 messages to prevent token explosion
+      const MAX_HIST = 20
+      const fullHist = [...messages, userMsg]
+      const cappedHist = fullHist.length > MAX_HIST ? fullHist.slice(-MAX_HIST) : fullHist
+      const history = cappedHist.map((m) => ({ role: m.role, content: m.content }))
       // Embed document/file context directly into the last user message
       // Using role:'system' caused issues with Anthropic and other providers
       let messagesForAPI = history
@@ -633,7 +644,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   return (
     <ChatContext.Provider value={{
       conversations, folders, activeConversationId: activeId, activeConversation,
-      messages, isStreaming, stopStreaming, agentMode, setAgentMode,
+      messages, isStreaming, stopStreaming, agentMode, setAgentMode, selectedAgent, setSelectedAgent,
       createConversation, deleteConversation, setActiveConversation,
       renameConversation, togglePin, moveToFolder,
       createFolder, deleteFolder,

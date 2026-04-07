@@ -29,6 +29,9 @@ const MobileHomePage = lazy(() => import('./pages/mobile/MobileHomePage'))
 const MobileChatPage = lazy(() => import('./pages/mobile/MobileChatPage'))
 const MobileAgentsPage = lazy(() => import('./pages/mobile/MobileAgentsPage'))
 const MobileWalletPage = lazy(() => import('./pages/mobile/MobileWalletPage'))
+const MobileLoginPage = lazy(() => import('./pages/mobile/MobileLoginPage'))
+const MobileRegisterPage = lazy(() => import('./pages/mobile/MobileRegisterPage'))
+const MobileSettingsPage = lazy(() => import('./pages/mobile/MobileSettingsPage'))
 const UsagePage = lazy(() => import('./pages/UsagePage'))
 const SessionsPage = lazy(() => import('./pages/SessionsPage'))
 const TeamPage = lazy(() => import('./pages/TeamPage'))
@@ -137,8 +140,8 @@ function AppRoutes() {
       <Routes>
         {/* Public */}
         <Route path="/" element={<NativeHomeRedirect />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/login" element={isNative ? <MobileLoginPage /> : <LoginPage />} />
+        <Route path="/register" element={isNative ? <MobileRegisterPage /> : <RegisterPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/join" element={<JoinPage />} />
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
@@ -151,7 +154,7 @@ function AppRoutes() {
           <Route path="/chat" element={isNative ? <MobileChatPage /> : <ChatPage />} />
           <Route path="/models" element={isNative ? <MobileAgentsPage /> : <ModelsPage />} />
           <Route path="/usage" element={<UsagePage />} />
-          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/settings" element={isNative ? <MobileSettingsPage /> : <SettingsPage />} />
           <Route path="/api-docs" element={<ApiDocsPage />} />
           {/* Token purchase — only freelancers + org_owner + platform_admin */}
           <Route element={<TokenBuyGuard />}>

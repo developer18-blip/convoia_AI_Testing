@@ -331,9 +331,22 @@ export const queryAIStream = async (req: Request, res: Response) => {
     if (!user) { res.status(404).json({ success: false, message: 'User not found' }); return; }
     const organizationId = await getOrCreatePersonalOrg(user.id);
 
+    // ── CAP CONVERSATION HISTORY ──────────────────────────────
+    // Prevent token explosion: only keep the last MAX_HISTORY_MESSAGES.
+    // Keeps the first system message (if any) + the most recent messages.
+    const MAX_HISTORY_MESSAGES = 20;
+    let cappedMessages = messages;
+    if (messages.length > MAX_HISTORY_MESSAGES) {
+      const systemMsg = messages[0]?.role === 'system' ? [messages[0]] : [];
+      const recentMsgs = messages.slice(-(MAX_HISTORY_MESSAGES - systemMsg.length));
+      const trimmedCount = messages.length - (systemMsg.length + recentMsgs.length);
+      cappedMessages = [...systemMsg, ...recentMsgs];
+      logger.info(`Trimmed conversation history: removed ${trimmedCount} old messages, keeping ${cappedMessages.length} (max ${MAX_HISTORY_MESSAGES})`);
+    }
+
     // Check token balance — estimate includes system prompt (~500 tokens) + all message history
     const streamTokenBalance = await TokenWalletService.getBalance(user.id);
-    const inputText = messages.map((m: any) => m.content).join(' ');
+    const inputText = cappedMessages.map((m: any) => m.content).join(' ');
     const estimatedInputTokens = Math.ceil(inputText.length / 4) + 500;
     const minimumRequired = estimatedInputTokens + 200;
 
@@ -409,7 +422,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
     }
 
     // ── SMART ROUTER — unified intent detection ─────────────────
-    const lastUserMessage = [...messages].reverse().find((m: any) => m.role === 'user');
+    const lastUserMessage = [...cappedMessages].reverse().find((m: any) => m.role === 'user');
     const lastUserText = typeof lastUserMessage?.content === 'string' ? lastUserMessage.content : '';
 
     const route = await smartRoute({
@@ -417,7 +430,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
       hasImageAttachment: !!referenceImage || (referenceImages && referenceImages.length > 0),
       hasDocumentContext: lastUserText.includes('Here is the attached document content:'),
       agentId,
-      conversationMessages: messages,
+      conversationMessages: cappedMessages,
       prisma,
     });
 
@@ -587,7 +600,7 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
 
         // Enhance prompt with conversation context
         const enhancedPrompt = enhanceImagePrompt(imageIntent.extractedSubject, {
-          conversationContext: messages,
+          conversationContext: cappedMessages,
         });
 
         res.write(`data: ${JSON.stringify({ type: 'chunk', content: `**Generating image:** "${enhancedPrompt.substring(0, 100)}..."\n\n` })}\n\n`);
@@ -745,7 +758,7 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
     });
 
     // Web search: check if the latest user message needs real-time data
-    const lastUserMsg = [...messages].reverse().find((m: any) => m.role === 'user');
+    const lastUserMsg = [...cappedMessages].reverse().find((m: any) => m.role === 'user');
     const rawUserContent = typeof lastUserMsg?.content === 'string' ? lastUserMsg.content : '';
     // Extract actual user question if document context is embedded
     const docSeparator = '---\n\nUser question: ';
@@ -753,7 +766,7 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
     const userQuery = hasDocContext && rawUserContent.includes(docSeparator)
       ? rawUserContent.split(docSeparator).pop()?.trim() || rawUserContent
       : rawUserContent;
-    let enrichedMessages = messages;
+    let enrichedMessages = cappedMessages;
 
     if (userQuery && needsWebSearch(userQuery, hasDocContext)) {
       try {
@@ -763,7 +776,7 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
           webSearched = true;
           // Append search data to user message (formatting rules go in system prompt below)
           const searchPrefix = `\n\n[LIVE WEB SEARCH DATA — searched on ${new Date().toISOString().split('T')[0]}]\n\n${searchResult.contextText}`;
-          enrichedMessages = [...messages];
+          enrichedMessages = [...cappedMessages];
           const lastIdx = enrichedMessages.length - 1;
           if (enrichedMessages[lastIdx]?.role === 'user') {
             enrichedMessages[lastIdx] = {

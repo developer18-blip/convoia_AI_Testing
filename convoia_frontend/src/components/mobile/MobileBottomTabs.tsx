@@ -13,7 +13,8 @@ export function MobileBottomTabs() {
   const location = useLocation()
   const navigate = useNavigate()
 
-  const activeTab = TABS.findIndex(t => location.pathname.startsWith(t.path)) ?? 0
+  const idx = TABS.findIndex(t => location.pathname.startsWith(t.path))
+  const activeTab = idx >= 0 ? idx : 0
 
   return (
     <nav className="mobile-tab-bar" style={{
