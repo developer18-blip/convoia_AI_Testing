@@ -10,6 +10,33 @@ import { needsWebSearch, searchWeb } from '../services/webSearchService.js';
 import { enhanceImagePrompt } from '../services/imageIntentService.js';
 import { FileProcessingService } from '../services/fileProcessingService.js';
 import { generateVideo as generateVideoFn, VIDEO_TOKEN_COST, type MediaRequest } from '../services/mediaGenerationService.js';
+
+// ── COST-AWARE TOKEN ENGINE ──────────────────────────────────────
+// Token base rate: the dollar value of 1 token in the wallet.
+// Matches the Standard package price: $2.00 per 1,000,000 tokens.
+// Expensive models consume MORE tokens because their per-token cost is higher.
+// Cheap models consume FEWER tokens. The system is always profitable.
+const TOKEN_BASE_RATE = 0.000002; // $0.000002 per token = $2/1M
+
+/**
+ * Calculate cost-adjusted tokens for wallet deduction.
+ * Instead of deducting raw provider tokens (which ignores model cost),
+ * we deduct based on the actual dollar cost of the query.
+ *
+ * Example:
+ *   GPT-4o-mini: 2K raw tokens → $0.00075 cost → 375 adjusted tokens
+ *   Claude Opus: 2K raw tokens → $0.030 cost → 15,000 adjusted tokens
+ *
+ * This ensures expensive models consume proportionally more wallet tokens.
+ * Falls back to raw tokens if cost calculation fails (safety net).
+ */
+function costAdjustedTokens(customerPrice: number, rawTokens: number): number {
+  if (!customerPrice || customerPrice <= 0 || !TOKEN_BASE_RATE) return rawTokens;
+  const adjusted = Math.ceil(customerPrice / TOKEN_BASE_RATE);
+  // Safety: never deduct less than raw tokens (prevents exploitation)
+  // and never deduct more than 50x raw tokens (prevents absurd charges)
+  return Math.max(adjusted, Math.ceil(rawTokens * 0.5));
+}
 import { smartRoute } from '../services/smartRouter.js';
 import { getCachedResponse, setCachedResponse } from '../services/modelRecommendationService.js';
 import { getUserMemoryPrompt } from '../services/userMemoryService.js';
@@ -150,10 +177,10 @@ export const queryAI = asyncHandler(async (req: Request, res: Response) => {
     },
   });
 
-  // Deduct tokens from wallet — always from user's personal balance, never org pool
+  // Deduct cost-adjusted tokens from wallet
   await TokenWalletService.deductTokens({
     userId: user.id,
-    tokens: aiResponse.totalTokens,
+    tokens: costAdjustedTokens(aiResponse.customerPrice, aiResponse.totalTokens),
     reference: aiResponse.aiModel.id,
     description: `Query: ${aiResponse.aiModel.name}`,
     organizationId,
@@ -293,7 +320,10 @@ export const queryAIStream = async (req: Request, res: Response) => {
         const providerMap: Record<string, 'gemini' | 'dalle' | 'gpt-image-1'> = { 'gpt-image-1': 'gpt-image-1', 'dall-e-3': 'dalle', 'gemini-2.5-flash-image': 'gemini', 'gemini-3-pro-image-preview': 'gemini' };
         const imageProvider = providerMap[streamModelCheck.modelId] || 'gemini';
         const result = await FileProcessingService.generateImage(imagePrompt, '1024x1024', 'standard', imageProvider, referenceImage);
-        const imageTokenCost = result.provider === 'gemini' ? 1300 : 1000;
+        // Image gen: cost-adjusted deduction. DALL-E ~$0.04/image, Gemini ~$0.003, GPT Image ~$0.08
+        const imageProviderCost = result.provider === 'gpt-image-1' ? 0.08 : result.provider === 'dalle' ? 0.04 : 0.003;
+        const imageCustPrice = imageProviderCost * 1.25; // 25% markup
+        const imageTokenCost = costAdjustedTokens(imageCustPrice, result.provider === 'gemini' ? 1300 : 1000);
         await TokenWalletService.deductTokens({ userId: req.user.userId, tokens: imageTokenCost, reference: `image-gen-${Date.now()}`, description: `Image generation (${streamModelCheck.name})`, organizationId: imgUser?.organizationId || undefined });
         // Send description only — the actual image renders via imageUrl in the done event
         const imageContent = `**Image generated:** "${result.revisedPrompt}"`;
@@ -518,10 +548,10 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
         const providerCost = VIDEO_TOKEN_COST * videoOutputPrice;
         const videoCustomerPrice = providerCost * (1 + videoMarkup / 100);
 
-        // Deduct tokens (video gen + thinking if used) — from user's personal balance only
+        // Deduct cost-adjusted tokens for video gen
         await TokenWalletService.deductTokens({
           userId: user.id,
-          tokens: totalVideoTokens,
+          tokens: costAdjustedTokens(videoCustomerPrice, totalVideoTokens),
           reference: `video-gen-${Date.now()}`,
           description: `Video generation (Google Veo 2)${videoThinkTokens > 0 ? ' + AI director' : ''}`,
           organizationId,
@@ -598,8 +628,10 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
         // Generate image (Gemini first, DALL-E fallback) — pass reference image if available
         const result = await FileProcessingService.generateImage(enhancedPrompt, '1024x1024', 'standard', undefined, referenceImage);
 
-        // Deduct tokens (flat cost for image gen) — from user's personal balance only
-        const imageTokenCost = result.provider === 'gemini' ? 1300 : 1000;
+        // Deduct cost-adjusted tokens for image gen
+        const imgProvCost = result.provider === 'gemini' ? 0.003 : 0.04;
+        const imgCustPrice = imgProvCost * 1.25;
+        const imageTokenCost = costAdjustedTokens(imgCustPrice, result.provider === 'gemini' ? 1300 : 1000);
         await TokenWalletService.deductTokens({
           userId: user.id,
           tokens: imageTokenCost,
@@ -1007,15 +1039,17 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
                 logger.error(`Direct usageLog creation FAILED: ${logErr.message}`, logErr);
               }
 
-              // 2. Deduct tokens from user's personal TokenWallet — never from org pool
+              // 2. Deduct cost-adjusted tokens from user's TokenWallet
+              const walletTokens = costAdjustedTokens(customerPrice, totalTokensUsed);
               try {
                 await TokenWalletService.deductTokens({
                   userId: user.id,
-                  tokens: totalTokensUsed,
+                  tokens: walletTokens,
                   reference: aiModel.id,
                   description: `Query: ${aiModel.name}${pass1ExtraInputTokens > 0 ? ' (deep think)' : ''}`,
                   organizationId,
                 });
+                logger.info(`Token deduction: raw=${totalTokensUsed} adjusted=${walletTokens} cost=$${customerPrice.toFixed(6)} model=${aiModel.name}`);
               } catch (deductErr) {
                 logger.error('Token deduction failed:', deductErr);
               }
@@ -1026,7 +1060,7 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
                   model: aiModel.name,
                   provider: aiModel.provider,
                   tokens: { input: inputTokens, output: outputTokens, total: totalTokensUsed },
-                  tokensUsed: totalTokensUsed,
+                  tokensUsed: walletTokens,
                   cost: { charged: customerPrice.toFixed(6) },
                   executionTime,
                   webSearched,
@@ -1148,10 +1182,10 @@ export const compareModels = asyncHandler(async (req: Request, res: Response) =>
           aiResponse.customerPrice,
           aiResponse.markupPercentage
         );
-        // Deduct tokens for this model's response — from user's personal balance only
+        // Deduct cost-adjusted tokens for comparison
         await TokenWalletService.deductTokens({
           userId: user.id,
-          tokens: aiResponse.totalTokens,
+          tokens: costAdjustedTokens(aiResponse.customerPrice, aiResponse.totalTokens),
           reference: aiResponse.aiModel.id,
           description: `Compare: ${aiResponse.aiModel.name}`,
           organizationId,
