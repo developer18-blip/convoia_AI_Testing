@@ -109,7 +109,7 @@ export function PersonalView({ stats, wallet: _wallet, recentUsage, insights, us
             yKey={chartMode}
             color="var(--color-accent-start)"
             height={280}
-            formatY={chartMode === 'cost' ? (v: number) => `$${v.toFixed(2)}` : undefined}
+            formatY={chartMode === 'cost' ? (v: number) => `$${(Number(v) || 0).toFixed(2)}` : undefined}
           />
         </Card>
         <Card className="lg:col-span-2" padding="lg">

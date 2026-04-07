@@ -104,7 +104,7 @@ export function ManagerView({ stats, userName, orgName }: ManagerViewProps) {
         />
         <StatCard
           title="Budget Health"
-          value={`${avgBudgetPct.toFixed(0)}% avg`}
+          value={`${(Number(avgBudgetPct) || 0).toFixed(0)}% avg`}
           subtitle={budgetSubtitle}
           icon={<Shield size={20} />}
           className={membersNearLimit > 0 ? 'border-amber-500/30' : 'border-emerald-500/20'}

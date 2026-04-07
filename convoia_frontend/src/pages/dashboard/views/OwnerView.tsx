@@ -277,7 +277,7 @@ export function OwnerView({ stats, userName, orgName }: OwnerViewProps) {
           xKey="date"
           yKey="cost"
           height={220}
-          formatY={(v: number) => `$${v.toFixed(2)}`}
+          formatY={(v: number) => `$${(Number(v) || 0).toFixed(2)}`}
         />
       </Card>
 

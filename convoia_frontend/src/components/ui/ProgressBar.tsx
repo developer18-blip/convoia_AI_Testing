@@ -27,9 +27,9 @@ export function ProgressBar({ value, max = 100, size = 'md', showLabel, classNam
     <div className={cn('w-full', className)}>
       {showLabel && (
         <div className="flex justify-between text-xs text-text-muted mb-1.5">
-          <span className="font-medium">{percentage.toFixed(0)}%</span>
+          <span className="font-medium">{(Number(percentage) || 0).toFixed(0)}%</span>
           <span>
-            {value.toFixed(2)} / {max.toFixed(2)}
+            {(Number(value) || 0).toFixed(2)} / {(Number(max) || 0).toFixed(2)}
           </span>
         </div>
       )}
