@@ -116,8 +116,8 @@ export function AdminView() {
         <button onClick={() => {
           const rows = [
             ['Type', 'Name', 'Email', 'Revenue ($)', 'Queries'],
-            ...stats.topOrgs.map((o) => ['Organization', o.name, '', o.revenue.toFixed(4), String(o.queries)]),
-            ...stats.topPersonalUsers.map((u) => ['Personal', u.name, u.email, u.revenue.toFixed(4), String(u.queries)]),
+            ...(stats.topOrgs || []).map((o: any) => ['Organization', o.name, '', (Number(o.revenue) || 0).toFixed(4), String(o.queries)]),
+            ...(stats.topPersonalUsers || []).map((u: any) => ['Personal', u.name, u.email, (Number(u.revenue) || 0).toFixed(4), String(u.queries)]),
           ]
           const csv = rows.map((r) => r.join(',')).join('\n')
           const blob = new Blob([csv], { type: 'text/csv' })
@@ -133,7 +133,7 @@ export function AdminView() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard title="Revenue" value={formatCurrency(stats.revenue)} subtitle="This month" icon={<DollarSign size={20} />} />
         <StatCard title="Provider Cost" value={formatCurrency(stats.providerCost)} subtitle="This month" icon={<TrendingUp size={20} />} />
-        <StatCard title="Profit Margin" value={`${stats.profitMargin.toFixed(1)}%`} icon={<BarChart3 size={20} />} />
+        <StatCard title="Profit Margin" value={`${(Number(stats.profitMargin) || 0).toFixed(1)}%`} icon={<BarChart3 size={20} />} />
         <StatCard title="Queries Today" value={formatNumber(stats.queriesToday)} icon={<Activity size={20} />} />
         <StatCard title="Active Orgs" value={String(stats.activeOrgs)} icon={<Building2 size={20} />} />
         <StatCard title="New Users" value={String(stats.newUsers)} subtitle="This month" icon={<Users size={20} />} />

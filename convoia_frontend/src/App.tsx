@@ -221,7 +221,7 @@ function AppRoutes() {
 
           {/* Platform Admin */}
           <Route element={<RoleGuard allowedRoles={['platform_admin']} />}>
-            <Route path="/admin" element={<DashboardPage />} />
+            <Route path="/admin" element={isNative ? <MobileHomePage /> : <DashboardPage />} />
             <Route path="/admin/orgs" element={<AdminOrgsPage />} />
             <Route path="/admin/users" element={<AdminUsersPage />} />
             <Route path="/admin/users/:userId" element={<AdminUserDetailPage />} />
