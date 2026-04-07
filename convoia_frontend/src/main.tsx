@@ -6,6 +6,15 @@ import App from './App.tsx'
 import { initNativeBridge } from './lib/capacitor'
 import { initStorageCache } from './lib/storage'
 
+// Global error handler — logs full stack trace for debugging
+window.addEventListener('error', (e) => {
+  console.error('[GLOBAL ERROR]', e.message, '\nFile:', e.filename, '\nLine:', e.lineno, '\nCol:', e.colno)
+  if (e.error?.stack) console.error('[STACK]', e.error.stack)
+})
+window.addEventListener('unhandledrejection', (e) => {
+  console.error('[UNHANDLED PROMISE]', e.reason?.message || e.reason, e.reason?.stack)
+})
+
 // Initialize secure storage cache + native plugins (no-ops on web)
 initStorageCache()
 initNativeBridge()
