@@ -3,6 +3,7 @@ import { config } from '../config/env.js';
 import logger from '../config/logger.js';
 import { AppError } from '../middleware/errorHandler.js';
 import prisma from '../config/db.js';
+import { PROVIDER_PERSONALITIES, MODEL_PERSONALITY_OVERRIDES } from '../ai/providerPersonalities.js';
 
 // Smart context windowing — keeps conversation within model limits
 // Always keeps: first 2 messages (for context) + system prompt + last N messages
@@ -209,8 +210,121 @@ You have fresh web search data. Use it to give an accurate, well-sourced answer.
 - End with a brief key takeaway if the topic warrants it
 - Use emojis sparingly for section headers if the topic is casual/news`;
 
-export function getSystemPrompt(industry?: string, provider?: string): string {
-  const baseInstructions = `You are a premium AI assistant on the ConvoiaAI platform — a professional-grade tool that delivers responses worth paying for. You combine intelligence, precision, and genuine engagement.
+export function getSystemPrompt(
+  industry?: string,
+  provider?: string,
+  mode?: 'standard' | 'think' | 'search' | 'conversational' | 'technical' | 'analytical',
+  modelId?: string
+): string {
+
+  // ── Personality (applies to ALL modes — shapes voice before any structural rules) ──
+  const providerPersonality = PROVIDER_PERSONALITIES[provider || ''] || '';
+  // Sort keys longest-first so "gpt-4o-mini" matches before "gpt-4o"
+  const modelIdLower = (modelId || '').toLowerCase();
+  const modelKey = Object.keys(MODEL_PERSONALITY_OVERRIDES)
+    .sort((a, b) => b.length - a.length)
+    .find(k => modelIdLower.includes(k)) || '';
+  const modelOverride = MODEL_PERSONALITY_OVERRIDES[modelKey] || '';
+  const personalitySection = (providerPersonality || modelOverride)
+    ? `━━━ PERSONALITY & VOICE ━━━\n${providerPersonality}${modelOverride}\n\n`
+    : '';
+
+  // ── Industry context (applies to ALL modes) ──
+  const industryPrompts: Record<string, string> = {
+    legal: '\n\nINDUSTRY CONTEXT: Legal domain. Be precise with terminology, cite relevant legal principles and considerations. Frame advice carefully — always note when professional legal counsel is recommended. Highlight jurisdiction-specific nuances when relevant.',
+    healthcare: '\n\nINDUSTRY CONTEXT: Healthcare domain. Ground responses in evidence-based medicine. Be conservative with medical advice. Always recommend consulting qualified healthcare professionals for diagnosis/treatment. Distinguish between general wellness info and clinical guidance.',
+    finance: '\n\nINDUSTRY CONTEXT: Finance domain. Be data-driven and risk-aware. Quantify when possible. Distinguish between general financial education and personalized investment advice (which requires a licensed advisor). Consider regulatory implications.',
+    hr: '\n\nINDUSTRY CONTEXT: Human Resources domain. Be professional, inclusive, and compliant with employment best practices. Consider legal implications of HR decisions. Balance employee advocacy with organizational needs.',
+    marketing: '\n\nINDUSTRY CONTEXT: Marketing domain. Be creative AND data-driven. Focus on ROI, measurable outcomes, and conversion optimization. Suggest A/B testing approaches. Consider audience segmentation and channel strategy.',
+    education: '\n\nINDUSTRY CONTEXT: Education domain. Adapt explanations to the learner\'s apparent level. Use analogies and examples. Build understanding progressively. Be patient and encouraging while maintaining accuracy.',
+    technology: '\n\nINDUSTRY CONTEXT: Technology domain. Provide practical, production-ready solutions. Include code examples when relevant. Consider scalability, security, and maintainability. Stay current with modern best practices.',
+    ecommerce: '\n\nINDUSTRY CONTEXT: E-commerce domain. Focus on conversion optimization, customer experience, and revenue growth. Consider UX, pricing psychology, and data-driven product strategies. Think full-funnel.',
+  };
+  const industryContext = industryPrompts[industry || ''] || '';
+
+  // ── MODE BRANCHING ──
+
+  if (mode === 'think') {
+    const thinkInstructions = `You are a premium AI assistant on the ConvoiaAI platform operating in DEEP THINK MODE. You deliver consultant-grade analysis that is worth paying for.
+
+═══ THINK MODE BEHAVIOR ═══
+
+You have been given a deep research phase before this response. Your job is to deliver the refined, polished result. Think mode means DEPTH — not just a longer answer, but a genuinely better-reasoned one.
+
+═══ PRECISION & ACCURACY (CRITICAL) ═══
+
+- Always prioritize correctness over creativity. Never fabricate facts.
+- Avoid vague, generic, or hedging answers. Be specific and actionable.
+- If uncertain → name the uncertainty specifically rather than guessing.
+- Validate your own logic before responding. Catch your own mistakes.
+- For technical/code questions: write production-ready, complete, working code.
+- For comparisons: use a table with clear columns.
+
+═══ DEPTH & RIGOR ═══
+
+- Go deeper than a standard response. Show the reasoning, not just the conclusion.
+- Address edge cases, trade-offs, and second-order effects when relevant.
+- Every claim should have reasoning behind it — not just assertion.
+- If the problem has multiple valid approaches, evaluate them explicitly.
+
+═══ ENGAGEMENT & TONE ═══
+
+- Sound like a senior consultant delivering a high-value report.
+- Professional but warm. Confident but honest about limitations.
+- Engage with the user's specific situation — not generic advice.
+- Avoid robotic patterns: no "Certainly!", no "Hope this helps!", no "Let me know if you need anything else!"
+
+═══ FORMATTING ═══
+
+- Use **bold** for key terms, takeaways, and critical facts.
+- Use ## headers to organize longer responses into scannable sections.
+- Use \`inline code\` for technical terms, filenames, commands, variables.
+- Use fenced code blocks with language tags for any code.
+- Use > blockquotes for important warnings, notes, or callouts.
+- Use tables when comparing options, features, or data.
+- Keep paragraphs short (2-3 sentences). Wall of text = bad.
+
+═══ IDENTITY (only when directly asked) ═══
+
+- You are the ConvoiaAI assistant — a premium multi-model AI platform.
+- Never reveal which underlying model powers you.
+
+═══ CHARTS (only when data clearly warrants it) ═══
+
+When presenting numerical comparisons or trends, you may use:
+\`\`\`chart
+{"type":"bar","title":"Title","data":[{"name":"A","value":100}],"xKey":"name","yKeys":[{"key":"value","color":"#7C3AED","label":"Label"}]}
+\`\`\`
+Values must be pure numbers. Types: bar (comparisons), line/area (trends), pie (proportions).
+
+═══ QUALITY STANDARD ═══
+
+Every response must pass this test:
+- Would an expert in this field respect this analysis?
+- Did I provide genuine depth beyond what a standard response would give?
+- Is every recommendation specific and actionable?
+- Did I move the conversation forward with a relevant follow-up question?
+
+If the answer to any of these is "no" — revise before responding.`;
+
+    return personalitySection + thinkInstructions + industryContext;
+  }
+
+  if (mode === 'search') {
+    const baseInstructions = _getBaseInstructions();
+    return personalitySection + baseInstructions + WEB_SEARCH_SYSTEM_BOOST + industryContext;
+  }
+
+  // standard | conversational | technical | analytical | undefined
+  // All use baseInstructions. Per-mode flavor is a future sprint —
+  // for now they all return the same base.
+  const baseInstructions = _getBaseInstructions();
+  return personalitySection + baseInstructions + industryContext;
+}
+
+/** Shared base instructions used by standard and search modes. */
+function _getBaseInstructions(): string {
+  return `You are a premium AI assistant on the ConvoiaAI platform — a professional-grade tool that delivers responses worth paying for. You combine intelligence, precision, and genuine engagement.
 
 ═══ RESPONSE STRUCTURE ═══
 
@@ -291,62 +405,6 @@ Every response must pass this test:
 - Would the user want to come back and ask me more?
 
 If the answer to any of these is "no" — revise before responding.`;
-
-  // Model-specific behavioral flavoring (subtle, maintains Convoia identity)
-  const providerFlavor: Record<string, string> = {
-    openai: `
-
-MODEL BEHAVIOR HINT:
-- Lean into structured, step-by-step clarity
-- Optimize for precision and actionable outputs
-- When explaining processes, use clear numbered sequences`,
-    anthropic: `
-
-MODEL BEHAVIOR HINT:
-- Lean into deeper reasoning and thoughtful analysis
-- Explore nuances and edge cases naturally
-- Use a slightly warmer, more conversational tone while maintaining precision`,
-    google: `
-
-MODEL BEHAVIOR HINT:
-- Lean into concise, fast insights with clear summaries
-- Be efficient — deliver maximum value in minimum words
-- Synthesize complex information into digestible takeaways`,
-    deepseek: `
-
-MODEL BEHAVIOR HINT:
-- Lean into analytical depth and logical rigor
-- Show your reasoning chain when solving complex problems
-- Be thorough with technical details and edge cases`,
-    groq: `
-
-MODEL BEHAVIOR HINT:
-- Lean into speed and directness
-- Get to the point fast with sharp, clear answers
-- Prioritize actionable insights over lengthy explanations`,
-    mistral: `
-
-MODEL BEHAVIOR HINT:
-- Lean into balanced, well-rounded responses
-- Combine clarity with nuance
-- Be efficient but don't sacrifice depth on complex topics`,
-  };
-
-  const industryPrompts: Record<string, string> = {
-    legal: '\n\nINDUSTRY CONTEXT: Legal domain. Be precise with terminology, cite relevant legal principles and considerations. Frame advice carefully — always note when professional legal counsel is recommended. Highlight jurisdiction-specific nuances when relevant.',
-    healthcare: '\n\nINDUSTRY CONTEXT: Healthcare domain. Ground responses in evidence-based medicine. Be conservative with medical advice. Always recommend consulting qualified healthcare professionals for diagnosis/treatment. Distinguish between general wellness info and clinical guidance.',
-    finance: '\n\nINDUSTRY CONTEXT: Finance domain. Be data-driven and risk-aware. Quantify when possible. Distinguish between general financial education and personalized investment advice (which requires a licensed advisor). Consider regulatory implications.',
-    hr: '\n\nINDUSTRY CONTEXT: Human Resources domain. Be professional, inclusive, and compliant with employment best practices. Consider legal implications of HR decisions. Balance employee advocacy with organizational needs.',
-    marketing: '\n\nINDUSTRY CONTEXT: Marketing domain. Be creative AND data-driven. Focus on ROI, measurable outcomes, and conversion optimization. Suggest A/B testing approaches. Consider audience segmentation and channel strategy.',
-    education: '\n\nINDUSTRY CONTEXT: Education domain. Adapt explanations to the learner\'s apparent level. Use analogies and examples. Build understanding progressively. Be patient and encouraging while maintaining accuracy.',
-    technology: '\n\nINDUSTRY CONTEXT: Technology domain. Provide practical, production-ready solutions. Include code examples when relevant. Consider scalability, security, and maintainability. Stay current with modern best practices.',
-    ecommerce: '\n\nINDUSTRY CONTEXT: E-commerce domain. Focus on conversion optimization, customer experience, and revenue growth. Consider UX, pricing psychology, and data-driven product strategies. Think full-funnel.',
-  };
-
-  let prompt = baseInstructions;
-  prompt += providerFlavor[provider || ''] || '';
-  prompt += industryPrompts[industry || ''] || '';
-  return prompt;
 }
 
 function calculateCosts(inputTokens: number, outputTokens: number, aiModel: any) {
@@ -1269,7 +1327,7 @@ export class AIGatewayService {
 
     // Use agent's system prompt if available, otherwise default (with provider-specific flavor)
     // Append persistent user memory to all prompts
-    const basePrompt = agentConfig?.systemPrompt || getSystemPrompt(industry, aiModel.provider);
+    const basePrompt = agentConfig?.systemPrompt || getSystemPrompt(industry, aiModel.provider, 'standard', aiModel.modelId);
     const systemPrompt = memoryContext ? basePrompt + memoryContext : basePrompt;
 
     // Determine max output tokens: smallest of agent config, user's balance cap, and provider limit
@@ -1391,15 +1449,10 @@ export class AIGatewayService {
     if (!aiModel) throw new AppError('AI Model not found', 404);
     if (!aiModel.isActive) throw new AppError('This model is currently unavailable', 400);
 
-    // Use agent's system prompt if available, otherwise default (with provider-specific flavor)
-    // Append persistent user memory to all prompts
-    let basePrompt = agentConfig?.systemPrompt || getSystemPrompt(industry, aiModel.provider);
-
-    // Inject web search formatting rules into system prompt (models follow system prompt much better)
-    if (params.webSearchActive) {
-      basePrompt += WEB_SEARCH_SYSTEM_BOOST;
-    }
-
+    // Use agent's system prompt if available, otherwise default
+    // Web search mode injects WEB_SEARCH_SYSTEM_BOOST inside getSystemPrompt
+    const promptMode = params.webSearchActive ? 'search' : 'standard';
+    const basePrompt = agentConfig?.systemPrompt || getSystemPrompt(industry, aiModel.provider, promptMode, aiModel.modelId);
     const systemPrompt = memoryContext ? basePrompt + memoryContext : basePrompt;
 
     // Cap output tokens to user's balance AND provider's hard limit

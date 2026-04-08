@@ -951,7 +951,8 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
           // engagement behavior, and model-specific flavor.
           const thinkIndustry = industry || user.organization?.industry || undefined;
           const thinkProvider = selectedModel?.provider || undefined;
-          const baseThinkPrompt = getSystemPrompt(thinkIndustry, thinkProvider);
+          const thinkModelId = selectedModel?.modelId || undefined;
+          const baseThinkPrompt = getSystemPrompt(thinkIndustry, thinkProvider, 'think', thinkModelId);
 
           agentConfig = {
             systemPrompt: baseThinkPrompt + `\n\n═══ THINK MODE: REFINEMENT PASS ═══\nYou have just completed a deep research phase. Now deliver a polished, consultant-grade response based on that research. Follow the output format in the user's message exactly. Be thorough but concise — every sentence must earn its place. The follow-up questions are MANDATORY.`,
