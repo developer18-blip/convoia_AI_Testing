@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  ArrowRight, Globe, DollarSign, Building2, Clock, Shield, Brain,
+  ArrowRight, Globe, DollarSign, Building2, Shield, Brain,
   Check, ChevronRight, ChevronDown, Bot, Sparkles, Calculator, Star, Quote, Send, X,
 } from 'lucide-react'
 import { useState, useMemo, useRef, useEffect } from 'react'
@@ -9,12 +9,12 @@ import { ThemeToggle } from '../../components/shared/ThemeToggle'
 import api from '../../lib/api'
 
 const features = [
-  { icon: <Globe size={24} />, title: 'Universal Gateway', description: 'Access GPT-4o, Claude, Gemini, DeepSeek, Mistral, and Llama through a single API.' },
-  { icon: <DollarSign size={24} />, title: 'Cost Tracking', description: 'Real-time cost per query, per user, per team. Know exactly where every dollar goes.' },
-  { icon: <Building2 size={24} />, title: 'Enterprise Hierarchy', description: 'Organizations, teams, managers, budgets. Built for how real companies work.' },
-  { icon: <Clock size={24} />, title: 'Pay-Per-Hour Sessions', description: 'Buy dedicated model time. Perfect for intensive research or coding sessions.' },
-  { icon: <Shield size={24} />, title: 'Auto Fallback', description: 'Set budget caps with automatic model downgrade. Never get a surprise bill.' },
-  { icon: <Brain size={24} />, title: 'Industry AI', description: 'Optimized prompts for Legal, Healthcare, Finance, HR, and Marketing.' },
+  { icon: <Globe size={24} />, title: 'Universal Gateway', description: 'Access GPT-5.4, Claude Opus 4.6, Gemini 3.1, DeepSeek, and more through a single platform.' },
+  { icon: <DollarSign size={24} />, title: 'Smart Cost Engine', description: 'Cost-aware token deduction — cheap models cost less, expensive models cost more. Always transparent.' },
+  { icon: <Building2 size={24} />, title: 'Enterprise Hierarchy', description: 'Organizations, teams, managers, budgets, token allocation. Built for how real companies work.' },
+  { icon: <Brain size={24} />, title: 'Deep Think Mode', description: 'Multi-pass reasoning with research, analysis, and refinement. Like having a senior consultant.' },
+  { icon: <Shield size={24} />, title: 'Auto Fallback', description: 'Set budget caps with automatic model downgrade. Provider goes down? Auto-switches. Zero downtime.' },
+  { icon: <Sparkles size={24} />, title: 'AI Agents', description: 'Pre-built expert agents for coding, writing, analysis, marketing, and more. One-click expertise.' },
 ]
 
 const providers = [
@@ -44,103 +44,145 @@ interface TokenPackage {
 
 const plans: TokenPackage[] = [
   {
-    name: 'Basic',
-    price: 1,
+    name: 'Starter',
+    price: 5,
     tokens: 500_000,
-    pricePerMillion: 2.00,
+    pricePerMillion: 10.00,
     icon: '⚡',
     savings: null,
     features: [
       '500,000 tokens',
-      'All 35+ AI models',
-      'Image generation',
+      'All 28+ AI models',
+      'Image & video generation',
       'No expiry — use anytime',
     ],
     popular: false,
-    cta: 'Buy 500K Tokens',
-    miniMsgs: 1_000,
-    proMsgs: 333,
+    cta: 'Get Started',
+    miniMsgs: 500,
+    proMsgs: 80,
   },
   {
     name: 'Standard',
-    price: 2,
-    tokens: 1_000_000,
-    pricePerMillion: 2.00,
-    icon: '🔥',
-    savings: null,
+    price: 14,
+    tokens: 2_000_000,
+    pricePerMillion: 7.00,
+    icon: '🚀',
+    savings: 'Save 30%',
     features: [
-      '1,000,000 tokens',
-      'All 35+ AI models',
-      'Image generation',
+      '2,000,000 tokens',
+      'All 28+ AI models',
+      'Deep Think Mode',
+      'Image & video generation',
       'Usage analytics',
-      'API access',
     ],
     popular: false,
-    cta: 'Buy 1M Tokens',
+    cta: 'Buy 2M Tokens',
     miniMsgs: 2_000,
-    proMsgs: 667,
+    proMsgs: 320,
   },
   {
     name: 'Popular',
-    price: 8,
+    price: 25,
     tokens: 5_000_000,
-    pricePerMillion: 1.60,
-    icon: '🚀',
-    savings: 'Save 20%',
+    pricePerMillion: 5.00,
+    icon: '⭐',
+    savings: 'Save 50%',
     features: [
       '5,000,000 tokens',
-      'All 35+ AI models + priority',
-      'Image generation',
+      'All 28+ AI models',
+      'Deep Think Mode',
+      'AI Agents',
       'Team token allocation',
       'Usage analytics',
-      'API access',
     ],
     popular: true,
     cta: 'Buy 5M Tokens',
-    miniMsgs: 10_000,
-    proMsgs: 3_333,
+    miniMsgs: 5_000,
+    proMsgs: 800,
   },
   {
     name: 'Power',
-    price: 14,
-    tokens: 10_000_000,
-    pricePerMillion: 1.40,
+    price: 60,
+    tokens: 15_000_000,
+    pricePerMillion: 4.00,
     icon: '💎',
-    savings: 'Save 30%',
+    savings: 'Save 60%',
     features: [
-      '10,000,000 tokens',
-      'All 35+ AI models + priority',
-      'Image generation',
+      '15,000,000 tokens',
+      'All 28+ AI models',
+      'Deep Think Mode',
+      'AI Agents',
       'Full org hierarchy',
       'Team management',
       'Budget controls',
-      'Dedicated support',
     ],
     popular: false,
-    cta: 'Buy 10M Tokens',
-    miniMsgs: 20_000,
-    proMsgs: 6_667,
+    cta: 'Buy 15M Tokens',
+    miniMsgs: 15_000,
+    proMsgs: 2_400,
+  },
+  {
+    name: 'Pro',
+    price: 175,
+    tokens: 50_000_000,
+    pricePerMillion: 3.50,
+    icon: '🔥',
+    savings: 'Save 65%',
+    features: [
+      '50,000,000 tokens',
+      'All 28+ AI models',
+      'Everything in Power',
+      'Priority support',
+      'Advanced analytics',
+    ],
+    popular: false,
+    cta: 'Buy 50M Tokens',
+    miniMsgs: 50_000,
+    proMsgs: 8_000,
+  },
+  {
+    name: 'Enterprise',
+    price: 300,
+    tokens: 100_000_000,
+    pricePerMillion: 3.00,
+    icon: '🏢',
+    savings: 'Save 70%',
+    features: [
+      '100,000,000 tokens',
+      'All 28+ AI models',
+      'Everything in Pro',
+      'Dedicated support',
+      'Custom integrations',
+    ],
+    popular: false,
+    cta: 'Buy 100M Tokens',
+    miniMsgs: 100_000,
+    proMsgs: 16_000,
   },
 ]
 
 // ── Token calculator ───────────────────────────────────────────────────
 
 const calcModels = [
+  { label: 'GPT-5.4', avgTokens: 1500 },
+  { label: 'GPT-5.4 Mini', avgTokens: 500 },
   { label: 'GPT-4o', avgTokens: 1500 },
-  { label: 'GPT-4o-mini', avgTokens: 500 },
-  { label: 'Claude Sonnet', avgTokens: 1500 },
-  { label: 'Claude Haiku', avgTokens: 500 },
-  { label: 'Gemini Pro', avgTokens: 1200 },
-  { label: 'Gemini Flash', avgTokens: 400 },
-  { label: 'DeepSeek', avgTokens: 600 },
-  { label: 'Llama 70B', avgTokens: 600 },
+  { label: 'Claude Opus 4.6', avgTokens: 2000 },
+  { label: 'Claude Sonnet 4.6', avgTokens: 1500 },
+  { label: 'Claude Haiku 4.5', avgTokens: 500 },
+  { label: 'Gemini 3.1 Pro', avgTokens: 1200 },
+  { label: 'Gemini 2.5 Flash', avgTokens: 400 },
+  { label: 'DeepSeek Chat', avgTokens: 600 },
+  { label: 'DeepSeek Reasoner', avgTokens: 1200 },
 ]
 
 function getRecommendedPlan(monthlyTokens: number): string {
-  if (monthlyTokens <= 50_000) return 'Free'
   if (monthlyTokens <= 500_000) return 'Starter'
-  if (monthlyTokens <= 2_000_000) return 'Pro'
-  return 'Business'
+  if (monthlyTokens <= 2_000_000) return 'Standard'
+  if (monthlyTokens <= 5_000_000) return 'Popular'
+  if (monthlyTokens <= 15_000_000) return 'Power'
+  if (monthlyTokens <= 50_000_000) return 'Pro'
+  return 'Enterprise'
 }
 
 function formatTokenCount(n: number): string {
@@ -152,9 +194,9 @@ function formatTokenCount(n: number): string {
 // ── Other constants ────────────────────────────────────────────────────
 
 const steps = [
-  { num: '01', title: 'Create your account', description: 'Sign up in 30 seconds. No credit card required for the free tier.' },
-  { num: '02', title: 'Choose your model', description: 'Pick from 16+ AI models across 6 providers. Compare pricing and capabilities.' },
-  { num: '03', title: 'Start building', description: 'Use our chat interface or API. Track costs in real-time. Scale when ready.' },
+  { num: '01', title: 'Create your account', description: 'Sign up in 30 seconds. Buy tokens and start chatting instantly.' },
+  { num: '02', title: 'Choose your model', description: 'Pick from 28+ AI models across 6 providers. Switch models mid-conversation.' },
+  { num: '03', title: 'Chat, create, analyze', description: 'Chat with AI, generate images & videos, use Deep Think Mode, deploy AI agents.' },
 ]
 
 const fadeUp = {
@@ -230,7 +272,7 @@ export function LandingPage() {
             className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium mb-8"
           >
             <Sparkles size={14} />
-            Now with 35+ AI models
+            Now with 28+ AI models
           </motion.div>
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
@@ -302,8 +344,9 @@ export function LandingPage() {
       <section className="py-8 border-y border-border/50 bg-surface/30 backdrop-blur-sm">
         <div className="max-w-4xl mx-auto px-4 flex flex-wrap justify-center gap-16">
           {[
-            { value: '35+', label: 'AI Models' },
+            { value: '28+', label: 'AI Models' },
             { value: '6', label: 'Providers' },
+            { value: '4', label: 'Think Tiers' },
             { value: '99.9%', label: 'Uptime' },
           ].map((stat) => (
             <div key={stat.label} className="text-center">
@@ -480,7 +523,7 @@ export function LandingPage() {
 
           {/* Note below cards */}
           <p className="text-center text-sm text-text-muted mt-8 max-w-2xl mx-auto">
-            Tokens never expire. Buy once, use anytime across all 35+ AI models.
+            Tokens never expire. Buy once, use anytime across all 28+ AI models.
             1 token &asymp; 0.75 words &middot; Larger packages = lower cost per token.
           </p>
 

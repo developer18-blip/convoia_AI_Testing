@@ -18,8 +18,6 @@ android {
     }
     signingConfigs {
         release {
-            // Option 1: Set these via environment variables (recommended for CI/CD)
-            // Option 2: Set them in ~/.gradle/gradle.properties (never commit to git)
             storeFile file(System.getenv("CONVOIA_KEYSTORE_PATH") ?: "convoia-release.keystore")
             storePassword System.getenv("CONVOIA_KEYSTORE_PASSWORD") ?: ""
             keyAlias System.getenv("CONVOIA_KEY_ALIAS") ?: "convoia"
