@@ -13,6 +13,7 @@ export default defineConfig({
     },
   },
   build: {
+    sourcemap: false,  // no source maps in production builds
     rolldownOptions: {
       output: {
         manualChunks(id: string) {

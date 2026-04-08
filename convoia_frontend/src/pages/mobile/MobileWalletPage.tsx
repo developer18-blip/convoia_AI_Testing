@@ -35,7 +35,9 @@ export function MobileWalletPage() {
       ])
       setPackages(pkgRes.data?.data || [])
       setTransactions(txRes.data?.data?.transactions || [])
-    } catch { /* silent */ }
+    } catch {
+      toast.error('Failed to load wallet data. Pull down to retry.')
+    }
     finally { setIsLoading(false) }
   }
 

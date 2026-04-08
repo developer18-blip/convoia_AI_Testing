@@ -35,12 +35,8 @@ const config: CapacitorConfig = {
 
   // Android-specific
   android: {
-    allowMixedContent: true,     // allow HTTP API calls from HTTPS WebView (needed for local dev)
+    allowMixedContent: false,    // HTTPS only in production — Play Store requirement
     backgroundColor: '#0D0D0D',
-    buildOptions: {
-      keystorePath: undefined,   // set when signing for release
-      keystoreAlias: undefined,
-    },
   },
 
   // iOS-specific
