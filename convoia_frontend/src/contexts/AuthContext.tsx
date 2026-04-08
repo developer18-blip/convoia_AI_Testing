@@ -34,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const navigate = useNavigate()
 
+  // ── Restore auth from localStorage on mount ──
   useEffect(() => {
     const storedToken = localStorage.getItem('convoia_token')
     const storedUser = localStorage.getItem('convoia_user')
@@ -43,9 +44,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    // Restore state from localStorage, then verify with server.
-    // If the access token is expired, the axios interceptor will
-    // auto-refresh it using the refresh token (7-day lifetime).
     let parsedUser: User | null = null
     try {
       parsedUser = JSON.parse(storedUser)
@@ -62,24 +60,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(parsedUser)
 
     // Verify in background — if token expired, interceptor auto-refreshes
-    // If refresh also fails, interceptor redirects to /login
     api.get('/auth/profile')
       .then((res) => {
-        // Got fresh user data from server — update local state
         const freshUser = res.data.data?.user || res.data.data
         if (freshUser?.id) {
           setUser(freshUser)
           localStorage.setItem('convoia_user', JSON.stringify(freshUser))
         }
-        // Also update token in case interceptor refreshed it
         const currentToken = localStorage.getItem('convoia_token')
         if (currentToken && currentToken !== storedToken) {
           setToken(currentToken)
         }
       })
       .catch(() => {
-        // Interceptor already handled the 401 → refresh → redirect flow
-        // If we're still here, something else failed — just clear state
         setToken(null)
         setUser(null)
       })
@@ -87,6 +80,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(false)
       })
   }, [])
+
+  // ── Deep link auth handler (Google OAuth on mobile) ──
+  // Listens for 'convoia:auth' custom event dispatched by the Capacitor
+  // deep link handler. This updates React state directly, avoiding the
+  // race condition where ProtectedRoute redirects to /login before
+  // localStorage is read.
+  useEffect(() => {
+    const handleDeepLinkAuth = (e: Event) => {
+      const { token: newToken, refreshToken, user: userData } = (e as CustomEvent).detail
+      if (!newToken || !userData) return
+
+      localStorage.setItem('convoia_token', newToken)
+      if (refreshToken) localStorage.setItem('convoia_refresh_token', refreshToken)
+      localStorage.setItem('convoia_user', JSON.stringify(userData))
+      setStorageToken(newToken)
+      if (refreshToken) setStorageRefresh(refreshToken)
+      setUserProfile(userData)
+
+      setToken(newToken)
+      setUser(userData)
+      setIsLoading(false)
+      navigate(userData.role === 'platform_admin' ? '/admin' : '/dashboard')
+    }
+
+    window.addEventListener('convoia:auth', handleDeepLinkAuth)
+    return () => window.removeEventListener('convoia:auth', handleDeepLinkAuth)
+  }, [navigate])
 
   const redirectByRole = useCallback(
     (role: string) => {

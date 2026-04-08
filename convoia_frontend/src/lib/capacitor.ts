@@ -81,7 +81,9 @@ export async function initNativeBridge() {
     })
 
     // ── Deep Link Handler (Google OAuth callback) ──
-    // Catches convoia://auth?token=xxx&user=xxx from Google OAuth redirect
+    // Catches convoia://auth?token=xxx&user=xxx from Google OAuth redirect.
+    // Dispatches a custom event so AuthContext picks up the token in React state
+    // instead of relying on a page reload (which causes a race condition).
     const handleAuthDeepLink = (url: string) => {
       try {
         if (!url.startsWith('convoia://auth')) return false
@@ -94,10 +96,15 @@ export async function initNativeBridge() {
 
         if (token && userStr) {
           const user = JSON.parse(userStr)
+          // Persist to localStorage (for next cold start)
           localStorage.setItem('convoia_token', token)
           if (refreshToken) localStorage.setItem('convoia_refresh_token', refreshToken)
           localStorage.setItem('convoia_user', JSON.stringify(user))
-          window.location.href = '/dashboard'
+
+          // Notify AuthContext via custom event (updates React state immediately)
+          window.dispatchEvent(new CustomEvent('convoia:auth', {
+            detail: { token, refreshToken, user },
+          }))
           return true
         }
       } catch { /* invalid URL */ }
