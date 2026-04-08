@@ -11,6 +11,7 @@ import { enhanceImagePrompt } from '../services/imageIntentService.js';
 import { FileProcessingService } from '../services/fileProcessingService.js';
 import { generateVideo as generateVideoFn, VIDEO_TOKEN_COST, type MediaRequest } from '../services/mediaGenerationService.js';
 import { TOKEN_BASE_RATE } from '../config/tokenPackages.js';
+import { buildThinkModeParams } from '../ai/thinkModeParams.js';
 
 // ── COST-AWARE TOKEN ENGINE ──────────────────────────────────────
 // TOKEN_BASE_RATE is dynamically derived from the cheapest token package
@@ -904,6 +905,10 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
             ? Math.min(Math.floor(streamMaxOutput * 0.5), 6144)
             : Math.min(Math.floor(streamMaxOutput * 0.4), 4096);
 
+          // Build tier-aware params for Pass 1
+          const pass1Tp = buildThinkModeParams(selectedModel?.modelId || finalModelId);
+          const pass1UseNativeThinking = pass1Tp.tier === 'A' || pass1Tp.tier === 'B';
+
           const pass1Result = await AIGatewayService.sendMessage({
             userId: user.id,
             organizationId,
@@ -911,14 +916,14 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
             messages: enrichedMessages,
             agentConfig: {
               systemPrompt: researchPrompt,
-              temperature: 0.3,
+              temperature: pass1Tp.tier === 'B' ? undefined as any : (pass1Tp.temperature === 1 ? 0.3 : 0.3),
               maxTokens: pass1MaxTokens,
               topP: 0.9,
               name: agentConfig?.name || 'AI',
             },
             maxOutputTokens: pass1MaxTokens,
             memoryContext: memoryPrompt || undefined,
-            thinkingEnabled: true, // native thinking for Anthropic/DeepSeek
+            thinkingEnabled: pass1UseNativeThinking,
           });
 
           pass1ExtraInputTokens = pass1Result.inputTokens;
@@ -954,14 +959,21 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
           const thinkModelId = selectedModel?.modelId || undefined;
           const baseThinkPrompt = getSystemPrompt(thinkIndustry, thinkProvider, 'think', thinkModelId);
 
+          // Build tier-aware Think Mode params for Pass 2
+          const tp = buildThinkModeParams(thinkModelId || finalModelId);
+
           agentConfig = {
             systemPrompt: baseThinkPrompt + `\n\n═══ THINK MODE: REFINEMENT PASS ═══\nYou have just completed a deep research phase. Now deliver a polished, consultant-grade response based on that research. Follow the output format in the user's message exactly. Be thorough but concise — every sentence must earn its place. The follow-up questions are MANDATORY.`,
-            temperature: 0.4,
-            maxTokens: agentConfig?.maxTokens || 16384,
+            temperature: tp.temperature ?? 0.4,
+            maxTokens: tp.max_tokens || agentConfig?.maxTokens || 16384,
             topP: 0.9,
             name: agentConfig?.name || 'AI',
           };
-          useProviderThinking = false;
+
+          // Tier A (Anthropic) — let native extended thinking handle Pass 2
+          // Tier B (o-series) — let native reasoning handle it
+          // Tier C/D — prompt-only, no provider thinking needed
+          useProviderThinking = tp.tier === 'A' || tp.tier === 'B';
 
           logger.info(`Deep research Pass 1 complete: ${pass1Result.response.length} chars, ${pass1ExtraInputTokens + pass1ExtraOutputTokens} tokens, depth=${analysis.depthLevel}. Starting refinement.`);
 
