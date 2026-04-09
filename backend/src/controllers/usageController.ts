@@ -323,6 +323,8 @@ export const getDashboardUsage = asyncHandler(async (req: Request, res: Response
     todayAgg,
     weekAgg,
     monthAgg,
+    lastMonthAgg,
+    allTimeAgg,
     last30DaysLogs,
   ] = await Promise.all([
     // Today
@@ -340,6 +342,24 @@ export const getDashboardUsage = asyncHandler(async (req: Request, res: Response
     // This month
     prisma.usageLog.aggregate({
       where: { userId, createdAt: { gte: monthStart } },
+      _count: { id: true },
+      _sum: { customerPrice: true },
+    }),
+    // Last month (for trend calculation)
+    prisma.usageLog.aggregate({
+      where: {
+        userId,
+        createdAt: {
+          gte: new Date(now.getFullYear(), now.getMonth() - 1, 1),
+          lt: monthStart,
+        },
+      },
+      _count: { id: true },
+      _sum: { customerPrice: true },
+    }),
+    // All time total
+    prisma.usageLog.aggregate({
+      where: { userId },
       _count: { id: true },
       _sum: { customerPrice: true },
     }),
@@ -427,6 +447,14 @@ export const getDashboardUsage = asyncHandler(async (req: Request, res: Response
       thisMonth: {
         queries: monthAgg._count.id,
         cost: parseFloat((monthAgg._sum.customerPrice || 0).toFixed(4)),
+      },
+      lastMonth: {
+        queries: lastMonthAgg._count.id,
+        cost: parseFloat((lastMonthAgg._sum.customerPrice || 0).toFixed(4)),
+      },
+      allTime: {
+        queries: allTimeAgg._count.id,
+        cost: parseFloat((allTimeAgg._sum.customerPrice || 0).toFixed(4)),
       },
       topModels,
       costByProvider,

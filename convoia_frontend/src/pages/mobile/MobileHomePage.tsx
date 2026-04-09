@@ -172,10 +172,10 @@ export function MobileHomePage() {
       <div>
         <h2 style={sectionTitle}>This week</h2>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <StatCard icon={<MessageSquare size={20} />} iconColor="#7C3AED" iconBg="rgba(124,58,237,0.1)" value={stats?.thisWeek?.queries?.toString() || '0'} label="Conversations" />
-          <StatCard icon={<Zap size={20} />} iconColor="#F59E0B" iconBg="rgba(245,158,11,0.1)" value={formattedBalance} label="Tokens used" sub={`avg ${Math.round((stats?.thisWeek?.tokens || 0) / 7).toLocaleString()}/day`} />
+          <StatCard icon={<MessageSquare size={20} />} iconColor="#7C3AED" iconBg="rgba(124,58,237,0.1)" value={stats?.thisWeek?.queries?.toString() || '0'} label="This week" />
+          <StatCard icon={<Zap size={20} />} iconColor="#F59E0B" iconBg="rgba(245,158,11,0.1)" value={stats?.allTime?.queries?.toString() || '0'} label="Total queries" />
           <StatCard icon={<Coins size={20} />} iconColor="#10B981" iconBg="rgba(16,185,129,0.1)" value={stats?.topModels?.[0]?.name?.split(' ')[0] || '—'} label="Top model" />
-          <StatCard icon={<Clock size={20} />} iconColor="#EF4444" iconBg="rgba(239,68,68,0.1)" value={`$${(Number(stats?.thisWeek?.cost) || 0).toFixed(2)}`} label="Total cost" />
+          <StatCard icon={<Clock size={20} />} iconColor="#EF4444" iconBg="rgba(239,68,68,0.1)" value={`$${(Number(stats?.thisWeek?.cost) || 0).toFixed(2)}`} label="Week cost" />
         </div>
       </div>
 
