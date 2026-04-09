@@ -97,9 +97,16 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   'gemini-2.5-pro-preview-05-06': 1000000, 'gemini-2.5-flash-preview-05-20': 1000000,
   'gemini-2.5-flash-lite': 1000000, 'gemini-2.0-flash': 1000000,
   'deepseek-chat': 128000, 'deepseek-reasoner': 128000,
-  'mistral-large-latest': 128000, 'mistral-small-latest': 128000,
+  'mistral-large-latest': 131072, 'mistral-small-latest': 32768,
+  'codestral-latest': 32768, 'mistral-medium-latest': 131072,
   'llama-3.3-70b-versatile': 128000, 'llama-3.1-8b-instant': 128000,
   'mixtral-8x7b-32768': 32768,
+  // xAI / Grok
+  'grok-3': 131072, 'grok-3-mini': 131072, 'grok-3-fast': 131072,
+  'grok-3-mini-fast': 131072, 'grok-2-vision': 32768, 'grok-2-1212': 131072,
+  // Perplexity
+  'sonar-pro': 200000, 'sonar': 127000, 'sonar-reasoning-pro': 128000,
+  'sonar-reasoning': 127000, 'sonar-deep-research': 128000,
 };
 
 // ── Multimodal message formatting per provider ──────────────────────
@@ -424,6 +431,8 @@ const PROVIDER_MAX_OUTPUT: Record<string, number> = {
   deepseek: 16384,
   mistral: 16384,
   groq: 16384,
+  xai: 32768,
+  perplexity: 16384,
 };
 
 function clampMaxTokens(provider: string, requested?: number): number {
@@ -1280,6 +1289,92 @@ function callOpenAICompatibleStream(
   });
 }
 
+// Perplexity-specific streaming with citation support
+function callPerplexityStream(
+  modelId: string, messages: any[], systemPrompt: string,
+  apiKey: string, callbacks: StreamCallbacks, overrides?: ProviderOverrides
+): Promise<void> {
+  const formattedMsgs = formatMessagesForOpenAI(messages);
+
+  const body: Record<string, any> = {
+    model: modelId,
+    messages: [{ role: 'system', content: systemPrompt }, ...formattedMsgs],
+    stream: true,
+    temperature: overrides?.temperature ?? 0.2,
+    max_tokens: overrides?.maxTokens ?? 16384,
+    return_citations: true,
+    return_related_questions: false,
+    search_recency_filter: 'month',
+  };
+  if (overrides?.topP != null) body.top_p = overrides.topP;
+
+  return new Promise(async (resolve, reject) => {
+    try {
+      const response = await axios.post(
+        'https://api.perplexity.ai/chat/completions',
+        body,
+        {
+          headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+          timeout: config.aiRequestTimeout,
+          responseType: 'stream',
+        }
+      );
+
+      let inputTokens = 0, outputTokens = 0;
+      let buffer = '';
+      let citations: string[] = [];
+
+      response.data.on('data', (chunk: Buffer) => {
+        buffer += chunk.toString();
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed === 'data: [DONE]') continue;
+          if (!trimmed.startsWith('data: ')) continue;
+          try {
+            const json = JSON.parse(trimmed.slice(6));
+            const delta = json.choices?.[0]?.delta;
+
+            if (delta?.content) {
+              callbacks.onChunk(delta.content);
+            }
+
+            // Capture citations from Perplexity response
+            if (json.citations && Array.isArray(json.citations)) {
+              citations = json.citations;
+            }
+
+            if (json.usage) {
+              inputTokens = json.usage.prompt_tokens || 0;
+              outputTokens = json.usage.completion_tokens || 0;
+            }
+          } catch { /* skip malformed chunks */ }
+        }
+      });
+
+      response.data.on('end', () => {
+        // Append citation block before signaling done
+        if (citations.length > 0) {
+          const citationBlock = '\n\n---\n**Sources:**\n' +
+            citations.map((url: string, i: number) => `${i + 1}. ${url}`).join('\n');
+          callbacks.onChunk(citationBlock);
+        }
+        callbacks.onDone(inputTokens, outputTokens);
+        resolve();
+      });
+      response.data.on('error', (err: Error) => {
+        callbacks.onError(err);
+        reject(err);
+      });
+    } catch (err: any) {
+      callbacks.onError(err);
+      reject(err);
+    }
+  });
+}
+
 async function routeToProviderStream(
   aiModel: any, rawMessages: any[], systemPrompt: string,
   callbacks: StreamCallbacks, overrides?: ProviderOverrides
@@ -1346,8 +1441,7 @@ async function routeToProviderStream(
       );
 
     case 'perplexity':
-      return callOpenAICompatibleStream(
-        'https://api.perplexity.ai/chat/completions',
+      return callPerplexityStream(
         modelId, messages, systemPrompt, apiKey, callbacks, overrides
       );
 
@@ -1515,10 +1609,30 @@ export class AIGatewayService {
     if (!aiModel) throw new AppError('AI Model not found', 404);
     if (!aiModel.isActive) throw new AppError('This model is currently unavailable', 400);
 
-    // Use agent's system prompt if available, otherwise default
-    // Web search mode injects WEB_SEARCH_SYSTEM_BOOST inside getSystemPrompt
-    const promptMode = params.webSearchActive ? 'search' : 'standard';
-    const basePrompt = agentConfig?.systemPrompt || getSystemPrompt(industry, aiModel.provider, promptMode, aiModel.modelId);
+    // ── Web search: route through Perplexity if available ──
+    let effectiveModel = aiModel;
+    let usingPerplexitySearch = false;
+
+    if (params.webSearchActive) {
+      const perplexityKey = config.apiKeys['perplexity' as keyof typeof config.apiKeys];
+      if (perplexityKey) {
+        const perplexityModel = await prisma.aIModel.findFirst({
+          where: { modelId: 'sonar-pro', isActive: true },
+        });
+        if (perplexityModel) {
+          usingPerplexitySearch = true;
+          effectiveModel = perplexityModel;
+        }
+      }
+    }
+
+    // If Perplexity handles search natively, no need for WEB_SEARCH_SYSTEM_BOOST
+    const promptMode = params.webSearchActive && !usingPerplexitySearch
+      ? 'search'
+      : 'standard';
+
+    const basePrompt = agentConfig?.systemPrompt ||
+      getSystemPrompt(industry, effectiveModel.provider, promptMode, effectiveModel.modelId);
     const systemPrompt = memoryContext ? basePrompt + memoryContext : basePrompt;
 
     // Cap output tokens to user's balance AND provider's hard limit
@@ -1528,7 +1642,7 @@ export class AIGatewayService {
         ? Math.min(effectiveMaxTokens, maxOutputTokens)
         : maxOutputTokens;
     }
-    effectiveMaxTokens = clampMaxTokens(aiModel.provider, effectiveMaxTokens);
+    effectiveMaxTokens = clampMaxTokens(effectiveModel.provider, effectiveMaxTokens);
 
     const overrides: ProviderOverrides = {
       temperature: agentConfig?.temperature,
@@ -1537,9 +1651,9 @@ export class AIGatewayService {
       thinkingEnabled: params.thinkingEnabled,
     };
 
-    await routeToProviderStream(aiModel, messages, systemPrompt, callbacks, overrides);
+    await routeToProviderStream(effectiveModel, messages, systemPrompt, callbacks, overrides);
 
-    return { aiModel, overrides };
+    return { aiModel: effectiveModel, overrides };
   }
 
   // ─── Vision message routing (image analysis) ───

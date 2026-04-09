@@ -156,26 +156,30 @@ const THINK_MODE_CONFIG: Record<string, ThinkModeParams> = {
     supportsSystemPrompt: true,
   },
 
-  // ── TIER C: PERPLEXITY ──────────────────────────────────────────
+  // ── TIER C: PERPLEXITY (lower temp — search models work best cooler) ──
+  'sonar-deep-research': {
+    tier: 'C', temperature: 0.2, max_tokens: 8000,
+    supportsSystemPrompt: true,
+  },
   'sonar-reasoning-pro': {
-    tier: 'C', temperature: 0.4, max_tokens: 8000,
+    tier: 'C', temperature: 0.2, max_tokens: 8000,
     supportsSystemPrompt: true,
   },
   'sonar-reasoning': {
-    tier: 'C', temperature: 0.4, max_tokens: 4000,
+    tier: 'C', temperature: 0.2, max_tokens: 4000,
     supportsSystemPrompt: true,
   },
   'sonar-pro': {
-    tier: 'C', temperature: 0.4, max_tokens: 4000,
+    tier: 'C', temperature: 0.2, max_tokens: 4000,
     supportsSystemPrompt: true,
   },
   'sonar': {
-    tier: 'D', temperature: 0.5, max_tokens: 3000,
+    tier: 'D', temperature: 0.2, max_tokens: 3000,
     supportsSystemPrompt: true,
   },
 
-  // ── TIER C: XAI (GROK) ─────────────────────────────────────────
-  'grok-3': {
+  // ── TIER C: XAI (GROK) — grok-3-fast and grok-3-mini before grok-3 ──
+  'grok-3-fast': {
     tier: 'C', temperature: 0.4, max_tokens: 4000,
     supportsSystemPrompt: true,
   },
@@ -183,8 +187,30 @@ const THINK_MODE_CONFIG: Record<string, ThinkModeParams> = {
     tier: 'D', temperature: 0.5, max_tokens: 3000,
     supportsSystemPrompt: true,
   },
+  'grok-3': {
+    tier: 'C', temperature: 0.4, max_tokens: 4000,
+    supportsSystemPrompt: true,
+  },
   'grok-2': {
     tier: 'C', temperature: 0.4, max_tokens: 4000,
+    supportsSystemPrompt: true,
+  },
+
+  // ── TIER C: MISTRAL ────────────────────────────────────────────
+  'mistral-large-latest': {
+    tier: 'C', temperature: 0.4, max_tokens: 4000,
+    supportsSystemPrompt: true,
+  },
+  'mistral-medium-latest': {
+    tier: 'C', temperature: 0.4, max_tokens: 4000,
+    supportsSystemPrompt: true,
+  },
+  'codestral-latest': {
+    tier: 'C', temperature: 0.4, max_tokens: 4000,
+    supportsSystemPrompt: true,
+  },
+  'mistral-small-latest': {
+    tier: 'D', temperature: 0.5, max_tokens: 3000,
     supportsSystemPrompt: true,
   },
 

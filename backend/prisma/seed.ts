@@ -475,6 +475,40 @@ const aiModels = [
     capabilities: ['chat', 'function_calling'],
     contextWindow: 131072,
   },
+  {
+    name: 'Grok 3 Fast',
+    provider: 'xai',
+    modelId: 'grok-3-fast',
+    description: 'xAI high-speed model — full Grok capability, faster responses',
+    inputTokenPrice: 0.000005,     // $5 / 1M input
+    outputTokenPrice: 0.000025,    // $25 / 1M output
+    capabilities: ['chat'],
+    contextWindow: 131072,
+  },
+
+  // ── Mistral — additional model ──────────────────────────────────
+  {
+    name: 'Codestral',
+    provider: 'mistral',
+    modelId: 'codestral-latest',
+    description: 'Mistral code-specialized model — best for programming tasks',
+    inputTokenPrice: 0.0000003,    // $0.30 / 1M input
+    outputTokenPrice: 0.0000009,   // $0.90 / 1M output
+    capabilities: ['code', 'chat'],
+    contextWindow: 32768,
+  },
+
+  // ── Perplexity — additional model ───────────────────────────────
+  {
+    name: 'Perplexity Deep Research',
+    provider: 'perplexity',
+    modelId: 'sonar-deep-research',
+    description: 'Multi-step research agent — comprehensive reports with citations',
+    inputTokenPrice: 0.000002,     // $2 / 1M input
+    outputTokenPrice: 0.000008,    // $8 / 1M output
+    capabilities: ['search', 'research'],
+    contextWindow: 128000,
+  },
 ];
 
 // ─── Default Agents ───
