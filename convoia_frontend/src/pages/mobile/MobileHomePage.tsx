@@ -11,7 +11,7 @@ import { Avatar } from '../../components/ui/Avatar'
 
 export function MobileHomePage() {
   const { user } = useAuth()
-  const { tokenBalance, formattedBalance, totalUsed, refresh: refreshTokens } = useTokens()
+  const { tokenBalance, totalUsed, refresh: refreshTokens } = useTokens()
   const { stats, wallet, budget, isLoading, refetch } = useDashboard()
   const navigate = useNavigate()
   const { isRefreshing, pullProps } = usePullToRefresh(async () => { await refetch(); await refreshTokens() })

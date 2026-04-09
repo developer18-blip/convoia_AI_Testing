@@ -73,6 +73,7 @@ export interface DashboardStats {
   thisWeek: { queries: number; cost: number; tokens: number }
   thisMonth: { queries: number; cost: number; tokens: number }
   lastMonth: { queries: number; cost: number; tokens: number }
+  allTime: { queries: number; cost: number }
   topModels: Array<{ name: string; queries: number; cost: number }>
   dailyUsage: Array<{ date: string; cost: number; queries: number }>
   providerBreakdown: Array<{ provider: string; cost: number; queries: number }>
