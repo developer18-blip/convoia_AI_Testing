@@ -605,10 +605,15 @@ async function callMistral(modelId: string, messages: any[], systemPrompt: strin
 }
 
 async function callPerplexity(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
-  // Perplexity API: strictly minimal — no top_p, no max_tokens, no extra params
+  // Perplexity requires strict user/assistant alternation
+  const alternating = mergeConsecutiveMessages(messages);
+  if (alternating.length > 0 && alternating[0].role !== 'user') {
+    alternating.unshift({ role: 'user', content: 'Continue.' });
+  }
+
   const body: Record<string, any> = {
     model: modelId,
-    messages: [{ role: 'system', content: systemPrompt }, ...messages],
+    messages: [{ role: 'system', content: systemPrompt }, ...alternating],
     temperature: overrides?.temperature ?? 0.2,
   };
 
@@ -1318,6 +1323,23 @@ function callOpenAICompatibleStream(
   });
 }
 
+// Merge consecutive same-role messages (Perplexity requires strict alternation)
+function mergeConsecutiveMessages(msgs: any[]): any[] {
+  const merged: any[] = [];
+  for (const msg of msgs) {
+    const last = merged[merged.length - 1];
+    if (last && last.role === msg.role) {
+      // Merge content into previous message of same role
+      const lastText = typeof last.content === 'string' ? last.content : '';
+      const thisText = typeof msg.content === 'string' ? msg.content : '';
+      last.content = lastText + '\n\n' + thisText;
+    } else {
+      merged.push({ ...msg });
+    }
+  }
+  return merged;
+}
+
 // Perplexity-specific streaming with citation support
 function callPerplexityStream(
   modelId: string, messages: any[], systemPrompt: string,
@@ -1325,12 +1347,16 @@ function callPerplexityStream(
 ): Promise<void> {
   const formattedMsgs = formatMessagesForOpenAI(messages);
 
-  // Perplexity API: strictly minimal body — rejects unknown/conflicting params
-  // Do NOT send top_p alongside temperature (Perplexity rejects it)
-  // Do NOT send stream_options, return_citations, search_recency_filter
+  // Perplexity requires strict user/assistant alternation after system message
+  const alternating = mergeConsecutiveMessages(formattedMsgs);
+  // Ensure conversation starts with user message (after system)
+  if (alternating.length > 0 && alternating[0].role !== 'user') {
+    alternating.unshift({ role: 'user', content: 'Continue.' });
+  }
+
   const body: Record<string, any> = {
     model: modelId,
-    messages: [{ role: 'system', content: systemPrompt }, ...formattedMsgs],
+    messages: [{ role: 'system', content: systemPrompt }, ...alternating],
     stream: true,
     temperature: overrides?.temperature ?? 0.2,
   };
