@@ -1105,12 +1105,14 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
             }
           })();
         },
-        onError: (error: Error & { response?: { data?: any; status?: number } }) => {
-          const providerErr = error.response?.data;
-          logger.error(`Stream error: ${error.message}`, {
-            status: error.response?.status,
-            provider_error: providerErr?.error?.message || providerErr?.message || undefined,
-            provider_type: providerErr?.error?.type || undefined,
+        onError: (error: Error & { response?: { data?: any; status?: number }; config?: { data?: any } }) => {
+          logger.error('Stream error', {
+            message: error?.message,
+            provider: selectedModel?.provider,
+            modelId: selectedModel?.modelId,
+            status: error?.response?.status,
+            errorBody: JSON.stringify(error?.response?.data),
+            sentBody: JSON.stringify(error?.config?.data)?.slice(0, 800),
           });
           streamEnded = true;
           if (!res.writableEnded) {

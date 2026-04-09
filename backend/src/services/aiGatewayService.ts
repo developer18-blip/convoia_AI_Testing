@@ -1073,7 +1073,14 @@ ${systemPrompt}`;
           errMsg = body || errMsg;
         }
       } catch { /* ignore read errors */ }
-      logger.error(`OpenAI stream error for model ${modelId}: ${errMsg}`);
+      logger.error('Stream error', {
+        message: errMsg,
+        provider: 'openai',
+        modelId,
+        status: err?.response?.status,
+        errorBody: errMsg,
+        sentBody: JSON.stringify(err?.config?.data)?.slice(0, 800),
+      });
       callbacks.onError(new Error(errMsg));
       reject(new Error(errMsg));
     }
