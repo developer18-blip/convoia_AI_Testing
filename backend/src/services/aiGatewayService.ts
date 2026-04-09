@@ -1404,6 +1404,7 @@ function callPerplexityStream(
       let inputTokens = 0, outputTokens = 0;
       let buffer = '';
       let citations: string[] = [];
+      let insideThink = false;
 
       response.data.on('data', (chunk: Buffer) => {
         buffer += chunk.toString();
@@ -1419,7 +1420,25 @@ function callPerplexityStream(
             const delta = json.choices?.[0]?.delta;
 
             if (delta?.content) {
-              callbacks.onChunk(delta.content);
+              let text: string = delta.content;
+
+              // Strip <think>...</think> tags from reasoning models (sonar-deep-research etc.)
+              // These are internal reasoning and should not be shown to the user.
+              if (text.includes('<think>')) { insideThink = true; }
+              if (insideThink) {
+                if (text.includes('</think>')) {
+                  // End of thinking — extract any text after the closing tag
+                  insideThink = false;
+                  const afterTag = text.split('</think>').pop() || '';
+                  if (afterTag.trim()) callbacks.onChunk(afterTag);
+                }
+                // Skip chunks that are inside <think> block
+                continue;
+              }
+
+              // Clean any stray think tags that might appear in a single chunk
+              text = text.replace(/<\/?think>/g, '');
+              if (text) callbacks.onChunk(text);
             }
 
             // Capture citations from Perplexity response
