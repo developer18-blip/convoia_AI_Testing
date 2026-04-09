@@ -351,20 +351,30 @@ const aiModels = [
     name: 'Mistral Large',
     provider: 'mistral',
     modelId: 'mistral-large-latest',
-    description: 'Mistral flagship — strong multilingual and coding',
+    description: 'Mistral flagship — 41B active params, 256K context, top-tier reasoning and coding',
     inputTokenPrice: 0.000002,     // $2.00 / 1M input
     outputTokenPrice: 0.000006,    // $6.00 / 1M output
+    capabilities: ['chat', 'function_calling', 'json_mode', 'vision'],
+    contextWindow: 256000,
+  },
+  {
+    name: 'Mistral Medium',
+    provider: 'mistral',
+    modelId: 'mistral-medium-latest',
+    description: 'Mistral balanced model — good quality at moderate cost',
+    inputTokenPrice: 0.000001,     // $1.00 / 1M input
+    outputTokenPrice: 0.000003,    // $3.00 / 1M output
     capabilities: ['chat', 'function_calling', 'json_mode'],
-    contextWindow: 128000,
+    contextWindow: 131072,
   },
   {
     name: 'Mistral Small',
     provider: 'mistral',
     modelId: 'mistral-small-latest',
-    description: 'Mistral efficient model for everyday tasks',
-    inputTokenPrice: 0.0000001,    // $0.10 / 1M input
-    outputTokenPrice: 0.0000003,   // $0.30 / 1M output
-    capabilities: ['chat', 'function_calling', 'json_mode'],
+    description: 'Mistral efficient model — multimodal, 128K context, great value',
+    inputTokenPrice: 0.0000002,    // $0.20 / 1M input
+    outputTokenPrice: 0.0000006,   // $0.60 / 1M output
+    capabilities: ['chat', 'function_calling', 'json_mode', 'vision'],
     contextWindow: 128000,
   },
 
@@ -485,6 +495,16 @@ const aiModels = [
     outputTokenPrice: 0.000025,    // $25 / 1M output
     capabilities: ['chat'],
     contextWindow: 131072,
+  },
+  {
+    name: 'Grok 2 Vision',
+    provider: 'xai',
+    modelId: 'grok-2-vision-1212',
+    description: 'xAI vision model — image understanding and analysis',
+    inputTokenPrice: 0.000002,     // $2 / 1M input
+    outputTokenPrice: 0.000010,    // $10 / 1M output
+    capabilities: ['chat', 'vision'],
+    contextWindow: 32768,
   },
 
   // ── Mistral — additional model ──────────────────────────────────

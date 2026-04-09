@@ -97,13 +97,13 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   'gemini-2.5-pro-preview-05-06': 1000000, 'gemini-2.5-flash-preview-05-20': 1000000,
   'gemini-2.5-flash-lite': 1000000, 'gemini-2.0-flash': 1000000,
   'deepseek-chat': 128000, 'deepseek-reasoner': 128000,
-  'mistral-large-latest': 131072, 'mistral-small-latest': 32768,
-  'codestral-latest': 32768, 'mistral-medium-latest': 131072,
+  'mistral-large-latest': 256000, 'mistral-medium-latest': 131072,
+  'mistral-small-latest': 128000, 'codestral-latest': 32768,
   'llama-3.3-70b-versatile': 128000, 'llama-3.1-8b-instant': 128000,
   'mixtral-8x7b-32768': 32768,
   // xAI / Grok
   'grok-3': 131072, 'grok-3-mini': 131072, 'grok-3-fast': 131072,
-  'grok-3-mini-fast': 131072, 'grok-2-vision': 32768, 'grok-2-1212': 131072,
+  'grok-3-mini-fast': 131072, 'grok-2-vision-1212': 32768, 'grok-2-1212': 131072,
   // Perplexity
   'sonar-pro': 200000, 'sonar': 127000, 'sonar-reasoning-pro': 128000,
   'sonar-reasoning': 127000, 'sonar-deep-research': 128000,

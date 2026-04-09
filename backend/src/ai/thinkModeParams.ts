@@ -205,6 +205,10 @@ const THINK_MODE_CONFIG: Record<string, ThinkModeParams> = {
     tier: 'C', temperature: 0.4, max_tokens: 4000,
     supportsSystemPrompt: true,
   },
+  'grok-2-vision': {
+    tier: 'C', temperature: 0.4, max_tokens: 4000,
+    supportsSystemPrompt: true,
+  },
   'codestral-latest': {
     tier: 'C', temperature: 0.4, max_tokens: 4000,
     supportsSystemPrompt: true,
