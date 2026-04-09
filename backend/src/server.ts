@@ -34,6 +34,7 @@ import tokenWalletRoutes from './routes/tokenWalletRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
 import conversationRoutes from './routes/conversationRoutes.js';
 import memoryRoutes from './routes/memoryRoutes.js';
+import audioRoutes from './routes/audioRoutes.js';
 
 const app: Express = express();
 
@@ -250,6 +251,7 @@ app.use('/api/stripe', stripeRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/memory', memoryRoutes);
+app.use('/api/audio', audioRoutes);
 
 // ============== 404 HANDLER ==============
 app.use('*', (req: Request, res: Response) => {

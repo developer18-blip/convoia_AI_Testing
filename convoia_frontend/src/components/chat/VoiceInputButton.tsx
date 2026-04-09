@@ -1,138 +1,159 @@
-import { useState, useRef } from 'react'
-import { Mic, Square } from 'lucide-react'
+import { useEffect, useRef } from 'react'
+import { Mic } from 'lucide-react'
+import { useVoiceConversation } from '../../hooks/useVoiceConversation'
 
 interface Props {
   onTranscript: (text: string) => void
   disabled?: boolean
+  onSpeakResponse?: string
 }
 
-export function VoiceInputButton({ onTranscript, disabled }: Props) {
-  const [recording, setRecording] = useState(false)
-  const [duration, setDuration] = useState(0)
-  const [uploading, setUploading] = useState(false)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
-  const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
-  const streamRef = useRef<MediaStream | null>(null)
+export function VoiceInputButton({ onTranscript, disabled, onSpeakResponse }: Props) {
+  const hasUsedVoiceRef = useRef(false)
 
-  const transcribeAudio = async (blob: Blob) => {
-    setUploading(true)
-    try {
-      const formData = new FormData()
-      formData.append('file', blob, 'voice.webm')
+  const {
+    mode,
+    isListening,
+    isProcessing,
+    isSpeaking,
+    isSupported,
+    startListening,
+    stopListening,
+    stopSpeaking,
+    speakText,
+  } = useVoiceConversation({
+    onTranscript: (text) => {
+      hasUsedVoiceRef.current = true
+      onTranscript(text)
+    },
+    onError: (msg) => {
+      console.error('Voice error:', msg)
+    },
+    voice: 'nova',
+  })
 
-      const token = localStorage.getItem('convoia_token')
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/files/upload`,
-        {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData,
-        }
-      )
+  // Auto-speak AI response after voice was used
+  useEffect(() => {
+    if (
+      onSpeakResponse &&
+      onSpeakResponse.trim() &&
+      hasUsedVoiceRef.current &&
+      mode === 'idle'
+    ) {
+      speakText(onSpeakResponse)
+    }
+  }, [onSpeakResponse])
 
-      const data = await res.json()
+  if (!isSupported) return null
 
-      if (data.success && data.data.transcript) {
-        onTranscript(data.data.transcript)
-      }
-    } catch (err) {
-      console.error('Transcription error:', err)
-    } finally {
-      setUploading(false)
+  const handleClick = () => {
+    if (disabled) return
+    if (isSpeaking) { stopSpeaking(); return }
+    if (isListening) { stopListening(); return }
+    if (isProcessing) return
+    startListening()
+  }
+
+  const getButtonStyle = (): React.CSSProperties => {
+    const base: React.CSSProperties = {
+      width: 36,
+      height: 36,
+      borderRadius: '50%',
+      border: 'none',
+      cursor: isProcessing ? 'not-allowed' : 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      transition: 'all 0.2s ease',
+      position: 'relative',
+      flexShrink: 0,
+    }
+
+    if (isListening) return {
+      ...base,
+      background: '#5B5BD6',
+      color: '#fff',
+      animation: 'voicePulse 1.5s infinite',
+    }
+
+    if (isProcessing) return {
+      ...base,
+      background: '#FFF3E0',
+      color: '#FF9F0A',
+    }
+
+    if (isSpeaking) return {
+      ...base,
+      background: '#E8F5E9',
+      color: '#30D158',
+    }
+
+    return {
+      ...base,
+      background: 'transparent',
+      color: 'var(--color-text-secondary, #666)',
     }
   }
 
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      streamRef.current = stream
-
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' })
-      mediaRecorderRef.current = mediaRecorder
-      chunksRef.current = []
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunksRef.current.push(e.data)
-        }
-      }
-
-      mediaRecorder.onstop = async () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
-        stream.getTracks().forEach((t) => t.stop())
-        streamRef.current = null
-        await transcribeAudio(blob)
-      }
-
-      mediaRecorder.start(100)
-      setRecording(true)
-      setDuration(0)
-
-      timerRef.current = setInterval(() => {
-        setDuration((d) => {
-          if (d >= 120) {
-            stopRecording()
-            return d
-          }
-          return d + 1
-        })
-      }, 1000)
-    } catch (err) {
-      console.error('Microphone error:', err)
-      alert('Microphone access denied. Please allow microphone access in your browser settings.')
-    }
+  const getTooltip = () => {
+    if (isListening) return 'Listening... (tap to stop)'
+    if (isProcessing) return 'Transcribing...'
+    if (isSpeaking) return 'Speaking... (tap to stop)'
+    return 'Click to speak'
   }
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && recording) {
-      mediaRecorderRef.current.stop()
-      setRecording(false)
-      clearInterval(timerRef.current)
-    }
-  }
-
-  const formatDuration = (secs: number) => {
-    const m = Math.floor(secs / 60)
-    const s = secs % 60
-    return `${m}:${s.toString().padStart(2, '0')}`
-  }
-
-  if (uploading) {
-    return (
-      <div className="flex items-center gap-1 px-2">
-        <div className="w-3 h-3 border border-primary border-t-transparent rounded-full animate-spin" />
-        <span className="text-xs text-text-muted">Transcribing...</span>
-      </div>
+  const getIcon = () => {
+    if (isProcessing) return (
+      <svg
+        width="16" height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        style={{ animation: 'voiceSpin 1s linear infinite' }}
+      >
+        <path d="M21 12a9 9 0 11-6.219-8.56" />
+      </svg>
     )
-  }
-
-  if (recording) {
-    return (
-      <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1.5 bg-danger/10 border border-danger/30 rounded-lg px-2 py-1">
-          <div className="w-2 h-2 rounded-full bg-danger animate-pulse" />
-          <span className="text-xs text-danger font-mono">{formatDuration(duration)}</span>
-        </div>
-        <button
-          onClick={stopRecording}
-          className="p-2 rounded-lg bg-danger/10 border border-danger/30 text-danger hover:bg-danger/20 transition-colors"
-          title="Stop recording"
-        >
-          <Square size={16} fill="currentColor" />
-        </button>
-      </div>
+    if (isSpeaking) return (
+      <svg
+        width="16" height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      >
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+        <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+        <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+      </svg>
     )
+    return <Mic size={16} />
   }
 
   return (
-    <button
-      onClick={startRecording}
-      disabled={disabled}
-      className="p-2 rounded-lg text-text-muted hover:text-white hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-      title="Voice input (click to record)"
-    >
-      <Mic size={18} />
-    </button>
+    <>
+      <style>{`
+        @keyframes voicePulse {
+          0% { box-shadow: 0 0 0 0 rgba(91,91,214,0.4); }
+          70% { box-shadow: 0 0 0 10px rgba(91,91,214,0); }
+          100% { box-shadow: 0 0 0 0 rgba(91,91,214,0); }
+        }
+        @keyframes voiceSpin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+
+      <button
+        onClick={handleClick}
+        disabled={disabled || isProcessing}
+        style={getButtonStyle()}
+        title={getTooltip()}
+        aria-label={getTooltip()}
+      >
+        {getIcon()}
+      </button>
+    </>
   )
 }

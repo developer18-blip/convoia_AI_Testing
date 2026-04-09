@@ -43,6 +43,7 @@ interface MessageInputProps {
   onImageGenerated?: (data: ImageGeneratedData) => void
   onSendWithContext?: (text: string, systemContext: string | null, extras?: { fileAttachment?: { name: string; type: 'image' | 'document' | 'audio' | 'video'; size: number }; imagePreview?: string; imagePreviews?: string[] }) => void
   onError?: (message: string) => void
+  latestAIResponse?: string
 }
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
@@ -59,6 +60,7 @@ export function MessageInput({
   onImageGenerated,
   onSendWithContext,
   onError: _onError,
+  latestAIResponse,
 }: MessageInputProps) {
   void _selectedModelId; void _onFileProcessed; void _onError;
   const [value, setValue] = useState('')
@@ -429,6 +431,7 @@ export function MessageInput({
               <VoiceInputButton
                 onTranscript={(text) => setValue((prev) => prev + (prev ? ' ' : '') + text)}
                 disabled={isLoading || fileLoading}
+                onSpeakResponse={latestAIResponse}
               />
             </div>
 

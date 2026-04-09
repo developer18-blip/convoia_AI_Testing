@@ -118,6 +118,7 @@ export interface ChatContextType {
   clearMessages: () => void
   retryLastMessage: (modelId: string, industry?: string, agentId?: string) => void
   addMessages: (msgs: Message[]) => void
+  latestCompletedResponse: string
 }
 
 export const ChatContext = createContext<ChatContextType | null>(null)
@@ -140,6 +141,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, [])
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
+  const [latestCompletedResponse, setLatestCompletedResponse] = useState('')
   const [agentMode, setAgentMode] = useState(false)
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -452,6 +454,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
       // Refresh wallet balance after tokens were used
       window.dispatchEvent(new Event('tokens:refresh'))
+
+      // Store final response for voice auto-speak
+      if (accumulated.trim()) {
+        setLatestCompletedResponse(accumulated)
+      }
     } catch (err: unknown) {
       // If user stopped, don't show error
       if (err instanceof DOMException && err.name === 'AbortError') {
@@ -609,6 +616,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
       // Refresh wallet balance after tokens were used
       window.dispatchEvent(new Event('tokens:refresh'))
+
+      // Store final response for voice auto-speak
+      if (accumulated.trim()) {
+        setLatestCompletedResponse(accumulated)
+      }
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to get response'
       setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, isLoading: false, error: errorMsg, content: errorMsg } : m))
@@ -651,6 +663,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       renameConversation, togglePin, moveToFolder,
       createFolder, deleteFolder,
       sendMessage, sendWithContext, editAndResend, deleteMessage, clearMessages, retryLastMessage, addMessages,
+      latestCompletedResponse,
     }}>
       {children}
     </ChatContext.Provider>

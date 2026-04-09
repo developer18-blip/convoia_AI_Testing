@@ -18,7 +18,8 @@ import { useAuth } from '../hooks/useAuth'
 import { useTokens } from '../contexts/TokenContext'
 import { formatTokens } from '../lib/utils'
 import { useNavigate } from 'react-router-dom'
-import { Zap, PanelLeftClose, PanelLeft, MoreHorizontal, Trash2, Download, Menu } from 'lucide-react'
+import { Zap, PanelLeftClose, PanelLeft, MoreHorizontal, Trash2, Download, Menu, Headphones } from 'lucide-react'
+import { VoiceConversationMode } from '../components/VoiceConversationMode'
 
 export function ChatPage() {
   const { models } = useModels()
@@ -32,6 +33,7 @@ export function ChatPage() {
     createConversation, deleteConversation, setActiveConversation,
     renameConversation, togglePin, moveToFolder, createFolder, deleteFolder,
     sendMessage, sendWithContext, editAndResend, deleteMessage, clearMessages, retryLastMessage, addMessages,
+    latestCompletedResponse,
   } = useChat()
 
   const [selectedModelId, setSelectedModelId] = useState('')
@@ -46,6 +48,7 @@ export function ChatPage() {
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const navigate = useNavigate()
   const [codeInterpreter, setCodeInterpreter] = useState<{ code: string; language: string } | null>(null)
+  const [voiceModeOpen, setVoiceModeOpen] = useState(false)
 
   // Canvas state
   const [canvasItems, setCanvasItems] = useState<CanvasItem[]>([])
@@ -520,6 +523,42 @@ export function ChatPage() {
           onImageGenerated={handleImageGenerated}
           onSendWithContext={handleSendWithContext}
           onError={(msg) => toast.error(msg)}
+          latestAIResponse={latestCompletedResponse}
+        />
+        {/* Voice conversation mode trigger */}
+        <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 4 }}>
+          <button
+            onClick={() => setVoiceModeOpen(true)}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--color-text-muted, #888)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              fontSize: 12,
+              opacity: 0.7,
+              transition: 'opacity 0.2s',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.7')}
+            title="Voice conversation mode"
+          >
+            <Headphones size={14} />
+            <span>Voice mode</span>
+          </button>
+        </div>
+
+        {/* Voice conversation overlay */}
+        <VoiceConversationMode
+          isOpen={voiceModeOpen}
+          onClose={() => setVoiceModeOpen(false)}
+          onTranscript={(text) => {
+            setVoiceModeOpen(false)
+            handleSend(text)
+          }}
+          latestAIResponse={latestCompletedResponse}
         />
       </div>
 
