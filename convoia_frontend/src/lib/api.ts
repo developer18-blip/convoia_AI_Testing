@@ -42,7 +42,7 @@ api.interceptors.response.use(
     const isAuthEndpoint = original?.url?.includes('/auth/refresh') || original?.url?.includes('/auth/login')
     if (error.response?.status !== 401 || original._retry || isAuthEndpoint) {
       // Retry on 429 (rate limit) with exponential backoff
-      if (error.response?.status === 429 && !original._retryCount) {
+      if (error.response?.status === 429) {
         original._retryCount = (original._retryCount || 0) + 1
         if (original._retryCount <= 3) {
           const delay = Math.pow(2, original._retryCount) * 1000

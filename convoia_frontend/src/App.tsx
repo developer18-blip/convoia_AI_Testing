@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 import { AuthProvider } from './contexts/AuthContext'
@@ -82,12 +82,13 @@ function ProtectedRoute() {
 function RoleGuard({ allowedRoles }: { allowedRoles: string[] }) {
   const { user } = useAuth()
   const toast = useToast()
+  const blocked = !user || !allowedRoles.includes(user.role)
 
-  if (!user || !allowedRoles.includes(user.role)) {
-    toast.error('This page is not available for your role.')
-    return <Navigate to="/dashboard" replace />
-  }
+  useEffect(() => {
+    if (blocked) toast.error('This page is not available for your role.')
+  }, [blocked])
 
+  if (blocked) return <Navigate to="/dashboard" replace />
   return <Outlet />
 }
 
@@ -97,20 +98,18 @@ function RoleGuard({ allowedRoles }: { allowedRoles: string[] }) {
 function SessionGuard() {
   const { user } = useAuth()
   const toast = useToast()
+  const blocked = user?.organizationId && user?.role !== 'org_owner' && user?.role !== 'platform_admin'
 
-  const canAccess = !user?.organizationId || user?.role === 'org_owner' || user?.role === 'platform_admin'
-  if (!canAccess) {
-    toast.error('This page is not available for your role.')
-    return <Navigate to="/dashboard" replace />
-  }
+  useEffect(() => {
+    if (blocked) toast.error('This page is not available for your role.')
+  }, [blocked])
 
+  if (blocked) return <Navigate to="/dashboard" replace />
   return <Outlet />
 }
 
 /** Handles Google OAuth redirect back to mobile app */
 function AuthCallbackPage() {
-  const { useEffect } = require('react')
-
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const token = params.get('token')

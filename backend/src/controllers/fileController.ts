@@ -10,7 +10,7 @@ import { TokenWalletService } from '../services/tokenWalletService.js'
 import { config } from '../config/env.js'
 import logger from '../config/logger.js'
 import prisma from '../config/db.js'
-import { TOKEN_BASE_RATE } from '../config/tokenPackages.js'
+import { TOKEN_BASE_RATE, costAdjustedTokens } from '../config/tokenPackages.js'
 
 // OCR scanned/image-based PDFs using AI vision models
 async function ocrPdfWithVision(filePath: string): Promise<string | null> {
@@ -182,7 +182,7 @@ export const processFile = asyncHandler(async (req: Request, res: Response): Pro
         // Deduct tokens from wallet
         await TokenWalletService.deductTokens({
           userId: user.id,
-          tokens: aiResponse.totalTokens,
+          tokens: costAdjustedTokens(aiResponse.customerPrice, aiResponse.totalTokens),
           reference: aiResponse.aiModel.id,
           description: `Vision: ${aiResponse.aiModel.name}`,
         })

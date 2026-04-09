@@ -88,4 +88,14 @@ const PLATFORM_MARGIN = 0.17;
 const lowestRatePerToken = Math.min(...TOKEN_PACKAGES.map(p => p.price / p.tokens));
 export const TOKEN_BASE_RATE = lowestRatePerToken * (1 - PLATFORM_MARGIN);
 
+/**
+ * Convert a query's dollar cost into wallet tokens to deduct.
+ * Expensive models deduct MORE tokens; cheap models deduct FEWER.
+ * Falls back to raw tokens if cost calculation fails (safety net).
+ */
+export function costAdjustedTokens(customerPrice: number, rawTokens: number): number {
+  if (!customerPrice || customerPrice <= 0 || !TOKEN_BASE_RATE) return rawTokens;
+  return Math.max(Math.ceil(customerPrice / TOKEN_BASE_RATE), 1);
+}
+
 export type TokenPackage = (typeof TOKEN_PACKAGES)[number];

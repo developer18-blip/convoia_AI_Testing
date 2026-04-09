@@ -8,6 +8,7 @@ import { afterQueryMiddleware, estimateCost } from '../middleware/tokenTracker.j
 import { getOrCreatePersonalOrg } from '../utils/orgHelper.js';
 import AIGatewayService from '../services/aiGatewayService.js';
 import { TokenWalletService } from '../services/tokenWalletService.js';
+import { costAdjustedTokens } from '../config/tokenPackages.js';
 import logger from '../config/logger.js';
 
 const router = Router();
@@ -163,7 +164,7 @@ router.post('/chat/completions', queryLimiter, asyncHandler(async (req: Request,
   // Deduct tokens from wallet
   await TokenWalletService.deductTokens({
     userId: user.id,
-    tokens: aiResponse.totalTokens,
+    tokens: costAdjustedTokens(aiResponse.customerPrice, aiResponse.totalTokens),
     reference: aiResponse.aiModel.id,
     description: `OpenWebUI: ${aiResponse.aiModel.name}`,
   });

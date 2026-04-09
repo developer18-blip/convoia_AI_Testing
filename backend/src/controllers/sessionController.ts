@@ -18,7 +18,7 @@ export const createHourlySession = asyncHandler(async (req: Request, res: Respon
   }
 
   // Check authorization
-  if (userId !== req.user.userId && req.user.role !== 'admin') {
+  if (userId !== req.user.userId && req.user.role !== 'admin' && req.user.role !== 'platform_admin') {
     throw new AppError('Unauthorized to create session for this user', 403);
   }
 
@@ -161,7 +161,7 @@ export const getActiveSession = asyncHandler(async (req: Request, res: Response)
   }
 
   // Check authorization
-  if (userId !== req.user.userId && req.user.role !== 'admin') {
+  if (userId !== req.user.userId && req.user.role !== 'admin' && req.user.role !== 'platform_admin') {
     throw new AppError('Unauthorized to check session for this user', 403);
   }
 
@@ -223,7 +223,7 @@ export const getActiveSession = asyncHandler(async (req: Request, res: Response)
 export const expireOldSessions = asyncHandler(async (req: Request, res: Response) => {
   // This is typically called by a cron job
   // But we include it for manual triggering if needed (admin only)
-  if (req.user && req.user.role !== 'admin') {
+  if (req.user && req.user.role !== 'admin' && req.user.role !== 'platform_admin') {
     throw new AppError('Only admins can expire sessions', 403);
   }
 

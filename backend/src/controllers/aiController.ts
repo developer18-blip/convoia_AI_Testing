@@ -10,7 +10,7 @@ import { needsWebSearch, searchWeb } from '../services/webSearchService.js';
 import { enhanceImagePrompt } from '../services/imageIntentService.js';
 import { FileProcessingService } from '../services/fileProcessingService.js';
 import { generateVideo as generateVideoFn, VIDEO_TOKEN_COST, type MediaRequest } from '../services/mediaGenerationService.js';
-import { TOKEN_BASE_RATE } from '../config/tokenPackages.js';
+import { TOKEN_BASE_RATE, costAdjustedTokens } from '../config/tokenPackages.js';
 import { buildThinkModeParams } from '../ai/thinkModeParams.js';
 
 // ── SAFE ERROR SERIALIZER (prevents circular reference crash) ────
@@ -40,30 +40,8 @@ function safeErrorDetails(err: any): Record<string, any> {
   return details;
 }
 
-// ── COST-AWARE TOKEN ENGINE ──────────────────────────────────────
-// TOKEN_BASE_RATE is dynamically derived from the cheapest token package
-// with a 17% platform margin built in. See config/tokenPackages.ts.
-//
-// costAdjustedTokens() converts the query's dollar cost into wallet tokens.
-// Expensive models (Opus, o3) deduct MORE tokens; cheap models (Flash, Mini) deduct FEWER.
-// This guarantees profitability on every query, every model, every package tier.
-
-/**
- * Convert a query's dollar cost into wallet tokens for deduction.
- *
- * Formula: adjustedTokens = customerPrice / TOKEN_BASE_RATE
- *
- * Examples (at TOKEN_BASE_RATE ≈ $2.49/1M):
- *   GPT-4o-mini query ($0.0025 cost)  →  1,004 wallet tokens
- *   GPT-4o query     ($0.0156 cost)  →  6,265 wallet tokens
- *   Claude Opus query ($0.0375 cost)  → 15,060 wallet tokens
- *
- * Falls back to raw tokens if cost calculation fails (safety net).
- */
-function costAdjustedTokens(customerPrice: number, rawTokens: number): number {
-  if (!customerPrice || customerPrice <= 0 || !TOKEN_BASE_RATE) return rawTokens;
-  return Math.max(Math.ceil(customerPrice / TOKEN_BASE_RATE), 1);
-}
+// costAdjustedTokens() is now imported from config/tokenPackages.ts
+// It converts a query's dollar cost into wallet tokens using TOKEN_BASE_RATE.
 import { smartRoute } from '../services/smartRouter.js';
 import { getCachedResponse, setCachedResponse } from '../services/modelRecommendationService.js';
 import { getUserMemoryPrompt } from '../services/userMemoryService.js';
@@ -212,6 +190,14 @@ export const queryAI = asyncHandler(async (req: Request, res: Response) => {
     description: `Query: ${aiResponse.aiModel.name}`,
     organizationId,
   });
+
+  // Increment budget currentUsage so budget caps actually work
+  try {
+    await prisma.budget.updateMany({
+      where: { userId: user.id },
+      data: { currentUsage: { increment: aiResponse.customerPrice } },
+    });
+  } catch { /* budget tracking is non-critical */ }
 
   // Check for low balance and notify (fire and forget)
   const balAfter = await TokenWalletService.getBalance(user.id);
@@ -1106,6 +1092,14 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
               } catch (deductErr) {
                 logger.error('Token deduction failed:', deductErr);
               }
+
+              // Increment budget currentUsage so budget caps actually work
+              try {
+                await prisma.budget.updateMany({
+                  where: { userId: user.id },
+                  data: { currentUsage: { increment: customerPrice } },
+                });
+              } catch { /* budget tracking is non-critical */ }
 
               if (!streamEnded && !res.writableEnded) {
                 res.write(`data: ${JSON.stringify({

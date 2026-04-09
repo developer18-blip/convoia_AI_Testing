@@ -904,12 +904,12 @@ async function main() {
         outputTokenPrice: model.outputTokenPrice,
         capabilities: model.capabilities,
         contextWindow: model.contextWindow,
-        isActive: true,
+        isActive: model.isActive ?? true,
       },
       create: {
         ...model,
         markupPercentage: 25,
-        isActive: true,
+        isActive: model.isActive ?? true,
       },
     });
 

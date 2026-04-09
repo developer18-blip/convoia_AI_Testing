@@ -12,7 +12,7 @@ import { passwordStrength } from '../../lib/utils'
 import api from '../../lib/api'
 
 export function MobileSettingsPage() {
-  const { user, updateUser } = useAuth()
+  const { user, updateUser, logout } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
 
@@ -81,8 +81,7 @@ export function MobileSettingsPage() {
   }
 
   const handleLogout = () => {
-    localStorage.clear()
-    window.location.href = '/login'
+    logout()
   }
 
   return (

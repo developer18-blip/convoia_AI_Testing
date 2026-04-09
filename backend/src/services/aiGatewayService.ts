@@ -90,11 +90,11 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   'gpt-5': 1000000, 'gpt-5-mini': 1000000,
   'gpt-5.4': 1000000, 'gpt-5.4-mini': 1000000, 'gpt-5.4-nano': 1000000,
   'o3': 200000, 'o3-mini': 200000, 'o4-mini': 200000,
-  'claude-opus-4-6': 1000000, 'claude-opus-4-5-20250514': 200000,
-  'claude-sonnet-4-6': 1000000, 'claude-sonnet-4-5-20241022': 200000,
+  'claude-opus-4-6': 1000000, 'claude-opus-4-5-20251101': 200000,
+  'claude-sonnet-4-6': 1000000, 'claude-sonnet-4-5-20250929': 200000,
   'claude-haiku-4-5-20251001': 200000,
-  'gemini-3.1-pro': 2000000, 'gemini-3-pro': 1000000,
-  'gemini-2.5-pro-preview-05-06': 1000000, 'gemini-2.5-flash-preview-05-20': 1000000,
+  'gemini-3.1-pro-preview': 2000000, 'gemini-3-pro': 1000000,
+  'gemini-2.5-pro': 1000000, 'gemini-2.5-flash': 1000000,
   'gemini-2.5-flash-lite': 1000000, 'gemini-2.0-flash': 1000000,
   'deepseek-chat': 128000, 'deepseek-reasoner': 128000,
   'mistral-large-latest': 256000, 'mistral-medium-latest': 131072,
@@ -452,8 +452,8 @@ interface ProviderOverrides {
   thinkingEnabled?: boolean;
 }
 
-// Reasoning models (o-series) reject temperature, top_p, max_tokens, and system role
-const isReasoningModel = (id: string) => /^(o\d|gpt-5)/.test(id); // o1/o3/o4 and gpt-5 family don't support temperature
+// Reasoning models (o-series only) reject temperature, top_p, max_tokens, and system role
+const isReasoningModel = (id: string) => /^o\d/.test(id); // o1/o3/o4 — NOT gpt-5 (gpt-5 supports temperature)
 // GPT-5+ models use max_completion_tokens instead of max_tokens
 const usesCompletionTokens = (id: string) => /^(gpt-5|o\d)/.test(id);
 
@@ -1064,11 +1064,6 @@ ${systemPrompt}`;
             if (cleaned) callbacks.onChunk(cleaned);
           }
         }
-        callbacks.onDone(inputTokens, outputTokens);
-        resolve();
-      });
-
-      response.data.on('end', () => {
         callbacks.onDone(inputTokens, outputTokens);
         resolve();
       });

@@ -20,7 +20,7 @@ export const setBudget = asyncHandler(async (req: Request, res: Response) => {
   }
 
   // Check authorization
-  if (userId !== req.user.userId && req.user.role !== 'admin') {
+  if (userId !== req.user.userId && req.user.role !== 'admin' && req.user.role !== 'platform_admin') {
     throw new AppError('Unauthorized to set budget for this user', 403);
   }
 
@@ -129,7 +129,7 @@ export const checkBudget = asyncHandler(async (req: Request, res: Response) => {
   }
 
   // Check authorization
-  if (userId !== req.user.userId && req.user.role !== 'admin') {
+  if (userId !== req.user.userId && req.user.role !== 'admin' && req.user.role !== 'platform_admin') {
     throw new AppError('Unauthorized to check budget for this user', 403);
   }
 
@@ -179,7 +179,7 @@ export const checkBudget = asyncHandler(async (req: Request, res: Response) => {
 export const resetMonthlyBudgets = asyncHandler(async (req: Request, res: Response) => {
   // This is typically called by a cron job, not exposed via API
   // But we include it for manual triggering if needed (admin only)
-  if (req.user && req.user.role !== 'admin') {
+  if (req.user && req.user.role !== 'admin' && req.user.role !== 'platform_admin') {
     throw new AppError('Only admins can reset budgets', 403);
   }
 
@@ -352,7 +352,7 @@ export const getOrgBudgets = asyncHandler(async (req: Request, res: Response) =>
 });
 
 export const autoDowngradeUser = asyncHandler(async (req: Request, res: Response) => {
-  if (!req.user || req.user.role !== 'admin') {
+  if (!req.user || req.user.role !== 'admin' && req.user.role !== 'platform_admin') {
     throw new AppError('Admin access required', 403);
   }
 

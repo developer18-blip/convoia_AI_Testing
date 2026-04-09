@@ -69,11 +69,11 @@ export const optionalAuth = (
 export const requireRole = (...allowedRoles: string[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
-      throw new AppError('User not authenticated', 401);
+      return next(new AppError('User not authenticated', 401));
     }
 
     if (!allowedRoles.includes(req.user.role)) {
-      throw new AppError('Insufficient permissions', 403);
+      return next(new AppError('Insufficient permissions', 403));
     }
 
     next();
