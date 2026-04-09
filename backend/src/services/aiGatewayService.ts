@@ -608,8 +608,11 @@ async function callPerplexity(modelId: string, messages: any[], systemPrompt: st
   const body: Record<string, any> = {
     model: modelId,
     messages: [{ role: 'system', content: systemPrompt }, ...messages],
-    temperature: overrides?.temperature ?? 0.7,
+    temperature: overrides?.temperature ?? 0.2,  // search models need low temp for accuracy
     max_tokens: overrides?.maxTokens ?? 16384,
+    return_citations: true,
+    return_related_questions: false,
+    search_recency_filter: 'month',
   };
   if (overrides?.topP != null) body.top_p = overrides.topP;
 
@@ -621,8 +624,15 @@ async function callPerplexity(modelId: string, messages: any[], systemPrompt: st
       'Content-Type': 'application/json',
     })
   );
+  // Append citations if Perplexity returned them
+  let text = response.data.choices[0].message.content;
+  const citations = response.data.citations;
+  if (citations && Array.isArray(citations) && citations.length > 0) {
+    text += '\n\n---\n**Sources:**\n' + citations.map((url: string, i: number) => `${i + 1}. ${url}`).join('\n');
+  }
+
   return {
-    response: response.data.choices[0].message.content,
+    response: text,
     inputTokens: response.data.usage.prompt_tokens,
     outputTokens: response.data.usage.completion_tokens,
   };
@@ -1211,10 +1221,13 @@ function callAnthropicStream(
   });
 }
 
-// Generic OpenAI-compatible streaming (Groq, Mistral, DeepSeek)
+// Generic OpenAI-compatible streaming (Groq, Mistral, DeepSeek, xAI)
+// supportsStreamOptions: only OpenAI, Groq, DeepSeek support stream_options.
+// xAI and Mistral reject it with 400 — must be omitted for them.
 function callOpenAICompatibleStream(
   url: string, modelId: string, messages: any[], systemPrompt: string,
-  apiKey: string, callbacks: StreamCallbacks, overrides?: ProviderOverrides
+  apiKey: string, callbacks: StreamCallbacks, overrides?: ProviderOverrides,
+  supportsStreamOptions: boolean = false
 ): Promise<void> {
   const isDeepSeekReasoner = modelId === 'deepseek-reasoner';
   const formattedMsgs = formatMessagesForOpenAI(messages);
@@ -1223,7 +1236,7 @@ function callOpenAICompatibleStream(
     model: modelId,
     messages: [{ role: 'system', content: systemPrompt }, ...formattedMsgs],
     stream: true,
-    stream_options: { include_usage: true },
+    ...(supportsStreamOptions ? { stream_options: { include_usage: true } } : {}),
   };
 
   // DeepSeek Reasoner doesn't support temperature/top_p
@@ -1451,19 +1464,22 @@ async function routeToProviderStream(
     case 'groq':
       return callOpenAICompatibleStream(
         'https://api.groq.com/openai/v1/chat/completions',
-        modelId, messages, systemPrompt, apiKey, callbacks, overrides
+        modelId, messages, systemPrompt, apiKey, callbacks, overrides,
+        true  // Groq supports stream_options
       );
 
     case 'mistral':
       return callOpenAICompatibleStream(
         'https://api.mistral.ai/v1/chat/completions',
-        modelId, messages, systemPrompt, apiKey, callbacks, overrides
+        modelId, messages, systemPrompt, apiKey, callbacks, overrides,
+        false  // Mistral does NOT support stream_options → 400
       );
 
     case 'deepseek':
       return callOpenAICompatibleStream(
         'https://api.deepseek.com/v1/chat/completions',
-        modelId, messages, systemPrompt, apiKey, callbacks, overrides
+        modelId, messages, systemPrompt, apiKey, callbacks, overrides,
+        true  // DeepSeek supports stream_options
       );
 
     case 'perplexity':
@@ -1474,7 +1490,8 @@ async function routeToProviderStream(
     case 'xai':
       return callOpenAICompatibleStream(
         'https://api.x.ai/v1/chat/completions',
-        modelId, messages, systemPrompt, apiKey, callbacks, overrides
+        modelId, messages, systemPrompt, apiKey, callbacks, overrides,
+        false  // xAI does NOT support stream_options → 400
       );
 
     case 'google':
