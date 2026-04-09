@@ -372,16 +372,25 @@ const startServer = async (): Promise<void> => {
       });
     });
 
-    // Handle uncaught exceptions
-    process.on('uncaughtException', (error) => {
-      logger.error('Uncaught Exception:', error);
-      process.exit(1);
+    // Handle unhandled promise rejections — DO NOT crash the server
+    // Stream errors from axios sometimes escape catch blocks as rejections.
+    // Logging and continuing is safer than killing the process.
+    process.on('unhandledRejection', (reason: any) => {
+      logger.error('Unhandled Promise Rejection', {
+        reason: reason?.message || String(reason),
+        stack: reason?.stack?.slice(0, 500),
+      });
+      // Do NOT process.exit — PM2 restart loop is worse than a logged warning
     });
 
-    // Handle unhandled promise rejections
-    process.on('unhandledRejection', (reason, promise) => {
-      logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
-      process.exit(1);
+    // Handle uncaught exceptions — log and graceful shutdown
+    process.on('uncaughtException', (err: Error) => {
+      logger.error('Uncaught Exception', {
+        message: err.message,
+        stack: err.stack?.slice(0, 500),
+      });
+      // Give logger time to flush, then exit (PM2 will restart once)
+      setTimeout(() => process.exit(1), 1000);
     });
   } catch (error) {
     logger.error('Failed to start server:', error);

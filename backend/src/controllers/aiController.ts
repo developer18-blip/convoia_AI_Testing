@@ -13,6 +13,33 @@ import { generateVideo as generateVideoFn, VIDEO_TOKEN_COST, type MediaRequest }
 import { TOKEN_BASE_RATE } from '../config/tokenPackages.js';
 import { buildThinkModeParams } from '../ai/thinkModeParams.js';
 
+// ── SAFE ERROR SERIALIZER (prevents circular reference crash) ────
+// Axios errors contain TLSSocket → ClientRequest → socket circular refs.
+// Never pass raw axios error objects to JSON.stringify or logger.
+function safeErrorDetails(err: any): Record<string, any> {
+  const details: Record<string, any> = {
+    message: err?.message || 'Unknown error',
+    code: err?.code,
+    status: err?.response?.status,
+    statusText: err?.response?.statusText,
+  };
+  // err.response.data may be a stream (circular) — extract safely
+  try {
+    const data = err?.response?.data;
+    if (data && typeof data === 'object' && typeof data.pipe !== 'function') {
+      details.errorBody = JSON.stringify(data).slice(0, 500);
+    } else if (typeof data === 'string') {
+      details.errorBody = data.slice(0, 500);
+    }
+  } catch { /* circular or unserializable — skip */ }
+  // err.config.data is the sent request body (string, safe)
+  try {
+    const sent = err?.config?.data;
+    if (typeof sent === 'string') details.sentBody = sent.slice(0, 800);
+  } catch { /* skip */ }
+  return details;
+}
+
 // ── COST-AWARE TOKEN ENGINE ──────────────────────────────────────
 // TOKEN_BASE_RATE is dynamically derived from the cheapest token package
 // with a 17% platform margin built in. See config/tokenPackages.ts.
@@ -1107,12 +1134,9 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
         },
         onError: (error: Error & { response?: { data?: any; status?: number }; config?: { data?: any } }) => {
           logger.error('Stream error', {
-            message: error?.message,
             provider: selectedModel?.provider,
             modelId: selectedModel?.modelId,
-            status: error?.response?.status,
-            errorBody: JSON.stringify(error?.response?.data),
-            sentBody: JSON.stringify(error?.config?.data)?.slice(0, 800),
+            ...safeErrorDetails(error),
           });
           streamEnded = true;
           if (!res.writableEnded) {

@@ -1079,7 +1079,7 @@ ${systemPrompt}`;
         modelId,
         status: err?.response?.status,
         errorBody: errMsg,
-        sentBody: JSON.stringify(err?.config?.data)?.slice(0, 800),
+        sentBody: typeof err?.config?.data === 'string' ? err.config.data.slice(0, 800) : undefined,
       });
       callbacks.onError(new Error(errMsg));
       reject(new Error(errMsg));
@@ -1199,6 +1199,12 @@ function callAnthropicStream(
         reject(err);
       });
     } catch (err: any) {
+      const status = err?.response?.status;
+      logger.error('Anthropic stream error', {
+        provider: 'anthropic', modelId, status,
+        message: err?.response?.data?.error?.message || err?.message,
+        ...(status === 403 ? { hint: 'Check ANTHROPIC_API_KEY in .env' } : {}),
+      });
       callbacks.onError(err);
       reject(err);
     }
@@ -1290,6 +1296,13 @@ function callOpenAICompatibleStream(
         reject(err);
       });
     } catch (err: any) {
+      const status = err?.response?.status;
+      const provider = url.includes('groq') ? 'groq' : url.includes('mistral') ? 'mistral' : url.includes('deepseek') ? 'deepseek' : url.includes('x.ai') ? 'xai' : 'unknown';
+      logger.error('Compatible stream error', {
+        provider, modelId, status,
+        message: err?.response?.data?.error?.message || err?.message,
+        ...(status === 403 ? { hint: `Check ${provider.toUpperCase()}_API_KEY in .env` } : {}),
+      });
       callbacks.onError(err);
       reject(err);
     }
@@ -1376,6 +1389,12 @@ function callPerplexityStream(
         reject(err);
       });
     } catch (err: any) {
+      const status = err?.response?.status;
+      logger.error('Perplexity stream error', {
+        provider: 'perplexity', modelId, status,
+        message: err?.response?.data?.error?.message || err?.message,
+        ...(status === 403 ? { hint: 'Check PERPLEXITY_API_KEY in .env' } : {}),
+      });
       callbacks.onError(err);
       reject(err);
     }
