@@ -32,17 +32,46 @@ export function VoiceInputButton({ onTranscript, disabled, onSpeakResponse }: Pr
     voice: 'nova',
   })
 
+  // Strip markdown formatting for cleaner TTS output
+  const stripMarkdown = (text: string): string => {
+    return text
+      .replace(/```[\s\S]*?```/g, '') // remove code blocks
+      .replace(/`[^`]*`/g, '')        // remove inline code
+      .replace(/#{1,6}\s?/g, '')      // remove headers
+      .replace(/\*\*([^*]+)\*\*/g, '$1') // bold → plain
+      .replace(/\*([^*]+)\*/g, '$1')     // italic → plain
+      .replace(/__([^_]+)__/g, '$1')
+      .replace(/_([^_]+)_/g, '$1')
+      .replace(/>\s?/g, '')           // remove blockquotes
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // links → text only
+      .replace(/!\[([^\]]*)\]\([^)]+\)/g, '') // remove images
+      .replace(/[-*+]\s/g, '')        // remove list bullets
+      .replace(/\d+\.\s/g, '')        // remove numbered list
+      .replace(/\|[^\n]+\|/g, '')     // remove tables
+      .replace(/---+/g, '')           // remove horizontal rules
+      .replace(/\n{3,}/g, '\n\n')     // collapse multiple newlines
+      .trim()
+  }
+
+  // Track last spoken response to avoid re-speaking the same one
+  const lastSpokenRef = useRef('')
+
   // Auto-speak AI response after voice was used
   useEffect(() => {
     if (
       onSpeakResponse &&
       onSpeakResponse.trim() &&
       hasUsedVoiceRef.current &&
-      mode === 'idle'
+      mode === 'idle' &&
+      onSpeakResponse !== lastSpokenRef.current
     ) {
-      speakText(onSpeakResponse)
+      lastSpokenRef.current = onSpeakResponse
+      const cleanText = stripMarkdown(onSpeakResponse)
+      if (cleanText) {
+        speakText(cleanText)
+      }
     }
-  }, [onSpeakResponse])
+  }, [onSpeakResponse, mode])
 
   if (!isSupported) return null
 

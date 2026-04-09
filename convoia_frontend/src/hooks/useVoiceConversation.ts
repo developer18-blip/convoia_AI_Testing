@@ -186,6 +186,7 @@ export function useVoiceConversation({
       }
 
       setState((s) => ({ ...s, mode: 'speaking' }))
+      console.log('[Voice] TTS: sending', text.length, 'chars to /api/audio/speak')
 
       try {
         const token = localStorage.getItem('convoia_token')
@@ -201,9 +202,11 @@ export function useVoiceConversation({
 
         if (!response.ok) {
           const error = await response.json().catch(() => ({ message: 'Speech synthesis failed' }))
+          console.error('[Voice] TTS API error:', response.status, error)
           throw new Error(error.message || 'Speech synthesis failed')
         }
 
+        console.log('[Voice] TTS: received audio, playing...')
         const audioBlob = await response.blob()
         const audioUrl = URL.createObjectURL(audioBlob)
         const audio = new Audio(audioUrl)
@@ -220,8 +223,8 @@ export function useVoiceConversation({
           setState((s) => ({ ...s, mode: 'idle' }))
         }
 
-        await audio.play().catch(() => {
-          // Autoplay blocked — reset state silently
+        await audio.play().catch((e) => {
+          console.error('[Voice] Autoplay blocked:', e)
           setState((s) => ({ ...s, mode: 'idle' }))
         })
       } catch (err: any) {
