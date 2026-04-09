@@ -477,16 +477,6 @@ const aiModels = [
     contextWindow: 131072,
   },
   {
-    name: 'Grok 2',
-    provider: 'xai',
-    modelId: 'grok-2-1212',
-    description: 'xAI previous generation — reliable and fast general assistant',
-    inputTokenPrice: 0.000002,     // $2 / 1M input
-    outputTokenPrice: 0.000010,    // $10 / 1M output
-    capabilities: ['chat', 'function_calling'],
-    contextWindow: 131072,
-  },
-  {
     name: 'Grok 3 Fast',
     provider: 'xai',
     modelId: 'grok-3-fast',
@@ -497,13 +487,66 @@ const aiModels = [
     contextWindow: 131072,
   },
   {
+    name: 'Grok 4.20',
+    provider: 'xai',
+    modelId: 'grok-4.20-0309-non-reasoning',
+    description: 'xAI flagship model — highest capability with industry-leading accuracy',
+    inputTokenPrice: 0.000002,     // $2 / 1M input
+    outputTokenPrice: 0.000006,    // $6 / 1M output
+    capabilities: ['chat', 'function_calling'],
+    contextWindow: 2000000,
+  },
+  {
+    name: 'Grok 4.20 Reasoning',
+    provider: 'xai',
+    modelId: 'grok-4.20-0309-reasoning',
+    description: 'xAI flagship reasoning model — deep analytical thinking with extended reasoning',
+    inputTokenPrice: 0.000002,     // $2 / 1M input
+    outputTokenPrice: 0.000006,    // $6 / 1M output
+    capabilities: ['chat', 'reasoning', 'function_calling'],
+    contextWindow: 2000000,
+  },
+  {
+    name: 'Grok 4.1 Fast',
+    provider: 'xai',
+    modelId: 'grok-4-1-fast-non-reasoning',
+    description: 'xAI fast model — 10x cheaper than flagship, speed-optimized',
+    inputTokenPrice: 0.0000002,    // $0.20 / 1M input
+    outputTokenPrice: 0.0000005,   // $0.50 / 1M output
+    capabilities: ['chat', 'function_calling'],
+    contextWindow: 2000000,
+  },
+  {
+    name: 'Grok 4.1 Fast Reasoning',
+    provider: 'xai',
+    modelId: 'grok-4-1-fast-reasoning',
+    description: 'xAI fast reasoning model — affordable extended thinking',
+    inputTokenPrice: 0.0000002,    // $0.20 / 1M input
+    outputTokenPrice: 0.0000005,   // $0.50 / 1M output
+    capabilities: ['chat', 'reasoning', 'function_calling'],
+    contextWindow: 2000000,
+  },
+  // Deprecated — removed from xAI API
+  {
+    name: 'Grok 2',
+    provider: 'xai',
+    modelId: 'grok-2-1212',
+    isActive: false,
+    description: 'Deprecated by xAI — use Grok 4.20 instead',
+    inputTokenPrice: 0.000002,
+    outputTokenPrice: 0.000010,
+    capabilities: ['chat'],
+    contextWindow: 131072,
+  },
+  {
     name: 'Grok 2 Vision',
     provider: 'xai',
     modelId: 'grok-2-vision-1212',
-    description: 'xAI vision model — image understanding and analysis',
-    inputTokenPrice: 0.000002,     // $2 / 1M input
-    outputTokenPrice: 0.000010,    // $10 / 1M output
-    capabilities: ['chat', 'vision'],
+    isActive: false,
+    description: 'Deprecated by xAI — use Grok 4.20 instead',
+    inputTokenPrice: 0.000002,
+    outputTokenPrice: 0.000010,
+    capabilities: ['chat'],
     contextWindow: 32768,
   },
 

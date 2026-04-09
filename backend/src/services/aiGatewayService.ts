@@ -103,7 +103,9 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   'mixtral-8x7b-32768': 32768,
   // xAI / Grok
   'grok-3': 131072, 'grok-3-mini': 131072, 'grok-3-fast': 131072,
-  'grok-3-mini-fast': 131072, 'grok-2-vision-1212': 32768, 'grok-2-1212': 131072,
+  'grok-3-mini-fast': 131072,
+  'grok-4.20-0309-non-reasoning': 2000000, 'grok-4.20-0309-reasoning': 2000000,
+  'grok-4-1-fast-non-reasoning': 2000000, 'grok-4-1-fast-reasoning': 2000000,
   // Perplexity
   'sonar-pro': 200000, 'sonar': 127000, 'sonar-reasoning-pro': 128000,
   'sonar-reasoning': 127000, 'sonar-deep-research': 128000,

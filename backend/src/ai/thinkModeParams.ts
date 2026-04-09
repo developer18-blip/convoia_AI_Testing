@@ -191,8 +191,24 @@ const THINK_MODE_CONFIG: Record<string, ThinkModeParams> = {
     tier: 'C', temperature: 0.4, max_tokens: 4000,
     supportsSystemPrompt: true,
   },
-  'grok-2': {
+  'grok-4.20-0309-non-reasoning': {
+    tier: 'C', temperature: 0.4, max_tokens: 8000,
+    supportsSystemPrompt: true,
+  },
+  'grok-4.20-0309-reasoning': {
+    tier: 'B',
+    reasoning_effort: 'high',
+    max_completion_tokens: 16000,
+    supportsSystemPrompt: true,
+  },
+  'grok-4-1-fast-non-reasoning': {
     tier: 'C', temperature: 0.4, max_tokens: 4000,
+    supportsSystemPrompt: true,
+  },
+  'grok-4-1-fast-reasoning': {
+    tier: 'B',
+    reasoning_effort: 'high',
+    max_completion_tokens: 8000,
     supportsSystemPrompt: true,
   },
 
@@ -202,10 +218,6 @@ const THINK_MODE_CONFIG: Record<string, ThinkModeParams> = {
     supportsSystemPrompt: true,
   },
   'mistral-medium-latest': {
-    tier: 'C', temperature: 0.4, max_tokens: 4000,
-    supportsSystemPrompt: true,
-  },
-  'grok-2-vision': {
     tier: 'C', temperature: 0.4, max_tokens: 4000,
     supportsSystemPrompt: true,
   },

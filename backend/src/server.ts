@@ -288,6 +288,8 @@ async function validateModels() {
       'gemini-3-pro-preview',       // Deprecated by Google March 9, 2026
       'gemini-3-pro-image-preview', // Deprecated with Gemini 3 Pro
       'sonar-reasoning',            // Deprecated by Perplexity April 2026
+      'grok-2-1212',                // Deprecated by xAI — replaced by Grok 4
+      'grok-2-vision-1212',         // Deprecated by xAI — replaced by Grok 4
     ];
 
     // 1. Deactivate models without API keys
