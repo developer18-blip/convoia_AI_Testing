@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import AIGatewayService, { getSystemPrompt } from '../services/aiGatewayService.js';
+import AIGatewayService, { getSystemPrompt, classifyQueryComplexity } from '../services/aiGatewayService.js';
 import prisma from '../config/db.js';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { afterQueryMiddleware } from '../middleware/tokenTracker.js';
@@ -364,17 +364,23 @@ export const queryAIStream = async (req: Request, res: Response) => {
     if (!user) { res.status(404).json({ success: false, message: 'User not found' }); return; }
     const organizationId = await getOrCreatePersonalOrg(user.id);
 
+    // ── CLASSIFY QUERY COMPLEXITY ─────────────────────────────
+    // Used for: dynamic history cap, lightweight system prompt, memory skip
+    const latestUserMsg = [...messages].reverse().find((m: any) => m.role === 'user');
+    const latestUserText = typeof latestUserMsg?.content === 'string' ? latestUserMsg.content : '';
+    const queryComplexity = classifyQueryComplexity(latestUserText);
+
     // ── CAP CONVERSATION HISTORY ──────────────────────────────
-    // Prevent token explosion: only keep the last MAX_HISTORY_MESSAGES.
-    // Keeps the first system message (if any) + the most recent messages.
-    const MAX_HISTORY_MESSAGES = 20;
+    // Simple queries (greetings) only need last 4 messages to save tokens.
+    // Standard queries keep 20, complex keep 20.
+    const MAX_HISTORY_MESSAGES = queryComplexity === 'simple' ? 4 : 20;
     let cappedMessages = messages;
     if (messages.length > MAX_HISTORY_MESSAGES) {
       const systemMsg = messages[0]?.role === 'system' ? [messages[0]] : [];
       const recentMsgs = messages.slice(-(MAX_HISTORY_MESSAGES - systemMsg.length));
       const trimmedCount = messages.length - (systemMsg.length + recentMsgs.length);
       cappedMessages = [...systemMsg, ...recentMsgs];
-      logger.info(`Trimmed conversation history: removed ${trimmedCount} old messages, keeping ${cappedMessages.length} (max ${MAX_HISTORY_MESSAGES})`);
+      logger.info(`Trimmed conversation history: removed ${trimmedCount} old messages, keeping ${cappedMessages.length} (max ${MAX_HISTORY_MESSAGES}, complexity=${queryComplexity})`);
     }
 
     // Check token balance — estimate includes system prompt (~500 tokens) + all message history
@@ -720,12 +726,15 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
     // 1. Retrieve relevant memories via semantic search (top 5)
     // 2. Extract new memories from user message (background)
     // 3. Build compact context string (max ~375 tokens)
+    // Skip memory for simple queries (greetings) — saves ~100-150 tokens
     let memoryPrompt = '';
-    try {
-      memoryPrompt = await processMemoryForQuery(user.id, lastUserText);
-    } catch {
-      // Fallback to simple memory if vector service fails
-      try { memoryPrompt = await getUserMemoryPrompt(user.id); } catch { /* silent */ }
+    if (queryComplexity !== 'simple') {
+      try {
+        memoryPrompt = await processMemoryForQuery(user.id, lastUserText);
+      } catch {
+        // Fallback to simple memory if vector service fails
+        try { memoryPrompt = await getUserMemoryPrompt(user.id); } catch { /* silent */ }
+      }
     }
 
     // Inject memory into agent's system prompt (if agent selected)
@@ -1010,6 +1019,7 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
         memoryContext: !thinkingEnabled ? (memoryPrompt || undefined) : undefined, // memory already in Pass 1
         thinkingEnabled: useProviderThinking,
         webSearchActive: webSearched,
+        complexity: queryComplexity,
       },
       {
         onChunk: (text: string) => {

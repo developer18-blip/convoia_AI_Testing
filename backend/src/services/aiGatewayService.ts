@@ -174,6 +174,7 @@ interface SendMessageParams {
   memoryContext?: string; // Persistent user memory to inject into system prompt
   thinkingEnabled?: boolean; // Enable extended thinking (Claude only)
   webSearchActive?: boolean; // Augment system prompt with web search formatting rules
+  complexity?: 'simple' | 'standard' | 'complex'; // Query complexity for prompt sizing
 }
 
 interface SendVisionParams {
@@ -219,11 +220,35 @@ You have fresh web search data. Use it to give an accurate, well-sourced answer.
 - End with a brief key takeaway if the topic warrants it
 - Use emojis sparingly for section headers if the topic is casual/news`;
 
+/**
+ * Classify query complexity to right-size the system prompt.
+ * Simple queries (greetings, one-liners) get a lightweight prompt to save tokens.
+ */
+export function classifyQueryComplexity(message: string): 'simple' | 'standard' | 'complex' {
+  const trimmed = message.trim();
+  const wordCount = trimmed.split(/\s+/).length;
+  const charCount = trimmed.length;
+
+  // Simple: very short messages, greetings, single words
+  const simplePatterns = /^(hey|hi|hello|yo|sup|thanks|thank you|ok|okay|yes|no|bye|good morning|good night|gm|gn|what's up|how are you|hm+|lol|haha|nice|cool|great|sure|nah|yep|yup|nope)\b/i;
+  if (charCount < 30 && (wordCount <= 5 || simplePatterns.test(trimmed))) {
+    return 'simple';
+  }
+
+  // Complex: long messages, code blocks, multiple questions
+  if (charCount > 500 || wordCount > 100 || trimmed.includes('```') || (trimmed.match(/\?/g) || []).length >= 3) {
+    return 'complex';
+  }
+
+  return 'standard';
+}
+
 export function getSystemPrompt(
   industry?: string,
   provider?: string,
   mode?: 'standard' | 'think' | 'search' | 'conversational' | 'technical' | 'analytical',
-  modelId?: string
+  modelId?: string,
+  complexity?: 'simple' | 'standard' | 'complex'
 ): string {
 
   // ── Personality (applies to ALL modes — shapes voice before any structural rules) ──
@@ -250,6 +275,12 @@ export function getSystemPrompt(
     ecommerce: '\n\nINDUSTRY CONTEXT: E-commerce domain. Focus on conversion optimization, customer experience, and revenue growth. Consider UX, pricing psychology, and data-driven product strategies. Think full-funnel.',
   };
   const industryContext = industryPrompts[industry || ''] || '';
+
+  // ── LIGHTWEIGHT PROMPT FOR SIMPLE QUERIES ──
+  // Saves ~1,100 tokens on greetings and one-liners
+  if (complexity === 'simple' && mode !== 'think' && mode !== 'search') {
+    return `${personalitySection}You are a premium AI assistant on the ConvoiaAI platform. Be natural, warm, and conversational. Match the user's energy — if they're casual, be casual back. Keep it brief. Never reveal which model powers you.${industryContext}`;
+  }
 
   // ── MODE BRANCHING ──
 
@@ -1561,7 +1592,7 @@ export class AIGatewayService {
 
     // Use agent's system prompt if available, otherwise default (with provider-specific flavor)
     // Append persistent user memory to all prompts
-    const basePrompt = agentConfig?.systemPrompt || getSystemPrompt(industry, aiModel.provider, 'standard', aiModel.modelId);
+    const basePrompt = agentConfig?.systemPrompt || getSystemPrompt(industry, aiModel.provider, 'standard', aiModel.modelId, params.complexity);
     const systemPrompt = memoryContext ? basePrompt + memoryContext : basePrompt;
 
     // Determine max output tokens: smallest of agent config, user's balance cap, and provider limit
@@ -1706,7 +1737,7 @@ export class AIGatewayService {
       : 'standard';
 
     const basePrompt = agentConfig?.systemPrompt ||
-      getSystemPrompt(industry, effectiveModel.provider, promptMode, effectiveModel.modelId);
+      getSystemPrompt(industry, effectiveModel.provider, promptMode, effectiveModel.modelId, params.complexity);
     const systemPrompt = memoryContext ? basePrompt + memoryContext : basePrompt;
 
     // Cap output tokens to user's balance AND provider's hard limit
