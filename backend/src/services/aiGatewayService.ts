@@ -605,14 +605,12 @@ async function callMistral(modelId: string, messages: any[], systemPrompt: strin
 }
 
 async function callPerplexity(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
+  // Perplexity API: keep request minimal — extra params cause 400
   const body: Record<string, any> = {
     model: modelId,
     messages: [{ role: 'system', content: systemPrompt }, ...messages],
-    temperature: overrides?.temperature ?? 0.2,  // search models need low temp for accuracy
+    temperature: overrides?.temperature ?? 0.2,
     max_tokens: overrides?.maxTokens ?? 16384,
-    return_citations: true,
-    return_related_questions: false,
-    search_recency_filter: 'month',
   };
   if (overrides?.topP != null) body.top_p = overrides.topP;
 
@@ -1329,15 +1327,13 @@ function callPerplexityStream(
 ): Promise<void> {
   const formattedMsgs = formatMessagesForOpenAI(messages);
 
+  // Perplexity API: keep request minimal — extra params cause 400
   const body: Record<string, any> = {
     model: modelId,
     messages: [{ role: 'system', content: systemPrompt }, ...formattedMsgs],
     stream: true,
     temperature: overrides?.temperature ?? 0.2,
     max_tokens: overrides?.maxTokens ?? 16384,
-    return_citations: true,
-    return_related_questions: false,
-    search_recency_filter: 'month',
   };
   if (overrides?.topP != null) body.top_p = overrides.topP;
 
