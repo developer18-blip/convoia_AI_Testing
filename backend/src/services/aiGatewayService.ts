@@ -605,14 +605,12 @@ async function callMistral(modelId: string, messages: any[], systemPrompt: strin
 }
 
 async function callPerplexity(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
-  // Perplexity API: keep request minimal — extra params cause 400
+  // Perplexity API: strictly minimal — no top_p, no max_tokens, no extra params
   const body: Record<string, any> = {
     model: modelId,
     messages: [{ role: 'system', content: systemPrompt }, ...messages],
     temperature: overrides?.temperature ?? 0.2,
-    max_tokens: overrides?.maxTokens ?? 16384,
   };
-  if (overrides?.topP != null) body.top_p = overrides.topP;
 
   const response = await axios.post(
     'https://api.perplexity.ai/chat/completions',
@@ -1327,15 +1325,15 @@ function callPerplexityStream(
 ): Promise<void> {
   const formattedMsgs = formatMessagesForOpenAI(messages);
 
-  // Perplexity API: keep request minimal — extra params cause 400
+  // Perplexity API: strictly minimal body — rejects unknown/conflicting params
+  // Do NOT send top_p alongside temperature (Perplexity rejects it)
+  // Do NOT send stream_options, return_citations, search_recency_filter
   const body: Record<string, any> = {
     model: modelId,
     messages: [{ role: 'system', content: systemPrompt }, ...formattedMsgs],
     stream: true,
     temperature: overrides?.temperature ?? 0.2,
-    max_tokens: overrides?.maxTokens ?? 16384,
   };
-  if (overrides?.topP != null) body.top_p = overrides.topP;
 
   return new Promise(async (resolve, reject) => {
     try {
@@ -1399,12 +1397,26 @@ function callPerplexityStream(
       });
     } catch (err: any) {
       const status = err?.response?.status;
+      // Read the actual error body from Perplexity (it's a stream on error)
+      let errorBody = '';
+      try {
+        if (err?.response?.data) {
+          if (typeof err.response.data === 'string') {
+            errorBody = err.response.data;
+          } else if (typeof err.response.data.pipe === 'function') {
+            for await (const chunk of err.response.data) errorBody += String(chunk);
+          } else {
+            errorBody = JSON.stringify(err.response.data);
+          }
+        }
+      } catch { /* ignore read errors */ }
       logger.error('Perplexity stream error', {
         provider: 'perplexity', modelId, status,
-        message: err?.response?.data?.error?.message || err?.message,
+        message: err?.message,
+        errorBody: errorBody.slice(0, 500),
         ...(status === 403 ? { hint: 'Check PERPLEXITY_API_KEY in .env' } : {}),
       });
-      callbacks.onError(err);
+      callbacks.onError(new Error(errorBody || err?.message || 'Perplexity error'));
       reject(err);
     }
   });
