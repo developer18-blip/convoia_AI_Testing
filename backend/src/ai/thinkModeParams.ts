@@ -156,6 +156,38 @@ const THINK_MODE_CONFIG: Record<string, ThinkModeParams> = {
     supportsSystemPrompt: true,
   },
 
+  // ── TIER C: PERPLEXITY ──────────────────────────────────────────
+  'sonar-reasoning-pro': {
+    tier: 'C', temperature: 0.4, max_tokens: 8000,
+    supportsSystemPrompt: true,
+  },
+  'sonar-reasoning': {
+    tier: 'C', temperature: 0.4, max_tokens: 4000,
+    supportsSystemPrompt: true,
+  },
+  'sonar-pro': {
+    tier: 'C', temperature: 0.4, max_tokens: 4000,
+    supportsSystemPrompt: true,
+  },
+  'sonar': {
+    tier: 'D', temperature: 0.5, max_tokens: 3000,
+    supportsSystemPrompt: true,
+  },
+
+  // ── TIER C: XAI (GROK) ─────────────────────────────────────────
+  'grok-3': {
+    tier: 'C', temperature: 0.4, max_tokens: 4000,
+    supportsSystemPrompt: true,
+  },
+  'grok-3-mini': {
+    tier: 'D', temperature: 0.5, max_tokens: 3000,
+    supportsSystemPrompt: true,
+  },
+  'grok-2': {
+    tier: 'C', temperature: 0.4, max_tokens: 4000,
+    supportsSystemPrompt: true,
+  },
+
   // ── TIER D: LITE / FAST MODELS ──────────────────────────────────
 
   'gpt-5.4-nano': {

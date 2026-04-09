@@ -18,9 +18,11 @@ const features = [
 ]
 
 const providers = [
-  { name: 'OpenAI', models: 'GPT-5.4, GPT-4.1, o3, o4', color: '#10B981' },
+  { name: 'OpenAI', models: 'GPT-5.4, GPT-4.1, o3, o4-mini', color: '#10B981' },
   { name: 'Anthropic', models: 'Claude Opus 4.6, Sonnet 4.6, Haiku 4.5', color: '#D97706' },
-  { name: 'Google', models: 'Gemini 3.1 Pro, 2.5 Flash, Image Gen', color: '#3B82F6' },
+  { name: 'Google', models: 'Gemini 3.1 Pro, 2.5 Pro, 2.5 Flash', color: '#3B82F6' },
+  { name: 'Perplexity', models: 'Sonar Pro, Sonar Reasoning Pro', color: '#22D3EE' },
+  { name: 'xAI', models: 'Grok 3, Grok 3 Mini, Grok 2', color: '#F43F5E' },
   { name: 'DeepSeek', models: 'DeepSeek Chat, Reasoner', color: '#8B5CF6' },
   { name: 'Mistral', models: 'Mistral Large, Mistral Small', color: '#EF4444' },
   { name: 'Groq', models: 'Llama 3.3 70B, Mixtral 8x7B', color: '#F97316' },
@@ -52,7 +54,7 @@ const plans: TokenPackage[] = [
     savings: null,
     features: [
       '500,000 tokens',
-      'All 28+ AI models',
+      'All 35+ AI models',
       'Image & video generation',
       'No expiry — use anytime',
     ],
@@ -70,7 +72,7 @@ const plans: TokenPackage[] = [
     savings: 'Save 30%',
     features: [
       '2,000,000 tokens',
-      'All 28+ AI models',
+      'All 35+ AI models',
       'Deep Think Mode',
       'Image & video generation',
       'Usage analytics',
@@ -89,7 +91,7 @@ const plans: TokenPackage[] = [
     savings: 'Save 50%',
     features: [
       '5,000,000 tokens',
-      'All 28+ AI models',
+      'All 35+ AI models',
       'Deep Think Mode',
       'AI Agents',
       'Team token allocation',
@@ -109,7 +111,7 @@ const plans: TokenPackage[] = [
     savings: 'Save 60%',
     features: [
       '15,000,000 tokens',
-      'All 28+ AI models',
+      'All 35+ AI models',
       'Deep Think Mode',
       'AI Agents',
       'Full org hierarchy',
@@ -130,7 +132,7 @@ const plans: TokenPackage[] = [
     savings: 'Save 65%',
     features: [
       '50,000,000 tokens',
-      'All 28+ AI models',
+      'All 35+ AI models',
       'Everything in Power',
       'Priority support',
       'Advanced analytics',
@@ -149,7 +151,7 @@ const plans: TokenPackage[] = [
     savings: 'Save 70%',
     features: [
       '100,000,000 tokens',
-      'All 28+ AI models',
+      'All 35+ AI models',
       'Everything in Pro',
       'Dedicated support',
       'Custom integrations',
@@ -195,7 +197,7 @@ function formatTokenCount(n: number): string {
 
 const steps = [
   { num: '01', title: 'Create your account', description: 'Sign up in 30 seconds. Buy tokens and start chatting instantly.' },
-  { num: '02', title: 'Choose your model', description: 'Pick from 28+ AI models across 6 providers. Switch models mid-conversation.' },
+  { num: '02', title: 'Choose your model', description: 'Pick from 35+ AI models across 6 providers. Switch models mid-conversation.' },
   { num: '03', title: 'Chat, create, analyze', description: 'Chat with AI, generate images & videos, use Deep Think Mode, deploy AI agents.' },
 ]
 
@@ -272,7 +274,7 @@ export function LandingPage() {
             className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium mb-8"
           >
             <Sparkles size={14} />
-            Now with 28+ AI models
+            Now with 35+ AI models
           </motion.div>
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
@@ -344,8 +346,8 @@ export function LandingPage() {
       <section className="py-8 border-y border-border/50 bg-surface/30 backdrop-blur-sm">
         <div className="max-w-4xl mx-auto px-4 flex flex-wrap justify-center gap-16">
           {[
-            { value: '28+', label: 'AI Models' },
-            { value: '6', label: 'Providers' },
+            { value: '35+', label: 'AI Models' },
+            { value: '8', label: 'Providers' },
             { value: '4', label: 'Think Tiers' },
             { value: '99.9%', label: 'Uptime' },
           ].map((stat) => (
@@ -523,7 +525,7 @@ export function LandingPage() {
 
           {/* Note below cards */}
           <p className="text-center text-sm text-text-muted mt-8 max-w-2xl mx-auto">
-            Tokens never expire. Buy once, use anytime across all 28+ AI models.
+            Tokens never expire. Buy once, use anytime across all 35+ AI models.
             1 token &asymp; 0.75 words &middot; Larger packages = lower cost per token.
           </p>
 

@@ -401,6 +401,80 @@ const aiModels = [
     capabilities: ['chat'],
     contextWindow: 32768,
   },
+
+  // ── Perplexity ──────────────────────────────────────────────────
+  {
+    name: 'Sonar Pro',
+    provider: 'perplexity',
+    modelId: 'sonar-pro',
+    description: 'Perplexity flagship — advanced search with citations and deep reasoning',
+    inputTokenPrice: 0.000003,     // $3 / 1M input
+    outputTokenPrice: 0.000015,    // $15 / 1M output
+    capabilities: ['chat', 'search'],
+    contextWindow: 200000,
+  },
+  {
+    name: 'Sonar',
+    provider: 'perplexity',
+    modelId: 'sonar',
+    description: 'Perplexity lightweight search — fast answers with web citations',
+    inputTokenPrice: 0.000001,     // $1 / 1M input
+    outputTokenPrice: 0.000001,    // $1 / 1M output
+    capabilities: ['chat', 'search'],
+    contextWindow: 128000,
+  },
+  {
+    name: 'Sonar Reasoning Pro',
+    provider: 'perplexity',
+    modelId: 'sonar-reasoning-pro',
+    description: 'Perplexity reasoning model — multi-step research with citations',
+    inputTokenPrice: 0.000003,     // $3 / 1M input
+    outputTokenPrice: 0.000015,    // $15 / 1M output
+    capabilities: ['chat', 'search', 'reasoning'],
+    contextWindow: 128000,
+  },
+  {
+    name: 'Sonar Reasoning',
+    provider: 'perplexity',
+    modelId: 'sonar-reasoning',
+    description: 'Perplexity fast reasoning with search — quick analysis with citations',
+    inputTokenPrice: 0.000001,     // $1 / 1M input
+    outputTokenPrice: 0.000005,    // $5 / 1M output
+    capabilities: ['chat', 'search', 'reasoning'],
+    contextWindow: 128000,
+  },
+
+  // ── xAI (Grok) ─────────────────────────────────────────────────
+  {
+    name: 'Grok 3',
+    provider: 'xai',
+    modelId: 'grok-3',
+    description: 'xAI flagship model — sharp, witty, high-capability reasoning',
+    inputTokenPrice: 0.000003,     // $3 / 1M input
+    outputTokenPrice: 0.000015,    // $15 / 1M output
+    capabilities: ['chat', 'function_calling'],
+    contextWindow: 131072,
+  },
+  {
+    name: 'Grok 3 Mini',
+    provider: 'xai',
+    modelId: 'grok-3-mini',
+    description: 'xAI fast model — quick and efficient with reasoning capability',
+    inputTokenPrice: 0.0000003,    // $0.30 / 1M input
+    outputTokenPrice: 0.0000005,   // $0.50 / 1M output
+    capabilities: ['chat', 'function_calling'],
+    contextWindow: 131072,
+  },
+  {
+    name: 'Grok 2',
+    provider: 'xai',
+    modelId: 'grok-2-1212',
+    description: 'xAI previous generation — reliable and fast general assistant',
+    inputTokenPrice: 0.000002,     // $2 / 1M input
+    outputTokenPrice: 0.000010,    // $10 / 1M output
+    capabilities: ['chat', 'function_calling'],
+    contextWindow: 131072,
+  },
 ];
 
 // ─── Default Agents ───

@@ -44,6 +44,8 @@ export const config = {
     google: process.env.GOOGLE_AI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY,
     deepseek: process.env.DEEPSEEK_API_KEY,
     mistral: process.env.MISTRAL_API_KEY,
+    perplexity: process.env.PERPLEXITY_API_KEY,
+    xai: process.env.XAI_API_KEY,
     groq: process.env.GROQ_API_KEY,
   },
 

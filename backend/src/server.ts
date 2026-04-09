@@ -278,6 +278,8 @@ async function validateModels() {
       google: !!config.apiKeys.google,
       deepseek: !!config.apiKeys.deepseek,
       mistral: !!config.apiKeys.mistral,
+      perplexity: !!config.apiKeys.perplexity,
+      xai: !!config.apiKeys.xai,
       groq: !!config.apiKeys.groq,
     };
 

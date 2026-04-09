@@ -595,6 +595,54 @@ async function callMistral(modelId: string, messages: any[], systemPrompt: strin
   };
 }
 
+async function callPerplexity(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
+  const body: Record<string, any> = {
+    model: modelId,
+    messages: [{ role: 'system', content: systemPrompt }, ...messages],
+    temperature: overrides?.temperature ?? 0.7,
+    max_tokens: overrides?.maxTokens ?? 16384,
+  };
+  if (overrides?.topP != null) body.top_p = overrides.topP;
+
+  const response = await axios.post(
+    'https://api.perplexity.ai/chat/completions',
+    body,
+    axiosConfig({
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    })
+  );
+  return {
+    response: response.data.choices[0].message.content,
+    inputTokens: response.data.usage.prompt_tokens,
+    outputTokens: response.data.usage.completion_tokens,
+  };
+}
+
+async function callXAI(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
+  const body: Record<string, any> = {
+    model: modelId,
+    messages: [{ role: 'system', content: systemPrompt }, ...messages],
+    temperature: overrides?.temperature ?? 0.7,
+    max_tokens: overrides?.maxTokens ?? 16384,
+  };
+  if (overrides?.topP != null) body.top_p = overrides.topP;
+
+  const response = await axios.post(
+    'https://api.x.ai/v1/chat/completions',
+    body,
+    axiosConfig({
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    })
+  );
+  return {
+    response: response.data.choices[0].message.content,
+    inputTokens: response.data.usage.prompt_tokens,
+    outputTokens: response.data.usage.completion_tokens,
+  };
+}
+
 async function callDeepSeek(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
   const body: Record<string, any> = {
     model: modelId,
@@ -768,6 +816,12 @@ async function routeToProvider(aiModel: any, rawMessages: any[], systemPrompt: s
 
     case 'deepseek':
       return await callDeepSeek(modelId, formatMessagesForOpenAI(messages), systemPrompt, apiKey, overrides);
+
+    case 'perplexity':
+      return await callPerplexity(modelId, formatMessagesForOpenAI(messages), systemPrompt, apiKey, overrides);
+
+    case 'xai':
+      return await callXAI(modelId, formatMessagesForOpenAI(messages), systemPrompt, apiKey, overrides);
 
     default:
       throw new AppError(`Unsupported provider: ${provider}`, 400);
@@ -1288,6 +1342,18 @@ async function routeToProviderStream(
     case 'deepseek':
       return callOpenAICompatibleStream(
         'https://api.deepseek.com/v1/chat/completions',
+        modelId, messages, systemPrompt, apiKey, callbacks, overrides
+      );
+
+    case 'perplexity':
+      return callOpenAICompatibleStream(
+        'https://api.perplexity.ai/chat/completions',
+        modelId, messages, systemPrompt, apiKey, callbacks, overrides
+      );
+
+    case 'xai':
+      return callOpenAICompatibleStream(
+        'https://api.x.ai/v1/chat/completions',
         modelId, messages, systemPrompt, apiKey, callbacks, overrides
       );
 
