@@ -434,10 +434,11 @@ const aiModels = [
     contextWindow: 128000,
   },
   {
-    name: 'Sonar Reasoning',
+    name: 'Sonar Reasoning (Deprecated)',
     provider: 'perplexity',
     modelId: 'sonar-reasoning',
-    description: 'Perplexity fast reasoning with search — quick analysis with citations',
+    isActive: false,
+    description: 'Deprecated by Perplexity — use Sonar Reasoning Pro instead',
     inputTokenPrice: 0.000001,     // $1 / 1M input
     outputTokenPrice: 0.000005,    // $5 / 1M output
     capabilities: ['chat', 'search', 'reasoning'],

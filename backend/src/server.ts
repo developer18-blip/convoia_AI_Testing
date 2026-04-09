@@ -287,6 +287,7 @@ async function validateModels() {
     const DEPRECATED_MODELS = [
       'gemini-3-pro-preview',       // Deprecated by Google March 9, 2026
       'gemini-3-pro-image-preview', // Deprecated with Gemini 3 Pro
+      'sonar-reasoning',            // Deprecated by Perplexity April 2026
     ];
 
     // 1. Deactivate models without API keys
