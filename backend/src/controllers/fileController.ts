@@ -217,7 +217,7 @@ export const processFile = asyncHandler(async (req: Request, res: Response): Pro
             const { PDFParse } = await import('pdf-parse')
             const dataBuffer = fs.readFileSync(file.path)
             const parser = new PDFParse({ data: new Uint8Array(dataBuffer) })
-            const result = await parser.getText()
+            const result = await parser.getText({ pageJoiner: '' })
             await parser.destroy()
             extractedText = result.text || ''
             pageCount = result.total || 0
@@ -231,7 +231,7 @@ export const processFile = asyncHandler(async (req: Request, res: Response): Pro
           // Validate extracted text contains actual readable content, not PDF garbage
           // A readable document should have common English words or word-like patterns
           if (extractedText.length > 0) {
-            const readableWordCount = (extractedText.match(/\b[a-zA-Z]{2,}\b/g) || []).length
+            const readableWordCount = (extractedText.match(/\b[a-zA-Z]{3,}\b/g) || []).length
             const charRatio = readableWordCount / Math.max(extractedText.length / 5, 1)
             if (charRatio < 0.1) {
               // Less than 10% readable words — likely PDF structural commands or garbled encoding
@@ -266,6 +266,7 @@ export const processFile = asyncHandler(async (req: Request, res: Response): Pro
               logger.info(`OCR succeeded: ${ocrText.length} chars extracted from PDF`)
             } else {
               logger.warn(`OCR also failed for ${file.originalname}. Document may be empty or unsupported format.`)
+              extractedText = '' // Clear page markers so empty-document warning is shown
             }
           }
         }

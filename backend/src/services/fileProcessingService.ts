@@ -102,7 +102,7 @@ export class FileProcessingService {
       const { PDFParse } = await import('pdf-parse')
       const dataBuffer = fs.readFileSync(filePath)
       const parser = new PDFParse({ data: new Uint8Array(dataBuffer) })
-      const result = await parser.getText()
+      const result = await parser.getText({ pageJoiner: '' })
       await parser.destroy()
 
       return {
