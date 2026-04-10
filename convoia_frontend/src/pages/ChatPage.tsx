@@ -555,7 +555,7 @@ export function ChatPage() {
           isOpen={voiceModeOpen}
           onClose={() => setVoiceModeOpen(false)}
           onTranscript={(text) => {
-            setVoiceModeOpen(false)
+            // Do NOT close overlay — keep continuous voice loop
             handleSend(text)
           }}
           latestAIResponse={latestCompletedResponse}

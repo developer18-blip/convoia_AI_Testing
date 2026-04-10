@@ -1,6 +1,26 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { X, Mic } from 'lucide-react'
 import { useVoiceConversation } from '../hooks/useVoiceConversation'
+
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`[^`]*`/g, '')
+    .replace(/#{1,6}\s?/g, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
+    .replace(/>\s?/g, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '')
+    .replace(/[-*+]\s/g, '')
+    .replace(/\d+\.\s/g, '')
+    .replace(/\|[^\n]+\|/g, '')
+    .replace(/---+/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
 
 interface Props {
   isOpen: boolean
@@ -33,7 +53,11 @@ export function VoiceConversationMode({ isOpen, onClose, onTranscript, latestAIR
     voice: 'nova',
   })
 
-  // Auto-speak latest AI response
+  // Track if we just finished speaking (for auto-loop)
+  const prevModeRef = useRef(mode)
+  const hasSpokenOnceRef = useRef(false)
+
+  // Auto-speak latest AI response (strip markdown for clean TTS)
   useEffect(() => {
     if (
       isOpen &&
@@ -43,20 +67,27 @@ export function VoiceConversationMode({ isOpen, onClose, onTranscript, latestAIR
       mode === 'idle'
     ) {
       lastSpokenRef.current = latestAIResponse
-      setLastResponse(latestAIResponse)
-      speakText(latestAIResponse)
+      const cleanText = stripMarkdown(latestAIResponse)
+      setLastResponse(cleanText || latestAIResponse)
+      if (cleanText) {
+        hasSpokenOnceRef.current = true
+        speakText(cleanText)
+      }
     }
   }, [latestAIResponse, isOpen, mode])
 
-  // Auto-loop: after speaking finishes, wait 1s then listen again
+  // Auto-loop: after TTS finishes → auto-listen (like ChatGPT)
   useEffect(() => {
-    if (isOpen && mode === 'idle' && autoLoop && lastResponse) {
+    const wasSpeaking = prevModeRef.current === 'speaking'
+    prevModeRef.current = mode
+
+    if (isOpen && wasSpeaking && mode === 'idle' && autoLoop) {
       const timer = setTimeout(() => {
         startListening()
-      }, 1000)
+      }, 600) // faster than before — feels more natural
       return () => clearTimeout(timer)
     }
-  }, [mode, autoLoop, isOpen, lastResponse])
+  }, [mode, autoLoop, isOpen])
 
   if (!isOpen) return null
 

@@ -91,8 +91,8 @@ export function useVoiceConversation({
 
       const dataArray = new Uint8Array(analyser.frequencyBinCount)
       let silenceStart: number | null = null
-      const SILENCE_THRESHOLD = 15
-      const SILENCE_DURATION = 2500
+      const SILENCE_THRESHOLD = 12     // lower = more sensitive
+      const SILENCE_DURATION = 3000    // 3s silence before auto-stop (natural speech pauses)
 
       const checkSilence = () => {
         if (mediaRecorderRef.current?.state !== 'recording') {
