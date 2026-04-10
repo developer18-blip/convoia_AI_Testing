@@ -4,8 +4,8 @@ import { useAuth } from '../hooks/useAuth'
 import api from '../lib/api'
 import type { Agent, Conversation, Message, ChatFolder } from '../types'
 
-const MAX_CONVERSATIONS = 100
-const MAX_MESSAGES_PER_CONV = 500
+const MAX_CONVERSATIONS = 30
+const MAX_MESSAGES_PER_CONV = 50
 
 function storageKey(userId: string) { return `convoia_chats_${userId}` }
 function foldersKey(userId: string) { return `convoia_folders_${userId}` }
@@ -215,11 +215,19 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const toSave = conversations.filter(c => !c._draft && c.messages && c.messages.length > 0)
       localStorage.setItem(storageKey(userId), JSON.stringify(trimForStorage(toSave)))
     } catch (err) {
-      console.error('Failed to save conversations:', err)
-      if (conversations.length > 10) {
+      console.warn('localStorage quota exceeded — trimming old conversations')
+      // Progressive fallback: keep fewer conversations with fewer messages
+      const trimAggressive = (convs: Conversation[], maxConv: number, maxMsg: number) =>
+        convs.slice(0, maxConv).map(c => ({ ...c, messages: c.messages.slice(-maxMsg) }))
+      try {
+        localStorage.setItem(storageKey(userId), JSON.stringify(trimAggressive(toSave, 15, 30)))
+      } catch {
         try {
-          localStorage.setItem(storageKey(userId), JSON.stringify(trimForStorage(conversations.slice(0, 10))))
-        } catch { /* storage truly full */ }
+          localStorage.setItem(storageKey(userId), JSON.stringify(trimAggressive(toSave, 5, 10)))
+        } catch {
+          // Last resort: clear old data entirely
+          try { localStorage.removeItem(storageKey(userId)) } catch { /* truly broken */ }
+        }
       }
     }
   }, [conversations, userId])
