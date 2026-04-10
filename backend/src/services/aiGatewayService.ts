@@ -484,7 +484,7 @@ interface ProviderOverrides {
 }
 
 // Reasoning models (o-series only) reject temperature, top_p, max_tokens, and system role
-const isReasoningModel = (id: string) => /^o\d/.test(id); // o1/o3/o4 — NOT gpt-5 (gpt-5 supports temperature)
+const isReasoningModel = (id: string) => /^(o\d|gpt-5)/.test(id); // o1/o3/o4 and gpt-5 family — all reject temperature != 1
 // GPT-5+ models use max_completion_tokens instead of max_tokens
 const usesCompletionTokens = (id: string) => /^(gpt-5|o\d)/.test(id);
 
