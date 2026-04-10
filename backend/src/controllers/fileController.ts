@@ -223,16 +223,21 @@ export const processFile = asyncHandler(async (req: Request, res: Response): Pro
             pageCount = result.total || 0
             logger.info(`PDF extracted: ${file.originalname}, pages=${pageCount}, chars=${extractedText.length}`)
           } catch (pdfErr: any) {
-            logger.error(`PDF extraction failed for ${file.originalname}: ${pdfErr.message}`)
-            // Fallback: try reading raw text
-            try {
-              const rawText = fs.readFileSync(file.path, 'utf-8')
-              const cleaned = rawText.replace(/[^\x20-\x7E\n\r\t]/g, ' ').replace(/\s{3,}/g, ' ').trim()
-              if (cleaned.length > 50) {
-                extractedText = cleaned
-                logger.info(`PDF fallback raw extraction: ${cleaned.length} chars`)
-              }
-            } catch { /* silent */ }
+            logger.error(`PDF extraction failed for ${file.originalname}: ${pdfErr.message}. Will attempt OCR.`)
+            // Do NOT fall back to raw binary read — it produces garbage PDF commands
+            // that bypass OCR. Let the meaningfulText check below handle OCR instead.
+          }
+
+          // Validate extracted text contains actual readable content, not PDF garbage
+          // A readable document should have common English words or word-like patterns
+          if (extractedText.length > 0) {
+            const readableWordCount = (extractedText.match(/\b[a-zA-Z]{2,}\b/g) || []).length
+            const charRatio = readableWordCount / Math.max(extractedText.length / 5, 1)
+            if (charRatio < 0.1) {
+              // Less than 10% readable words — likely PDF structural commands or garbled encoding
+              logger.warn(`PDF text appears garbled (${readableWordCount} readable words in ${extractedText.length} chars, ratio=${charRatio.toFixed(2)}). Discarding for OCR.`)
+              extractedText = ''
+            }
           }
         } else if (
           file.mimetype.includes('wordprocessingml') ||
@@ -246,15 +251,21 @@ export const processFile = asyncHandler(async (req: Request, res: Response): Pro
           extractedText = fs.readFileSync(file.path, 'utf-8')
         }
 
-        // Check if extracted text is only page markers (scanned/image-based PDF)
+        // Check if extracted text is meaningful (scanned/image-based PDFs, failed extraction)
         if (file.mimetype === 'application/pdf') {
-          const meaningfulText = extractedText.replace(/--\s*\d+\s*of\s*\d+\s*--/g, '').replace(/\s+/g, '').trim()
+          const meaningfulText = extractedText
+            .replace(/--\s*\d+\s*of\s*\d+\s*--/g, '') // strip page markers
+            .replace(/\s+/g, '')
+            .trim()
           if (meaningfulText.length < 50 && file.size > 1000) {
-            logger.info(`PDF appears scanned (only ${meaningfulText.length} meaningful chars). Attempting vision OCR...`)
+            logger.info(`PDF text extraction produced ${meaningfulText.length} meaningful chars (file size: ${file.size} bytes). Attempting vision OCR...`)
             const ocrText = await ocrPdfWithVision(file.path)
             if (ocrText) {
               extractedText = ocrText
-              logger.info(`OCR succeeded: ${ocrText.length} chars extracted from scanned PDF`)
+              pageCount = pageCount || 1
+              logger.info(`OCR succeeded: ${ocrText.length} chars extracted from PDF`)
+            } else {
+              logger.warn(`OCR also failed for ${file.originalname}. Document may be empty or unsupported format.`)
             }
           }
         }
