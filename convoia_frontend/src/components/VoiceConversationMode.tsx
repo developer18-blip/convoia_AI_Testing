@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { X, Mic } from 'lucide-react'
 import { useVoiceConversation } from '../hooks/useVoiceConversation'
 
