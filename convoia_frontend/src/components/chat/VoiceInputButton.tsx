@@ -63,6 +63,22 @@ export function VoiceInputButton({ onTranscript, onAutoSend, disabled, onSpeakRe
 
   // Track last spoken response to avoid re-speaking the same one
   const lastSpokenRef = useRef('')
+  const prevModeRef = useRef(mode)
+
+  // Auto-listen after TTS finishes — continuous voice conversation
+  useEffect(() => {
+    const wasSpeaking = prevModeRef.current === 'speaking'
+    prevModeRef.current = mode
+
+    if (wasSpeaking && mode === 'idle' && hasUsedVoiceRef.current && !disabled) {
+      // TTS just finished — auto-start listening after brief pause
+      const timer = setTimeout(() => {
+        console.log('[Voice] Auto-listen: TTS finished, starting mic...')
+        startListening()
+      }, 800)
+      return () => clearTimeout(timer)
+    }
+  }, [mode, disabled])
 
   // Auto-speak AI response after voice was used
   useEffect(() => {
