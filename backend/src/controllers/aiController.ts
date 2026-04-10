@@ -47,6 +47,8 @@ import { getCachedResponse, setCachedResponse } from '../services/modelRecommend
 import { getUserMemoryPrompt } from '../services/userMemoryService.js';
 import { processMemoryForQuery } from '../services/vectorMemoryService.js';
 import { analyzeQuery, getClarificationSystemPrompt, getDeepResearchPrompt, buildRefinementPrompt } from '../services/thinkingService.js';
+import { getModelIntelligence } from '../ai/modelRegistry.js';
+import { config } from '../config/env.js';
 import logger from '../config/logger.js';
 
 // Image-only models that cannot handle chat/streaming
@@ -885,14 +887,21 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
     let useProviderThinking = !!thinkingEnabled;
 
     if (thinkingEnabled) {
-      const analysis = analyzeQuery(userQuery, enrichedMessages);
+      const analysis = await analyzeQuery(
+        userQuery,
+        enrichedMessages,
+        selectedModel?.modelId,
+        config.apiKeys.openai || undefined,
+        'gpt-4o-mini'
+      );
+      const thinkIntel = getModelIntelligence(selectedModel?.modelId || '');
       logger.info(`Deep research: depth=${analysis.depthLevel}, task=${analysis.taskType}, confidence=${analysis.confidenceScore.toFixed(2)}, hypotheses=${analysis.hypotheses.length}, clarify=${analysis.needsClarification}`);
 
       if (analysis.needsClarification) {
         // ── Stage 2: Clarification — ask smart questions instead of guessing ──
         res.write(`data: ${JSON.stringify({ type: 'status', content: 'Analyzing your question...' })}\n\n`);
         agentConfig = {
-          systemPrompt: getClarificationSystemPrompt(analysis),
+          systemPrompt: getClarificationSystemPrompt(analysis, selectedModel?.modelId),
           temperature: 0.3,
           maxTokens: 1000,
           topP: 0.9,
@@ -921,8 +930,20 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
           res.write(`data: ${JSON.stringify({ type: 'status', content: depthLabels[analysis.depthLevel] || 'Researching...' })}\n\n`);
 
           // Pass 1: Deep Research (non-streaming)
-          // Combines hypothesis building + multi-angle analysis in one call
-          const researchPrompt = getDeepResearchPrompt(analysis);
+          // Detect if user is answering a prior clarification question
+          const prevAssistantMsg = [...enrichedMessages]
+            .reverse()
+            .find((m, i) => i > 0 && m.role === 'assistant');
+          const isAnsweringClarification =
+            prevAssistantMsg?.content &&
+            typeof prevAssistantMsg.content === 'string' &&
+            prevAssistantMsg.content.includes('?') &&
+            userQuery.split(' ').length < 80;
+          const clarificationContext = isAnsweringClarification
+            ? `User's clarification answer: "${userQuery}"`
+            : undefined;
+
+          const researchPrompt = getDeepResearchPrompt(analysis, selectedModel?.modelId, clarificationContext);
           const pass1MaxTokens = analysis.depthLevel === 'research'
             ? Math.min(Math.floor(streamMaxOutput * 0.5), 6144)
             : Math.min(Math.floor(streamMaxOutput * 0.4), 4096);
@@ -959,6 +980,13 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
             res.write(`data: ${JSON.stringify({
               type: 'thinking_result',
               content: researchSummary,
+              metadata: {
+                depthLevel: analysis.depthLevel,
+                taskType: analysis.taskType,
+                modelTier: thinkIntel?.tier || 'unknown',
+                hypothesesCount: analysis.hypotheses.length,
+                usedNativeThinking: pass1UseNativeThinking,
+              },
             })}\n\n`);
           }
 
@@ -967,7 +995,7 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
           await new Promise(r => setTimeout(r, 300));
           res.write(`data: ${JSON.stringify({ type: 'status', content: 'Refining and polishing response...' })}\n\n`);
 
-          const refinementPrompt = buildRefinementPrompt(pass1Result.response, userQuery);
+          const refinementPrompt = buildRefinementPrompt(pass1Result.response, userQuery, analysis, selectedModel?.modelId);
           enrichedMessages = [
             ...enrichedMessages.slice(0, -1),
             { role: 'user', content: refinementPrompt },

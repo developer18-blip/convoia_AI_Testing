@@ -1,17 +1,17 @@
 /**
- * Deep Research Service — 4-Stage Expert Research Pipeline
+ * Deep Research Service — AI-Powered Expert Research Pipeline
  *
- * Simulates how a senior human expert researches a problem:
+ * Hybrid approach: fast rule-based pre-screen + AI-powered deep analysis.
  *
- * Stage 1: Intent + Depth Detection (instant, rule-based)
- * Stage 2: Clarification (if query is vague — ask BEFORE answering)
- * Stage 3: Deep Research — Hypothesis + Multi-Angle Reasoning (Pass 1, non-streaming)
- * Stage 4: Iterative Refinement — Self-Critique + Polish (Pass 2, streaming)
- *
- * The AI should feel like a consultant, researcher, and strategist — not a chatbot.
+ * Stage 1: Intent + Depth Detection (rule-based pre-screen + AI classifier)
+ * Stage 2: Clarification (model-aware, hypothesis-driven questions)
+ * Stage 3: Deep Research — model-aware reasoning styles (Pass 1, non-streaming)
+ * Stage 4: Iterative Refinement — model-aware output polish (Pass 2, streaming)
  */
 
+import axios from 'axios';
 import logger from '../config/logger.js';
+import { getModelIntelligence } from '../ai/modelRegistry.js';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -20,27 +20,108 @@ export type TaskType = 'factual' | 'analytical' | 'research' | 'coding' | 'creat
 
 export interface QueryAnalysis {
   needsClarification: boolean;
-  confidenceScore: number;     // 0–1
-  depthLevel: DepthLevel;      // how deep should we go
+  confidenceScore: number;
+  depthLevel: DepthLevel;
   taskType: TaskType;
   reasons: string[];
-  hypotheses: string[];        // possible interpretations of the query
+  hypotheses: string[];
+  ambiguities?: string[];
 }
 
 // ── Stage 1: Intent + Depth Detection ────────────────────────────────
 
 /**
- * Analyze a user query to determine:
- * - What kind of task is it? (factual, analytical, research, coding, creative, strategic, troubleshooting)
- * - How deep should we go? (surface, deep, research)
- * - Is clarification needed? (confidence too low)
- * - What are possible interpretations? (hypothesis building)
+ * Analyze a user query with hybrid rule-based + AI-powered classification.
  *
- * Rule-based — no model call, instant.
+ * Phase A: Fast rule-based pre-screen (instant, free)
+ * Phase B: AI classifier for ambiguous cases (fast model call)
+ * Phase C: Model-aware depth adjustment
  */
-export function analyzeQuery(
+export async function analyzeQuery(
   query: string,
-  messageHistory: Array<{ role: string; content: string }>
+  messageHistory: Array<{ role: string; content: any }>,
+  modelId?: string,
+  apiKey?: string,
+  fastModelId?: string
+): Promise<QueryAnalysis> {
+  // ── PHASE A: Rule-based pre-screen ──
+
+  const ruleResult = ruleBasedAnalysis(query, messageHistory);
+
+  // Fast exits — skip AI classifier to save cost
+  const wordCount = query.trim().split(/\s+/).length;
+  const hasDocumentContext = query.includes('Here is the attached document content:');
+
+  if (ruleResult.confidenceScore > 0.85 && wordCount > 15) {
+    logger.info(`Think mode (rule-based, high confidence): depth=${ruleResult.depthLevel}, task=${ruleResult.taskType}, confidence=${ruleResult.confidenceScore.toFixed(2)}`);
+    return ruleResult;
+  }
+  if (hasDocumentContext) {
+    return ruleResult;
+  }
+  if (ruleResult.taskType === 'factual' && wordCount < 10) {
+    ruleResult.depthLevel = 'surface';
+    ruleResult.needsClarification = false;
+    return ruleResult;
+  }
+
+  // ── PHASE B: AI-powered analysis for ambiguous cases ──
+
+  if (apiKey && (ruleResult.confidenceScore >= 0.4 && ruleResult.confidenceScore <= 0.85 || wordCount < 12)) {
+    try {
+      const aiResult = await runAIClassifier(query, messageHistory, apiKey, fastModelId || 'gpt-4o-mini');
+
+      // Merge: AI takes precedence for key fields
+      if (aiResult) {
+        ruleResult.needsClarification = aiResult.needsClarification;
+        ruleResult.depthLevel = aiResult.depthLevel;
+        if (aiResult.taskType !== 'general') ruleResult.taskType = aiResult.taskType;
+        ruleResult.confidenceScore = aiResult.confidenceScore;
+        ruleResult.ambiguities = aiResult.ambiguities || [];
+
+        // Merge hypotheses (deduplicate)
+        const existing = new Set(ruleResult.hypotheses.map(h => h.toLowerCase()));
+        for (const h of aiResult.hypotheses) {
+          if (!existing.has(h.toLowerCase())) {
+            ruleResult.hypotheses.push(h);
+          }
+        }
+
+        if (aiResult.clarificationReason) {
+          ruleResult.reasons.push(aiResult.clarificationReason);
+        }
+      }
+    } catch (err: any) {
+      logger.warn(`AI classifier failed, using rule-based result: ${err.message}`);
+      // Fall through to rule-based result
+    }
+  }
+
+  // ── PHASE C: Model-aware depth adjustment ──
+
+  const intel = modelId ? getModelIntelligence(modelId) : null;
+
+  if (intel) {
+    if (intel.tier === 'flagship' && intel.isReasoningModel && ruleResult.depthLevel === 'deep') {
+      ruleResult.depthLevel = 'research';
+      ruleResult.reasons.push(`${intel.displayName} is a reasoning model — elevated to research depth`);
+    }
+    if (intel.tier === 'fast' && ruleResult.depthLevel === 'research') {
+      ruleResult.depthLevel = 'deep';
+      ruleResult.reasons.push(`${intel.displayName} capped at deep mode for quality`);
+    }
+  }
+
+  logger.info(`Think mode (hybrid): depth=${ruleResult.depthLevel}, task=${ruleResult.taskType}, confidence=${ruleResult.confidenceScore.toFixed(2)}, hypotheses=${ruleResult.hypotheses.length}, clarify=${ruleResult.needsClarification}`);
+
+  return ruleResult;
+}
+
+// ── Rule-based analysis (Phase A internals) ──────────────────────────
+
+function ruleBasedAnalysis(
+  query: string,
+  messageHistory: Array<{ role: string; content: any }>
 ): QueryAnalysis {
   const reasons: string[] = [];
   const hypotheses: string[] = [];
@@ -73,14 +154,10 @@ export function analyzeQuery(
   }
 
   // ── Depth level detection ──
-  let depthLevel: DepthLevel = 'deep'; // default for thinking mode
+  let depthLevel: DepthLevel = 'deep';
 
-  // Surface: simple factual queries with short input
-  if (taskType === 'factual' && wordCount < 10) {
-    depthLevel = 'surface';
-  }
+  if (taskType === 'factual' && wordCount < 10) depthLevel = 'surface';
 
-  // Research: complex multi-faceted problems
   const RESEARCH_SIGNALS = [
     /\b(how (to|should|can|do I)|best (way|approach|practice|strategy|method))\b/i,
     /\b(compare|versus|vs|trade-?off|alternative|which is better|difference between)\b/i,
@@ -91,15 +168,11 @@ export function analyzeQuery(
     /\b(consider|evaluate|weigh|decision|choose between|recommend)\b/i,
   ];
   const researchSignalCount = RESEARCH_SIGNALS.filter(p => p.test(query)).length;
-  if (researchSignalCount >= 2 || (researchSignalCount >= 1 && wordCount >= 15)) {
-    depthLevel = 'research';
-  }
+  if (researchSignalCount >= 2 || (researchSignalCount >= 1 && wordCount >= 15)) depthLevel = 'research';
   if (taskType === 'strategic' || taskType === 'troubleshooting') depthLevel = 'research';
-
-  // Long queries (40+ words) always get research depth
   if (wordCount >= 40) depthLevel = 'research';
 
-  // ── Hypothesis building (possible interpretations) ──
+  // ── Hypothesis building ──
   if (/\b(scale|scaling)\b/i.test(queryLower)) {
     hypotheses.push('Technical scaling (infrastructure, performance, load handling)');
     hypotheses.push('Business scaling (revenue, team, market expansion)');
@@ -118,49 +191,42 @@ export function analyzeQuery(
   if (/\b(build|create|make|develop|implement)\b/i.test(queryLower) && taskType !== 'creative') {
     hypotheses.push('Build from scratch vs. use existing tools/frameworks');
     hypotheses.push('MVP / prototype approach vs. production-grade');
-    hypotheses.push('Solo developer vs. team implementation');
   }
   if (/\b(fix|solve|resolve|debug|troubleshoot)\b/i.test(queryLower)) {
     hypotheses.push('Quick fix / workaround vs. proper root cause solution');
     hypotheses.push('Configuration issue vs. code/logic bug');
-    hypotheses.push('Environment-specific vs. universal problem');
   }
-  if (/\b(security|secure|protect|vulnerable|attack|hack)\b/i.test(queryLower)) {
+  if (/\b(security|secure|protect|vulnerable)\b/i.test(queryLower)) {
     hypotheses.push('Application-level security (auth, input validation, XSS)');
     hypotheses.push('Infrastructure security (network, firewall, encryption)');
-    hypotheses.push('Data security (PII, compliance, access control)');
   }
-  if (/\b(cost|price|pricing|expensive|cheap|budget|afford)\b/i.test(queryLower)) {
+  if (/\b(cost|price|pricing|expensive|cheap|budget)\b/i.test(queryLower)) {
     hypotheses.push('Upfront cost vs. total cost of ownership');
-    hypotheses.push('Cost reduction strategies');
-    hypotheses.push('Value-based pricing vs. competitive pricing');
+    hypotheses.push('Cost reduction strategies vs. value-based pricing');
   }
 
-  // ── Document context: still analyze depth, but don't ask clarification ──
+  // ── Document context: skip clarification ──
   if (hasDocumentContext) {
-    return { needsClarification: false, confidenceScore: 0.9, depthLevel: Math.max(depthLevel === 'surface' ? 0 : depthLevel === 'deep' ? 1 : 2, 1) === 2 ? 'research' : 'deep' as DepthLevel, taskType, reasons: ['document context provided'], hypotheses };
+    return {
+      needsClarification: false,
+      confidenceScore: 0.9,
+      depthLevel: depthLevel === 'surface' ? 'deep' : depthLevel,
+      taskType,
+      reasons: ['document context provided'],
+      hypotheses,
+    };
   }
 
   // ── Confidence scoring ──
+  if (wordCount < 4 && !hasConversationContext) { confidence -= 0.35; reasons.push('query is very short — likely needs more context'); }
+  else if (wordCount < 5 && !hasConversationContext) { confidence -= 0.25; reasons.push('query is short — may need more detail'); }
+  else if (wordCount < 8 && !hasConversationContext) { confidence -= 0.1; }
 
-  // Very short standalone queries — high chance of ambiguity
-  if (wordCount < 4 && !hasConversationContext) {
-    confidence -= 0.35;
-    reasons.push('query is very short — likely needs more context');
-  } else if (wordCount < 5 && !hasConversationContext) {
-    confidence -= 0.25;
-    reasons.push('query is short — may need more detail');
-  } else if (wordCount < 8 && !hasConversationContext) {
-    confidence -= 0.1;
-  }
-
-  // Short queries even IN conversation context
   if (wordCount < 4 && hasConversationContext) {
     confidence -= 0.15;
     reasons.push('very short follow-up — may need clarification on what aspect to address');
   }
 
-  // Vague action words without specific target
   const VAGUE_PATTERNS = [
     { pattern: /^(optimize|improve|fix|enhance|update|change|make better)\b/i, penalty: 0.25, reason: 'vague action — what specifically should be optimized/improved?' },
     { pattern: /^(help me|help with|I need help)\b/i, penalty: 0.2, reason: 'request for help without specific problem statement' },
@@ -169,278 +235,433 @@ export function analyzeQuery(
   ];
 
   for (const { pattern, penalty, reason } of VAGUE_PATTERNS) {
-    if (pattern.test(query)) {
-      confidence -= penalty;
-      reasons.push(reason);
-    }
+    if (pattern.test(query)) { confidence -= penalty; reasons.push(reason); }
   }
 
-  // Broad scope without specifics
   if (/\b(everything|all|complete|full|entire|whole)\b/i.test(query) && wordCount < 15) {
     confidence -= 0.15;
     reasons.push('very broad scope — narrowing would improve answer quality');
   }
-
-  // Missing constraints for coding
   if (taskType === 'coding' && !/\b(python|javascript|typescript|java|rust|go|react|node|express|sql|html|css|c\+\+|c#|swift|kotlin|php|ruby|vue|angular|next|django|flask|spring|laravel)\b/i.test(query)) {
     confidence -= 0.1;
     reasons.push('no programming language or framework specified');
   }
-
-  // Missing context for troubleshooting
   if (taskType === 'troubleshooting' && wordCount < 15 && !/```/.test(query)) {
     confidence -= 0.15;
     reasons.push('troubleshooting without error message or code context');
   }
 
-  // Boosters — specific, detailed queries increase confidence
+  // Boosters
   if (wordCount >= 20) confidence += 0.1;
   if (wordCount >= 40) confidence += 0.1;
   if (/\?$/.test(query.trim())) confidence += 0.05;
   if (/\b(specifically|exactly|precisely|in particular)\b/i.test(query)) confidence += 0.1;
-  if (/```/.test(query)) confidence += 0.15; // code block = specific context
-  if (/\b(because|since|given that|context|background)\b/i.test(query)) confidence += 0.1; // provides reasoning
+  if (/```/.test(query)) confidence += 0.15;
+  if (/\b(because|since|given that|context|background)\b/i.test(query)) confidence += 0.1;
 
   confidence = Math.max(0, Math.min(1, confidence));
 
-  // Clarification threshold: trigger if confidence is low
-  // Allow clarification even in conversations if the query is very vague (< 0.5)
   const needsClarification = hasConversationContext
-    ? confidence < 0.5 && wordCount < 5  // stricter in conversations — only for very vague follow-ups
-    : confidence < 0.65;                  // standalone queries — broader threshold
-
-  if (needsClarification) {
-    logger.info(`Think mode: needs clarification (confidence=${confidence.toFixed(2)}): "${query.substring(0, 80)}"`);
-  } else {
-    logger.info(`Think mode: depth=${depthLevel}, task=${taskType}, confidence=${confidence.toFixed(2)}, hypotheses=${hypotheses.length}`);
-  }
+    ? confidence < 0.5 && wordCount < 5
+    : confidence < 0.65;
 
   return { needsClarification, confidenceScore: confidence, depthLevel, taskType, reasons, hypotheses };
 }
 
+// ── AI Classifier (Phase B) ──────────────────────────────────────────
+
+async function runAIClassifier(
+  query: string,
+  messageHistory: Array<{ role: string; content: any }>,
+  apiKey: string,
+  fastModelId: string
+): Promise<{
+  needsClarification: boolean;
+  clarificationReason: string | null;
+  depthLevel: DepthLevel;
+  taskType: TaskType;
+  confidenceScore: number;
+  hypotheses: string[];
+  ambiguities: string[];
+} | null> {
+  const userTurns = messageHistory.filter(m => m.role === 'user').length;
+
+  const CLASSIFIER_PROMPT = `You are a query analyzer for a deep AI research system.
+Analyze this user query and respond with ONLY valid JSON, no markdown, no explanation.
+
+Query: "${query}"
+
+Conversation turns so far: ${userTurns}
+
+Respond with exactly this JSON structure:
+{
+  "needsClarification": boolean,
+  "clarificationReason": string or null,
+  "depthLevel": "surface" | "deep" | "research",
+  "taskType": "factual" | "analytical" | "research" | "coding" | "creative" | "strategic" | "troubleshooting" | "general",
+  "confidenceScore": number between 0 and 1,
+  "hypotheses": string[],
+  "ambiguities": string[]
+}
+
+Rules for needsClarification:
+- true ONLY if the answer would be FUNDAMENTALLY DIFFERENT based on missing info
+- true if there are 2+ plausible interpretations with very different solutions
+- false if you can make reasonable assumptions and still give a great answer
+- false if the conversation history already provides enough context
+- false for simple factual questions
+
+Rules for depthLevel:
+- "surface": simple fact, definition, quick answer
+- "deep": requires analysis but direction is clear
+- "research": multi-faceted, competing approaches, requires expert synthesis
+
+Rules for hypotheses:
+- List 2-4 specific, distinct interpretations of what user might want
+- Each hypothesis should be actionable — different enough to warrant different answers
+- Empty array if query is unambiguous`;
+
+  const response = await axios.post(
+    'https://api.openai.com/v1/chat/completions',
+    {
+      model: fastModelId,
+      messages: [{ role: 'user', content: CLASSIFIER_PROMPT }],
+      max_tokens: 400,
+      temperature: 0.1,
+      response_format: { type: 'json_object' },
+    },
+    {
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      timeout: 8000,
+    }
+  );
+
+  const text = response.data.choices?.[0]?.message?.content;
+  if (!text) return null;
+
+  const parsed = JSON.parse(text);
+
+  // Validate and normalize
+  const validDepths: DepthLevel[] = ['surface', 'deep', 'research'];
+  const validTasks: TaskType[] = ['factual', 'analytical', 'research', 'coding', 'creative', 'strategic', 'troubleshooting', 'general'];
+
+  return {
+    needsClarification: !!parsed.needsClarification,
+    clarificationReason: parsed.clarificationReason || null,
+    depthLevel: validDepths.includes(parsed.depthLevel) ? parsed.depthLevel : 'deep',
+    taskType: validTasks.includes(parsed.taskType) ? parsed.taskType : 'general',
+    confidenceScore: Math.max(0, Math.min(1, Number(parsed.confidenceScore) || 0.7)),
+    hypotheses: Array.isArray(parsed.hypotheses) ? parsed.hypotheses.filter((h: any) => typeof h === 'string') : [],
+    ambiguities: Array.isArray(parsed.ambiguities) ? parsed.ambiguities.filter((a: any) => typeof a === 'string') : [],
+  };
+}
+
 // ── Stage 2: Clarification System Prompt ─────────────────────────────
 
-export function getClarificationSystemPrompt(analysis: QueryAnalysis): string {
-  const reasonsList = analysis.reasons.map(r => `• ${r}`).join('\n');
-  const hypothesesList = analysis.hypotheses.length > 0
-    ? `\nI've identified these possible interpretations:\n${analysis.hypotheses.map((h, i) => `${i + 1}. ${h}`).join('\n')}\n`
+export function getClarificationSystemPrompt(
+  analysis: QueryAnalysis,
+  modelId?: string
+): string {
+  const hypothesesBlock = analysis.hypotheses.length >= 2
+    ? `\nThe query could mean any of these:\n${analysis.hypotheses.map((h, i) => `${i + 1}. ${h}`).join('\n')}\n`
     : '';
 
-  return `You are a premium AI consultant on the ConvoiaAI platform operating in THINK MODE.
+  const ambiguitiesBlock = analysis.ambiguities && analysis.ambiguities.length > 0
+    ? `\nSpecific ambiguities detected:\n${analysis.ambiguities.map(a => `• ${a}`).join('\n')}\n`
+    : '';
 
-The user's query needs clarification before you can deliver a truly expert-level answer. Think mode is about DEPTH and PRECISION — it's better to ask smart questions than to guess and give a generic answer.
+  const intel = modelId ? getModelIntelligence(modelId) : null;
 
-ANALYSIS OF THE QUERY:
-${reasonsList}
-${hypothesesList}
-YOUR APPROACH:
-1. Acknowledge their topic — show you understand the general direction
-2. If you identified multiple interpretations, briefly mention the 2–3 most likely ones
-3. Ask 2–3 targeted, specific questions that will dramatically improve your answer
-4. Each question should address a real gap — not generic filler like "what is your goal?"
+  const toneInstruction = intel?.provider === 'anthropic'
+    ? 'Warm and intellectually curious. Show genuine interest in their problem. Build to the questions naturally.'
+    : intel?.provider === 'openai' && intel?.isReasoningModel
+    ? 'Direct and precise. State what you need and why concisely. No warm-up.'
+    : intel?.provider === 'xai'
+    ? 'Direct, no-nonsense. Ask what you need. Skip the preamble.'
+    : intel?.provider === 'google'
+    ? 'Clear and structured. Lead with a brief summary of what you understand, then ask.'
+    : 'Professional and direct. Warm but not effusive.';
 
-QUESTION QUALITY RULES:
-- Questions must be SPECIFIC to their domain and query
-- Frame questions as "This vs. That" choices when possible (easier for user to answer)
-- Include context about WHY you're asking (helps user understand the value)
+  return `You are operating in DEEP THINK MODE on ConvoiaAI.
 
-TONE:
-- Confident and expert — like a senior consultant scoping a project
-- Warm but direct — no robotic formality
-- Show genuine intellectual curiosity about their problem
+You analyzed the user's query and identified genuine ambiguity that would produce fundamentally different answers depending on what they actually mean.
+${hypothesesBlock}${ambiguitiesBlock}
+YOUR TASK:
+Ask the ONE most important clarifying question — not multiple.
+The single question that, when answered, most reduces ambiguity.
+
+If hypotheses are listed above: frame your question as a choice between those interpretations. Do not invent new ones.
+
+Example of a good clarifying question:
+"Before I go deep — are you asking about [hypothesis 1] or [hypothesis 2]? The answer changes significantly depending on which direction you need."
+
+TONE: ${toneInstruction}
+
+RULES:
+- Ask maximum ONE question
+- Make it a choice question when possible ("Are you X or Y?" is better than "What do you mean?")
+- Show in 1 sentence that you understand their topic
+- Explain in 1 sentence WHY you're asking (what changes based on their answer)
+- Never ask a question that could be answered with a simple yes/no unless yes/no genuinely separates the interpretations
+- Do NOT start answering the question
+- Do NOT say "Great question" or "I'd be happy to help"
+- Keep the entire response under 100 words
 
 FORMAT:
-- Start with a brief acknowledgment (1-2 sentences about what you think they're exploring)
-- Present possible interpretations if relevant (numbered list)
-- Ask your 2-3 questions (numbered, each with a brief "why I'm asking" context)
-- Close with confidence: "With these details, I'll provide a thorough, expert-level analysis."
-
-DO NOT:
-- Give a generic answer alongside the questions
-- Ask more than 3 questions (respect their time)
-- Use formulaic phrases like "I'd be happy to help" or "Great question"`;
+[1 sentence: I understand you're asking about X]
+[1 sentence: Before I answer, I need to know Y — because depending on your answer, Z changes significantly]
+[The actual question — framed as a choice]`;
 }
 
 // ── Stage 3: Deep Research Prompt (Pass 1) ───────────────────────────
 
-/**
- * Build the deep research system prompt for Pass 1.
- * Combines hypothesis building + multi-angle reasoning.
- * Tailored by task type.
- */
-export function getDeepResearchPrompt(analysis: QueryAnalysis): string {
-  const hypothesesSection = analysis.hypotheses.length > 0
-    ? `\nPOSSIBLE INTERPRETATIONS TO CONSIDER:\n${analysis.hypotheses.map((h, i) => `${i + 1}. ${h}`).join('\n')}\nAddress the most likely interpretation, but note if others apply.\n`
+export function getDeepResearchPrompt(
+  analysis: QueryAnalysis,
+  modelId?: string,
+  clarificationAnswers?: string
+): string {
+  const intel = modelId ? getModelIntelligence(modelId) : null;
+
+  // ── Model-aware reasoning style ──
+  let modelStyle = '';
+
+  if (intel?.provider === 'anthropic') {
+    modelStyle = `
+REASONING STYLE FOR THIS MODEL:
+You are Claude. Think inductively — build from specific observations to general principles. Show your reasoning as it develops. Use em-dashes to extend thoughts. Acknowledge genuine uncertainty with "I think" or "my read is". Build to your conclusion — don't lead with it. Show the work.`;
+  } else if (intel?.isReasoningModel && intel?.provider === 'openai') {
+    modelStyle = `
+REASONING STYLE FOR THIS MODEL:
+You are a reasoning model. Think deductively — state premises, derive implications, reach conclusions. Be mathematically precise about claims: "X implies Y because Z". Show the logical chain. Short sentences. Active voice. High signal density.`;
+  } else if (intel?.provider === 'google') {
+    modelStyle = `
+REASONING STYLE FOR THIS MODEL:
+You are Gemini. Think synthetically — gather perspectives, find patterns across them, synthesize into insight. Lead with a crisp summary of your conclusion, then support it. Tables for comparisons. Efficiency in prose.`;
+  } else if (intel?.provider === 'xai') {
+    modelStyle = `
+REASONING STYLE FOR THIS MODEL:
+Think directly. State what you see. Call out what's wrong with common takes before giving your own. Be willing to disagree with conventional wisdom if your reasoning supports it. Direct, confident, no hedging theater.`;
+  } else if (intel?.provider === 'deepseek' && intel?.isReasoningModel) {
+    modelStyle = `
+REASONING STYLE FOR THIS MODEL:
+Show your reasoning chain explicitly. State assumptions. Flag when you're uncertain vs. when you're confident. Mathematical or logical notation where it clarifies. Be thorough on technical details.`;
+  } else if (intel?.provider === 'perplexity') {
+    modelStyle = `
+REASONING STYLE FOR THIS MODEL:
+Ground every claim in sources where possible. Distinguish between: established fact, expert consensus, emerging evidence, and speculation. Cite as you reason, not just at the end.`;
+  } else {
+    modelStyle = `
+REASONING STYLE:
+Think step by step. Show your reasoning. Build to conclusions. Be specific — avoid generic claims. Acknowledge uncertainty honestly.`;
+  }
+
+  // ── Clarification injection ──
+  const clarificationSection = clarificationAnswers
+    ? `\nCLARIFICATION FROM USER:\n${clarificationAnswers}\n\nUse this to focus your research. The user has told you exactly what direction they need.`
     : '';
 
-  const BASE = `You are an expert researcher operating in DEEP THINK MODE on the ConvoiaAI platform.
-
-Your task: research this problem the way a senior expert would — not just answer it, but UNDERSTAND it from multiple angles before forming a conclusion.
-${hypothesesSection}
-RESEARCH PROCESS (follow this structure):
-
-## 1. PROBLEM DECOMPOSITION
-- Restate the core problem in your own words
-- Break it into sub-problems or components
-- Identify what's actually being asked vs. what they might REALLY need (the question behind the question)
-- Note any ambiguity and state how you're interpreting it
-
-## 2. KEY ASSUMPTIONS & CONSTRAINTS
-- List assumptions you're making explicitly
-- Identify constraints (time, budget, technical, organizational)
-- Flag anything that depends on context you don't have
-
-## 3. MULTI-ANGLE ANALYSIS`;
-
-  const ANGLE_MAP: Record<TaskType, string> = {
-    coding: `
-Analyze from EVERY relevant angle:
-- **Architecture**: Design patterns, component structure, data flow, separation of concerns
-- **Implementation**: Approach, algorithm choice, language/framework considerations
-- **Performance**: Time/space complexity, bottlenecks, optimization opportunities, caching
-- **Security**: Attack vectors, input validation, auth, data exposure risks
-- **Maintainability**: Code structure, testing strategy, documentation, future extensibility
-- **Alternatives**: Other approaches, libraries, or patterns that could solve this differently
-- **Edge Cases**: What could break? Null values, race conditions, scale limits`,
-
-    troubleshooting: `
-Diagnose systematically:
-- **Symptoms vs. Root Cause**: What they're seeing vs. what's actually wrong
-- **Isolation**: Narrow down where the problem occurs (layer, component, timing)
-- **Common Causes**: Most frequent reasons for this type of issue
-- **Uncommon Causes**: Less obvious but possible explanations
-- **Dependencies**: External systems, versions, configurations that could be involved
-- **Verification**: How to confirm which cause is correct before fixing
-- **Prevention**: How to prevent recurrence after fixing`,
-
-    strategic: `
-Analyze from EVERY relevant angle:
-- **Market & Positioning**: Competitive landscape, timing, market size, differentiation
-- **Business Model**: Revenue streams, unit economics, pricing, margins
-- **Execution**: Team requirements, timeline, milestones, resource allocation, dependencies
-- **Risk Assessment**: What could go wrong (quantified where possible), mitigation strategies
-- **Growth Path**: Scaling strategy, customer acquisition, retention, network effects
-- **Financial**: Revenue projections, break-even, funding requirements, burn rate`,
-
-    analytical: `
-Analyze from EVERY relevant angle:
-- **Quantitative**: Numbers, metrics, benchmarks, data-driven insights, statistical significance
-- **Qualitative**: User experience, strategic fit, organizational/cultural impact
-- **Comparative**: How alternatives stack up — use a framework (weighted scoring, decision matrix)
-- **Temporal**: Short-term vs. long-term implications, time-value considerations
-- **Risk/Reward**: Trade-offs quantified, downside exposure, upside potential, expected value
-- **Second-Order Effects**: Consequences of consequences — what happens AFTER the decision`,
-
+  // ── Depth-specific instructions ──
+  const DEPTH_INSTRUCTIONS: Record<DepthLevel, string> = {
+    surface: `
+DEPTH: Surface
+Give the direct, accurate answer with essential context. No multi-angle analysis needed. Be thorough but efficient.`,
+    deep: `
+DEPTH: Deep Analysis
+This needs genuine analysis, not just information retrieval. Go beyond the obvious answer to what the user actually needs. Cover: the direct answer, the non-obvious insight, the common mistake to avoid, and what to do next.`,
     research: `
-Research from EVERY relevant angle:
-- **Foundational**: Core concepts, principles, and mental models
-- **Current State**: Latest developments, consensus view, recent breakthroughs
-- **Debates & Open Questions**: Areas of disagreement, unresolved tensions
-- **Practical Applications**: Real-world use cases, implementation considerations
-- **Evidence Quality**: How strong is the evidence? Consensus vs. emerging vs. speculative
-- **Future Direction**: Where this is heading, emerging trends, paradigm shifts`,
+DEPTH: Full Research Mode
+This is a complex problem requiring expert synthesis. Do NOT jump to conclusions. Work through it.
 
-    factual: `
-Verify and contextualize:
-- **Core Answer**: The direct, accurate, verified answer
-- **Context**: Why this matters, historical background, significance
-- **Nuances**: Edge cases, exceptions, common misconceptions to correct
-- **Related Knowledge**: Connected topics that deepen understanding
-- **Practical Relevance**: How this applies to real-world situations`,
+Cover ALL of these that apply:
+1. What is actually being asked (vs. what was literally said)
+2. The key tensions or trade-offs at play
+3. Multiple valid approaches with honest pros/cons
+4. What matters most given their likely constraints
+5. The recommendation with specific reasoning
+6. What would change your recommendation
+7. What they're probably not thinking about but should be
 
-    creative: `
-Explore from multiple creative angles:
-- **Strategic Alignment**: Why each approach works for the target audience and goals
-- **Execution Quality**: Specific, usable output (not just outlines or placeholders)
-- **Differentiation**: What makes this stand out from generic, AI-generated content
-- **Multiple Directions**: 2-3 distinct creative approaches with different strengths
-- **Refinement Opportunities**: How each direction could be iterated and improved
-- **Audience Psychology**: What resonates emotionally and drives the desired action`,
-
-    general: `
-Analyze from multiple perspectives:
-- **Primary Analysis**: The most direct and relevant examination of the question
-- **Alternative Perspective**: A contrarian or different way to think about the problem
-- **Practical Considerations**: Real-world constraints, implementation challenges
-- **Blind Spots**: What the user might not have considered but should
-- **Cross-Domain Insights**: Lessons from other fields that apply here`,
+Be the expert who has seen this problem 50 times and knows where people get it wrong.`,
   };
 
-  const CLOSING = `
+  // ── Task-specific angles ──
+  const ANGLE_MAP: Record<TaskType, string> = {
+    coding: `
+TASK-SPECIFIC ANGLES (Coding):
+Start with: what is the REAL problem? Often the stated coding question is a symptom of a design issue upstream.
+- Architecture: Design patterns, component structure, data flow
+- Implementation: Approach, algorithm choice, language/framework considerations
+- Performance: Time/space complexity, bottlenecks, caching
+- Security: Attack vectors, input validation, auth, data exposure
+- Maintainability: Testing strategy, future extensibility
+- Edge Cases: What could break? Null values, race conditions, scale limits`,
 
-## 4. SYNTHESIS & PRELIMINARY CONCLUSION
-- Combine insights from all angles into a coherent thesis
-- Rank factors by importance — what matters most?
-- State your preliminary recommendation with confidence level
-- Note what would change your recommendation (sensitivity analysis)
+    troubleshooting: `
+TASK-SPECIFIC ANGLES (Troubleshooting):
+State your diagnostic hypothesis BEFORE listing causes. What do you think is most likely wrong, and why?
+- Symptoms vs. Root Cause: What they're seeing vs. what's actually wrong
+- Isolation: Narrow down where the problem occurs
+- Common Causes: Most frequent reasons for this type of issue
+- Uncommon Causes: Less obvious but possible explanations
+- Verification: How to confirm which cause is correct before fixing
+- Prevention: How to prevent recurrence`,
 
-RESEARCH RULES:
-- Think step-by-step — don't jump to conclusions
-- Every claim must have reasoning behind it, not just assertion
-- If you're uncertain about something, say so explicitly and explain why
-- Prefer depth over breadth — better to be thorough on 3 key points than shallow on 10
-- Include concrete examples, numbers, comparisons, or code where relevant
-- Challenge your own assumptions — look for holes in your reasoning
-- This is a RESEARCH document — be rigorous, not conversational`;
+    strategic: `
+TASK-SPECIFIC ANGLES (Strategic):
+What is the user NOT saying that matters? What assumption are they making that may be wrong?
+- Market & Positioning: Competitive landscape, timing, differentiation
+- Business Model: Revenue streams, unit economics, margins
+- Execution: Team requirements, timeline, dependencies
+- Risk Assessment: What could go wrong, mitigation strategies
+- Growth Path: Scaling strategy, acquisition, retention`,
 
-  return BASE + (ANGLE_MAP[analysis.taskType] || ANGLE_MAP.general) + CLOSING;
+    analytical: `
+TASK-SPECIFIC ANGLES (Analytical):
+What is the correct framing for this analysis? Is the user asking the right question?
+- Quantitative: Numbers, metrics, benchmarks, data-driven insights
+- Qualitative: User experience, strategic fit, cultural impact
+- Comparative: How alternatives stack up — use a framework
+- Risk/Reward: Trade-offs quantified, downside exposure, upside potential
+- Second-Order Effects: Consequences of consequences`,
+
+    research: `
+TASK-SPECIFIC ANGLES (Research):
+- Foundational: Core concepts, principles, mental models
+- Current State: Latest developments, consensus view
+- Debates & Open Questions: Areas of disagreement
+- Practical Applications: Real-world use cases
+- Evidence Quality: How strong is the evidence?
+- Future Direction: Where this is heading`,
+
+    factual: `
+TASK-SPECIFIC ANGLES (Factual):
+- Core Answer: Direct, accurate, verified
+- Context: Why this matters, historical background
+- Nuances: Edge cases, exceptions, common misconceptions
+- Practical Relevance: How this applies in practice`,
+
+    creative: `
+TASK-SPECIFIC ANGLES (Creative):
+- Strategic Alignment: Why each approach works for the target audience
+- Execution Quality: Specific, usable output (not outlines)
+- Differentiation: What makes this stand out
+- Multiple Directions: 2-3 distinct creative approaches
+- Audience Psychology: What resonates emotionally`,
+
+    general: `
+TASK-SPECIFIC ANGLES (General):
+- Primary Analysis: Most direct examination of the question
+- Alternative Perspective: A different way to think about it
+- Practical Considerations: Real-world constraints
+- Blind Spots: What the user might not have considered`,
+  };
+
+  return `You are in DEEP THINK MODE on ConvoiaAI. A user needs expert-level analysis.
+${modelStyle}
+${clarificationSection}
+${DEPTH_INSTRUCTIONS[analysis.depthLevel]}
+
+TASK TYPE: ${analysis.taskType.toUpperCase()}
+${ANGLE_MAP[analysis.taskType] || ANGLE_MAP.general}
+
+${analysis.hypotheses.length > 0
+    ? `INTERPRETATIONS TO CONSIDER:\n${analysis.hypotheses.map((h, i) => `${i + 1}. ${h}`).join('\n')}\nAddress the most likely but note where others apply.`
+    : ''}
+
+RESEARCH QUALITY RULES:
+- Every claim needs reasoning behind it, not just assertion
+- Specific beats general: numbers, examples, code over abstract advice
+- Honest uncertainty: "I'm confident about X, less certain about Y"
+- Challenge your first answer: is it actually right?
+- The insight that would make an expert nod — include it
+- The mistake most people make here — name it
+
+This is your research phase. Think thoroughly.
+The user will see a polished version of this in the next step.`;
 }
 
 // ── Stage 4: Iterative Refinement (Pass 2) ───────────────────────────
 
-/**
- * Build the self-critique + refinement prompt for Pass 2.
- * Takes Pass 1 research output and produces the polished final answer.
- */
-export function buildRefinementPrompt(researchOutput: string, originalQuery: string): string {
-  return `You completed a deep research phase on the user's question. Now transform that research into a PREMIUM, consultant-grade response.
+export function buildRefinementPrompt(
+  researchOutput: string,
+  originalQuery: string,
+  analysis: QueryAnalysis,
+  modelId?: string
+): string {
+  const intel = modelId ? getModelIntelligence(modelId) : null;
 
-═══ ORIGINAL QUESTION ═══
-${originalQuery}
+  const outputStyle = intel?.provider === 'anthropic'
+    ? `Write in flowing prose with clear structure. Use headers sparingly — only when sections are truly distinct. Let reasoning show in how you write, not just what you say. Em-dashes for extended thoughts. Build to your conclusion.`
+    : intel?.isReasoningModel
+    ? `Be precise and direct. Lead with the answer. Support with tight reasoning. Short paragraphs. Tables for comparisons. Code for code questions. No warm-up. High information density.`
+    : intel?.provider === 'google'
+    ? `Summary first, always. One crisp sentence with the answer. Then support it with organized sections. Tables for anything comparative. Efficient — no redundancy.`
+    : intel?.provider === 'xai'
+    ? `Direct. Say what you think. Call out what's wrong with the conventional take if relevant. No hedging theater. Confident prose.`
+    : intel?.provider === 'perplexity'
+    ? `Cite sources inline as you make claims. Lead with answer, support with evidence. Distinguish established fact from inference.`
+    : `Clear, structured, expert. Lead with the answer. Support with reasoning. Use formatting where it helps.`;
 
-═══ YOUR RESEARCH (from analysis phase) ═══
-${researchOutput}
+  const truncatedResearch = researchOutput.length > 3000
+    ? researchOutput.slice(0, 3000) + '\n[analysis continues — synthesize the key points]'
+    : researchOutput;
 
-═══ SELF-CRITIQUE CHECKLIST (apply before writing) ═══
-□ Is anything GENERIC that should be SPECIFIC? → Replace with concrete details
-□ Is anything MISSING that the user would need? → Add it
-□ Is anything WRONG or weakly reasoned? → Correct it with stronger logic
-□ Is anything REDUNDANT or bloated? → Cut mercilessly
-□ Is every recommendation ACTIONABLE? → Include specific steps, tools, or code
-□ Would an expert in this field respect this answer? → If not, elevate it
-□ Does this go BEYOND what a free AI tool would give? → It must
+  const taskHint = analysis.taskType === 'coding'
+    ? '\nThis is a CODING question — include actual code, not pseudocode.'
+    : analysis.taskType === 'troubleshooting'
+    ? '\nThis is a TROUBLESHOOTING question — lead with the most likely cause and fix.'
+    : analysis.taskType === 'strategic'
+    ? '\nThis is a STRATEGY question — give a clear recommendation with reasoning.'
+    : '';
 
-═══ OUTPUT FORMAT (follow this structure) ═══
+  return `You just completed a deep research phase on this question:
+"${originalQuery}"
 
-### Understanding
-[1-2 sentences showing you deeply understand what they need and WHY they need it — not just restating the question]
+Here is your research:
+---
+${truncatedResearch}
+---
 
-### Analysis
-[The deep, multi-angle analysis — organized with clear subheaders]
-[Use tables for comparisons, bullet points for lists, code blocks for code]
-[Every point must be specific and backed by reasoning]
-[Include concrete examples, numbers, or references]
+Now write the FINAL RESPONSE for the user.
+${taskHint}
+CRITICAL INSTRUCTION: Do not summarize the research. BUILD on it. The research is your thinking — the response is your conclusion.
 
-### Recommendation
-[Clear, decisive, actionable answer — what they should DO]
-[Include specific steps, tools, numbers, timelines, or code]
-[If there are multiple valid paths, rank them with clear reasoning]
+The difference:
+- Summarizing: "I found three approaches: A, B, C..."
+- Building: "The answer is B — and here's why A fails and why C is only right in edge case X..."
 
-### Key Takeaway
-[One powerful sentence that captures the essential insight — something they'll remember]
+OUTPUT STYLE FOR THIS MODEL:
+${outputStyle}
 
-### What would you like to explore deeper?
-[Ask 1-2 specific, intelligent follow-up questions that probe deeper into their situation]
-[These should feel like a senior consultant probing for the next phase of work]
-[Example: "Are you optimizing for speed-to-market or long-term scalability? That changes the architecture significantly."]
+SELF-CRITIQUE BEFORE WRITING:
+Ask yourself:
+1. What is the single most important thing the user needs to know? → Lead with that.
+2. What do most people get wrong about this? → Say it directly.
+3. What is my actual recommendation, and am I confident in it? → State it without hedging theater.
+4. What would an expert in this field add that a generalist wouldn't? → Include it.
 
-═══ RULES ═══
-- Output ONLY the polished answer in the format above
-- Do NOT reference "the research" or "the analysis phase" — present as your direct expert answer
-- Do NOT start with filler ("Here's my analysis", "Let me break this down") — jump straight into ### Understanding
-- Be thorough but concise — every sentence must earn its place
-- Sound like a senior consultant delivering a high-value report
-- Use markdown formatting throughout (bold, headers, tables, code blocks)
-- The follow-up questions are MANDATORY — they drive the conversation forward
-- Show genuine expertise — go beyond surface-level advice`;
+REQUIRED SECTIONS (adapt format to model style above):
+
+**Core Answer** — direct, specific, actionable
+[Not "it depends" — give the actual answer with the conditions stated]
+
+**Why This Is Right / The Key Insight**
+[The reasoning that makes this answer defensible]
+[The thing most people miss or get wrong]
+
+**How To Act On This**
+[Concrete next steps, specific tools, actual code, real numbers]
+[If there are multiple paths, rank them: "Do X first, then Y if Z"]
+
+**One Follow-Up Worth Exploring**
+[ONE specific question or direction that would deepen their situation]
+[Not generic — specific to what they told you]
+[Frame as: "The next question worth asking is X — because Y"]
+
+RULES:
+- Do NOT start with "Here's my analysis" or any filler
+- Do NOT reference "the research phase" or "my analysis above"
+- Do NOT hedge with "it depends" without immediately giving the conditions
+- Every sentence must earn its place
+- Sound like the most knowledgeable person in the room who also happens to communicate clearly`;
 }
