@@ -210,22 +210,20 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   // Persist conversations to user-namespaced key
   useEffect(() => {
     if (!userId) return
+    // Only persist conversations that have messages (skip empty drafts)
+    const toSave = conversations.filter(c => !c._draft && c.messages && c.messages.length > 0)
+    const trimAggressive = (convs: Conversation[], maxConv: number, maxMsg: number) =>
+      convs.slice(0, maxConv).map(c => ({ ...c, messages: c.messages.slice(-maxMsg) }))
     try {
-      // Only persist conversations that have messages (skip empty drafts)
-      const toSave = conversations.filter(c => !c._draft && c.messages && c.messages.length > 0)
       localStorage.setItem(storageKey(userId), JSON.stringify(trimForStorage(toSave)))
-    } catch (err) {
+    } catch {
       console.warn('localStorage quota exceeded — trimming old conversations')
-      // Progressive fallback: keep fewer conversations with fewer messages
-      const trimAggressive = (convs: Conversation[], maxConv: number, maxMsg: number) =>
-        convs.slice(0, maxConv).map(c => ({ ...c, messages: c.messages.slice(-maxMsg) }))
       try {
         localStorage.setItem(storageKey(userId), JSON.stringify(trimAggressive(toSave, 15, 30)))
       } catch {
         try {
           localStorage.setItem(storageKey(userId), JSON.stringify(trimAggressive(toSave, 5, 10)))
         } catch {
-          // Last resort: clear old data entirely
           try { localStorage.removeItem(storageKey(userId)) } catch { /* truly broken */ }
         }
       }
