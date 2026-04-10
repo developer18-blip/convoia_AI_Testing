@@ -379,6 +379,8 @@ export const revokeAllocation = asyncHandler(async (req: Request, res: Response)
   // Return unused tokens to pool
   const tokensToReturn = allocation.tokensRemaining;
 
+  const tokensUsed = allocation.tokensAllocated - tokensToReturn;
+
   const [updated] = await prisma.$transaction([
     prisma.tokenAllocation.update({
       where: { id },
@@ -389,6 +391,7 @@ export const revokeAllocation = asyncHandler(async (req: Request, res: Response)
       data: {
         allocatedTokens: { decrement: allocation.tokensAllocated },
         availableTokens: { increment: tokensToReturn },
+        usedTokens: { increment: tokensUsed },
       },
     }),
   ]);

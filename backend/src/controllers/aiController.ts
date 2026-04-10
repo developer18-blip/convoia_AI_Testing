@@ -1274,6 +1274,13 @@ export const compareModels = asyncHandler(async (req: Request, res: Response) =>
           description: `Compare: ${aiResponse.aiModel.name}`,
           organizationId,
         });
+        // Increment budget for comparison queries
+        try {
+          await prisma.budget.updateMany({
+            where: { userId: user.id },
+            data: { currentUsage: { increment: aiResponse.customerPrice } },
+          });
+        } catch { /* non-critical */ }
         return {
           modelId: id,
           modelName: aiResponse.aiModel.name,

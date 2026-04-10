@@ -78,6 +78,14 @@ export const transcribeAudioHandler = asyncHandler(
       organizationId,
     });
 
+    // Budget increment for voice transcription
+    try {
+      await prisma.budget.updateMany({
+        where: { userId: user.id },
+        data: { currentUsage: { increment: billing.customerPrice } },
+      });
+    } catch { /* non-critical */ }
+
     // Log usage (non-fatal)
     try {
       const openaiModel = await prisma.aIModel.findFirst({
@@ -180,6 +188,14 @@ export const synthesizeSpeechHandler = asyncHandler(
       description: `Voice synthesis (${charCount} chars, ${voice})`,
       organizationId,
     });
+
+    // Budget increment for voice synthesis
+    try {
+      await prisma.budget.updateMany({
+        where: { userId: user.id },
+        data: { currentUsage: { increment: billing.customerPrice } },
+      });
+    } catch { /* non-critical */ }
 
     // Log usage (non-fatal)
     try {

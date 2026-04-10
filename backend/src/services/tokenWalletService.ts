@@ -127,6 +127,14 @@ export class TokenWalletService {
           },
         });
 
+        // Decrement org-level balance so it reflects actual usage
+        if (organizationId) {
+          await tx.organization.update({
+            where: { id: organizationId },
+            data: { orgTokenBalance: { decrement: actualDeduct } },
+          }).catch(() => { /* org may not exist for personal accounts */ });
+        }
+
         if (actualDeduct < tokens) {
           logger.warn(`Partial deduction: userId=${userId} orgId=${organizationId || 'none'} requested=${tokens} actual=${actualDeduct} remaining=0`);
         }

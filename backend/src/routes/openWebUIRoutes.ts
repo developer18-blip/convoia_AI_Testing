@@ -167,7 +167,16 @@ router.post('/chat/completions', queryLimiter, asyncHandler(async (req: Request,
     tokens: costAdjustedTokens(aiResponse.customerPrice, aiResponse.totalTokens),
     reference: aiResponse.aiModel.id,
     description: `OpenWebUI: ${aiResponse.aiModel.name}`,
+    organizationId: user.organizationId || undefined,
   });
+
+  // Budget increment
+  try {
+    await prisma.budget.updateMany({
+      where: { userId: user.id },
+      data: { currentUsage: { increment: aiResponse.customerPrice } },
+    });
+  } catch { /* non-critical */ }
 
   logger.info(
     `OpenWebUI query — User: ${user.id}, Model: ${aiResponse.aiModel.name}, Cost: $${aiResponse.customerPrice.toFixed(6)}`

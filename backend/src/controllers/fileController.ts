@@ -185,7 +185,16 @@ export const processFile = asyncHandler(async (req: Request, res: Response): Pro
           tokens: costAdjustedTokens(aiResponse.customerPrice, aiResponse.totalTokens),
           reference: aiResponse.aiModel.id,
           description: `Vision: ${aiResponse.aiModel.name}`,
+          organizationId: orgId,
         })
+
+        // Budget increment for vision analysis
+        try {
+          await prisma.budget.updateMany({
+            where: { userId: user.id },
+            data: { currentUsage: { increment: aiResponse.customerPrice } },
+          });
+        } catch { /* non-critical */ }
 
         res.json({
           success: true,
@@ -415,14 +424,26 @@ export const generateImage = asyncHandler(async (req: Request, res: Response): P
   // Generate image (Gemini first, DALL-E fallback)
   const result = await FileProcessingService.generateImage(prompt, size, quality, provider)
 
-  // Token cost: Gemini is cheaper (uses actual token count ~1300), DALL-E flat 1000
-  const imageTokenCost = result.provider === 'gemini' ? 500 : 1000
+  // Cost-adjusted token billing for image generation
+  const imgProvCost = result.provider === 'gemini' ? 0.003 : 0.04
+  const imgCustPrice = imgProvCost * 1.25  // 25% markup
+  const imageTokenCost = costAdjustedTokens(imgCustPrice, result.provider === 'gemini' ? 1300 : 1000)
+  const orgId = user.organizationId || await getOrCreatePersonalOrg(user.id)
   await TokenWalletService.deductTokens({
     userId: user.id,
     tokens: imageTokenCost,
     reference: result.provider === 'gemini' ? 'gemini-2.5-flash-image' : 'dall-e-3',
     description: `Image generation (${result.provider === 'gemini' ? 'Gemini' : 'DALL-E'})`,
+    organizationId: orgId,
   })
+
+  // Budget increment for image generation
+  try {
+    await prisma.budget.updateMany({
+      where: { userId: user.id },
+      data: { currentUsage: { increment: imgCustPrice } },
+    });
+  } catch { /* non-critical */ }
 
   const providerLabel = result.provider === 'gemini' ? 'Gemini Flash' : 'DALL-E 3'
   logger.info(`Image generated via ${providerLabel} for user ${user.id}, tokens: ${imageTokenCost}`)
