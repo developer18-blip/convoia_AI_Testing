@@ -96,6 +96,11 @@ model User {
   conversations            Conversation[]
   memories                 UserMemory[]
 
+  // Autonomous agent relations
+  agentMemories            AgentMemory[]
+  agentProjects            AgentProject[]
+  toolExecutions           ToolExecution[]
+
   @@index([organizationId])
   @@index([managerId])
   @@index([email])
@@ -317,12 +322,20 @@ model Agent {
   industry        String?
   isDefault       Boolean   @default(false)       // platform-level default employee
   isActive        Boolean   @default(true)
+  toolsEnabled    Boolean   @default(false)       // enable autonomous tool use
+  tools           Json      @default("[]")        // allowed tools: ['file_read','file_write','terminal_exec','web_search','git_op']
+  maxToolCalls    Int       @default(10)           // max tool calls per user message
+  sandboxConfig   Json?                            // resource limits per agent
   userId          String?                         // null = platform default, set = user-created
   user            User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
   organizationId  String?                         // org-shared employee
   organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+
+  // Autonomous agent relations
+  agentMemories   AgentMemory[]
+  agentProjects   AgentProject[]
 
   @@index([userId])
   @@index([organizationId])
@@ -606,4 +619,60 @@ model UserMemory {
 
   @@unique([userId, key])
   @@index([userId])
+}
+
+// ============== AUTONOMOUS AGENT SYSTEM ==============
+
+model AgentMemory {
+  id        String   @id @default(uuid())
+  userId    String
+  agentId   String
+  type      String   // 'user_preference' | 'project_context'
+  key       String   // 'languages', 'frameworks', 'project:myapp:stack'
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, agentId, type, key])
+  @@index([userId, agentId])
+}
+
+model AgentProject {
+  id          String   @id @default(uuid())
+  userId      String
+  agentId     String
+  name        String
+  techStack   Json     @default("[]")
+  fileTree    String?  @db.Text
+  conventions Json     @default("[]")
+  diskUsage   Int      @default(0) // bytes used in sandbox
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, agentId, name])
+  @@index([userId, agentId])
+}
+
+model ToolExecution {
+  id             String   @id @default(uuid())
+  userId         String
+  agentId        String
+  conversationId String
+  toolName       String
+  toolInput      Json
+  toolOutput     Json
+  durationMs     Int
+  success        Boolean
+  createdAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, agentId])
+  @@index([createdAt])
 }

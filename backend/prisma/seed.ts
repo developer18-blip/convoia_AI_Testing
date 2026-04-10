@@ -640,6 +640,9 @@ STYLE: Terse. Code-first. Explain only what's non-obvious. No motivational fluff
     maxTokens: 16384,
     topP: 0.95,
     isDefault: true,
+    toolsEnabled: true,
+    tools: ['file_read', 'file_write', 'file_list', 'file_delete', 'terminal_exec', 'web_search', 'git_init', 'git_status', 'git_diff', 'git_log', 'git_commit'],
+    maxToolCalls: 10,
   },
   {
     name: 'Writer',

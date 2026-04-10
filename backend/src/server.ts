@@ -36,6 +36,7 @@ import conversationRoutes from './routes/conversationRoutes.js';
 import memoryRoutes from './routes/memoryRoutes.js';
 import audioRoutes from './routes/audioRoutes.js';
 import walletRoutes from './routes/walletRoutes.js';
+import agentToolRoutes from './routes/agentToolRoutes.js';
 
 const app: Express = express();
 
@@ -254,6 +255,7 @@ app.use('/api/conversations', conversationRoutes);
 app.use('/api/memory', memoryRoutes);
 app.use('/api/audio', audioRoutes);
 app.use('/api/wallet', walletRoutes);
+app.use('/api/agent-tools', agentToolRoutes);
 
 // ============== 404 HANDLER ==============
 app.use('*', (req: Request, res: Response) => {

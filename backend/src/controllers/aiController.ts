@@ -1036,6 +1036,65 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
       }
     }
 
+    // ── AUTONOMOUS AGENT ROUTING ─────────────────────────────
+    // If agent has tools enabled, route through the orchestrator
+    // The orchestrator handles tool-use loops and streams the final response
+    if (agentId && agentConfig) {
+      const agentRecord = await (prisma as any).agent.findUnique({ where: { id: agentId }, select: { toolsEnabled: true, tools: true, maxToolCalls: true } });
+      if (agentRecord?.toolsEnabled) {
+        const { runAgentOrchestrator } = await import('../services/agentOrchestrator.js');
+        try {
+          await runAgentOrchestrator(
+            {
+              userId: user.id, organizationId,
+              agentId, modelId: finalModelId,
+              messages: enrichedMessages,
+              conversationId: undefined,
+              industry: industry || user.organization?.industry || undefined,
+            },
+            {
+              onChunk: (text: string) => {
+                if (!streamEnded && !res.writableEnded) {
+                  res.write(`data: ${JSON.stringify({ type: 'chunk', content: text })}\n\n`);
+                }
+              },
+              onToolUse: (tool) => {
+                if (!streamEnded && !res.writableEnded) {
+                  res.write(`data: ${JSON.stringify({ type: 'tool_use', name: tool.name, input: tool.input })}\n\n`);
+                }
+              },
+              onToolResult: (tool) => {
+                if (!streamEnded && !res.writableEnded) {
+                  res.write(`data: ${JSON.stringify({ type: 'tool_result', name: tool.name, success: tool.result.success, output: typeof tool.result.output === 'string' ? tool.result.output.slice(0, 2000) : JSON.stringify(tool.result.output).slice(0, 2000) })}\n\n`);
+                }
+              },
+              onDone: (inputTokens, outputTokens) => {
+                if (!streamEnded && !res.writableEnded) {
+                  res.write(`data: ${JSON.stringify({ type: 'done', tokens: { input: inputTokens, output: outputTokens, total: inputTokens + outputTokens } })}\n\n`);
+                  res.write('data: [DONE]\n\n');
+                  res.end();
+                }
+              },
+              onError: (err) => {
+                if (!streamEnded && !res.writableEnded) {
+                  res.write(`data: ${JSON.stringify({ type: 'error', content: err.message })}\n\n`);
+                  res.write('data: [DONE]\n\n');
+                  res.end();
+                }
+              },
+            }
+          );
+        } catch (orchErr: any) {
+          logger.error(`Agent orchestrator failed: ${orchErr.message}`);
+          if (!streamEnded && !res.writableEnded) {
+            res.write(`data: ${JSON.stringify({ type: 'error', content: 'Agent tool execution failed. Falling back to normal response.' })}\n\n`);
+          }
+          // Fall through to normal streaming below
+        }
+        return; // Don't fall through to normal streaming
+      }
+    }
+
     // ── STREAMING CALL (handles normal, clarification, and Pass 2 refinement) ──
     await AIGatewayService.sendMessageStream(
       {

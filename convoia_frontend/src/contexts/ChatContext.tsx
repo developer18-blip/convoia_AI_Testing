@@ -425,6 +425,21 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               setMessages((prev) => prev.map((m) =>
                 m.id === assistantId ? { ...m, content: accumulated, isLoading: true, statusText: 'Refining answer...' } : m
               ))
+            } else if (parsed.type === 'tool_use') {
+              // Agent is using a tool — show indicator
+              const toolIcon = parsed.name?.startsWith('file') ? '📄' : parsed.name?.startsWith('git') ? '🔀' : parsed.name === 'terminal_exec' ? '💻' : parsed.name === 'web_search' ? '🔍' : '🔧'
+              accumulated += `> ${toolIcon} **Using tool:** \`${parsed.name}\`\n>\n`
+              setMessages((prev) => prev.map((m) =>
+                m.id === assistantId ? { ...m, content: accumulated, isLoading: true, statusText: `Running ${parsed.name}...` } : m
+              ))
+            } else if (parsed.type === 'tool_result') {
+              // Tool finished — show result summary
+              const statusIcon = parsed.success ? '✅' : '❌'
+              const output = typeof parsed.output === 'string' ? parsed.output.slice(0, 200) : ''
+              accumulated += `> ${statusIcon} ${parsed.name} ${parsed.success ? 'completed' : 'failed'}${output ? `: \`${output}\`` : ''}\n\n`
+              setMessages((prev) => prev.map((m) =>
+                m.id === assistantId ? { ...m, content: accumulated, isLoading: true } : m
+              ))
             } else if (parsed.type === 'note') {
               accumulated += `> **Note:** ${parsed.content}\n\n`
               setMessages((prev) => prev.map((m) =>
@@ -581,11 +596,23 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                 m.id === assistantId ? { ...m, content: '', isLoading: false, webSearch: { query: parsed.query, sources: parsed.sources || [] } } : m
               ))
             } else if (parsed.type === 'thinking_result') {
-              // Deep thinking result — show as blockquote (markdown-native, no raw HTML)
               const thinkBlock = `> **🧠 Deep Thinking**\n>\n> ${parsed.content.replace(/\n/g, '\n> ')}\n\n---\n\n`
               accumulated += thinkBlock
               setMessages((prev) => prev.map((m) =>
                 m.id === assistantId ? { ...m, content: accumulated, isLoading: true, statusText: 'Refining answer...' } : m
+              ))
+            } else if (parsed.type === 'tool_use') {
+              const toolIcon = parsed.name?.startsWith('file') ? '📄' : parsed.name?.startsWith('git') ? '🔀' : parsed.name === 'terminal_exec' ? '💻' : parsed.name === 'web_search' ? '🔍' : '🔧'
+              accumulated += `> ${toolIcon} **Using tool:** \`${parsed.name}\`\n>\n`
+              setMessages((prev) => prev.map((m) =>
+                m.id === assistantId ? { ...m, content: accumulated, isLoading: true, statusText: `Running ${parsed.name}...` } : m
+              ))
+            } else if (parsed.type === 'tool_result') {
+              const statusIcon = parsed.success ? '✅' : '❌'
+              const output = typeof parsed.output === 'string' ? parsed.output.slice(0, 200) : ''
+              accumulated += `> ${statusIcon} ${parsed.name} ${parsed.success ? 'completed' : 'failed'}${output ? `: \`${output}\`` : ''}\n\n`
+              setMessages((prev) => prev.map((m) =>
+                m.id === assistantId ? { ...m, content: accumulated, isLoading: true } : m
               ))
             } else if (parsed.type === 'note') {
               accumulated += `> **Note:** ${parsed.content}\n\n`
