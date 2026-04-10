@@ -27,9 +27,10 @@ interface Props {
   onClose: () => void
   onTranscript: (text: string) => void
   latestAIResponse?: string
+  isAIStreaming?: boolean
 }
 
-export function VoiceConversationMode({ isOpen, onClose, onTranscript, latestAIResponse }: Props) {
+export function VoiceConversationMode({ isOpen, onClose, onTranscript, latestAIResponse, isAIStreaming }: Props) {
   const [autoLoop, setAutoLoop] = useState(true)
   const [lastTranscript, setLastTranscript] = useState('')
   const [lastResponse, setLastResponse] = useState('')
@@ -52,6 +53,17 @@ export function VoiceConversationMode({ isOpen, onClose, onTranscript, latestAIR
     onError: (msg) => console.error('Voice mode error:', msg),
     voice: 'nova',
   })
+
+  // Auto-start listening when overlay opens
+  const didAutoStartRef = useRef(false)
+  useEffect(() => {
+    if (isOpen && !didAutoStartRef.current && mode === 'idle') {
+      didAutoStartRef.current = true
+      const timer = setTimeout(() => startListening(), 500)
+      return () => clearTimeout(timer)
+    }
+    if (!isOpen) didAutoStartRef.current = false
+  }, [isOpen, mode])
 
   // Track if we just finished speaking (for auto-loop)
   const prevModeRef = useRef(mode)
@@ -132,6 +144,12 @@ export function VoiceConversationMode({ isOpen, onClose, onTranscript, latestAIR
       animation: 'orbWave 1s ease-in-out infinite',
       boxShadow: '0 0 30px rgba(48,209,88,0.5)',
     }
+    if (isAIStreaming) return {
+      ...base,
+      background: 'rgba(255,159,10,0.3)',
+      animation: 'orbPulse 2s ease-in-out infinite',
+      boxShadow: '0 0 20px rgba(255,159,10,0.3)',
+    }
     return {
       ...base,
       background: 'rgba(91,91,214,0.15)',
@@ -142,6 +160,7 @@ export function VoiceConversationMode({ isOpen, onClose, onTranscript, latestAIR
   const getStatusText = () => {
     if (isListening) return 'Listening...'
     if (isProcessing) return 'Transcribing...'
+    if (isAIStreaming) return 'AI is thinking...'
     if (isSpeaking) return 'Speaking...'
     return 'Tap to speak'
   }
