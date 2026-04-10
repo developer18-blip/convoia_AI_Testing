@@ -1,0 +1,204 @@
+{
+  "name": "convoia-dev",
+  "displayName": "ConvoiaAI Dev Agent",
+  "description": "Autonomous AI coding assistant powered by 40+ models via ConvoiaAI",
+  "version": "0.1.0",
+  "publisher": "convoia",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "AI",
+    "Programming Languages",
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "convoia.openChat",
+        "title": "ConvoiaAI: Open Chat"
+      },
+      {
+        "command": "convoia.explainCode",
+        "title": "ConvoiaAI: Explain Selection"
+      },
+      {
+        "command": "convoia.refactorCode",
+        "title": "ConvoiaAI: Refactor Selection"
+      },
+      {
+        "command": "convoia.writeTests",
+        "title": "ConvoiaAI: Write Tests for File"
+      },
+      {
+        "command": "convoia.reviewCode",
+        "title": "ConvoiaAI: Review File"
+      },
+      {
+        "command": "convoia.fixError",
+        "title": "ConvoiaAI: Fix This Error"
+      },
+      {
+        "command": "convoia.askAboutProject",
+        "title": "ConvoiaAI: Ask About Project"
+      },
+      {
+        "command": "convoia.selectModel",
+        "title": "ConvoiaAI: Select AI Model"
+      },
+      {
+        "command": "convoia.showTokenBalance",
+        "title": "ConvoiaAI: Show Token Balance"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "convoia.explainCode",
+          "when": "editorHasSelection",
+          "group": "convoia@1"
+        },
+        {
+          "command": "convoia.refactorCode",
+          "when": "editorHasSelection",
+          "group": "convoia@2"
+        },
+        {
+          "command": "convoia.writeTests",
+          "group": "convoia@3"
+        },
+        {
+          "command": "convoia.reviewCode",
+          "group": "convoia@4"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "convoia",
+          "title": "ConvoiaAI",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "convoia": [
+        {
+          "type": "webview",
+          "id": "convoia.chatPanel",
+          "name": "Chat"
+        },
+        {
+          "id": "convoia.modifiedFiles",
+          "name": "Modified Files"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "ConvoiaAI",
+      "properties": {
+        "convoia.apiKey": {
+          "type": "string",
+          "description": "Your ConvoiaAI API key from intellect.convoia.com/api-keys",
+          "order": 1
+        },
+        "convoia.apiBaseUrl": {
+          "type": "string",
+          "default": "https://intellect.convoia.com/api",
+          "description": "ConvoiaAI API base URL",
+          "order": 2
+        },
+        "convoia.defaultModel": {
+          "type": "string",
+          "default": "claude-sonnet-4-6",
+          "description": "Default AI model for Dev agent",
+          "enum": [
+            "claude-opus-4-6",
+            "claude-sonnet-4-6",
+            "claude-haiku-4-5-20251001",
+            "gpt-5.4",
+            "gpt-5.4-mini",
+            "gpt-4.1",
+            "gpt-4.1-mini",
+            "o3",
+            "o4-mini",
+            "gemini-2.5-pro",
+            "gemini-2.5-flash",
+            "deepseek-chat",
+            "grok-4.20-0309-non-reasoning"
+          ],
+          "order": 3
+        },
+        "convoia.serverMode": {
+          "type": "string",
+          "enum": [
+            "local",
+            "remote"
+          ],
+          "default": "local",
+          "description": "local = tools run on your machine; remote = tools run on ConvoiaAI server",
+          "order": 4
+        },
+        "convoia.autoApproveReads": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-approve file read operations"
+        },
+        "convoia.autoApproveWrites": {
+          "type": "boolean",
+          "default": false,
+          "description": "Auto-approve file write operations (shows diff for approval)"
+        },
+        "convoia.autoApproveCommands": {
+          "type": "boolean",
+          "default": false,
+          "description": "Auto-approve terminal commands"
+        },
+        "convoia.maxToolCalls": {
+          "type": "number",
+          "default": 10,
+          "description": "Max tool calls per message"
+        },
+        "convoia.thinkMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Deep Think Mode for complex tasks"
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "command": "convoia.openChat",
+        "key": "ctrl+shift+a",
+        "mac": "cmd+shift+a"
+      },
+      {
+        "command": "convoia.explainCode",
+        "key": "ctrl+shift+e",
+        "mac": "cmd+shift+e",
+        "when": "editorHasSelection"
+      }
+    ]
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "axios": "^1.15.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@types/vscode": "^1.115.0",
+    "@vscode/vsce": "^3.7.1",
+    "typescript": "^6.0.2"
+  }
+}

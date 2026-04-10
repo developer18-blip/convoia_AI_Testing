@@ -1,0 +1,33 @@
+{
+  "name": "@convoia/mcp-server",
+  "version": "0.1.0",
+  "description": "ConvoiaAI Dev Agent MCP Server",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "convoia-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "start:stdio": "node dist/index.js --transport stdio",
+    "start:sse": "node dist/index.js --transport sse --port 3500"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "axios": "^1.15.0",
+    "dotenv": "^17.4.1",
+    "glob": "^13.0.6",
+    "tree-kill": "^1.2.2"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/node": "^25.6.0",
+    "typescript": "^6.0.2"
+  }
+}
