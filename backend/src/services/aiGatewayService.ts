@@ -535,26 +535,44 @@ async function callAnthropic(modelId: string, messages: any[], systemPrompt: str
     system: systemPrompt,
     messages,
   };
-  // Anthropic rejects requests with BOTH temperature AND top_p — use only one
-  if (overrides?.temperature != null) {
-    body.temperature = overrides.temperature;
-  } else if (overrides?.topP != null) {
-    body.top_p = overrides.topP;
+
+  const headers: Record<string, string> = {
+    'x-api-key': apiKey,
+    'anthropic-version': '2023-06-01',
+    'Content-Type': 'application/json',
+  };
+
+  // Extended thinking mode (Claude only)
+  if (overrides?.thinkingEnabled) {
+    body.thinking = { type: 'enabled', budget_tokens: 10000 };
+    body.max_tokens = Math.max(body.max_tokens, 32000);
+    // Extended thinking requires temperature=1 (or omitted) — do NOT set temperature/top_p
+    headers['anthropic-beta'] = 'interleaved-thinking-2025-05-14';
   } else {
-    body.temperature = 0.7;
+    // Anthropic rejects requests with BOTH temperature AND top_p — use only one
+    if (overrides?.temperature != null) {
+      body.temperature = overrides.temperature;
+    } else if (overrides?.topP != null) {
+      body.top_p = overrides.topP;
+    } else {
+      body.temperature = 0.7;
+    }
   }
 
   const response = await axios.post(
     'https://api.anthropic.com/v1/messages',
     body,
-    axiosConfig({
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'Content-Type': 'application/json',
-    })
+    axiosConfig(headers)
   );
+
+  // Extract text from response — thinking mode returns multiple content blocks
+  const textContent = response.data.content
+    .filter((c: any) => c.type === 'text')
+    .map((c: any) => c.text)
+    .join('\n');
+
   return {
-    response: response.data.content[0].text,
+    response: textContent || response.data.content[0]?.text || '',
     inputTokens: response.data.usage.input_tokens,
     outputTokens: response.data.usage.output_tokens,
   };
