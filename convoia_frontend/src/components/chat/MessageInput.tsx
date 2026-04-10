@@ -430,6 +430,7 @@ export function MessageInput({
               </button>
               <VoiceInputButton
                 onTranscript={(text) => setValue((prev) => prev + (prev ? ' ' : '') + text)}
+                onAutoSend={(text) => { onSend(text) }}
                 disabled={isLoading || fileLoading}
                 onSpeakResponse={latestAIResponse}
               />

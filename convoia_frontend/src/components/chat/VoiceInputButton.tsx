@@ -4,11 +4,12 @@ import { useVoiceConversation } from '../../hooks/useVoiceConversation'
 
 interface Props {
   onTranscript: (text: string) => void
+  onAutoSend?: (text: string) => void  // auto-submit voice transcript
   disabled?: boolean
   onSpeakResponse?: string
 }
 
-export function VoiceInputButton({ onTranscript, disabled, onSpeakResponse }: Props) {
+export function VoiceInputButton({ onTranscript, onAutoSend, disabled, onSpeakResponse }: Props) {
   const hasUsedVoiceRef = useRef(false)
 
   const {
@@ -24,7 +25,14 @@ export function VoiceInputButton({ onTranscript, disabled, onSpeakResponse }: Pr
   } = useVoiceConversation({
     onTranscript: (text) => {
       hasUsedVoiceRef.current = true
-      onTranscript(text)
+      console.log('[Voice] Transcript received:', text.substring(0, 50))
+      if (onAutoSend) {
+        // Auto-send: voice transcript goes directly to AI
+        onAutoSend(text)
+      } else {
+        // Fallback: populate input field
+        onTranscript(text)
+      }
     },
     onError: (msg) => {
       console.error('Voice error:', msg)
@@ -65,10 +73,14 @@ export function VoiceInputButton({ onTranscript, disabled, onSpeakResponse }: Pr
       mode === 'idle' &&
       onSpeakResponse !== lastSpokenRef.current
     ) {
+      console.log('[Voice] Auto-speak triggered, response length:', onSpeakResponse.length)
       lastSpokenRef.current = onSpeakResponse
       const cleanText = stripMarkdown(onSpeakResponse)
       if (cleanText) {
+        console.log('[Voice] Speaking cleaned text:', cleanText.substring(0, 80))
         speakText(cleanText)
+      } else {
+        console.log('[Voice] Cleaned text was empty after markdown strip')
       }
     }
   }, [onSpeakResponse, mode])
