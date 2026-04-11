@@ -4,18 +4,18 @@ import logger from '../config/logger.js';
 // Two-tier: fast regex check + contextual analysis
 
 const IMAGE_TRIGGER_PATTERNS = [
-  // Explicit generation
-  /\b(generate|create|make|draw|design|produce|render|craft|build)\b.{0,30}\b(image|picture|photo|illustration|poster|banner|logo|icon|thumbnail|mockup|ui|visual|graphic|artwork|infographic|diagram|flyer|cover|avatar|wallpaper|meme|cartoon|sketch|painting)\b/i,
+  // Explicit generation: verb + image noun (MUST have both)
+  /\b(generate|create|make|draw|design|produce|render|craft|build)\b.{0,30}\b(image|picture|photo|illustration|poster|banner|logo|icon|thumbnail|mockup|visual|graphic|artwork|infographic|flyer|cover|avatar|wallpaper|meme|cartoon|sketch|painting)\b/i,
   // Reverse order: "image of", "poster for"
   /\b(image|picture|photo|poster|banner|logo|thumbnail|mockup|illustration|icon)\b.{0,20}\b(of|for|about|showing|depicting|with)\b/i,
-  // Direct commands
-  /^(generate|create|make|draw|design|visualize|illustrate|render)\b.{0,10}\b(a|an|the|me|this)?\b/i,
-  // Implicit design requests
+  // Direct visual-only commands (MUST include an image-specific noun)
+  /^(draw|paint|sketch|illustrate)\b/i,
+  // Implicit design requests (specific multi-word phrases only)
   /\b(landing page design|website design|app design|ui design|ux design|brand identity|business card|social media post|instagram post|facebook cover|youtube thumbnail)\b/i,
   // "Show me" pattern
   /\bshow me\b.{0,20}\b(image|picture|visual|design|what.*looks? like)\b/i,
-  // "I need a" pattern
-  /\bi need\b.{0,15}\b(logo|poster|banner|design|image|graphic|illustration)\b/i,
+  // "I need a" pattern with image nouns
+  /\bi need\b.{0,15}\b(logo|poster|banner|image|graphic|illustration|wallpaper|icon|avatar|thumbnail)\b/i,
   // Dalle/image model explicit
   /\b(dall-?e|dalle|midjourney|stable diffusion|image gen)\b/i,
 ];
@@ -36,11 +36,18 @@ const IMAGE_MODIFY_PATTERNS = [
 
 // Patterns that should NOT trigger image gen (code, analysis, text, documents)
 const ANTI_PATTERNS = [
+  // Analysis/explanation requests about images (not generation)
   /\b(explain|analyze|compare|describe|tell me about|what is|how does|write code|implement|debug|fix)\b.*\b(image|design|poster)\b/i,
-  /\b(code|script|function|algorithm|api|endpoint)\b/i,
-  /```/,  // Code blocks
-  /\b(doc|document|docx|pdf|report|essay|article|blog|paper|proposal|letter|resume|cv|email|memo|presentation|ppt|spreadsheet|excel|csv)\b/i,
-  /\b(write|create|make|draft|prepare)\b.{0,15}\b(doc|document|docx|pdf|report|essay|article|blog|paper|proposal|letter|file|resume|cv|content|text|email|memo)\b/i,
+  // Code-related keywords
+  /\b(code|script|function|algorithm|api|endpoint|component|class|module|package|library|framework|variable|method|route|controller|middleware|hook|query|mutation|schema|migration)\b/i,
+  // Code blocks
+  /```/,
+  // Document / text output keywords
+  /\b(doc|document|docx|pdf|report|essay|article|blog|paper|proposal|letter|resume|cv|email|memo|presentation|ppt|spreadsheet|excel|csv|readme|changelog|summary|plan|strategy|outline|draft|template|contract|invoice|receipt|schedule|agenda|minutes|notes|guide|tutorial|documentation|spec|requirement|brief|review|audit|response|answer|list|table|analysis)\b/i,
+  // Verb + text-output noun combos
+  /\b(write|create|make|draft|prepare|generate|build|design)\b.{0,20}\b(doc|document|report|essay|article|blog|paper|proposal|letter|file|resume|cv|content|text|email|memo|plan|summary|outline|template|strategy|spec|readme|changelog|test|tests|unit test|response|database|schema|PR|pull request|issue|ticket|task)\b/i,
+  // URL fetch requests
+  /\b(fetch|scrape|crawl|open|visit|check|read|summarize|browse)\b.{0,20}\b(url|link|website|page|site|http)\b/i,
 ];
 
 export interface ImageIntent {
