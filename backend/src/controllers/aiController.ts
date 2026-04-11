@@ -367,9 +367,15 @@ export const queryAIStream = async (req: Request, res: Response) => {
     if (!user) { res.status(404).json({ success: false, message: 'User not found' }); return; }
     const organizationId = await getOrCreatePersonalOrg(user.id);
 
+    // ── SAVE ORIGINAL USER MESSAGE (before URL enrichment) ─────
+    // Smart router + image/video intent detection must use the ORIGINAL
+    // short message, not the URL-enriched version (which can be 15K+ chars).
+    const latestUserMsg = [...messages].reverse().find((m: any) => m.role === 'user');
+    const latestUserText = typeof latestUserMsg?.content === 'string' ? latestUserMsg.content : '';
+
     // ── URL FETCH — enrich messages with fetched page content ──
-    const lastMsgForUrl = [...messages].reverse().find((m: any) => m.role === 'user');
-    const lastMsgText = typeof lastMsgForUrl?.content === 'string' ? lastMsgForUrl.content : '';
+    const lastMsgForUrl = latestUserMsg;
+    const lastMsgText = latestUserText;
     if (lastMsgText) {
       try {
         const urlResult = await fetchAndExtractURLs(lastMsgText);
@@ -389,8 +395,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
 
     // ── CLASSIFY QUERY COMPLEXITY ─────────────────────────────
     // Used for: dynamic history cap, lightweight system prompt, memory skip
-    const latestUserMsg = [...messages].reverse().find((m: any) => m.role === 'user');
-    const latestUserText = typeof latestUserMsg?.content === 'string' ? latestUserMsg.content : '';
+    // NOTE: uses latestUserText (original message), NOT the enriched version
     const queryComplexity = classifyQueryComplexity(latestUserText);
 
     // ── CAP CONVERSATION HISTORY ──────────────────────────────
@@ -484,8 +489,11 @@ export const queryAIStream = async (req: Request, res: Response) => {
     }
 
     // ── SMART ROUTER — unified intent detection ─────────────────
-    const lastUserMessage = [...cappedMessages].reverse().find((m: any) => m.role === 'user');
-    const lastUserText = typeof lastUserMessage?.content === 'string' ? lastUserMessage.content : '';
+    // IMPORTANT: Use original latestUserText (saved before URL enrichment),
+    // NOT the enriched message. The enriched content is 15K+ chars which
+    // breaks image/video intent detection and exceeds prompt limits.
+    void latestUserMsg; // used above for URL enrichment
+    const lastUserText = latestUserText;
 
     const route = await smartRoute({
       message: lastUserText,
