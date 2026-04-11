@@ -27,7 +27,7 @@ export async function handleSearchTool(
 
   try {
     const response = await axios.post(
-      `${baseUrl}/ai/stream`,
+      `${baseUrl}/ai/query/stream`,
       {
         modelId: '', // backend resolves to Perplexity Sonar
         messages: [{ role: 'user', content: query }],

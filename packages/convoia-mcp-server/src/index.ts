@@ -5,7 +5,8 @@
  *
  * Usage:
  *   convoia-mcp --transport stdio              (default, for VS Code)
- *   convoia-mcp --transport sse --port 3500    (remote mode)
+ *   convoia-mcp --transport sse --port 3500    (remote SSE mode)
+ *   convoia-mcp --transport api --port 3600    (REST API mode)
  *   CONVOIA_API_KEY=xxx convoia-mcp            (env-based config)
  */
 
@@ -15,13 +16,14 @@ dotenv.config();
 import { ConvoiaMCPServer } from './server.js';
 import { createStdioTransport } from './transport/stdio.js';
 import { createSSEServer } from './transport/sse.js';
+import { createAPIServer } from './api/server.js';
 import { validateApiKey } from './auth.js';
 
 // ── Parse CLI args ───────────────────────────────────────────────────
 
-function parseArgs(): { transport: 'stdio' | 'sse'; port: number; apiKey: string; baseUrl: string; workspaceRoot: string } {
+function parseArgs(): { transport: 'stdio' | 'sse' | 'api'; port: number; apiKey: string; baseUrl: string; workspaceRoot: string } {
   const args = process.argv.slice(2);
-  let transport: 'stdio' | 'sse' = 'stdio';
+  let transport: 'stdio' | 'sse' | 'api' = 'stdio';
   let port = 3500;
   let apiKey = process.env.CONVOIA_API_KEY || '';
   let baseUrl = process.env.CONVOIA_API_URL || 'https://intellect.convoia.com/api';
@@ -69,7 +71,16 @@ async function main(): Promise<void> {
   const mcpServer = new ConvoiaMCPServer(config.apiKey, config.baseUrl, config.workspaceRoot);
 
   // Start with selected transport
-  if (config.transport === 'sse') {
+  if (config.transport === 'api') {
+    await createAPIServer({
+      port: config.port || 3600,
+      apiKey: config.apiKey,
+      baseUrl: config.baseUrl,
+      workspaceRoot: config.workspaceRoot,
+    });
+    console.error(`[ConvoiaAI MCP] Server running (REST API mode, port ${config.port || 3600})`);
+    // Keep process alive — the Express server handles its own lifecycle
+  } else if (config.transport === 'sse') {
     const { transport } = await createSSEServer(config.port, config.apiKey);
     await mcpServer.getServer().connect(transport);
     console.error(`[ConvoiaAI MCP] Server running (SSE mode, port ${config.port})`);

@@ -48,6 +48,7 @@ import { getUserMemoryPrompt } from '../services/userMemoryService.js';
 import { processMemoryForQuery } from '../services/vectorMemoryService.js';
 import { analyzeQuery, getClarificationSystemPrompt, getDeepResearchPrompt, buildRefinementPrompt } from '../services/thinkingService.js';
 import { getModelIntelligence } from '../ai/modelRegistry.js';
+import { fetchAndExtractURLs } from '../services/urlFetchService.js';
 import { config } from '../config/env.js';
 import logger from '../config/logger.js';
 
@@ -365,6 +366,26 @@ export const queryAIStream = async (req: Request, res: Response) => {
     });
     if (!user) { res.status(404).json({ success: false, message: 'User not found' }); return; }
     const organizationId = await getOrCreatePersonalOrg(user.id);
+
+    // ── URL FETCH — enrich messages with fetched page content ──
+    const lastMsgForUrl = [...messages].reverse().find((m: any) => m.role === 'user');
+    const lastMsgText = typeof lastMsgForUrl?.content === 'string' ? lastMsgForUrl.content : '';
+    if (lastMsgText) {
+      try {
+        const urlResult = await fetchAndExtractURLs(lastMsgText);
+        if (urlResult.urls.length > 0) {
+          // Replace the user message content with enriched version
+          const msgIndex = messages.lastIndexOf(lastMsgForUrl);
+          if (msgIndex >= 0) {
+            messages[msgIndex] = { ...messages[msgIndex], content: urlResult.enrichedMessage };
+          }
+          const fetched = urlResult.urls.filter((u: any) => u.success).length;
+          logger.info(`URL enrichment: ${fetched}/${urlResult.urls.length} URLs fetched for user ${req.user!.userId}`);
+        }
+      } catch (err: any) {
+        logger.warn(`URL fetch failed silently: ${err.message}`);
+      }
+    }
 
     // ── CLASSIFY QUERY COMPLEXITY ─────────────────────────────
     // Used for: dynamic history cap, lightweight system prompt, memory skip

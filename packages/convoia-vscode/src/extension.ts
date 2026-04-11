@@ -7,12 +7,14 @@
 
 import * as vscode from 'vscode';
 import { MCPBridge } from './mcp/mcpBridge.js';
+import { ConvoiaApiClient } from './api/convoiaApiClient.js';
 import { createStatusBar, updateModel, updateBalance, updateConnectionStatus } from './status/statusBar.js';
 import { initWorkspaceScanner, getWorkspaceRoot } from './context/workspaceScanner.js';
 import { initActiveEditorTracker, getCurrentContext } from './context/activeEditor.js';
 import axios from 'axios';
 
 let mcpBridge: MCPBridge | null = null;
+let apiClient: ConvoiaApiClient | null = null;
 let chatPanel: vscode.WebviewPanel | null = null;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -42,13 +44,31 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   initWorkspaceScanner(context);
   initActiveEditorTracker(context);
 
-  // Connect MCP bridge
-  if (workspaceRoot) {
+  // Connect MCP bridge or REST API client
+  const serverMode = config.get<string>('serverMode') || 'local';
+  const apiServerUrl = config.get<string>('apiServerUrl') || 'http://localhost:3600';
+
+  if (serverMode === 'remote') {
     try {
-      mcpBridge = new MCPBridge(apiKey, baseUrl, workspaceRoot);
+      apiClient = new ConvoiaApiClient(apiServerUrl, apiKey);
+      const connected = await apiClient.isConnected();
+      updateConnectionStatus(connected);
+      if (connected) {
+        vscode.window.showInformationMessage(`ConvoiaAI connected to API server at ${apiServerUrl}`);
+      } else {
+        vscode.window.showWarningMessage(`ConvoiaAI: API server not reachable at ${apiServerUrl}`);
+      }
+    } catch (err: any) {
+      updateConnectionStatus(false);
+      vscode.window.showWarningMessage(`ConvoiaAI: Failed to connect to API server: ${err.message}`);
+    }
+  } else if (workspaceRoot) {
+    try {
+      const mcpServerPath = config.get<string>('mcpServerPath') || undefined;
+      mcpBridge = new MCPBridge(apiKey, baseUrl, workspaceRoot, mcpServerPath);
       await mcpBridge.connect();
       updateConnectionStatus(true);
-      vscode.window.showInformationMessage('ConvoiaAI Dev Agent connected');
+      vscode.window.showInformationMessage('ConvoiaAI Dev Agent connected (local)');
     } catch (err: any) {
       updateConnectionStatus(false);
       vscode.window.showWarningMessage(`ConvoiaAI: Failed to start MCP server: ${err.message}`);
@@ -97,6 +117,7 @@ export function deactivate(): void {
     mcpBridge.disconnect().catch(() => { /* silent */ });
     mcpBridge = null;
   }
+  apiClient = null;
   if (chatPanel) {
     chatPanel.dispose();
     chatPanel = null;
@@ -134,19 +155,60 @@ async function handleChatMessage(content: string, apiKey: string, baseUrl: strin
   const modelId = config.get<string>('defaultModel') || 'claude-sonnet-4-6';
   const thinkMode = config.get<boolean>('thinkMode') || false;
 
-  // Add context from active editor
+  // Build rich context from active editor + workspace
   const editorCtx = getCurrentContext();
-  let enrichedContent = content;
+  let systemContext = 'You are ConvoiaAI Dev Agent, an expert coding assistant. ';
+  systemContext += `Workspace: ${getWorkspaceRoot() || 'unknown'}.\n`;
+
   if (editorCtx?.file) {
-    enrichedContent += `\n\n[Context: Currently editing ${editorCtx.file} (${editorCtx.language}, ${editorCtx.lineCount} lines)]`;
+    const editor = vscode.window.activeTextEditor;
+    const fileContent = editor ? editor.document.getText() : '';
+    const selectedText = editorCtx.selection || '';
+
+    systemContext += `\nCurrently open file: ${editorCtx.file} (${editorCtx.language}, ${editorCtx.lineCount} lines)\n`;
+
+    if (selectedText) {
+      systemContext += `\nUser has selected this code:\n\`\`\`${editorCtx.language}\n${selectedText}\n\`\`\`\n`;
+    }
+
+    // Include file content (truncate to ~8000 chars to avoid token waste)
+    if (fileContent) {
+      const truncated = fileContent.length > 8000
+        ? fileContent.slice(0, 8000) + '\n\n[... truncated ...]'
+        : fileContent;
+      systemContext += `\nFull file content:\n\`\`\`${editorCtx.language}\n${truncated}\n\`\`\`\n`;
+    }
+
+    // Include diagnostics/errors if any
+    if (editorCtx.diagnostics.length > 0) {
+      systemContext += `\nCurrent errors/warnings:\n${editorCtx.diagnostics.map(d => `  Line ${d.line}: [${d.severity}] ${d.message}`).join('\n')}\n`;
+    }
   }
 
+  const messages = [
+    { role: 'system', content: systemContext },
+    { role: 'user', content },
+  ];
+
+  // Use REST API client if available (remote mode)
+  if (apiClient) {
+    try {
+      const result = await apiClient.chatSync({ modelId, messages, thinkMode });
+      panel.webview.postMessage({ type: 'response', data: { type: 'chunk', content: result.response } });
+      panel.webview.postMessage({ type: 'response', data: { type: 'done' } });
+    } catch (err: any) {
+      panel.webview.postMessage({ type: 'error', message: err.message });
+    }
+    return;
+  }
+
+  // Direct API call (local mode)
   try {
     const response = await axios.post(
-      `${baseUrl}/ai/stream`,
+      `${baseUrl}/ai/query/stream`,
       {
         modelId,
-        messages: [{ role: 'user', content: enrichedContent }],
+        messages,
         thinkingEnabled: thinkMode,
         source: 'vscode',
       },
@@ -273,6 +335,13 @@ async function selectModel(): Promise<void> {
 
 async function showTokenBalance(apiKey: string, baseUrl: string): Promise<void> {
   try {
+    if (apiClient) {
+      const balance = await apiClient.getBalance();
+      vscode.window.showInformationMessage(`Token Balance: ${balance.toLocaleString()} tokens`);
+      updateBalance(balance);
+      return;
+    }
+
     const response = await axios.get(`${baseUrl}/token-wallet/balance`, {
       headers: { Authorization: `Bearer ${apiKey}` },
       timeout: 10000,

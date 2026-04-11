@@ -62,7 +62,7 @@ export class ConvoiaClient {
     industry?: string;
   }): AsyncGenerator<StreamEvent> {
     const response = await axios.post(
-      `${this.baseUrl}/ai/stream`,
+      `${this.baseUrl}/ai/query/stream`,
       {
         modelId: params.modelId,
         messages: params.messages,

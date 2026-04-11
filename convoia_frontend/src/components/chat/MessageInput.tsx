@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect, type KeyboardEvent } from 'react'
-import { ArrowUp, Plus, Square, X, FileText, Music, Film } from 'lucide-react'
+import { useState, useRef, useEffect, useMemo, type KeyboardEvent } from 'react'
+import { ArrowUp, Plus, Square, X, FileText, Music, Film, Link2 } from 'lucide-react'
 import { VoiceInputButton } from './VoiceInputButton'
 import { ImageGenerationModal } from './ImageGenerationModal'
 
@@ -69,6 +69,13 @@ export function MessageInput({
   const [fileError, setFileError] = useState<string | null>(null)
   const [imageGenOpen, setImageGenOpen] = useState(false)
   const [inputFocused, setInputFocused] = useState(false)
+  const detectedUrls = useMemo(() => {
+    const withoutCode = value.replace(/```[\s\S]*?```/g, '').replace(/`[^`]+`/g, '')
+    const matches = withoutCode.match(/https?:\/\/[^\s<>"{}|\\^`\[\]()]+/gi) || []
+    return [...new Set(matches.map(u => u.replace(/[.,;:!?)]+$/, '')))]
+      .filter(u => !/\.(png|jpg|jpeg|gif|svg|webp|mp4|mov|avi)$/i.test(u))
+      .slice(0, 3)
+  }, [value])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -400,6 +407,19 @@ export function MessageInput({
               overflowY: 'auto', scrollbarWidth: 'thin', scrollbarColor: 'var(--chat-border) transparent',
             }}
           />
+
+          {/* URL detection chips */}
+          {detectedUrls.length > 0 && (
+            <div style={{ padding: '0 16px 4px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {detectedUrls.map((url, i) => (
+                <div key={i} className="inline-flex items-center gap-1.5" style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: '8px', padding: '3px 8px', fontSize: '11px', color: '#60A5FA' }}>
+                  <Link2 size={11} />
+                  <span className="truncate" style={{ maxWidth: '180px' }}>{url.replace(/^https?:\/\/(www\.)?/, '')}</span>
+                  <span style={{ color: 'rgba(96,165,250,0.6)', fontSize: '10px' }}>will be fetched</span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Bottom bar inside pill */}
           <div className="flex items-center justify-between" style={{ padding: '6px 12px 12px' }}>

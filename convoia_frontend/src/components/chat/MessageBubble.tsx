@@ -781,6 +781,33 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
         {/* Agent run */}
         {message.agentRun && <div style={{ marginTop: '12px' }}><AgentPanel agentRun={message.agentRun} /></div>}
 
+        {/* URL Sources — detect fetched URLs referenced in context */}
+        {!message.isLoading && (() => {
+          // Find URLs from the previous user message that were likely fetched
+          const urlPattern = /https?:\/\/[^\s<>"{}|\\^`\[\]()]+/gi
+          const contentUrls = (message.content || '').match(urlPattern)
+          // Only show if the AI actually references URLs in its response
+          if (!contentUrls || contentUrls.length === 0) return null
+          const uniqueUrls = [...new Set(contentUrls.map((u: string) => u.replace(/[.,;:!?)]+$/, '')))]
+            .filter((u: string) => !u.match(/\.(png|jpg|jpeg|gif|svg|webp|mp4)$/i))
+            .slice(0, 3)
+          if (uniqueUrls.length === 0) return null
+          return (
+            <div style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+              <span style={{ fontSize: '11px', color: 'var(--chat-text-muted)', fontWeight: 500 }}>Sources:</span>
+              {uniqueUrls.map((url: string, i: number) => (
+                <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                  style={{ fontSize: '11px', color: 'var(--color-primary)', display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'none', padding: '2px 8px', borderRadius: '6px', background: 'var(--color-primary-glow, rgba(99,102,241,0.08))', border: '1px solid rgba(99,102,241,0.15)' }}
+                  onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                  onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+                >
+                  {url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 40)}{url.replace(/^https?:\/\/(www\.)?/, '').length > 40 ? '...' : ''}
+                </a>
+              ))}
+            </div>
+          )
+        })()}
+
         {/* Document Download Bar — at the end after all content */}
         {documentInfo?.worthy && !message.isLoading && (
           <DocumentDownloadBar content={message.content} contentRef={contentRef} title={documentInfo.title} />

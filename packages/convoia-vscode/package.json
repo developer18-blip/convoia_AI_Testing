@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "publisher": "convoia",
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.115.0"
   },
   "categories": [
     "AI",
@@ -147,8 +147,20 @@
             "remote"
           ],
           "default": "local",
-          "description": "local = tools run on your machine; remote = tools run on ConvoiaAI server",
+          "description": "local = spawn MCP server as child process; remote = connect to REST API server",
           "order": 4
+        },
+        "convoia.apiServerUrl": {
+          "type": "string",
+          "default": "http://localhost:3600",
+          "description": "REST API server URL (used when serverMode is 'remote')",
+          "order": 5
+        },
+        "convoia.mcpServerPath": {
+          "type": "string",
+          "default": "",
+          "description": "Custom path to convoia-mcp-server index.js (auto-detected if empty)",
+          "order": 6
         },
         "convoia.autoApproveReads": {
           "type": "boolean",

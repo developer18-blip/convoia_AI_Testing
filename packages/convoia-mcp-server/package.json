@@ -12,7 +12,8 @@
     "dev": "tsc --watch",
     "start": "node dist/index.js",
     "start:stdio": "node dist/index.js --transport stdio",
-    "start:sse": "node dist/index.js --transport sse --port 3500"
+    "start:sse": "node dist/index.js --transport sse --port 3500",
+    "start:api": "node dist/index.js --transport api --port 3600"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -23,9 +24,11 @@
     "axios": "^1.15.0",
     "dotenv": "^17.4.1",
     "glob": "^13.0.6",
+    "express": "^5.1.0",
     "tree-kill": "^1.2.2"
   },
   "devDependencies": {
+    "@types/express": "^5.0.2",
     "@types/glob": "^8.1.0",
     "@types/node": "^25.6.0",
     "typescript": "^6.0.2"
