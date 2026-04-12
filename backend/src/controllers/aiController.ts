@@ -1132,28 +1132,27 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
       );
       const _memLen = memoryPrompt?.length || 0;
       const _agentLen = agentConfig?.systemPrompt?.length || 0;
-      logger.warn('🔍 TOKEN_DEBUG', {
-        modelId: finalModelId,
-        messagesCount: enrichedMessages.length,
-        messagesChars: _msgLen,
-        messagesTokensEst: Math.ceil(_msgLen / 4),
-        memoryContextChars: _memLen,
-        memoryTokensEst: Math.ceil(_memLen / 4),
-        agentPromptChars: _agentLen,
-        agentPromptTokensEst: Math.ceil(_agentLen / 4),
-        totalEstInputTokens: Math.ceil((_msgLen + _memLen + _agentLen) / 4),
-        complexity: queryComplexity,
-        thinkMode: thinkingEnabled,
-        webSearch: webSearched,
-        hasAgent: !!agentConfig,
-        agentName: agentConfig?.name || 'none',
-        firstMsgPreview: typeof enrichedMessages[0]?.content === 'string'
-          ? enrichedMessages[0].content.substring(0, 200)
-          : '[non-string content]',
-        lastMsgPreview: typeof enrichedMessages[enrichedMessages.length - 1]?.content === 'string'
-          ? enrichedMessages[enrichedMessages.length - 1].content.substring(0, 200)
-          : '[non-string content]',
-      });
+      const _firstMsg = typeof enrichedMessages[0]?.content === 'string'
+        ? enrichedMessages[0].content.substring(0, 150).replace(/\n/g, ' ')
+        : '[non-string]';
+      const _lastMsg = typeof enrichedMessages[enrichedMessages.length - 1]?.content === 'string'
+        ? enrichedMessages[enrichedMessages.length - 1].content.substring(0, 150).replace(/\n/g, ' ')
+        : '[non-string]';
+      // Per-message breakdown — shows which messages are huge
+      const _msgBreakdown = enrichedMessages.map((m: any, i: number) => {
+        const len = typeof m.content === 'string' ? m.content.length : JSON.stringify(m.content).length;
+        return `${i}[${m.role}:${len}]`;
+      }).join(',');
+
+      logger.warn(
+        `🔍 TOKEN_DEBUG model=${finalModelId} msgs=${enrichedMessages.length} msgChars=${_msgLen} ` +
+        `memChars=${_memLen} agentChars=${_agentLen} ` +
+        `estInputTokens=${Math.ceil((_msgLen + _memLen + _agentLen) / 4)} ` +
+        `complexity=${queryComplexity} think=${thinkingEnabled} web=${webSearched} ` +
+        `agent=${agentConfig?.name || 'none'} ` +
+        `breakdown=[${_msgBreakdown}] ` +
+        `firstMsg="${_firstMsg}" lastMsg="${_lastMsg}"`
+      );
     } catch (_dbgErr) { /* silent */ }
     // ─── END TOKEN DEBUG ───
 
