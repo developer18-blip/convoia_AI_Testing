@@ -431,96 +431,154 @@ const isPureReasoningModel = (id: string) => /^o\d/.test(id);
 // They use max_completion_tokens but DO accept temperature and 'system' role.
 const isGPT5Family = (id: string) => /^gpt-5/.test(id);
 
+// ── Temperature-locked models ────────────────────────────────────────
+// Some models (Claude Opus 4.6/Sonnet 4.6, GPT-5, etc.) only accept temperature=1.
+// Instead of maintaining a brittle allowlist, safeProviderCall() catches the error
+// and auto-populates this cache. Streaming calls check the cache before sending.
+const TEMP_LOCKED_MODELS = new Set<string>();
+
+// Seed the cache with known models that require temperature=1
+[
+  'claude-opus-4-6',
+  'claude-sonnet-4-6',
+  'claude-opus-4-5-20251101',
+  'claude-sonnet-4-5-20250929',
+  'gpt-5',
+  'gpt-5-mini',
+].forEach(m => TEMP_LOCKED_MODELS.add(m));
+
+/**
+ * Wraps a provider API call. If the provider rejects the temperature setting,
+ * logs a warning, adds the model to TEMP_LOCKED_MODELS, and retries with temperature=1.
+ * This handles providers that ship new models with temperature=1-only restrictions.
+ */
+async function safeProviderCall<T>(
+  callFn: () => Promise<T>,
+  retryFn: () => Promise<T>,
+  modelId: string
+): Promise<T> {
+  try {
+    return await callFn();
+  } catch (error: any) {
+    const errMsg = (error?.response?.data?.error?.message || error?.message || '').toLowerCase();
+    // Detect temperature rejection from any provider
+    if (
+      errMsg.includes('temperature') &&
+      (errMsg.includes('unsupported') || errMsg.includes('does not support') ||
+       errMsg.includes('invalid') || errMsg.includes('only the default'))
+    ) {
+      logger.warn(`Model ${modelId} rejected temperature — adding to TEMP_LOCKED_MODELS and retrying with temperature=1`);
+      TEMP_LOCKED_MODELS.add(modelId);
+      return await retryFn();
+    }
+    throw error;
+  }
+}
+
 async function callOpenAI(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
   const pureReasoning = isPureReasoningModel(modelId);
   const gpt5 = isGPT5Family(modelId);
-
-  // Pure reasoning models require 'developer' role; everything else uses 'system'
   const systemRole = pureReasoning ? 'developer' : 'system';
-  const body: Record<string, any> = {
-    model: modelId,
-    messages: [{ role: systemRole, content: systemPrompt }, ...messages],
+
+  const buildBody = (forceTemp1: boolean = false): Record<string, any> => {
+    const body: Record<string, any> = {
+      model: modelId,
+      messages: [{ role: systemRole, content: systemPrompt }, ...messages],
+    };
+
+    if (pureReasoning) {
+      body.max_completion_tokens = overrides?.maxTokens ?? 16384;
+    } else if (gpt5) {
+      body.max_completion_tokens = overrides?.maxTokens ?? 16384;
+      body.temperature = forceTemp1 ? 1 : (overrides?.temperature ?? 0.7);
+      if (!forceTemp1 && overrides?.topP != null) body.top_p = overrides.topP;
+    } else {
+      body.max_tokens = overrides?.maxTokens ?? 16384;
+      body.temperature = forceTemp1 ? 1 : (overrides?.temperature ?? 0.7);
+      if (!forceTemp1 && overrides?.topP != null) body.top_p = overrides.topP;
+    }
+    return body;
   };
 
-  if (pureReasoning) {
-    // o-series: only max_completion_tokens, no temperature/top_p
-    body.max_completion_tokens = overrides?.maxTokens ?? 16384;
-  } else if (gpt5) {
-    // GPT-5 family: max_completion_tokens + temperature
-    body.max_completion_tokens = overrides?.maxTokens ?? 16384;
-    body.temperature = overrides?.temperature ?? 0.7;
-    if (overrides?.topP != null) body.top_p = overrides.topP;
-  } else {
-    // GPT-4o, GPT-4.1, etc: classic params
-    body.max_tokens = overrides?.maxTokens ?? 16384;
-    body.temperature = overrides?.temperature ?? 0.7;
-    if (overrides?.topP != null) body.top_p = overrides.topP;
-  }
+  const makeCall = async (body: Record<string, any>) => {
+    const response = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      body,
+      axiosConfig({ Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' })
+    );
+    return {
+      response: response.data.choices[0].message.content,
+      inputTokens: response.data.usage.prompt_tokens,
+      outputTokens: response.data.usage.completion_tokens,
+    };
+  };
 
-  const response = await axios.post(
-    'https://api.openai.com/v1/chat/completions',
-    body,
-    axiosConfig({
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    })
+  return safeProviderCall(
+    () => makeCall(buildBody(false)),
+    () => makeCall(buildBody(true)),
+    modelId
   );
-  return {
-    response: response.data.choices[0].message.content,
-    inputTokens: response.data.usage.prompt_tokens,
-    outputTokens: response.data.usage.completion_tokens,
-  };
 }
 
 async function callAnthropic(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
-  const body: Record<string, any> = {
-    model: modelId,
-    max_tokens: overrides?.maxTokens ?? 16384,
-    system: systemPrompt,
-    messages,
-  };
+  const buildBody = (forceTemp1: boolean = false): { body: Record<string, any>; headers: Record<string, string> } => {
+    const body: Record<string, any> = {
+      model: modelId,
+      max_tokens: overrides?.maxTokens ?? 16384,
+      system: systemPrompt,
+      messages,
+    };
 
-  const headers: Record<string, string> = {
-    'x-api-key': apiKey,
-    'anthropic-version': '2023-06-01',
-    'Content-Type': 'application/json',
-  };
+    const headers: Record<string, string> = {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'Content-Type': 'application/json',
+    };
 
-  // Extended thinking mode (Claude only)
-  if (overrides?.thinkingEnabled) {
-    body.thinking = { type: 'enabled', budget_tokens: 10000 };
-    body.max_tokens = Math.max(body.max_tokens, 32000);
-    body.temperature = 1; // REQUIRED by Anthropic when thinking is enabled
-    // Do NOT set top_p — Anthropic rejects both temperature AND top_p together
-    headers['anthropic-beta'] = 'interleaved-thinking-2025-05-14';
-  } else {
-    // Anthropic rejects requests with BOTH temperature AND top_p — use only one
-    if (overrides?.temperature != null) {
-      body.temperature = overrides.temperature;
-    } else if (overrides?.topP != null) {
-      body.top_p = overrides.topP;
+    if (overrides?.thinkingEnabled) {
+      body.thinking = { type: 'enabled', budget_tokens: 10000 };
+      body.max_tokens = Math.max(body.max_tokens, 32000);
+      body.temperature = 1; // REQUIRED by Anthropic when thinking is enabled
+      headers['anthropic-beta'] = 'interleaved-thinking-2025-05-14';
+    } else if (forceTemp1) {
+      body.temperature = 1;
     } else {
-      body.temperature = 0.7;
+      // Anthropic rejects both temperature AND top_p together — use only one
+      if (overrides?.temperature != null) {
+        body.temperature = overrides.temperature;
+      } else if (overrides?.topP != null) {
+        body.top_p = overrides.topP;
+      } else {
+        body.temperature = 0.7;
+      }
     }
-  }
-
-  const response = await axios.post(
-    'https://api.anthropic.com/v1/messages',
-    body,
-    axiosConfig(headers)
-  );
-
-  // Extract text from response — thinking mode returns multiple content blocks
-  const textContent = response.data.content
-    .filter((c: any) => c.type === 'text')
-    .map((c: any) => c.text)
-    .join('\n');
-
-  return {
-    response: textContent || response.data.content[0]?.text || '',
-    inputTokens: response.data.usage.input_tokens,
-    outputTokens: response.data.usage.output_tokens,
+    return { body, headers };
   };
+
+  const makeCall = async (forceTemp1: boolean) => {
+    const { body, headers } = buildBody(forceTemp1);
+    const response = await axios.post(
+      'https://api.anthropic.com/v1/messages',
+      body,
+      axiosConfig(headers)
+    );
+    // Extract text from response — thinking mode returns multiple content blocks
+    const textContent = response.data.content
+      .filter((c: any) => c.type === 'text')
+      .map((c: any) => c.text)
+      .join('\n');
+    return {
+      response: textContent || response.data.content[0]?.text || '',
+      inputTokens: response.data.usage.input_tokens,
+      outputTokens: response.data.usage.output_tokens,
+    };
+  };
+
+  return safeProviderCall(
+    () => makeCall(false),
+    () => makeCall(true),
+    modelId
+  );
 }
 
 async function callGoogle(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
@@ -529,75 +587,87 @@ async function callGoogle(modelId: string, messages: any[], systemPrompt: string
     parts: formatPartsForGoogle(m.content),
   }));
 
-  const response = await axios.post(
-    `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`,
-    {
-      systemInstruction: { parts: [{ text: systemPrompt }] },
-      contents,
-      generationConfig: {
-        temperature: overrides?.temperature ?? 0.7,
-        maxOutputTokens: overrides?.maxTokens ?? 16384,
-        ...(overrides?.topP != null ? { topP: overrides.topP } : {}),
+  const makeCall = async (forceTemp1: boolean) => {
+    const response = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`,
+      {
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents,
+        generationConfig: {
+          temperature: forceTemp1 ? 1 : (overrides?.temperature ?? 0.7),
+          maxOutputTokens: overrides?.maxTokens ?? 16384,
+          ...(!forceTemp1 && overrides?.topP != null ? { topP: overrides.topP } : {}),
+        },
       },
-    },
-    {
-      params: { key: apiKey },
-      timeout: config.aiRequestTimeout,
-    }
-  );
-  return {
-    response: response.data.candidates[0].content.parts[0].text,
-    inputTokens: response.data.usageMetadata?.promptTokenCount || 0,
-    outputTokens: response.data.usageMetadata?.candidatesTokenCount || 0,
+      {
+        params: { key: apiKey },
+        timeout: config.aiRequestTimeout,
+      }
+    );
+    return {
+      response: response.data.candidates[0].content.parts[0].text,
+      inputTokens: response.data.usageMetadata?.promptTokenCount || 0,
+      outputTokens: response.data.usageMetadata?.candidatesTokenCount || 0,
+    };
   };
+
+  return safeProviderCall(() => makeCall(false), () => makeCall(true), modelId);
 }
 
 async function callGroq(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
-  const body: Record<string, any> = {
-    model: modelId,
-    messages: [{ role: 'system', content: systemPrompt }, ...messages],
-    temperature: overrides?.temperature ?? 0.7,
-    max_tokens: overrides?.maxTokens ?? 16384,
+  const buildBody = (forceTemp1: boolean): Record<string, any> => {
+    const body: Record<string, any> = {
+      model: modelId,
+      messages: [{ role: 'system', content: systemPrompt }, ...messages],
+      temperature: forceTemp1 ? 1 : (overrides?.temperature ?? 0.7),
+      max_tokens: overrides?.maxTokens ?? 16384,
+    };
+    if (!forceTemp1 && overrides?.topP != null) body.top_p = overrides.topP;
+    return body;
   };
-  if (overrides?.topP != null) body.top_p = overrides.topP;
 
-  const response = await axios.post(
-    'https://api.groq.com/openai/v1/chat/completions',
-    body,
-    axiosConfig({
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    })
-  );
-  return {
-    response: response.data.choices[0].message.content,
-    inputTokens: response.data.usage.prompt_tokens,
-    outputTokens: response.data.usage.completion_tokens,
+  const makeCall = async (forceTemp1: boolean) => {
+    const response = await axios.post(
+      'https://api.groq.com/openai/v1/chat/completions',
+      buildBody(forceTemp1),
+      axiosConfig({ Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' })
+    );
+    return {
+      response: response.data.choices[0].message.content,
+      inputTokens: response.data.usage.prompt_tokens,
+      outputTokens: response.data.usage.completion_tokens,
+    };
   };
+
+  return safeProviderCall(() => makeCall(false), () => makeCall(true), modelId);
 }
 
 async function callMistral(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
-  const body: Record<string, any> = {
-    model: modelId,
-    messages: [{ role: 'system', content: systemPrompt }, ...messages],
-    temperature: overrides?.temperature ?? 0.7,
-    max_tokens: overrides?.maxTokens ?? 16384,
+  const buildBody = (forceTemp1: boolean): Record<string, any> => {
+    const body: Record<string, any> = {
+      model: modelId,
+      messages: [{ role: 'system', content: systemPrompt }, ...messages],
+      temperature: forceTemp1 ? 1 : (overrides?.temperature ?? 0.7),
+      max_tokens: overrides?.maxTokens ?? 16384,
+    };
+    if (!forceTemp1 && overrides?.topP != null) body.top_p = overrides.topP;
+    return body;
   };
-  if (overrides?.topP != null) body.top_p = overrides.topP;
 
-  const response = await axios.post(
-    'https://api.mistral.ai/v1/chat/completions',
-    body,
-    axiosConfig({
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    })
-  );
-  return {
-    response: response.data.choices[0].message.content,
-    inputTokens: response.data.usage.prompt_tokens,
-    outputTokens: response.data.usage.completion_tokens,
+  const makeCall = async (forceTemp1: boolean) => {
+    const response = await axios.post(
+      'https://api.mistral.ai/v1/chat/completions',
+      buildBody(forceTemp1),
+      axiosConfig({ Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' })
+    );
+    return {
+      response: response.data.choices[0].message.content,
+      inputTokens: response.data.usage.prompt_tokens,
+      outputTokens: response.data.usage.completion_tokens,
+    };
   };
+
+  return safeProviderCall(() => makeCall(false), () => makeCall(true), modelId);
 }
 
 async function callPerplexity(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
@@ -607,84 +677,92 @@ async function callPerplexity(modelId: string, messages: any[], systemPrompt: st
     alternating.unshift({ role: 'user', content: 'Continue.' });
   }
 
-  const body: Record<string, any> = {
+  const buildBody = (forceTemp1: boolean): Record<string, any> => ({
     model: modelId,
     messages: [{ role: 'system', content: systemPrompt }, ...alternating],
-    temperature: overrides?.temperature ?? 0.2,
+    temperature: forceTemp1 ? 1 : (overrides?.temperature ?? 0.2),
+  });
+
+  const makeCall = async (forceTemp1: boolean) => {
+    const response = await axios.post(
+      'https://api.perplexity.ai/chat/completions',
+      buildBody(forceTemp1),
+      axiosConfig({ Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' })
+    );
+    let text = response.data.choices[0].message.content;
+    const citations = response.data.citations;
+    if (citations && Array.isArray(citations) && citations.length > 0) {
+      text += '\n\n---\n**Sources:**\n' + citations.map((url: string, i: number) => `${i + 1}. ${url}`).join('\n');
+    }
+    return {
+      response: text,
+      inputTokens: response.data.usage.prompt_tokens,
+      outputTokens: response.data.usage.completion_tokens,
+    };
   };
 
-  const response = await axios.post(
-    'https://api.perplexity.ai/chat/completions',
-    body,
-    axiosConfig({
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    })
-  );
-  // Append citations if Perplexity returned them
-  let text = response.data.choices[0].message.content;
-  const citations = response.data.citations;
-  if (citations && Array.isArray(citations) && citations.length > 0) {
-    text += '\n\n---\n**Sources:**\n' + citations.map((url: string, i: number) => `${i + 1}. ${url}`).join('\n');
-  }
-
-  return {
-    response: text,
-    inputTokens: response.data.usage.prompt_tokens,
-    outputTokens: response.data.usage.completion_tokens,
-  };
+  return safeProviderCall(() => makeCall(false), () => makeCall(true), modelId);
 }
 
 async function callXAI(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
-  const body: Record<string, any> = {
-    model: modelId,
-    messages: [{ role: 'system', content: systemPrompt }, ...messages],
-    temperature: overrides?.temperature ?? 0.7,
-    max_tokens: overrides?.maxTokens ?? 16384,
+  const buildBody = (forceTemp1: boolean): Record<string, any> => {
+    const body: Record<string, any> = {
+      model: modelId,
+      messages: [{ role: 'system', content: systemPrompt }, ...messages],
+      temperature: forceTemp1 ? 1 : (overrides?.temperature ?? 0.7),
+      max_tokens: overrides?.maxTokens ?? 16384,
+    };
+    if (!forceTemp1 && overrides?.topP != null) body.top_p = overrides.topP;
+    return body;
   };
-  if (overrides?.topP != null) body.top_p = overrides.topP;
 
-  const response = await axios.post(
-    'https://api.x.ai/v1/chat/completions',
-    body,
-    axiosConfig({
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    })
-  );
-  return {
-    response: response.data.choices[0].message.content,
-    inputTokens: response.data.usage.prompt_tokens,
-    outputTokens: response.data.usage.completion_tokens,
+  const makeCall = async (forceTemp1: boolean) => {
+    const response = await axios.post(
+      'https://api.x.ai/v1/chat/completions',
+      buildBody(forceTemp1),
+      axiosConfig({ Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' })
+    );
+    return {
+      response: response.data.choices[0].message.content,
+      inputTokens: response.data.usage.prompt_tokens,
+      outputTokens: response.data.usage.completion_tokens,
+    };
   };
+
+  return safeProviderCall(() => makeCall(false), () => makeCall(true), modelId);
 }
 
 async function callDeepSeek(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
   const isReasoner = modelId === 'deepseek-reasoner';
-  const body: Record<string, any> = {
-    model: modelId,
-    messages: [{ role: 'system', content: systemPrompt }, ...messages],
-    max_tokens: overrides?.maxTokens ?? 16384,
-  };
-  // DeepSeek Reasoner does NOT support temperature or top_p
-  if (!isReasoner) {
-    body.temperature = overrides?.temperature ?? 0.7;
-    if (overrides?.topP != null) body.top_p = overrides.topP;
-  }
 
-  const response = await axios.post(
-    'https://api.deepseek.com/v1/chat/completions',
-    body,
-    axiosConfig({
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    })
-  );
-  return {
-    response: response.data.choices[0].message.content,
-    inputTokens: response.data.usage.prompt_tokens,
-    outputTokens: response.data.usage.completion_tokens,
+  const buildBody = (forceTemp1: boolean): Record<string, any> => {
+    const body: Record<string, any> = {
+      model: modelId,
+      messages: [{ role: 'system', content: systemPrompt }, ...messages],
+      max_tokens: overrides?.maxTokens ?? 16384,
+    };
+    // DeepSeek Reasoner does NOT support temperature or top_p
+    if (!isReasoner) {
+      body.temperature = forceTemp1 ? 1 : (overrides?.temperature ?? 0.7);
+      if (!forceTemp1 && overrides?.topP != null) body.top_p = overrides.topP;
+    }
+    return body;
   };
+
+  const makeCall = async (forceTemp1: boolean) => {
+    const response = await axios.post(
+      'https://api.deepseek.com/v1/chat/completions',
+      buildBody(forceTemp1),
+      axiosConfig({ Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' })
+    );
+    return {
+      response: response.data.choices[0].message.content,
+      inputTokens: response.data.usage.prompt_tokens,
+      outputTokens: response.data.usage.completion_tokens,
+    };
+  };
+
+  return safeProviderCall(() => makeCall(false), () => makeCall(true), modelId);
 }
 
 // ─── Vision-capable provider calls ───
@@ -939,6 +1017,12 @@ function callOpenAIStream(
     if (overrides?.topP != null) body.top_p = overrides.topP;
   }
 
+  // If this model is known to reject custom temperature, force temperature=1
+  if (TEMP_LOCKED_MODELS.has(modelId) && body.temperature !== undefined) {
+    body.temperature = 1;
+    delete body.top_p;
+  }
+
   // For OpenAI models with thinking enabled: use structured prompt with <think> tags
   if (thinkingEnabled) {
     body.max_completion_tokens = Math.max(body.max_completion_tokens || body.max_tokens || 16384, 32768);
@@ -1131,6 +1215,12 @@ function callAnthropicStream(
     }
   }
 
+  // If this model is known to reject custom temperature, force temperature=1
+  if (TEMP_LOCKED_MODELS.has(modelId) && !overrides?.thinkingEnabled) {
+    body.temperature = 1;
+    delete body.top_p;
+  }
+
   return new Promise(async (resolve, reject) => {
     try {
       const headers: Record<string, string> = {
@@ -1251,6 +1341,12 @@ function callOpenAICompatibleStream(
     body.max_tokens = overrides?.maxTokens ?? 16384;
   }
 
+  // If this model is known to reject custom temperature, force temperature=1
+  if (TEMP_LOCKED_MODELS.has(modelId) && body.temperature !== undefined) {
+    body.temperature = 1;
+    delete body.top_p;
+  }
+
   return new Promise(async (resolve, reject) => {
     try {
       const response = await axios.post(url, body, {
@@ -1362,6 +1458,11 @@ function callPerplexityStream(
     stream: true,
     temperature: overrides?.temperature ?? 0.2,
   };
+
+  // If this model is known to reject custom temperature, force temperature=1
+  if (TEMP_LOCKED_MODELS.has(modelId) && body.temperature !== undefined) {
+    body.temperature = 1;
+  }
 
   return new Promise(async (resolve, reject) => {
     try {

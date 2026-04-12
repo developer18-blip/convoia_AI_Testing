@@ -1124,6 +1124,39 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
       }
     }
 
+    // ─── TOKEN DEBUG (temporary — remove after finding the bloat) ───
+    try {
+      const _msgLen = enrichedMessages.reduce(
+        (s: number, m: any) => s + (typeof m.content === 'string' ? m.content.length : JSON.stringify(m.content).length),
+        0
+      );
+      const _memLen = memoryPrompt?.length || 0;
+      const _agentLen = agentConfig?.systemPrompt?.length || 0;
+      logger.warn('🔍 TOKEN_DEBUG', {
+        modelId: finalModelId,
+        messagesCount: enrichedMessages.length,
+        messagesChars: _msgLen,
+        messagesTokensEst: Math.ceil(_msgLen / 4),
+        memoryContextChars: _memLen,
+        memoryTokensEst: Math.ceil(_memLen / 4),
+        agentPromptChars: _agentLen,
+        agentPromptTokensEst: Math.ceil(_agentLen / 4),
+        totalEstInputTokens: Math.ceil((_msgLen + _memLen + _agentLen) / 4),
+        complexity: queryComplexity,
+        thinkMode: thinkingEnabled,
+        webSearch: webSearched,
+        hasAgent: !!agentConfig,
+        agentName: agentConfig?.name || 'none',
+        firstMsgPreview: typeof enrichedMessages[0]?.content === 'string'
+          ? enrichedMessages[0].content.substring(0, 200)
+          : '[non-string content]',
+        lastMsgPreview: typeof enrichedMessages[enrichedMessages.length - 1]?.content === 'string'
+          ? enrichedMessages[enrichedMessages.length - 1].content.substring(0, 200)
+          : '[non-string content]',
+      });
+    } catch (_dbgErr) { /* silent */ }
+    // ─── END TOKEN DEBUG ───
+
     // ── STREAMING CALL (handles normal, clarification, and Pass 2 refinement) ──
     await AIGatewayService.sendMessageStream(
       {
