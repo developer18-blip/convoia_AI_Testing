@@ -1834,16 +1834,6 @@ export class AIGatewayService {
       getSystemPrompt(industry, effectiveModel.provider, promptMode, effectiveModel.modelId, params.complexity);
     const systemPrompt = memoryContext ? basePrompt + memoryContext : basePrompt;
 
-    // ─── SYSTEM PROMPT DEBUG (temporary — track bloat source) ───
-    logger.warn(
-      `🔍 GATEWAY_DEBUG model=${effectiveModel.modelId} provider=${effectiveModel.provider} ` +
-      `basePromptChars=${basePrompt.length} memoryChars=${memoryContext?.length || 0} ` +
-      `totalSystemChars=${systemPrompt.length} systemTokensEst=${Math.ceil(systemPrompt.length / 4)} ` +
-      `mode=${promptMode} complexity=${params.complexity} ` +
-      `systemPreview="${systemPrompt.substring(0, 200).replace(/\n/g, ' ')}"`
-    );
-    // ─── END GATEWAY_DEBUG ───
-
     // Cap output tokens to user's balance AND provider's hard limit
     let effectiveMaxTokens = agentConfig?.maxTokens;
     if (maxOutputTokens && maxOutputTokens > 0) {
@@ -1853,11 +1843,19 @@ export class AIGatewayService {
     }
     effectiveMaxTokens = clampMaxTokens(effectiveModel.provider, effectiveMaxTokens);
 
-    logger.warn(
-      `🔍 MAXTOKENS_DEBUG model=${effectiveModel.modelId} ` +
-      `userBalance=${maxOutputTokens} agentCap=${agentConfig?.maxTokens} ` +
-      `effectiveMaxTokens=${effectiveMaxTokens} providerHardMax=${PROVIDER_MAX_OUTPUT[effectiveModel.provider]}`
-    );
+    // ── COMPLEXITY-AWARE OUTPUT CAPS ──────────────────────────────
+    // Without this cap, GPT-5 and reasoning models burn 10K+ tokens on simple
+    // queries because they interpret high max_tokens as "go long / think hard".
+    // Simple "hey?" should never produce a 10K-token response.
+    const complexityCaps: Record<string, number> = {
+      simple: 1024,    // Greetings and one-word acknowledgments
+      standard: 4096,  // Normal questions
+      complex: 16384,  // Long code, deep analysis, multiple questions
+    };
+    const complexityCap = complexityCaps[params.complexity || 'standard'] || 4096;
+    if (effectiveMaxTokens && effectiveMaxTokens > complexityCap) {
+      effectiveMaxTokens = complexityCap;
+    }
 
     const overrides: ProviderOverrides = {
       temperature: agentConfig?.temperature,

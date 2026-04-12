@@ -1124,38 +1124,6 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
       }
     }
 
-    // ─── TOKEN DEBUG (temporary — remove after finding the bloat) ───
-    try {
-      const _msgLen = enrichedMessages.reduce(
-        (s: number, m: any) => s + (typeof m.content === 'string' ? m.content.length : JSON.stringify(m.content).length),
-        0
-      );
-      const _memLen = memoryPrompt?.length || 0;
-      const _agentLen = agentConfig?.systemPrompt?.length || 0;
-      const _firstMsg = typeof enrichedMessages[0]?.content === 'string'
-        ? enrichedMessages[0].content.substring(0, 150).replace(/\n/g, ' ')
-        : '[non-string]';
-      const _lastMsg = typeof enrichedMessages[enrichedMessages.length - 1]?.content === 'string'
-        ? enrichedMessages[enrichedMessages.length - 1].content.substring(0, 150).replace(/\n/g, ' ')
-        : '[non-string]';
-      // Per-message breakdown — shows which messages are huge
-      const _msgBreakdown = enrichedMessages.map((m: any, i: number) => {
-        const len = typeof m.content === 'string' ? m.content.length : JSON.stringify(m.content).length;
-        return `${i}[${m.role}:${len}]`;
-      }).join(',');
-
-      logger.warn(
-        `🔍 TOKEN_DEBUG model=${finalModelId} msgs=${enrichedMessages.length} msgChars=${_msgLen} ` +
-        `memChars=${_memLen} agentChars=${_agentLen} ` +
-        `estInputTokens=${Math.ceil((_msgLen + _memLen + _agentLen) / 4)} ` +
-        `complexity=${queryComplexity} think=${thinkingEnabled} web=${webSearched} ` +
-        `agent=${agentConfig?.name || 'none'} ` +
-        `breakdown=[${_msgBreakdown}] ` +
-        `firstMsg="${_firstMsg}" lastMsg="${_lastMsg}"`
-      );
-    } catch (_dbgErr) { /* silent */ }
-    // ─── END TOKEN DEBUG ───
-
     // ── STREAMING CALL (handles normal, clarification, and Pass 2 refinement) ──
     await AIGatewayService.sendMessageStream(
       {
