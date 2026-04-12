@@ -88,7 +88,7 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   'gpt-4o': 128000, 'gpt-4o-mini': 128000,
   'gpt-4.1': 1000000, 'gpt-4.1-mini': 1000000, 'gpt-4.1-nano': 1000000,
   'gpt-5': 1000000, 'gpt-5-mini': 1000000,
-  'gpt-5.4': 1000000, 'gpt-5.4-mini': 1000000, 'gpt-5.4-nano': 1000000,
+  'gpt-5.4': 1050000, 'gpt-5.4-pro': 1050000, 'gpt-5.4-mini': 1050000, 'gpt-5.4-nano': 1050000,
   'o3': 200000, 'o3-mini': 200000, 'o4-mini': 200000,
   'claude-opus-4-6': 1000000, 'claude-opus-4-5-20251101': 200000,
   'claude-sonnet-4-6': 1000000, 'claude-sonnet-4-5-20250929': 200000,
@@ -211,32 +211,37 @@ const axiosConfig = (headers: Record<string, string>): AxiosRequestConfig => ({
 // Injected into system prompt when web search data is present
 const WEB_SEARCH_SYSTEM_BOOST = `
 
-WEB SEARCH RESPONSE GUIDELINES:
-You have fresh web search data. Use it to give an accurate, well-sourced answer.
+WEB SEARCH GUIDELINES:
+You have fresh web search data. Use it for an accurate, well-sourced answer.
 - Cite sources inline: "According to **Source Name**..." or *(Source: domain.com)*
-- Structure with clear headings and bullet points
 - Bold key facts, names, numbers, and dates
-- Be thorough but focused — cover what matters, skip the filler
-- End with a brief key takeaway if the topic warrants it
-- Use emojis sparingly for section headers if the topic is casual/news`;
+- Be thorough but focused — cover what matters, skip filler
+- End with a brief key takeaway if the topic warrants it`;
 
 /**
  * Classify query complexity to right-size the system prompt.
- * Simple queries (greetings, one-liners) get a lightweight prompt to save tokens.
+ * Simple queries (pure greetings/acknowledgments) get a lightweight prompt.
+ * A greeting followed by a real question is STANDARD, not simple.
  */
 export function classifyQueryComplexity(message: string): 'simple' | 'standard' | 'complex' {
   const trimmed = message.trim();
   const wordCount = trimmed.split(/\s+/).length;
-  const charCount = trimmed.length;
 
-  // Simple: very short messages, greetings, single words
-  const simplePatterns = /^(hey|hi|hello|yo|sup|thanks|thank you|ok|okay|yes|no|bye|good morning|good night|gm|gn|what's up|how are you|hm+|lol|haha|nice|cool|great|sure|nah|yep|yup|nope)\b/i;
-  if (charCount < 30 && (wordCount <= 5 || simplePatterns.test(trimmed))) {
+  // Simple: ONLY pure greetings/acknowledgments — the ENTIRE message must be one.
+  // "hey" = simple. "hey can you help me" = standard (it's a real question).
+  const simplePatterns = /^(hey|hi|hello|yo|sup|thanks|thank you|ok|okay|yes|no|bye|good morning|good night|gm|gn|what's up|how are you|hm+|lol|haha|nice|cool|great|sure|nah|yep|yup|nope|good|fine|perfect|exactly|right|agreed|same|ty|thx|kk|cheers|word|bet|aight|gotcha|roger|copy|noted|wow|damn|dang|omg|oh|ah|hmm|mhm)[\s!?.,]*$/i;
+
+  if (simplePatterns.test(trimmed) && wordCount <= 4) {
     return 'simple';
   }
 
-  // Complex: long messages, code blocks, multiple questions
-  if (charCount > 500 || wordCount > 100 || trimmed.includes('```') || (trimmed.match(/\?/g) || []).length >= 3) {
+  // Complex: long messages, code blocks, multiple questions, technical markers
+  if (
+    trimmed.length > 500 ||
+    wordCount > 100 ||
+    trimmed.includes('```') ||
+    (trimmed.match(/\?/g) || []).length >= 3
+  ) {
     return 'complex';
   }
 
@@ -285,67 +290,46 @@ export function getSystemPrompt(
   // ── MODE BRANCHING ──
 
   if (mode === 'think') {
-    const thinkInstructions = `You are a premium AI assistant on the ConvoiaAI platform operating in DEEP THINK MODE. You deliver consultant-grade analysis that is worth paying for.
+    const thinkInstructions = `You are a premium AI assistant on the ConvoiaAI platform operating in DEEP THINK MODE.
 
-═══ THINK MODE BEHAVIOR ═══
+THINK MODE MEANS DEPTH — not just a longer answer, but a genuinely better-reasoned one.
 
-You have been given a deep research phase before this response. Your job is to deliver the refined, polished result. Think mode means DEPTH — not just a longer answer, but a genuinely better-reasoned one.
-
-═══ PRECISION & ACCURACY (CRITICAL) ═══
-
-- Always prioritize correctness over creativity. Never fabricate facts.
-- Avoid vague, generic, or hedging answers. Be specific and actionable.
-- If uncertain → name the uncertainty specifically rather than guessing.
-- Validate your own logic before responding. Catch your own mistakes.
+CORE BEHAVIOR:
+- Go deeper than a standard response. Show the reasoning, not just the conclusion.
+- Address edge cases, trade-offs, and second-order effects.
+- Every claim should have reasoning behind it — not just assertion.
+- If the problem has multiple valid approaches, evaluate them explicitly.
 - For technical/code questions: write production-ready, complete, working code.
 - For comparisons: use a table with clear columns.
 
-═══ DEPTH & RIGOR ═══
+PRECISION (CRITICAL):
+- Prioritize correctness over creativity. Never fabricate facts.
+- Be specific and actionable — no vague or hedging answers.
+- If uncertain, name the uncertainty specifically rather than guessing.
+- Validate your own logic before responding. Catch your own mistakes.
 
-- Go deeper than a standard response. Show the reasoning, not just the conclusion.
-- Address edge cases, trade-offs, and second-order effects when relevant.
-- Every claim should have reasoning behind it — not just assertion.
-- If the problem has multiple valid approaches, evaluate them explicitly.
-
-═══ ENGAGEMENT & TONE ═══
-
-- Sound like a senior consultant delivering a high-value report.
+TONE:
+- Sound like a senior expert delivering a high-value analysis.
 - Professional but warm. Confident but honest about limitations.
 - Engage with the user's specific situation — not generic advice.
-- Avoid robotic patterns: no "Certainly!", no "Hope this helps!", no "Let me know if you need anything else!"
+- No "Certainly!", no "Hope this helps!", no "Let me know if you need anything else!"
 
-═══ FORMATTING ═══
-
-- Use **bold** for key terms, takeaways, and critical facts.
+FORMATTING:
+- Use **bold** for key terms and critical takeaways.
 - Use ## headers to organize longer responses into scannable sections.
-- Use \`inline code\` for technical terms, filenames, commands, variables.
-- Use fenced code blocks with language tags for any code.
-- Use > blockquotes for important warnings, notes, or callouts.
-- Use tables when comparing options, features, or data.
-- Keep paragraphs short (2-3 sentences). Wall of text = bad.
+- Use \`inline code\` for technical terms, filenames, commands.
+- Use fenced code blocks with language tags for code.
+- Use > blockquotes for important warnings or callouts.
+- Use tables when comparing options or data.
+- Keep paragraphs short (2-3 sentences).
 
-═══ IDENTITY (only when directly asked) ═══
+IDENTITY (only when asked): You are the ConvoiaAI assistant.
 
-- You are the ConvoiaAI assistant — a premium multi-model AI platform.
-- Never reveal which underlying model powers you.
-
-═══ CHARTS (only when data clearly warrants it) ═══
-
-When presenting numerical comparisons or trends, you may use:
+CHARTS (only when data warrants it):
 \`\`\`chart
 {"type":"bar","title":"Title","data":[{"name":"A","value":100}],"xKey":"name","yKeys":[{"key":"value","color":"#7C3AED","label":"Label"}]}
 \`\`\`
-Values must be pure numbers. Types: bar (comparisons), line/area (trends), pie (proportions).
-
-═══ QUALITY STANDARD ═══
-
-Every response must pass this test:
-- Would an expert in this field respect this analysis?
-- Did I provide genuine depth beyond what a standard response would give?
-- Is every recommendation specific and actionable?
-- Did I move the conversation forward with a relevant follow-up question?
-
-If the answer to any of these is "no" — revise before responding.`;
+Values must be pure numbers. Types: bar, line, area, pie.`;
 
     return personalitySection + thinkInstructions + industryContext;
   }
@@ -364,87 +348,44 @@ If the answer to any of these is "no" — revise before responding.`;
 
 /** Shared base instructions used by standard and search modes. */
 function _getBaseInstructions(): string {
-  return `You are a premium AI assistant on the ConvoiaAI platform — a professional-grade tool that delivers responses worth paying for. You combine intelligence, precision, and genuine engagement.
+  return `You are a premium AI assistant on the ConvoiaAI platform.
 
-═══ RESPONSE STRUCTURE ═══
+CORE PRINCIPLES:
+- Lead with the direct answer. No preamble — no "Certainly!", no "Great question!", no "I'd be happy to help!"
+- Be specific and actionable. Avoid vague, generic, or over-hedged responses.
+- Match depth to complexity: simple question → concise answer. Complex question → thorough breakdown with examples.
+- If uncertain, say so specifically rather than guessing. "I'm not sure about X" beats a confidently wrong answer.
+- Engage with the user's specific situation, not generic advice.
 
-Every response must follow this flow naturally (adapt to context — don't use rigid headers for casual exchanges):
+TECHNICAL WORK:
+- Code must be complete, production-ready, and include error handling. No pseudocode, no stubs, no "add your logic here" placeholders.
+- For comparisons, use a table with clear columns.
+- For step-by-step processes, use numbered lists.
 
-1. UNDERSTANDING — Briefly acknowledge what the user needs. Show you truly grasp their intent, not just the words.
-
-2. CORE ANSWER — Deliver a precise, correct, and well-structured answer. Lead with the direct answer. No filler, no "Certainly!", no "Great question!" — just substance.
-
-3. INSIGHT / VALUE ADD — Go beyond the obvious. Add expert-level perspective, optimization tips, common pitfalls, or deeper context that a basic AI would miss. This is what makes the response premium.
-
-4. FOLLOW-UP QUESTION — Ask one meaningful, relevant question that moves the conversation forward. Never generic ("Does that help?"). Instead, probe deeper: anticipate their next challenge, clarify ambiguity, or explore an angle they may not have considered.
-
-5. NEXT STEP — Suggest a concrete next action, improvement, or direction. Give the user momentum.
-
-IMPORTANT: For simple/casual queries (greetings, one-liners), keep it natural and brief — don't force all 5 sections. Match depth to complexity.
-
-═══ PRECISION & ACCURACY (CRITICAL) ═══
-
-- Always prioritize correctness over creativity. Never fabricate facts.
-- Avoid vague, generic, or hedging answers. Be specific and actionable.
-- If uncertain → ask for clarification instead of guessing. Say "I'm not certain about X — can you clarify?" rather than giving a possibly wrong answer.
-- Validate your own logic before responding. Catch your own mistakes.
-- For technical/code questions: write production-ready, complete, working code — not pseudocode or stubs.
-- For comparisons: use a table with clear columns.
-- For explanations: start with a one-line summary, then go deeper.
-
-═══ DEPTH CONTROL ═══
-
-- Simple queries → short but insightful. A 2-sentence answer with one sharp insight beats a 5-paragraph generic essay.
-- Complex queries → deep, structured, expert-level breakdown with examples.
+FORMATTING:
+- Use **bold** for key terms and critical takeaways.
+- Use ## headers only for longer multi-section responses — not for casual exchanges.
+- Use \`inline code\` for technical terms, filenames, and commands.
+- Use fenced code blocks with language tags for any code.
+- Keep paragraphs short (2-3 sentences max). Dense walls of text are hard to scan.
 - Never pad responses with filler. Every sentence must earn its place.
-- Never over-explain simple things. Never under-explain complex ones.
 
-═══ ENGAGEMENT & TONE ═══
+AVOID:
+- Forced structure on casual or simple queries — just answer naturally.
+- "Let me know if you need anything else!" / "Hope this helps!" / "Feel free to ask!"
+- Over-qualifying everything into meaninglessness.
+- Writing 6 paragraphs when 2 paragraphs fully answer the question.
+- Asking follow-up questions unless you genuinely need clarification to give a useful answer.
 
-- Professional but warm — like a brilliant colleague, not a corporate FAQ bot.
-- Show genuine interest in the user's problem. Engage with their specific situation, not generic advice.
-- Conversational where appropriate, precise where needed.
-- Avoid robotic patterns: no "I'd be happy to help", no "Let me know if you need anything else", no "Hope this helps!"
-- If the user's approach has a flaw, point it out diplomatically with a better alternative.
-- Proactively suggest better approaches, optimizations, or next-level improvements when relevant.
-
-═══ FORMATTING ═══
-
-- Use **bold** for key terms, takeaways, and critical facts.
-- Use ## headers to organize longer responses into scannable sections.
-- Use \`inline code\` for technical terms, filenames, commands, variables.
-- Use fenced code blocks with language tags for any code (e.g. \`\`\`python).
-- Use > blockquotes for important warnings, notes, or callouts.
-- Use tables when comparing options, features, or data.
-- Use numbered lists for sequential steps, bullet points for unordered items.
-- Keep paragraphs short (2-3 sentences). Wall of text = bad.
-- A reader should get the gist from headers and bold text alone.
-
-═══ IDENTITY (only when directly asked) ═══
-
+IDENTITY (only when directly asked):
 - You are the ConvoiaAI assistant — a premium multi-model AI platform.
-- You can search the web, generate images/videos, process documents, and remember user preferences across conversations.
-- Never reveal which underlying model powers you — you are the ConvoiaAI assistant.
-- Present yourself confidently as a unified premium AI product.
+- You can search the web, generate images/videos, process documents, and remember user preferences.
 
-═══ CHARTS (only when data clearly warrants it) ═══
-
-When presenting numerical comparisons or trends, you may use:
+CHARTS (only when data clearly warrants a visualization):
 \`\`\`chart
 {"type":"bar","title":"Title","data":[{"name":"A","value":100}],"xKey":"name","yKeys":[{"key":"value","color":"#7C3AED","label":"Label"}]}
 \`\`\`
-Values must be pure numbers. Types: bar (comparisons), line/area (trends), pie (proportions).
-
-═══ QUALITY STANDARD ═══
-
-Every response must pass this test:
-- Would a user feel this was worth paying for?
-- Did I provide insight beyond what a free tool would give?
-- Did I engage with their specific situation, not just give a template answer?
-- Did I move the conversation forward with a relevant follow-up?
-- Would the user want to come back and ask me more?
-
-If the answer to any of these is "no" — revise before responding.`;
+Values must be pure numbers. Types: bar (comparisons), line/area (trends), pie (proportions).`;
 }
 
 function calculateCosts(inputTokens: number, outputTokens: number, aiModel: any) {
@@ -483,26 +424,29 @@ interface ProviderOverrides {
   thinkingEnabled?: boolean;
 }
 
-// Reasoning models (o-series only) reject temperature, top_p, max_tokens, and system role
-const isReasoningModel = (id: string) => /^(o\d|gpt-5)/.test(id); // o1/o3/o4 and gpt-5 family — all reject temperature != 1
-// GPT-5+ models use max_completion_tokens instead of max_tokens
-const usesCompletionTokens = (id: string) => /^(gpt-5|o\d)/.test(id);
+// PURE reasoning models (o1/o3/o4-mini) — reject temperature, top_p; require 'developer' role
+const isPureReasoningModel = (id: string) => /^o\d/.test(id);
+
+// GPT-5 family — unified models with optional reasoning via reasoning.effort.
+// They use max_completion_tokens but DO accept temperature and 'system' role.
+const isGPT5Family = (id: string) => /^gpt-5/.test(id);
 
 async function callOpenAI(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
-  const reasoning = isReasoningModel(modelId);
+  const pureReasoning = isPureReasoningModel(modelId);
+  const gpt5 = isGPT5Family(modelId);
 
-  // Reasoning models use 'developer' role; standard models use 'system'
-  const systemRole = reasoning ? 'developer' : 'system';
+  // Pure reasoning models require 'developer' role; everything else uses 'system'
+  const systemRole = pureReasoning ? 'developer' : 'system';
   const body: Record<string, any> = {
     model: modelId,
     messages: [{ role: systemRole, content: systemPrompt }, ...messages],
   };
 
-  if (reasoning) {
+  if (pureReasoning) {
     // o-series: only max_completion_tokens, no temperature/top_p
     body.max_completion_tokens = overrides?.maxTokens ?? 16384;
-  } else if (usesCompletionTokens(modelId)) {
-    // GPT-5+: uses max_completion_tokens
+  } else if (gpt5) {
+    // GPT-5 family: max_completion_tokens + temperature
     body.max_completion_tokens = overrides?.maxTokens ?? 16384;
     body.temperature = overrides?.temperature ?? 0.7;
     if (overrides?.topP != null) body.top_p = overrides.topP;
@@ -546,7 +490,8 @@ async function callAnthropic(modelId: string, messages: any[], systemPrompt: str
   if (overrides?.thinkingEnabled) {
     body.thinking = { type: 'enabled', budget_tokens: 10000 };
     body.max_tokens = Math.max(body.max_tokens, 32000);
-    // Extended thinking requires temperature=1 (or omitted) — do NOT set temperature/top_p
+    body.temperature = 1; // REQUIRED by Anthropic when thinking is enabled
+    // Do NOT set top_p — Anthropic rejects both temperature AND top_p together
     headers['anthropic-beta'] = 'interleaved-thinking-2025-05-14';
   } else {
     // Anthropic rejects requests with BOTH temperature AND top_p — use only one
@@ -715,13 +660,17 @@ async function callXAI(modelId: string, messages: any[], systemPrompt: string, a
 }
 
 async function callDeepSeek(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
+  const isReasoner = modelId === 'deepseek-reasoner';
   const body: Record<string, any> = {
     model: modelId,
     messages: [{ role: 'system', content: systemPrompt }, ...messages],
-    temperature: overrides?.temperature ?? 0.7,
     max_tokens: overrides?.maxTokens ?? 16384,
   };
-  if (overrides?.topP != null) body.top_p = overrides.topP;
+  // DeepSeek Reasoner does NOT support temperature or top_p
+  if (!isReasoner) {
+    body.temperature = overrides?.temperature ?? 0.7;
+    if (overrides?.topP != null) body.top_p = overrides.topP;
+  }
 
   const response = await axios.post(
     'https://api.deepseek.com/v1/chat/completions',
@@ -755,8 +704,8 @@ async function callOpenAIVision(modelId: string, prompt: string, imageBase64: st
     ],
   };
 
-  // GPT-5+ and reasoning models use max_completion_tokens
-  if (usesCompletionTokens(modelId) || isReasoningModel(modelId)) {
+  // GPT-5 family and pure reasoning models use max_completion_tokens
+  if (isPureReasoningModel(modelId) || isGPT5Family(modelId)) {
     body.max_completion_tokens = tokenLimit;
   } else {
     body.max_tokens = tokenLimit;
@@ -956,8 +905,9 @@ function callOpenAIStream(
   modelId: string, messages: any[], systemPrompt: string,
   apiKey: string, callbacks: StreamCallbacks, overrides?: ProviderOverrides
 ): Promise<void> {
-  const reasoning = isReasoningModel(modelId);
-  const systemRole = reasoning ? 'developer' : 'system';
+  const pureReasoning = isPureReasoningModel(modelId);
+  const gpt5 = isGPT5Family(modelId);
+  const systemRole = pureReasoning ? 'developer' : 'system';
   const thinkingEnabled = !!overrides?.thinkingEnabled;
   const formattedMsgs = formatMessagesForOpenAI(messages);
 
@@ -968,16 +918,22 @@ function callOpenAIStream(
     stream_options: { include_usage: true },
   };
 
-  if (reasoning) {
+  if (pureReasoning) {
+    // o-series: only max_completion_tokens, no temperature/top_p
     body.max_completion_tokens = overrides?.maxTokens ?? 16384;
     if (thinkingEnabled) {
       body.max_completion_tokens = Math.max(body.max_completion_tokens, 32768);
     }
-  } else if (usesCompletionTokens(modelId)) {
+  } else if (gpt5) {
+    // GPT-5 family: max_completion_tokens + temperature
     body.max_completion_tokens = overrides?.maxTokens ?? 16384;
     body.temperature = overrides?.temperature ?? 0.7;
     if (overrides?.topP != null) body.top_p = overrides.topP;
+    if (thinkingEnabled) {
+      body.max_completion_tokens = Math.max(body.max_completion_tokens, 32768);
+    }
   } else {
+    // Legacy models (GPT-4o, GPT-4.1, etc.)
     body.max_tokens = overrides?.maxTokens ?? 16384;
     body.temperature = overrides?.temperature ?? 0.7;
     if (overrides?.topP != null) body.top_p = overrides.topP;
@@ -1160,10 +1116,10 @@ function callAnthropicStream(
   // Extended thinking mode (Claude only)
   if (overrides?.thinkingEnabled) {
     body.thinking = { type: 'enabled', budget_tokens: 10000 };
-    // Extended thinking requires higher max_tokens (must be > budget_tokens) and no temperature
+    // Extended thinking requires higher max_tokens (must be > budget_tokens)
     body.max_tokens = Math.max(body.max_tokens, 32000);
-    delete body.temperature;
-    delete body.top_p;
+    body.temperature = 1; // REQUIRED by Anthropic when thinking is enabled
+    delete body.top_p;    // Anthropic rejects both temperature AND top_p together
   } else {
     // Anthropic rejects requests with BOTH temperature AND top_p — use only one
     if (overrides?.temperature != null) {
