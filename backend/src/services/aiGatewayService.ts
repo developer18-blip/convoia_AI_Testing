@@ -1834,7 +1834,7 @@ export class AIGatewayService {
       getSystemPrompt(industry, effectiveModel.provider, promptMode, effectiveModel.modelId, params.complexity);
     const systemPrompt = memoryContext ? basePrompt + memoryContext : basePrompt;
 
-    // Cap output tokens to user's balance AND provider's hard limit
+    // Cap output tokens: user balance → provider hard limit → complexity cap
     let effectiveMaxTokens = agentConfig?.maxTokens;
     if (maxOutputTokens && maxOutputTokens > 0) {
       effectiveMaxTokens = effectiveMaxTokens
