@@ -2,6 +2,8 @@
  * Security Utilities for XSS, SQL Injection, and input sanitization
  */
 
+import nodeCrypto from 'crypto';
+
 const htmlSpecialChars: Record<string, string> = {
   '&': '&amp;',
   '<': '&lt;',
@@ -135,32 +137,12 @@ export const validatePasswordStrength = (password: string): {
  */
 export const generateSecureToken = (length: number = 32): string => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  // Node's crypto.randomBytes is always available and is CSPRNG; no Math.random fallback.
+  const arr = nodeCrypto.randomBytes(length);
   let token = '';
-
-  const arr = new Uint8Array(length);
-  
-  // Use Node.js crypto if available, otherwise fallback
-  try {
-    const crypto = (globalThis as any).crypto || require('crypto').webcrypto;
-    if (crypto && typeof crypto.getRandomValues === 'function') {
-      crypto.getRandomValues(arr);
-    } else {
-      // Fallback
-      for (let i = 0; i < length; i++) {
-        arr[i] = Math.floor(Math.random() * 256);
-      }
-    }
-  } catch {
-    // Fallback if crypto module is not available
-    for (let i = 0; i < length; i++) {
-      arr[i] = Math.floor(Math.random() * 256);
-    }
-  }
-
   for (let i = 0; i < length; i++) {
     token += chars[arr[i] % chars.length];
   }
-
   return token;
 };
 

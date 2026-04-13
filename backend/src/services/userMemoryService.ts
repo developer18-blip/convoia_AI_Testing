@@ -113,6 +113,19 @@ export async function saveMemories(userId: string, memories: Array<{ category: s
 /**
  * Load all memories for a user and format as a system prompt section.
  */
+// Strip prompt-injection patterns before injecting into system prompt.
+function sanitizeMemoryValue(value: string): string {
+  let s = value || '';
+  s = s.replace(/ignore\s+(all\s+)?(previous|above|prior)\s+(instructions?|prompts?|rules?)/gi, '[filtered]');
+  s = s.replace(/you\s+are\s+now\s+/gi, '[filtered] ');
+  s = s.replace(/^\s*system\s*:/gim, '[filtered]:');
+  s = s.replace(/\[\/?(INST|SYS)\]/gi, '[filtered]');
+  s = s.replace(/<\|im_(start|end)\|>/gi, '[filtered]');
+  s = s.replace(/<\/?(system|instruction|prompt|role|assistant|user)[^>]*>/gi, '[filtered]');
+  if (s.length > 500) s = s.substring(0, 500) + '...';
+  return s.trim();
+}
+
 export async function getUserMemoryPrompt(userId: string, maxChars = 600): Promise<string> {
   try {
     const memories = await prisma.userMemory.findMany({
@@ -124,20 +137,22 @@ export async function getUserMemoryPrompt(userId: string, maxChars = 600): Promi
     if (!memories || memories.length === 0) return '';
 
     const formatEntry = (mem: { key: string; value: string }): string => {
+      const v = sanitizeMemoryValue(mem.value);
+      if (!v) return '';
       switch (mem.key) {
-        case 'user_name': return `name: ${mem.value}`;
-        case 'nickname':  return `nickname: ${mem.value}`;
-        case 'role':      return `role: ${mem.value}`;
-        case 'company':   return `company: ${mem.value}`;
-        case 'location':  return `location: ${mem.value}`;
+        case 'user_name': return `name: ${v}`;
+        case 'nickname':  return `nickname: ${v}`;
+        case 'role':      return `role: ${v}`;
+        case 'company':   return `company: ${v}`;
+        case 'location':  return `location: ${v}`;
         case 'language':
-        case 'response_language': return `respond in ${mem.value}`;
-        case 'age':       return `age: ${mem.value}`;
-        case 'timezone':  return `tz: ${mem.value}`;
+        case 'response_language': return `respond in ${v}`;
+        case 'age':       return `age: ${v}`;
+        case 'timezone':  return `tz: ${v}`;
         default:
-          if (mem.key.startsWith('user_fact') || mem.key.startsWith('always_rule')) return mem.value;
-          if (mem.key.startsWith('style_preference')) return `prefers ${mem.value}`;
-          return `${mem.key}: ${mem.value}`;
+          if (mem.key.startsWith('user_fact') || mem.key.startsWith('always_rule')) return v;
+          if (mem.key.startsWith('style_preference')) return `prefers ${v}`;
+          return `${mem.key}: ${v}`;
       }
     };
 

@@ -1,6 +1,7 @@
 import multer from 'multer'
 import path from 'path'
 import fs from 'fs'
+import crypto from 'crypto'
 
 // Create uploads directory if not exists
 const uploadDir = 'uploads/temp'
@@ -14,7 +15,7 @@ const storage = multer.diskStorage({
     cb(null, uploadDir)
   },
   filename: (_req, file, cb) => {
-    const unique = Date.now() + '-' + Math.round(Math.random() * 1e9)
+    const unique = Date.now() + '-' + crypto.randomBytes(8).toString('hex')
     cb(null, unique + path.extname(file.originalname))
   },
 })

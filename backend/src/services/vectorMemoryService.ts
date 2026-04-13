@@ -342,12 +342,28 @@ function keywordSimilarity(query: string, memory: string): number {
  * Single-line format matches how Claude.ai / ChatGPT memory works.
  * Default cap: ~150 tokens (600 chars). Pass smaller for standard queries.
  */
+// Strip common prompt-injection patterns from user-controlled memory
+// text before it's concatenated into the system prompt. Users can
+// only inject into their own sessions, but a sanitized memory layer
+// still hardens against social-engineered memory values.
+function sanitizeMemoryEntry(content: string): string {
+  let s = content;
+  s = s.replace(/ignore\s+(all\s+)?(previous|above|prior)\s+(instructions?|prompts?|rules?)/gi, '[filtered]');
+  s = s.replace(/you\s+are\s+now\s+/gi, '[filtered] ');
+  s = s.replace(/^\s*system\s*:/gim, '[filtered]:');
+  s = s.replace(/\[\/?(INST|SYS)\]/gi, '[filtered]');
+  s = s.replace(/<\|im_(start|end)\|>/gi, '[filtered]');
+  s = s.replace(/<\/?(system|instruction|prompt|role|assistant|user)[^>]*>/gi, '[filtered]');
+  if (s.length > 500) s = s.substring(0, 500) + '...';
+  return s.trim();
+}
+
 export function buildMemoryContext(memories: RetrievedMemory[], maxChars = 600): string {
   if (memories.length === 0) return '';
 
   let memStr = '';
   for (const mem of memories) {
-    const entry = (mem.content || '').trim();
+    const entry = sanitizeMemoryEntry(mem.content || '');
     if (!entry) continue;
     if (memStr.length + entry.length + 2 > maxChars) break;
     memStr += (memStr ? '; ' : '') + entry;

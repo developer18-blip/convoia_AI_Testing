@@ -10,12 +10,19 @@ const prisma = prismaClient as any;
 const router = Router();
 router.use(authMiddleware);
 
-// GET /api/conversations — List all conversations for current user
+// GET /api/conversations — List conversations with cursor pagination
+// Query params: limit (default 50, max 100), cursor (updatedAt ISO string)
 router.get('/', asyncHandler(async (req: Request, res: Response) => {
+  const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+  const cursor = req.query.cursor as string | undefined;
+
   const conversations = await prisma.conversation.findMany({
-    where: { userId: req.user!.userId },
+    where: {
+      userId: req.user!.userId,
+      ...(cursor ? { updatedAt: { lt: new Date(cursor) } } : {}),
+    },
     orderBy: [{ isPinned: 'desc' }, { updatedAt: 'desc' }],
-    take: 100,
+    take: limit + 1, // one extra to detect "more available"
     select: {
       id: true, title: true, modelName: true, agentId: true,
       industry: true, isPinned: true, folderId: true,
@@ -25,8 +32,11 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
     },
   });
 
-  // Filter out empty conversations (no messages ever sent)
-  const nonEmpty = conversations.filter((c: any) => c._count.messages > 0);
+  const hasMore = conversations.length > limit;
+  const page = hasMore ? conversations.slice(0, limit) : conversations;
+  const nextCursor = hasMore ? page[page.length - 1].updatedAt.toISOString() : null;
+
+  const nonEmpty = page.filter((c: any) => c._count.messages > 0);
 
   res.json({
     success: true,
@@ -35,25 +45,47 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
       messageCount: c._count.messages,
       _count: undefined,
     })),
+    nextCursor,
   });
 }));
 
-// GET /api/conversations/:id — Get a conversation with messages
+// GET /api/conversations/:id — Get a conversation with paginated messages
+// Query params: limit (default 100, max 500), before (message id for cursor)
 router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
+  const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
+  const before = req.query.before as string | undefined;
+
   const conv = await prisma.conversation.findUnique({
     where: { id: req.params.id },
-    include: {
-      messages: {
-        orderBy: { createdAt: 'asc' },
-        take: 500,
-      },
+    select: {
+      id: true, userId: true, title: true, modelId: true, modelName: true,
+      agentId: true, industry: true, isPinned: true, folderId: true,
+      totalCost: true, totalTokens: true, createdAt: true, updatedAt: true,
     },
   });
 
   if (!conv) throw new AppError('Conversation not found', 404);
   if (conv.userId !== req.user!.userId) throw new AppError('Unauthorized', 403);
 
-  res.json({ success: true, data: conv });
+  // Load newest messages first (cursor), then reverse for chronological order
+  const msgs = await prisma.chatMessage.findMany({
+    where: {
+      conversationId: req.params.id,
+      ...(before ? { createdAt: { lt: new Date(before) } } : {}),
+    },
+    orderBy: { createdAt: 'desc' },
+    take: limit + 1,
+  });
+
+  const hasMore = msgs.length > limit;
+  const page = hasMore ? msgs.slice(0, limit) : msgs;
+  const nextBefore = hasMore ? page[page.length - 1].createdAt.toISOString() : null;
+
+  res.json({
+    success: true,
+    data: { ...conv, messages: page.reverse() },
+    nextBefore,
+  });
 }));
 
 // POST /api/conversations — Create a new conversation
@@ -101,6 +133,7 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 // POST /api/conversations/:id/messages — Save messages to a conversation
+const MAX_MESSAGE_CONTENT_CHARS = 100_000; // ~25K tokens; generous for code/docs
 router.post('/:id/messages', asyncHandler(async (req: Request, res: Response) => {
   const conv = await prisma.conversation.findUnique({ where: { id: req.params.id } });
   if (!conv) throw new AppError('Conversation not found', 404);
@@ -109,6 +142,15 @@ router.post('/:id/messages', asyncHandler(async (req: Request, res: Response) =>
   const { messages } = req.body;
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     throw new AppError('messages array is required', 400);
+  }
+
+  for (const msg of messages) {
+    if (typeof msg.content === 'string' && msg.content.length > MAX_MESSAGE_CONTENT_CHARS) {
+      throw new AppError(
+        `Message content too large (${msg.content.length} chars, max ${MAX_MESSAGE_CONTENT_CHARS})`,
+        413,
+      );
+    }
   }
 
   // Upsert messages (create if new, skip if exists)

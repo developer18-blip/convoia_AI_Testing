@@ -508,6 +508,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setMessages((prev) => [...prev, userMsg, streamingMsg])
     setIsStreaming(true)
 
+    // AbortController so the user can cancel mid-stream (and so we
+    // can hook up the close path cleanly).
+    const controller = new AbortController()
+    abortRef.current = controller
+
     try {
       // Cap history to last 20 messages to prevent token explosion
       const MAX_HIST = 20
@@ -549,6 +554,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           ...(referenceImages.length === 1 ? { referenceImage: referenceImages[0] } : {}),
           ...(referenceImages.length > 1 ? { referenceImages } : {}),
         }),
+        signal: controller.signal,
       })
 
       if (!response.ok) {
@@ -655,9 +661,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setLatestCompletedResponse(accumulated)
       }
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to get response'
-      setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, isLoading: false, error: errorMsg, content: errorMsg } : m))
+      // Treat user-initiated abort as a clean stop, not an error.
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setMessages((prev) => prev.map((m) => m.id === assistantId && m.isLoading ? { ...m, isLoading: false } : m))
+      } else {
+        const errorMsg = err instanceof Error ? err.message : 'Failed to get response'
+        setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, isLoading: false, error: errorMsg, content: errorMsg } : m))
+      }
     } finally {
+      abortRef.current = null
       setIsStreaming(false)
     }
   }, [messages])

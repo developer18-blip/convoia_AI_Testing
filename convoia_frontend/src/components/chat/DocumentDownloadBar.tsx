@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { FileText, Download, Loader2 } from 'lucide-react'
+import { useToast } from '../../hooks/useToast'
 
 interface DocumentDownloadBarProps {
   content: string
@@ -9,6 +10,7 @@ interface DocumentDownloadBarProps {
 
 export function DocumentDownloadBar({ content, contentRef, title }: DocumentDownloadBarProps) {
   const [status, setStatus] = useState<'idle' | 'pdf' | 'docx'>('idle')
+  const toast = useToast()
 
   const handlePdf = async () => {
     if (!contentRef.current) return
@@ -18,6 +20,7 @@ export function DocumentDownloadBar({ content, contentRef, title }: DocumentDown
       await exportToPdf(contentRef.current, title)
     } catch (err) {
       console.error('PDF export failed:', err)
+      toast.error('PDF download failed. Please try again.')
     } finally {
       setStatus('idle')
     }
@@ -30,6 +33,7 @@ export function DocumentDownloadBar({ content, contentRef, title }: DocumentDown
       await exportToDocx(content, title)
     } catch (err) {
       console.error('DOCX export failed:', err)
+      toast.error('DOCX download failed. Please try again.')
     } finally {
       setStatus('idle')
     }

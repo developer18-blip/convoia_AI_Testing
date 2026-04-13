@@ -22,7 +22,7 @@ const providers = [
   { name: 'Anthropic', models: 'Claude Opus 4.6, Sonnet 4.6, Haiku 4.5', color: '#D97706' },
   { name: 'Google', models: 'Gemini 3.1 Pro, 2.5 Pro, 2.5 Flash', color: '#3B82F6' },
   { name: 'Perplexity', models: 'Sonar Pro, Sonar Reasoning Pro', color: '#22D3EE' },
-  { name: 'xAI', models: 'Grok 3, Grok 3 Mini, Grok 2', color: '#F43F5E' },
+  { name: 'xAI', models: 'Grok 4.20, Grok 3, Grok 3 Mini', color: '#F43F5E' },
   { name: 'DeepSeek', models: 'DeepSeek Chat, Reasoner', color: '#8B5CF6' },
   { name: 'Mistral', models: 'Mistral Large, Mistral Small', color: '#EF4444' },
   { name: 'Groq', models: 'Llama 3.3 70B, Mixtral 8x7B', color: '#F97316' },

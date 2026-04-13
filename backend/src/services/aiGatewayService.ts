@@ -1397,7 +1397,21 @@ function callPerplexityStream(
       let inputTokens = 0, outputTokens = 0;
       let buffer = '';
       let citations: string[] = [];
+      // Buffer-safe <think>...</think> stripping. The old code used
+      // text.includes('<think>') on a per-chunk basis, which silently
+      // dropped content when a tag was split across SSE chunks (e.g.
+      // chunk1 ends with `<thi`, chunk2 starts with `nk>`). We now
+      // accumulate content in thinkBuffer until we've either passed
+      // the </think> marker or emitted enough safe text.
+      let thinkBuffer = '';
       let insideThink = false;
+      let thinkDone = false;
+
+      const flushSafe = (s: string) => {
+        if (!s) return;
+        const cleaned = s.replace(/<\/?think>/g, '');
+        if (cleaned) callbacks.onChunk(cleaned);
+      };
 
       response.data.on('data', (chunk: Buffer) => {
         buffer += chunk.toString();
@@ -1413,25 +1427,45 @@ function callPerplexityStream(
             const delta = json.choices?.[0]?.delta;
 
             if (delta?.content) {
-              let text: string = delta.content;
+              const text: string = delta.content;
 
-              // Strip <think>...</think> tags from reasoning models (sonar-deep-research etc.)
-              // These are internal reasoning and should not be shown to the user.
-              if (text.includes('<think>')) { insideThink = true; }
-              if (insideThink) {
-                if (text.includes('</think>')) {
-                  // End of thinking — extract any text after the closing tag
-                  insideThink = false;
-                  const afterTag = text.split('</think>').pop() || '';
-                  if (afterTag.trim()) callbacks.onChunk(afterTag);
+              if (thinkDone) {
+                // Past the reasoning block — pass through directly.
+                flushSafe(text);
+              } else {
+                thinkBuffer += text;
+
+                // Enter think mode if we see an opening tag.
+                if (!insideThink && thinkBuffer.includes('<think>')) {
+                  const pre = thinkBuffer.split('<think>')[0];
+                  if (pre) flushSafe(pre);
+                  insideThink = true;
+                  thinkBuffer = thinkBuffer.split('<think>').slice(1).join('<think>');
                 }
-                // Skip chunks that are inside <think> block
-                continue;
-              }
 
-              // Clean any stray think tags that might appear in a single chunk
-              text = text.replace(/<\/?think>/g, '');
-              if (text) callbacks.onChunk(text);
+                if (insideThink) {
+                  // Exit think mode once we see the closing tag.
+                  if (thinkBuffer.includes('</think>')) {
+                    insideThink = false;
+                    thinkDone = true;
+                    const afterThink = thinkBuffer.split('</think>').slice(1).join('</think>');
+                    thinkBuffer = '';
+                    if (afterThink) flushSafe(afterThink);
+                  } else if (thinkBuffer.length > 50000) {
+                    // Safety: never grow the think buffer unbounded.
+                    insideThink = false;
+                    thinkDone = true;
+                    thinkBuffer = '';
+                  }
+                } else if (!thinkBuffer.startsWith('<') || thinkBuffer.length > 16) {
+                  // No opening tag seen and buffer is past the point
+                  // where a partial '<think>' could still be forming:
+                  // safe to flush.
+                  flushSafe(thinkBuffer);
+                  thinkBuffer = '';
+                  thinkDone = true;
+                }
+              }
             }
 
             // Capture citations from Perplexity response
@@ -1448,6 +1482,14 @@ function callPerplexityStream(
       });
 
       response.data.on('end', () => {
+        // Flush any residual think buffer — if the stream ended while
+        // we were still inside a <think> block, drop it; if it ended
+        // before we could decide, treat it as normal content.
+        if (!insideThink && thinkBuffer) {
+          flushSafe(thinkBuffer);
+          thinkBuffer = '';
+        }
+
         // Append citation block before signaling done
         if (citations.length > 0) {
           const citationBlock = '\n\n---\n**Sources:**\n' +

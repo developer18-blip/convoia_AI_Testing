@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import prisma from '../config/db.js';
 import { generateToken, generateRefreshToken } from '../utils/token.js';
 import { AppError } from '../middleware/errorHandler.js';
@@ -263,7 +264,7 @@ export class AuthService {
       throw new AppError('Email is already verified', 400);
     }
 
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const verificationCode = crypto.randomInt(100000, 1000000).toString();
     const verificationExpiry = new Date(Date.now() + 10 * 60 * 1000);
 
     await prisma.user.update({
