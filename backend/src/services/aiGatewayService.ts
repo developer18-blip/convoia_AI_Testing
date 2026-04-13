@@ -220,18 +220,21 @@ You have fresh web search data. Use it for an accurate, well-sourced answer.
 
 /**
  * Classify query complexity to right-size the system prompt.
- * Simple queries (pure greetings/acknowledgments) get a lightweight prompt.
+ * Simple queries (pure greetings/acknowledgments/small talk) get a lightweight prompt.
  * A greeting followed by a real question is STANDARD, not simple.
  */
 export function classifyQueryComplexity(message: string): 'simple' | 'standard' | 'complex' {
   const trimmed = message.trim();
   const wordCount = trimmed.split(/\s+/).length;
 
-  // Simple: ONLY pure greetings/acknowledgments — the ENTIRE message must be one.
-  // "hey" = simple. "hey can you help me" = standard (it's a real question).
-  const simplePatterns = /^(hey|hi|hello|yo|sup|thanks|thank you|ok|okay|yes|no|bye|good morning|good night|gm|gn|what's up|how are you|hm+|lol|haha|nice|cool|great|sure|nah|yep|yup|nope|good|fine|perfect|exactly|right|agreed|same|ty|thx|kk|cheers|word|bet|aight|gotcha|roger|copy|noted|wow|damn|dang|omg|oh|ah|hmm|mhm)[\s!?.,]*$/i;
+  // Simple: pure greetings, acknowledgments, and small talk.
+  // The ENTIRE message must be one of these — "hey can you help me with X" is NOT simple.
+  const simplePatterns = /^(hey|hi|hello|yo|sup|thanks|thank you|ok|okay|yes|no|bye|good morning|good night|gm|gn|hm+|lol|haha|nice|cool|great|sure|nah|yep|yup|nope|good|fine|perfect|exactly|right|agreed|same|ty|thx|kk|cheers|word|bet|aight|gotcha|roger|copy|noted|wow|damn|dang|omg|oh|ah|hmm|mhm)[\s!?.,]*$/i;
 
-  if (simplePatterns.test(trimmed) && wordCount <= 4) {
+  // Small-talk patterns — slightly longer but still greetings/pleasantries
+  const smallTalkPatterns = /^(what's up|what is up|whats up|how are you|how r u|how you doing|how're you|how ya doin|how's it going|hows it going|how's the day|hows the day|how's your day|hows your day|how's everything|hows everything|what's new|whats new|what's good|whats good|long time no see|nice to meet you|pleased to meet you|how have you been|hbu|hyd|wyd|wbu)[\s!?.,a-z]*$/i;
+
+  if ((simplePatterns.test(trimmed) && wordCount <= 4) || smallTalkPatterns.test(trimmed)) {
     return 'simple';
   }
 
@@ -1848,11 +1851,11 @@ export class AIGatewayService {
     // queries because they interpret high max_tokens as "go long / think hard".
     // Simple "hey?" should never produce a 10K-token response.
     const complexityCaps: Record<string, number> = {
-      simple: 1024,    // Greetings and one-word acknowledgments
-      standard: 4096,  // Normal questions
-      complex: 16384,  // Long code, deep analysis, multiple questions
+      simple: 512,     // Greetings, acknowledgments
+      standard: 2048,  // Normal questions
+      complex: 8192,   // Long code, deep analysis, multi-question
     };
-    const complexityCap = complexityCaps[params.complexity || 'standard'] || 4096;
+    const complexityCap = complexityCaps[params.complexity || 'standard'] || 2048;
     if (effectiveMaxTokens && effectiveMaxTokens > complexityCap) {
       effectiveMaxTokens = complexityCap;
     }

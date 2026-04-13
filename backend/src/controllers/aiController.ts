@@ -399,9 +399,12 @@ export const queryAIStream = async (req: Request, res: Response) => {
     const queryComplexity = classifyQueryComplexity(latestUserText);
 
     // ── CAP CONVERSATION HISTORY ──────────────────────────────
-    // Simple queries (greetings) only need last 4 messages to save tokens.
-    // Standard queries keep 20, complex keep 20.
-    const MAX_HISTORY_MESSAGES = queryComplexity === 'simple' ? 4 : 20;
+    // Aggressive trimming to prevent old verbose responses from inflating
+    // input tokens. Simple/standard queries keep last few turns; complex
+    // queries can go deeper but still have a ceiling.
+    const MAX_HISTORY_MESSAGES = queryComplexity === 'simple' ? 4
+      : queryComplexity === 'standard' ? 8
+      : 16;
     let cappedMessages = messages;
     if (messages.length > MAX_HISTORY_MESSAGES) {
       const systemMsg = messages[0]?.role === 'system' ? [messages[0]] : [];
@@ -410,6 +413,25 @@ export const queryAIStream = async (req: Request, res: Response) => {
       cappedMessages = [...systemMsg, ...recentMsgs];
       logger.info(`Trimmed conversation history: removed ${trimmedCount} old messages, keeping ${cappedMessages.length} (max ${MAX_HISTORY_MESSAGES}, complexity=${queryComplexity})`);
     }
+
+    // ── CAP PER-MESSAGE LENGTH ────────────────────────────────
+    // Old assistant responses from the removed 5-step template can be
+    // massive (2000-4000 chars each). Truncate historical assistant
+    // messages to prevent them from dominating the context. The latest
+    // user message and any document/URL context is preserved.
+    const MAX_HIST_ASSISTANT_CHARS = queryComplexity === 'simple' ? 800
+      : queryComplexity === 'standard' ? 1500
+      : 3000;
+    const lastIdx = cappedMessages.length - 1;
+    cappedMessages = cappedMessages.map((m: any, i: number) => {
+      // Don't touch: the latest message, system messages, non-string content
+      if (i === lastIdx || m.role === 'system' || typeof m.content !== 'string') return m;
+      // Only trim historical assistant messages (user messages are usually short)
+      if (m.role === 'assistant' && m.content.length > MAX_HIST_ASSISTANT_CHARS) {
+        return { ...m, content: m.content.slice(0, MAX_HIST_ASSISTANT_CHARS) + '\n[... truncated]' };
+      }
+      return m;
+    });
 
     // Check token balance — estimate includes system prompt (~500 tokens) + all message history
     const streamTokenBalance = await TokenWalletService.getBalance(user.id);
