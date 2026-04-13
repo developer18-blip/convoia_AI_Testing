@@ -144,11 +144,33 @@ export class AuthService {
         };
       }
 
-      // Auto-verify and issue token immediately (no OTP required)
+      // Non-invite self-registration: require email verification.
+      // Generate a 6-digit OTP, store it with a 10-minute expiry, and
+      // send the verification email. Tokens are still issued so the
+      // user can hit /verify-email without re-authenticating, but the
+      // new enforcement middleware blocks all other protected routes
+      // until isVerified flips to true.
+      const verificationCode = crypto.randomInt(100000, 1000000).toString();
+      const verificationExpiry = new Date(Date.now() + 10 * 60 * 1000);
       await prisma.user.update({
         where: { id: finalUser.id },
-        data: { isVerified: true },
+        data: {
+          isVerified: false,
+          verificationToken: verificationCode,
+          verificationExpiry,
+        },
       });
+
+      try {
+        await EmailService.sendVerificationCode({
+          recipientEmail: finalUser.email,
+          name: finalUser.name,
+          code: verificationCode,
+        });
+      } catch (emailErr: any) {
+        // Non-fatal: user can request a resend via /auth/resend-verification.
+        logger.warn(`Verification email send failed for ${finalUser.email}: ${emailErr.message}`);
+      }
 
       const token = generateToken({
         userId: finalUser.id,
@@ -172,7 +194,7 @@ export class AuthService {
           avatar: finalUser.avatar || null,
           role: finalUser.role,
           organizationId: finalUser.organizationId || undefined,
-          isVerified: true,
+          isVerified: false,
         },
         token,
         refreshToken,

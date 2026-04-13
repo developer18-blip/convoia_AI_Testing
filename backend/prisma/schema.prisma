@@ -110,7 +110,13 @@ model User {
 
 model APIKey {
   id             String        @id @default(uuid())
+  // Stores a SHA-256 hash of the raw key, never the plaintext.
+  // The raw key is shown to the user ONCE at creation time and is
+  // not recoverable from the DB after that.
   key            String        @unique
+  // First ~12 characters of the raw key (e.g. "cvai_fac4614d"), kept
+  // for UI masking so users can recognize their keys in the list view.
+  keyPrefix      String?
   name           String
   lastUsed       DateTime?
   isActive       Boolean       @default(true)

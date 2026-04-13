@@ -532,6 +532,126 @@ async function callGoogle(modelId: string, messages: any[], systemPrompt: string
   return safeProviderCall(() => makeCall(false), () => makeCall(true), modelId);
 }
 
+// ── Google Gemini real SSE streaming ──
+// Gemini exposes a streamGenerateContent endpoint. The response comes
+// as an SSE stream of `data: { candidates: [...] }` frames. If the
+// streaming endpoint fails for any reason (unsupported model version,
+// transient upstream error), we fall back to the non-streaming
+// callGoogle() and emit the full response as a single chunk so the
+// user still gets a response.
+function callGoogleStream(
+  modelId: string,
+  messages: any[],
+  systemPrompt: string,
+  apiKey: string,
+  callbacks: StreamCallbacks,
+  overrides?: ProviderOverrides,
+): Promise<void> {
+  const contents = messages.map((m) => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: formatPartsForGoogle(m.content),
+  }));
+
+  const effectiveTemp = TEMP_LOCKED_MODELS.has(modelId)
+    ? 1
+    : (overrides?.temperature ?? 0.7);
+
+  const body: Record<string, any> = {
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    contents,
+    generationConfig: {
+      temperature: effectiveTemp,
+      maxOutputTokens: overrides?.maxTokens ?? 16384,
+      ...(effectiveTemp !== 1 && overrides?.topP != null ? { topP: overrides.topP } : {}),
+    },
+  };
+
+  return new Promise(async (resolve, reject) => {
+    let streamingFailed = false;
+    try {
+      const response = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:streamGenerateContent`,
+        body,
+        {
+          params: { key: apiKey, alt: 'sse' },
+          timeout: config.aiRequestTimeout,
+          responseType: 'stream',
+        }
+      );
+
+      let inputTokens = 0;
+      let outputTokens = 0;
+      let buffer = '';
+      let gotAnyChunk = false;
+
+      response.data.on('data', (chunk: Buffer) => {
+        buffer += chunk.toString();
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith('data: ')) continue;
+          try {
+            const json = JSON.parse(trimmed.slice(6));
+            const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) {
+              gotAnyChunk = true;
+              callbacks.onChunk(text);
+            }
+            if (json?.usageMetadata) {
+              inputTokens = json.usageMetadata.promptTokenCount || inputTokens;
+              outputTokens = json.usageMetadata.candidatesTokenCount || outputTokens;
+            }
+          } catch { /* skip malformed SSE frame */ }
+        }
+      });
+
+      response.data.on('end', () => {
+        if (!gotAnyChunk) {
+          // Empty stream — treat as failure so we fall back below.
+          streamingFailed = true;
+          return;
+        }
+        callbacks.onDone(inputTokens, outputTokens);
+        resolve();
+      });
+
+      response.data.on('error', (err: Error) => {
+        logger.warn(`Gemini stream transport error for ${modelId}: ${err.message}`);
+        streamingFailed = true;
+      });
+
+      // Wait a tick for 'end' to potentially fire before checking the flag.
+      response.data.on('close', async () => {
+        if (!streamingFailed) return;
+        try {
+          logger.warn(`Gemini streaming produced no chunks for ${modelId}; falling back to non-streaming`);
+          const result = await callGoogle(modelId, messages, systemPrompt, apiKey, overrides);
+          if (result.response) callbacks.onChunk(result.response);
+          callbacks.onDone(result.inputTokens, result.outputTokens);
+          resolve();
+        } catch (fallbackErr: any) {
+          callbacks.onError(fallbackErr);
+          reject(fallbackErr);
+        }
+      });
+    } catch (err: any) {
+      // Streaming endpoint returned an HTTP error before any data.
+      logger.warn(`Gemini streaming failed for ${modelId}: ${err?.message}; falling back to non-streaming`);
+      try {
+        const result = await callGoogle(modelId, messages, systemPrompt, apiKey, overrides);
+        if (result.response) callbacks.onChunk(result.response);
+        callbacks.onDone(result.inputTokens, result.outputTokens);
+        resolve();
+      } catch (fallbackErr: any) {
+        callbacks.onError(fallbackErr);
+        reject(fallbackErr);
+      }
+    }
+  });
+}
+
 async function callGroq(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
   const buildBody = (forceTemp1: boolean): Record<string, any> => {
     const body: Record<string, any> = {
@@ -1611,16 +1731,7 @@ async function routeToProviderStream(
       );
 
     case 'google':
-      // Google Gemini streaming uses a different format; fall back to non-streaming
-      // and emit the full response as a single chunk
-      try {
-        const result = await callGoogle(modelId, messages, systemPrompt, apiKey, overrides);
-        callbacks.onChunk(result.response);
-        callbacks.onDone(result.inputTokens, result.outputTokens);
-      } catch (err: any) {
-        callbacks.onError(err);
-      }
-      return;
+      return callGoogleStream(modelId, messages, systemPrompt, apiKey, callbacks, overrides);
 
     default:
       throw new AppError(`Unsupported provider for streaming: ${provider}`, 400);

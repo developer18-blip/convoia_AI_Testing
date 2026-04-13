@@ -360,10 +360,47 @@ async function validateModels() {
   }
 }
 
+// ============== API KEY ONE-SHOT HASHING MIGRATION ==============
+// Runs once on boot. Any API key row whose `key` column still holds a
+// plaintext value (our raw keys start with "cvai_") is re-hashed with
+// SHA-256 and the keyPrefix column is populated so the list UI still
+// shows a recognizable prefix. Idempotent: re-running does nothing once
+// all keys are hashed. Runs before app.listen() so there is zero
+// window where the new code runs against an unmigrated DB.
+async function migrateApiKeysToHashed(): Promise<void> {
+  try {
+    const { hashApiKey, apiKeyPrefix } = await import('./middleware/apiKeyAuth.js');
+    const plaintextKeys = await prisma.aPIKey.findMany({
+      where: { key: { startsWith: 'cvai_' } },
+      select: { id: true, key: true },
+    });
+    if (plaintextKeys.length === 0) {
+      logger.info('API key hashing migration: no plaintext keys found — skipping');
+      return;
+    }
+    logger.warn(`API key hashing migration: re-hashing ${plaintextKeys.length} plaintext key(s)`);
+    for (const k of plaintextKeys) {
+      await prisma.aPIKey.update({
+        where: { id: k.id },
+        data: {
+          key: hashApiKey(k.key),
+          keyPrefix: apiKeyPrefix(k.key),
+        },
+      });
+    }
+    logger.info(`API key hashing migration: re-hashed ${plaintextKeys.length} key(s) successfully`);
+  } catch (err: any) {
+    // Non-fatal: if migration fails, keys stay plaintext and the new
+    // middleware will reject them. Surface it loudly so we notice.
+    logger.error(`API key hashing migration FAILED: ${err.message}`);
+  }
+}
+
 // ============== START SERVER ==============
 const startServer = async (): Promise<void> => {
   try {
     await validateModels();
+    await migrateApiKeysToHashed();
 
     const server = app.listen(config.port, () => {
       logger.info(`🚀 Server is running on port ${config.port}`);

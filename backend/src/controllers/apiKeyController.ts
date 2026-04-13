@@ -1,8 +1,9 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db.js';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
-import { generateAPIKey, maskAPIKey } from '../utils/token.js';
+import { generateAPIKey } from '../utils/token.js';
 import { isValidUUID } from '../utils/validators.js';
+import { hashApiKey, apiKeyPrefix } from '../middleware/apiKeyAuth.js';
 import logger from '../config/logger.js';
 
 // ============ CREATE API KEY ============
@@ -31,9 +32,14 @@ export const createApiKey = asyncHandler(
       ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000)
       : null;
 
+    // Store only the SHA-256 hash of the raw key. keyPrefix stores the
+    // first 12 chars of the raw key so the list UI can show "cvai_fac4..."
+    // without recovering the plaintext. The raw key is only returned
+    // here, once, at creation time.
     const apiKey = await prisma.aPIKey.create({
       data: {
-        key: rawKey,
+        key: hashApiKey(rawKey),
+        keyPrefix: apiKeyPrefix(rawKey),
         name: name.trim(),
         userId: req.user.userId,
         organizationId: req.user.organizationId || null,
@@ -72,7 +78,7 @@ export const listApiKeys = asyncHandler(
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
-        key: true,
+        keyPrefix: true,
         name: true,
         isActive: true,
         lastUsed: true,
@@ -87,7 +93,10 @@ export const listApiKeys = asyncHandler(
       message: 'API keys retrieved',
       data: keys.map((k) => ({
         id: k.id,
-        maskedKey: maskAPIKey(k.key),
+        // The raw key is not recoverable; show the stored prefix
+        // followed by a mask. Legacy rows pre-migration may have
+        // a null prefix — show a generic placeholder in that case.
+        maskedKey: k.keyPrefix ? `${k.keyPrefix}...` : 'cvai_****',
         name: k.name,
         isActive: k.isActive,
         isExpired: k.expiresAt ? k.expiresAt < new Date() : false,
@@ -172,7 +181,7 @@ export const rotateApiKey = asyncHandler(
 
     const newRawKey = generateAPIKey();
 
-    // Atomic: deactivate old, create new
+    // Atomic: deactivate old, create new (stored as hash + prefix)
     const result = await prisma.$transaction(async (tx) => {
       await tx.aPIKey.update({
         where: { id: keyId },
@@ -181,7 +190,8 @@ export const rotateApiKey = asyncHandler(
 
       const newKey = await tx.aPIKey.create({
         data: {
-          key: newRawKey,
+          key: hashApiKey(newRawKey),
+          keyPrefix: apiKeyPrefix(newRawKey),
           name: oldKey.name,
           userId: oldKey.userId,
           organizationId: oldKey.organizationId,

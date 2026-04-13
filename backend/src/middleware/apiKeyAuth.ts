@@ -1,7 +1,26 @@
 import { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import prisma from '../config/db.js';
 import { AppError } from './errorHandler.js';
 import logger from '../config/logger.js';
+
+/**
+ * SHA-256 hash of a raw API key. We only ever store this hash in the
+ * database; the plaintext is returned to the user once at creation and
+ * never again. This means a DB dump gives an attacker no usable keys.
+ */
+export function hashApiKey(rawKey: string): string {
+  return crypto.createHash('sha256').update(rawKey).digest('hex');
+}
+
+/**
+ * First 12 characters of a raw key — stored alongside the hash so the
+ * list-keys UI can show users which key is which without needing the
+ * plaintext. (e.g. "cvai_fac4614d")
+ */
+export function apiKeyPrefix(rawKey: string): string {
+  return rawKey.substring(0, 12);
+}
 
 /**
  * Middleware that authenticates requests using an API key.
@@ -31,9 +50,11 @@ export const apiKeyAuth = async (
       return next(new AppError('API key required (x-api-key header or Bearer cvai_...)', 401));
     }
 
-    // Look up key
+    // Hash the incoming key and look it up. The DB only stores the
+    // SHA-256 hash; we never compare plaintext.
+    const hashed = hashApiKey(rawKey);
     const apiKey = await prisma.aPIKey.findUnique({
-      where: { key: rawKey },
+      where: { key: hashed },
       include: {
         user: {
           select: { id: true, role: true, organizationId: true, isActive: true },
