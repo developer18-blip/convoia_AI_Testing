@@ -362,6 +362,8 @@ const TEMP_LOCKED_MODELS = new Set<string>();
   'gpt-5-mini',
 ].forEach(m => TEMP_LOCKED_MODELS.add(m));
 
+logger.info(`Temperature-locked models (seed): ${[...TEMP_LOCKED_MODELS].join(', ')}`);
+
 /**
  * Wraps a provider API call. If the provider rejects the temperature setting,
  * logs a warning, adds the model to TEMP_LOCKED_MODELS, and retries with temperature=1.
@@ -384,6 +386,7 @@ async function safeProviderCall<T>(
     ) {
       logger.warn(`Model ${modelId} rejected temperature — adding to TEMP_LOCKED_MODELS and retrying with temperature=1`);
       TEMP_LOCKED_MODELS.add(modelId);
+      logger.info(`TEMP_LOCKED_MODELS updated: ${[...TEMP_LOCKED_MODELS].join(', ')}`);
       return await retryFn();
     }
     throw error;
