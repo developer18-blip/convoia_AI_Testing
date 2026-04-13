@@ -325,7 +325,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
       }
       // Set up SSE and generate image
       res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
       res.setHeader('Connection', 'keep-alive');
       res.setHeader('X-Accel-Buffering', 'no');
       res.flushHeaders();
@@ -533,7 +533,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
       logger.info(`Smart route → video (${route.confidence}): type=${route.video.mediaType}, "${lastUserText.substring(0, 80)}"`);
 
       res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
       res.setHeader('Connection', 'keep-alive');
       res.setHeader('X-Accel-Buffering', 'no');
       res.flushHeaders();
@@ -683,7 +683,7 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
 
       // Set up SSE for image generation
       res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
       res.setHeader('Connection', 'keep-alive');
       res.setHeader('X-Accel-Buffering', 'no');
       res.flushHeaders();
@@ -800,10 +800,26 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
 
     // Set up SSE headers
     res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
+
+    // SSE heartbeat — sends a comment every 15s so idle time during
+    // model "thinking" pauses doesn't drop the connection through
+    // Nginx or the browser. Comments (lines starting with `:`) are
+    // ignored by the EventSource parser.
+    const sseHeartbeat = setInterval(() => {
+      try {
+        if (!res.writableEnded && !res.destroyed) {
+          res.write(': heartbeat\n\n');
+        }
+      } catch { /* silent */ }
+    }, 15000);
+    const stopHeartbeat = () => { try { clearInterval(sseHeartbeat); } catch { /* silent */ } };
+    res.on('close', stopHeartbeat);
+    res.on('finish', stopHeartbeat);
+    req.on('close', stopHeartbeat);
 
     // Auto-downgrade note
     if (autoDowngraded && autoDowngradeReason) {
