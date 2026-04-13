@@ -1837,6 +1837,47 @@ export class AIGatewayService {
       getSystemPrompt(industry, effectiveModel.provider, promptMode, effectiveModel.modelId, params.complexity);
     const systemPrompt = memoryContext ? basePrompt + memoryContext : basePrompt;
 
+    // ═══ MASTER TOKEN AUDIT ════════════════════════════════════════
+    // Breaks down every source of input tokens so we can pinpoint bloat.
+    try {
+      const _msgChars = messages.reduce((s: number, m: any) => {
+        const c = m.content;
+        return s + (typeof c === 'string' ? c.length : JSON.stringify(c).length);
+      }, 0);
+      const _systemChars = systemPrompt?.length || 0;
+      const _memoryChars = memoryContext?.length || 0;
+      const _agentChars = agentConfig?.systemPrompt?.length || 0;
+      const _basePromptChars = basePrompt.length;
+      const _systemTokens = Math.ceil(_systemChars / 4);
+      const _msgTokens = Math.ceil(_msgChars / 4);
+      const _memoryTokens = Math.ceil(_memoryChars / 4);
+      const _totalInputTokens = _systemTokens + _msgTokens;
+      const _roles = messages.map((m: any) => m.role).join(',');
+
+      logger.warn(
+        `═══ TOKEN_AUDIT total=${_totalInputTokens} | ` +
+        `systemTokens=${_systemTokens} (basePrompt=${Math.ceil(_basePromptChars / 4)} + memory=${_memoryTokens}) | ` +
+        `msgs[${messages.length}]=${_msgTokens} | ` +
+        `agentPromptTokens=${Math.ceil(_agentChars / 4)} | ` +
+        `model=${effectiveModel.modelId} complexity=${params.complexity} ` +
+        `think=${params.thinkingEnabled} web=${params.webSearchActive} roles=[${_roles}]`
+      );
+
+      if (_totalInputTokens > 2000) {
+        const _msgBreakdown = messages.map((m: any, i: number) => {
+          const len = typeof m.content === 'string' ? m.content.length : JSON.stringify(m.content).length;
+          return `${i}[${m.role}:${len}]`;
+        }).join(',');
+        logger.warn(
+          `═══ TOKEN_AUDIT DETAIL msgBreakdown=[${_msgBreakdown}] ` +
+          `systemPreview="${(systemPrompt || '').substring(0, 150).replace(/\n/g, ' ')}" ` +
+          `memoryPreview="${(memoryContext || '').substring(0, 200).replace(/\n/g, ' ')}" ` +
+          `lastMsgPreview="${(typeof messages[messages.length - 1]?.content === 'string' ? messages[messages.length - 1].content : JSON.stringify(messages[messages.length - 1]?.content || '')).substring(0, 200).replace(/\n/g, ' ')}"`
+        );
+      }
+    } catch (_auditErr) { /* silent */ }
+    // ═══ END TOKEN AUDIT ════════════════════════════════════════
+
     // Cap output tokens: user balance → provider hard limit → complexity cap
     let effectiveMaxTokens = agentConfig?.maxTokens;
     if (maxOutputTokens && maxOutputTokens > 0) {
