@@ -1726,27 +1726,11 @@ export class AIGatewayService {
     if (!aiModel) throw new AppError('AI Model not found', 404);
     if (!aiModel.isActive) throw new AppError('This model is currently unavailable', 400);
 
-    // ── Web search: route through Perplexity if available ──
-    let effectiveModel = aiModel;
-    let usingPerplexitySearch = false;
-
-    if (params.webSearchActive) {
-      const perplexityKey = config.apiKeys['perplexity' as keyof typeof config.apiKeys];
-      if (perplexityKey) {
-        const perplexityModel = await prisma.aIModel.findFirst({
-          where: { modelId: 'sonar-pro', isActive: true },
-        });
-        if (perplexityModel) {
-          usingPerplexitySearch = true;
-          effectiveModel = perplexityModel;
-        }
-      }
-    }
-
-    // If Perplexity handles search natively, no need for WEB_SEARCH_SYSTEM_BOOST
-    const promptMode = params.webSearchActive && !usingPerplexitySearch
-      ? 'search'
-      : 'standard';
+    // Web search runs externally in the controller (Perplexity → DDG → Tavily)
+    // and injects results into the user message as context. The user's chosen
+    // model handles the response — we never swap it out from under them.
+    const effectiveModel = aiModel;
+    const promptMode = params.webSearchActive ? 'search' : 'standard';
 
     const basePrompt = agentConfig?.systemPrompt ||
       getSystemPrompt(industry, effectiveModel.provider, promptMode, effectiveModel.modelId, params.complexity);

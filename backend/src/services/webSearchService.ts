@@ -29,10 +29,28 @@ export interface SearchResult {
 export interface WebSearchResponse {
   searched: boolean;
   query: string;
-  source: 'cache' | 'duckduckgo' | 'tavily' | 'none';
+  source: 'cache' | 'perplexity' | 'duckduckgo' | 'tavily' | 'none';
   confidence: number;
   results: SearchResult[];
   contextText: string;
+}
+
+// Map time-sensitivity to DDG df filter + Perplexity search_recency_filter
+function getRecencyFilter(query: string): { ddg: string; perplexity: 'day' | 'week' | 'month' | 'year' | null } {
+  const q = query.toLowerCase();
+  if (/\b(breaking|happening now|live|right now|today|tonight|this morning|just)\b/.test(q)) {
+    return { ddg: 'd', perplexity: 'day' };
+  }
+  if (/\b(this week|latest|recent|news|update|trending)\b/.test(q)) {
+    return { ddg: 'w', perplexity: 'week' };
+  }
+  if (/\b(this month|current|newest)\b/.test(q)) {
+    return { ddg: 'm', perplexity: 'month' };
+  }
+  if (/\b(20(2[5-9]|[3-9]\d))\b/.test(q)) {
+    return { ddg: 'y', perplexity: 'year' };
+  }
+  return { ddg: '', perplexity: null };
 }
 
 // ── Intelligent Query Classification ────────────────────────────────
@@ -223,13 +241,13 @@ const SEARCH_HEADERS = {
  * 2. DuckDuckGo HTML (fallback)
  * 3. If both fail → return empty (Tavily will handle)
  */
-async function searchFree(query: string, maxResults = 5): Promise<SearchResult[]> {
+async function searchFree(query: string, maxResults = 5, df = ''): Promise<SearchResult[]> {
   // Try DuckDuckGo Lite first (simpler page, less blocking)
   let results = await searchDDGLite(query, maxResults);
   if (results.length >= 2) return results;
 
-  // Fallback: DuckDuckGo full HTML
-  results = await searchDDGHTML(query, maxResults);
+  // Fallback: DuckDuckGo full HTML — this one supports the df= time filter
+  results = await searchDDGHTML(query, maxResults, df);
   if (results.length >= 2) return results;
 
   logger.info(`Free search returned ${results.length} results for: "${query}"`);
@@ -305,10 +323,11 @@ async function searchDDGLite(query: string, maxResults = 5): Promise<SearchResul
   }
 }
 
-async function searchDDGHTML(query: string, maxResults = 5): Promise<SearchResult[]> {
+async function searchDDGHTML(query: string, maxResults = 5, df = ''): Promise<SearchResult[]> {
   try {
+    const urlParams = `q=${encodeURIComponent(query)}${df ? `&df=${df}` : ''}`;
     const response = await axios.get(
-      `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
+      `https://html.duckduckgo.com/html/?${urlParams}`,
       { headers: SEARCH_HEADERS, timeout: 8000 }
     );
 
@@ -544,6 +563,75 @@ function scoreResults(query: string, results: SearchResult[]): { results: Search
   return { results: scored, confidence: Math.round(confidence * 100) / 100 };
 }
 
+// ── Perplexity Primary (fresh, cited, first-party search) ───────────
+
+async function searchPerplexity(
+  query: string,
+  maxResults = 5,
+  recency: 'day' | 'week' | 'month' | 'year' | null = null
+): Promise<SearchResult[]> {
+  const apiKey = process.env.PERPLEXITY_API_KEY;
+  if (!apiKey) return [];
+
+  try {
+    const body: Record<string, any> = {
+      model: 'sonar',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a web research tool. Return a concise, factual summary of the latest information relevant to the user query. Prioritize recent developments and cite specific dates when known.',
+        },
+        { role: 'user', content: query },
+      ],
+      max_tokens: 1000,
+      temperature: 0.2,
+      return_citations: true,
+    };
+    if (recency) body.search_recency_filter = recency;
+
+    const response = await axios.post(
+      'https://api.perplexity.ai/chat/completions',
+      body,
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 20000,
+      }
+    );
+
+    const data = response.data;
+    const answer: string = data?.choices?.[0]?.message?.content || '';
+    const citations: string[] = Array.isArray(data?.citations) ? data.citations : [];
+
+    if (citations.length === 0 && !answer) return [];
+
+    // If Perplexity returned an answer but no citations, still use the answer as fresh context
+    if (citations.length === 0) {
+      return [{
+        title: 'Perplexity research summary',
+        url: 'https://www.perplexity.ai',
+        content: answer.slice(0, 2000),
+        score: 1,
+      }];
+    }
+
+    // Turn each citation into a SearchResult stub — crawlUrl() in enrichResults
+    // will fetch the real page title + body. Seed the first result with
+    // Perplexity's answer so the model still gets fresh context even if a crawl fails.
+    return citations.slice(0, maxResults).map((url, i) => ({
+      title: url,
+      url,
+      content: i === 0 ? answer.slice(0, 1500) : '',
+      score: 1 - (i * 0.1),
+    }));
+  } catch (err: any) {
+    logger.error(`Perplexity search failed: ${err?.response?.status || ''} ${err.message}`);
+    return [];
+  }
+}
+
 // ── Tavily Fallback ──────────────────────────────────────────────────
 
 async function searchTavily(query: string, maxResults = 5): Promise<SearchResult[]> {
@@ -606,11 +694,15 @@ function buildContextText(query: string, results: SearchResult[], source: string
 const CONFIDENCE_THRESHOLD = 0.5; // Higher threshold = Tavily kicks in more often = better results
 
 /**
- * Perform hybrid web search:
+ * Perform web search with freshness-first priority:
  * 1. Check cache
- * 2. Try DuckDuckGo (free)
- * 3. If low confidence → fallback to Tavily
- * 4. Cache results
+ * 2. Try Perplexity sonar (fresh, cited, handles recency natively)
+ * 3. Fallback: DuckDuckGo with df= time filter
+ * 4. Fallback: Tavily (paid)
+ * 5. Cache results
+ *
+ * Perplexity is primary because it reliably returns fresh news with citations.
+ * DDG/Tavily only fire if Perplexity is unavailable or returns nothing useful.
  */
 export async function searchWeb(query: string, maxResults = 5): Promise<WebSearchResponse> {
   // 1. Check cache
@@ -620,29 +712,38 @@ export async function searchWeb(query: string, maxResults = 5): Promise<WebSearc
     return cached;
   }
 
-  // 2. Try free search (DuckDuckGo Lite → DuckDuckGo HTML)
-  // For time-sensitive queries, append current year to bias toward recent results
   const timeSensitive = isTimeSensitive(query);
-  const year = new Date().getFullYear();
-  const searchQuery = timeSensitive && !query.includes(String(year)) ? `${query} ${year}` : query;
-  let results = await searchFree(searchQuery, maxResults);
-  let source: 'duckduckgo' | 'tavily' = 'duckduckgo';
+  const recency = getRecencyFilter(query);
+  let source: 'perplexity' | 'duckduckgo' | 'tavily' = 'duckduckgo';
+  let results: SearchResult[] = [];
 
-  // Enrich top results with crawled content (parallel, fast)
-  if (results.length > 0) {
-    results = await enrichResults(results);
+  // 2. Perplexity primary — fresh, cited, handles recency natively
+  const perplexityResults = await searchPerplexity(query, maxResults, recency.perplexity);
+  if (perplexityResults.length > 0) {
+    results = await enrichResults(perplexityResults);
+    source = 'perplexity';
+    logger.info(`Perplexity returned ${perplexityResults.length} citations for: "${query}" (recency=${recency.perplexity || 'any'})`);
   }
 
-  // 3. Score results
+  // 3. DDG fallback — only if Perplexity failed or is not configured
+  if (results.length < 2) {
+    const year = new Date().getFullYear();
+    const ddgQuery = timeSensitive && !query.includes(String(year)) ? `${query} ${year}` : query;
+    const ddgResults = await searchFree(ddgQuery, maxResults, recency.ddg);
+    if (ddgResults.length > 0) {
+      results = await enrichResults(ddgResults);
+      source = 'duckduckgo';
+    }
+  }
+
+  // 4. Score whatever we have
   let { results: scored, confidence } = scoreResults(query, results);
 
-  // 4. Fallback to Tavily if confidence too low (always use Tavily for time-sensitive queries — better recency)
-  const tavilyThreshold = timeSensitive ? 0.9 : CONFIDENCE_THRESHOLD; // Force Tavily for news/recent queries
-  if (confidence < tavilyThreshold || scored.length < 2) {
-    logger.info(`${timeSensitive ? 'Time-sensitive query' : 'Low confidence'} (${confidence}), falling back to Tavily for: "${query}"`);
+  // 5. Tavily last-resort — only if we still have nothing good
+  if (confidence < CONFIDENCE_THRESHOLD || scored.length < 2) {
+    logger.info(`Low confidence (${confidence}), falling back to Tavily for: "${query}"`);
     const tavilyResults = await searchTavily(query, maxResults);
     if (tavilyResults.length > 0) {
-      // Enrich Tavily results with OG metadata from crawling
       const enrichedTavily = await enrichResults(tavilyResults);
       const tavilyScored = scoreResults(query, enrichedTavily);
       if (tavilyScored.confidence > confidence) {
@@ -663,7 +764,6 @@ export async function searchWeb(query: string, maxResults = 5): Promise<WebSearc
     contextText,
   };
 
-  // 5. Cache results
   if (scored.length > 0) {
     saveToCache(query, response);
   }
