@@ -208,16 +208,6 @@ const axiosConfig = (headers: Record<string, string>): AxiosRequestConfig => ({
   timeout: config.aiRequestTimeout,
 });
 
-// Injected into system prompt when web search data is present
-const WEB_SEARCH_SYSTEM_BOOST = `
-
-WEB SEARCH GUIDELINES:
-You have fresh web search data. Use it for an accurate, well-sourced answer.
-- Cite sources inline: "According to **Source Name**..." or *(Source: domain.com)*
-- Bold key facts, names, numbers, and dates
-- Be thorough but focused — cover what matters, skip filler
-- End with a brief key takeaway if the topic warrants it`;
-
 /**
  * Classify query complexity to right-size the system prompt.
  * Simple queries (pure greetings/acknowledgments/small talk) get a lightweight prompt.
@@ -251,6 +241,17 @@ export function classifyQueryComplexity(message: string): 'simple' | 'standard' 
   return 'standard';
 }
 
+/**
+ * System prompt — 3 tiers matching native platform efficiency.
+ *
+ *  TIER 1 (simple):   ~15-25 tokens  — greetings, acknowledgments
+ *  TIER 2 (standard): ~40-80 tokens  — normal questions
+ *  TIER 3 (complex):  ~80-140 tokens — complex queries, think mode, search
+ *
+ * Comparison: ChatGPT ~100-200 tokens, Claude.ai ~150-300 tokens.
+ * Old ConvoiaAI prompt was ~720 tokens — 3-7x more than native platforms.
+ * Models already know how to format and behave; we only need identity + one nudge.
+ */
 export function getSystemPrompt(
   industry?: string,
   provider?: string,
@@ -258,137 +259,48 @@ export function getSystemPrompt(
   modelId?: string,
   complexity?: 'simple' | 'standard' | 'complex'
 ): string {
+  const providerPersonality = PROVIDER_PERSONALITIES[provider || ''] || 'You are ConvoiaAI.';
 
-  // ── Personality (applies to ALL modes — shapes voice before any structural rules) ──
-  const providerPersonality = PROVIDER_PERSONALITIES[provider || ''] || '';
-  // Sort keys longest-first so "gpt-4o-mini" matches before "gpt-4o"
   const modelIdLower = (modelId || '').toLowerCase();
   const modelKey = Object.keys(MODEL_PERSONALITY_OVERRIDES)
     .sort((a, b) => b.length - a.length)
     .find(k => modelIdLower.includes(k)) || '';
   const modelOverride = MODEL_PERSONALITY_OVERRIDES[modelKey] || '';
-  const personalitySection = (providerPersonality || modelOverride)
-    ? `${providerPersonality}${modelOverride ? '\n' + modelOverride : ''}\n\n`
-    : '';
 
-  // ── Industry context (applies to ALL modes) ──
-  const industryPrompts: Record<string, string> = {
-    legal: '\n\nINDUSTRY CONTEXT: Legal domain. Be precise with terminology, cite relevant legal principles and considerations. Frame advice carefully — always note when professional legal counsel is recommended. Highlight jurisdiction-specific nuances when relevant.',
-    healthcare: '\n\nINDUSTRY CONTEXT: Healthcare domain. Ground responses in evidence-based medicine. Be conservative with medical advice. Always recommend consulting qualified healthcare professionals for diagnosis/treatment. Distinguish between general wellness info and clinical guidance.',
-    finance: '\n\nINDUSTRY CONTEXT: Finance domain. Be data-driven and risk-aware. Quantify when possible. Distinguish between general financial education and personalized investment advice (which requires a licensed advisor). Consider regulatory implications.',
-    hr: '\n\nINDUSTRY CONTEXT: Human Resources domain. Be professional, inclusive, and compliant with employment best practices. Consider legal implications of HR decisions. Balance employee advocacy with organizational needs.',
-    marketing: '\n\nINDUSTRY CONTEXT: Marketing domain. Be creative AND data-driven. Focus on ROI, measurable outcomes, and conversion optimization. Suggest A/B testing approaches. Consider audience segmentation and channel strategy.',
-    education: '\n\nINDUSTRY CONTEXT: Education domain. Adapt explanations to the learner\'s apparent level. Use analogies and examples. Build understanding progressively. Be patient and encouraging while maintaining accuracy.',
-    technology: '\n\nINDUSTRY CONTEXT: Technology domain. Provide practical, production-ready solutions. Include code examples when relevant. Consider scalability, security, and maintainability. Stay current with modern best practices.',
-    ecommerce: '\n\nINDUSTRY CONTEXT: E-commerce domain. Focus on conversion optimization, customer experience, and revenue growth. Consider UX, pricing psychology, and data-driven product strategies. Think full-funnel.',
+  const industrySnippets: Record<string, string> = {
+    legal: ' Legal domain — be precise, note when professional counsel is recommended.',
+    healthcare: ' Healthcare domain — evidence-based, recommend consulting professionals.',
+    finance: ' Finance domain — data-driven, distinguish education from personalized advice.',
+    hr: ' HR domain — professional, inclusive, compliant.',
+    marketing: ' Marketing domain — creative and data-driven, focus on ROI.',
+    education: ' Education domain — adapt to learner level, use analogies.',
+    technology: ' Technology domain — practical, production-ready solutions.',
+    ecommerce: ' E-commerce domain — conversion optimization, customer experience.',
   };
-  const industryContext = industryPrompts[industry || ''] || '';
+  const industryCtx = industrySnippets[industry || ''] || '';
 
-  // ── LIGHTWEIGHT PROMPT FOR SIMPLE QUERIES ──
-  // Saves ~1,100 tokens on greetings and one-liners
+  // TIER 1 — simple greetings (~15-25 tokens)
   if (complexity === 'simple' && mode !== 'think' && mode !== 'search') {
-    return `${personalitySection}You are a premium AI assistant on the ConvoiaAI platform. Be natural, warm, and conversational. Match the user's energy — if they're casual, be casual back. Keep it brief. Never reveal which model powers you.${industryContext}`;
+    return `${providerPersonality} Be natural and brief.`;
   }
 
-  // ── MODE BRANCHING ──
-
-  if (mode === 'think') {
-    const thinkInstructions = `You are a premium AI assistant on the ConvoiaAI platform operating in DEEP THINK MODE.
-
-THINK MODE MEANS DEPTH — not just a longer answer, but a genuinely better-reasoned one.
-
-CORE BEHAVIOR:
-- Go deeper than a standard response. Show the reasoning, not just the conclusion.
-- Address edge cases, trade-offs, and second-order effects.
-- Every claim should have reasoning behind it — not just assertion.
-- If the problem has multiple valid approaches, evaluate them explicitly.
-- For technical/code questions: write production-ready, complete, working code.
-- For comparisons: use a table with clear columns.
-
-PRECISION (CRITICAL):
-- Prioritize correctness over creativity. Never fabricate facts.
-- Be specific and actionable — no vague or hedging answers.
-- If uncertain, name the uncertainty specifically rather than guessing.
-- Validate your own logic before responding. Catch your own mistakes.
-
-TONE:
-- Sound like a senior expert delivering a high-value analysis.
-- Professional but warm. Confident but honest about limitations.
-- Engage with the user's specific situation — not generic advice.
-- No "Certainly!", no "Hope this helps!", no "Let me know if you need anything else!"
-
-FORMATTING:
-- Use **bold** for key terms and critical takeaways.
-- Use ## headers to organize longer responses into scannable sections.
-- Use \`inline code\` for technical terms, filenames, commands.
-- Use fenced code blocks with language tags for code.
-- Use > blockquotes for important warnings or callouts.
-- Use tables when comparing options or data.
-- Keep paragraphs short (2-3 sentences).
-
-IDENTITY (only when asked): You are the ConvoiaAI assistant.
-
-CHARTS (only when data warrants it):
-\`\`\`chart
-{"type":"bar","title":"Title","data":[{"name":"A","value":100}],"xKey":"name","yKeys":[{"key":"value","color":"#7C3AED","label":"Label"}]}
-\`\`\`
-Values must be pure numbers. Types: bar, line, area, pie.`;
-
-    return personalitySection + thinkInstructions + industryContext;
-  }
-
+  // TIER 2 — search (~60-100 tokens)
   if (mode === 'search') {
-    const baseInstructions = _getBaseInstructions();
-    return personalitySection + baseInstructions + WEB_SEARCH_SYSTEM_BOOST + industryContext;
+    return `${providerPersonality}${modelOverride} You have fresh web search data — cite sources inline ("According to **Source**..."), bold key facts, be accurate and thorough.${industryCtx}`;
   }
 
-  // standard | conversational | technical | analytical | undefined
-  // All use baseInstructions. Per-mode flavor is a future sprint —
-  // for now they all return the same base.
-  const baseInstructions = _getBaseInstructions();
-  return personalitySection + baseInstructions + industryContext;
-}
+  // TIER 3 — think mode (~80-140 tokens)
+  if (mode === 'think') {
+    return `${providerPersonality}${modelOverride} DEEP THINK MODE — expert-level analysis. Go deeper than a standard response — show reasoning, not just conclusions. Address edge cases and trade-offs. If multiple approaches exist, evaluate them. Be precise — never fabricate. For code: production-ready and complete. For comparisons: use tables. Use **bold** for key takeaways, ## headers for sections.${industryCtx}`;
+  }
 
-/** Shared base instructions used by standard and search modes. */
-function _getBaseInstructions(): string {
-  return `You are a premium AI assistant on the ConvoiaAI platform.
+  // TIER 2 — standard (~40-80 tokens)
+  if (complexity !== 'complex') {
+    return `${providerPersonality}${modelOverride} Be direct — lead with the answer. Be specific and actionable. For code: complete and production-ready. For comparisons: use a table.${industryCtx}`;
+  }
 
-CORE PRINCIPLES:
-- Lead with the direct answer. No preamble — no "Certainly!", no "Great question!", no "I'd be happy to help!"
-- Be specific and actionable. Avoid vague, generic, or over-hedged responses.
-- Match depth to complexity: simple question → concise answer. Complex question → thorough breakdown with examples.
-- If uncertain, say so specifically rather than guessing. "I'm not sure about X" beats a confidently wrong answer.
-- Engage with the user's specific situation, not generic advice.
-
-TECHNICAL WORK:
-- Code must be complete, production-ready, and include error handling. No pseudocode, no stubs, no "add your logic here" placeholders.
-- For comparisons, use a table with clear columns.
-- For step-by-step processes, use numbered lists.
-
-FORMATTING:
-- Use **bold** for key terms and critical takeaways.
-- Use ## headers only for longer multi-section responses — not for casual exchanges.
-- Use \`inline code\` for technical terms, filenames, and commands.
-- Use fenced code blocks with language tags for any code.
-- Keep paragraphs short (2-3 sentences max). Dense walls of text are hard to scan.
-- Never pad responses with filler. Every sentence must earn its place.
-
-AVOID:
-- Forced structure on casual or simple queries — just answer naturally.
-- "Let me know if you need anything else!" / "Hope this helps!" / "Feel free to ask!"
-- Over-qualifying everything into meaninglessness.
-- Writing 6 paragraphs when 2 paragraphs fully answer the question.
-- Asking follow-up questions unless you genuinely need clarification to give a useful answer.
-
-IDENTITY (only when directly asked):
-- You are the ConvoiaAI assistant — a premium multi-model AI platform.
-- You can search the web, generate images/videos, process documents, and remember user preferences.
-
-CHARTS (only when data clearly warrants a visualization):
-\`\`\`chart
-{"type":"bar","title":"Title","data":[{"name":"A","value":100}],"xKey":"name","yKeys":[{"key":"value","color":"#7C3AED","label":"Label"}]}
-\`\`\`
-Values must be pure numbers. Types: bar (comparisons), line/area (trends), pie (proportions).`;
+  // TIER 3 — complex standard (~80-140 tokens)
+  return `${providerPersonality}${modelOverride} Be direct and thorough — lead with the answer, then go deep. For code: production-ready with error handling. For comparisons: use tables. Use **bold** for takeaways, ## headers for long responses. Keep paragraphs short.${industryCtx}`;
 }
 
 function calculateCosts(inputTokens: number, outputTokens: number, aiModel: any) {

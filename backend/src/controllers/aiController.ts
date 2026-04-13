@@ -402,9 +402,11 @@ export const queryAIStream = async (req: Request, res: Response) => {
     // Aggressive trimming to prevent old verbose responses from inflating
     // input tokens. Simple/standard queries keep last few turns; complex
     // queries can go deeper but still have a ceiling.
+    // Matches native platform behavior: simple queries get minimal continuity,
+    // standard gets normal conversation depth, complex gets full context.
     const MAX_HISTORY_MESSAGES = queryComplexity === 'simple' ? 4
-      : queryComplexity === 'standard' ? 8
-      : 16;
+      : queryComplexity === 'standard' ? 30
+      : 50;
     let cappedMessages = messages;
     if (messages.length > MAX_HISTORY_MESSAGES) {
       const systemMsg = messages[0]?.role === 'system' ? [messages[0]] : [];
@@ -775,17 +777,15 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
       }
     }
 
-    // ── INTELLIGENT MEMORY SYSTEM ──────────────────────────────
-    // 1. Retrieve relevant memories via semantic search (top 5)
-    // 2. Extract new memories from user message (background)
-    // 3. Build compact context string (max ~375 tokens)
-    // Skip memory for simple queries (greetings) — saves ~100-150 tokens
+    // Smart memory injection — matches how Claude.ai handles memory.
+    // Simple queries get no memory. Standard queries get ~50 tokens.
+    // Complex queries get ~150 tokens. Single compact line format.
     let memoryPrompt = '';
     if (queryComplexity !== 'simple') {
+      const memMaxChars = queryComplexity === 'complex' ? 600 : 200;
       try {
-        memoryPrompt = await processMemoryForQuery(user.id, lastUserText);
+        memoryPrompt = await processMemoryForQuery(user.id, lastUserText, memMaxChars);
       } catch {
-        // Fallback to simple memory if vector service fails
         try { memoryPrompt = await getUserMemoryPrompt(user.id); } catch { /* silent */ }
       }
     }
@@ -1249,12 +1249,24 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
                 });
               } catch { /* budget tracking is non-critical */ }
 
+              // User-visible tokens: subtract ConvoiaAI platform overhead
+              // (system prompt + memory) so the user sees what their content
+              // actually cost, matching ChatGPT/Claude.ai display conventions.
+              // Billing still uses the real provider tokens above.
+              const systemOverheadEstimate = queryComplexity === 'simple' ? 20
+                : queryComplexity === 'complex' ? 140
+                : 80;
+              const memoryOverhead = memoryPrompt ? Math.ceil(memoryPrompt.length / 4) : 0;
+              const platformOverhead = systemOverheadEstimate + memoryOverhead;
+              const userVisibleInput = Math.max(0, inputTokens - platformOverhead);
+              const userVisibleTotal = userVisibleInput + outputTokens;
+
               if (!streamEnded && !res.writableEnded) {
                 res.write(`data: ${JSON.stringify({
                   type: 'done',
                   model: aiModel.name,
                   provider: aiModel.provider,
-                  tokens: { input: inputTokens, output: outputTokens, total: totalTokensUsed },
+                  tokens: { input: userVisibleInput, output: outputTokens, total: userVisibleTotal },
                   tokensUsed: walletTokens,
                   cost: { charged: customerPrice.toFixed(6) },
                   executionTime,

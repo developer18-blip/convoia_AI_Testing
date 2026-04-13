@@ -338,32 +338,23 @@ function keywordSimilarity(query: string, memory: string): number {
 // ── Prompt Building ──────────────────────────────────────────────────
 
 /**
- * Build a memory context string for injection into system prompt.
- * Optimized: max 300-500 tokens.
+ * Build a compact memory context string for injection into system prompt.
+ * Single-line format matches how Claude.ai / ChatGPT memory works.
+ * Default cap: ~150 tokens (600 chars). Pass smaller for standard queries.
  */
-export function buildMemoryContext(memories: RetrievedMemory[]): string {
+export function buildMemoryContext(memories: RetrievedMemory[], maxChars = 600): string {
   if (memories.length === 0) return '';
 
-  // Group by category
-  const groups: Record<string, string[]> = {};
-  let totalChars = 0;
-  const MAX_CHARS = 1500; // ~375 tokens
-
+  let memStr = '';
   for (const mem of memories) {
-    if (totalChars >= MAX_CHARS) break;
-    const cat = mem.category || 'general';
-    if (!groups[cat]) groups[cat] = [];
-    groups[cat].push(mem.content);
-    totalChars += mem.content.length;
+    const entry = (mem.content || '').trim();
+    if (!entry) continue;
+    if (memStr.length + entry.length + 2 > maxChars) break;
+    memStr += (memStr ? '; ' : '') + entry;
   }
 
-  let context = '\n[USER MEMORY — Personalize responses using this context. This persists across all conversations.]\n';
-  for (const [category, items] of Object.entries(groups)) {
-    context += `${category}: ${items.join('. ')}.\n`;
-  }
-  context += '[Use this naturally. Don\'t explicitly mention "memory" unless asked.]\n';
-
-  return context;
+  if (!memStr) return '';
+  return `\n[User context: ${memStr}]`;
 }
 
 // ── Full Pipeline ────────────────────────────────────────────────────
@@ -376,13 +367,14 @@ export function buildMemoryContext(memories: RetrievedMemory[]): string {
  */
 export async function processMemoryForQuery(
   userId: string,
-  userMessage: string
+  userMessage: string,
+  maxChars = 600
 ): Promise<string> {
   // Step 1: Retrieve relevant memories
   const memories = await retrieveRelevantMemories(userId, userMessage, 5);
 
   // Step 2: Build context
-  const context = buildMemoryContext(memories);
+  const context = buildMemoryContext(memories, maxChars);
 
   // Step 3: Extract and store new memories (background, don't block)
   const extracted = extractMemoriesFromMessage(userMessage);

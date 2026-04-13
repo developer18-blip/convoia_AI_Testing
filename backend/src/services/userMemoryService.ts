@@ -113,59 +113,43 @@ export async function saveMemories(userId: string, memories: Array<{ category: s
 /**
  * Load all memories for a user and format as a system prompt section.
  */
-export async function getUserMemoryPrompt(userId: string): Promise<string> {
+export async function getUserMemoryPrompt(userId: string, maxChars = 600): Promise<string> {
   try {
     const memories = await prisma.userMemory.findMany({
       where: { userId },
       orderBy: { updatedAt: 'desc' },
-      take: 50,
+      take: 10,
     });
 
     if (!memories || memories.length === 0) return '';
 
-    const sections: Record<string, string[]> = {};
+    const formatEntry = (mem: { key: string; value: string }): string => {
+      switch (mem.key) {
+        case 'user_name': return `name: ${mem.value}`;
+        case 'nickname':  return `nickname: ${mem.value}`;
+        case 'role':      return `role: ${mem.value}`;
+        case 'company':   return `company: ${mem.value}`;
+        case 'location':  return `location: ${mem.value}`;
+        case 'language':
+        case 'response_language': return `respond in ${mem.value}`;
+        case 'age':       return `age: ${mem.value}`;
+        case 'timezone':  return `tz: ${mem.value}`;
+        default:
+          if (mem.key.startsWith('user_fact') || mem.key.startsWith('always_rule')) return mem.value;
+          if (mem.key.startsWith('style_preference')) return `prefers ${mem.value}`;
+          return `${mem.key}: ${mem.value}`;
+      }
+    };
+
+    let memStr = '';
     for (const mem of memories) {
-      const cat = mem.category || 'general';
-      if (!sections[cat]) sections[cat] = [];
-
-      // Format based on key type
-      if (mem.key === 'user_name') {
-        sections[cat].push(`User's name is "${mem.value}"`);
-      } else if (mem.key === 'nickname') {
-        sections[cat].push(`User prefers to be called "${mem.value}" in friendly context`);
-      } else if (mem.key === 'role') {
-        sections[cat].push(`User's role: ${mem.value}`);
-      } else if (mem.key === 'company') {
-        sections[cat].push(`User works at: ${mem.value}`);
-      } else if (mem.key === 'location') {
-        sections[cat].push(`User is based in: ${mem.value}`);
-      } else if (mem.key === 'language' || mem.key === 'response_language') {
-        sections[cat].push(`Respond in: ${mem.value}`);
-      } else if (mem.key === 'age') {
-        sections[cat].push(`User's age: ${mem.value}`);
-      } else if (mem.key === 'timezone') {
-        sections[cat].push(`User's timezone: ${mem.value}`);
-      } else if (mem.key.startsWith('user_fact')) {
-        sections[cat].push(mem.value);
-      } else if (mem.key.startsWith('always_rule')) {
-        sections[cat].push(mem.value);
-      } else if (mem.key.startsWith('style_preference')) {
-        sections[cat].push(`User prefers: ${mem.value}`);
-      } else {
-        sections[cat].push(`${mem.key}: ${mem.value}`);
-      }
+      const entry = formatEntry(mem).trim();
+      if (!entry) continue;
+      if (memStr.length + entry.length + 2 > maxChars) break;
+      memStr += (memStr ? '; ' : '') + entry;
     }
 
-    let prompt = '\n\n[USER MEMORY — Use this information to personalize responses. This is persistent across all conversations.]\n';
-    for (const [category, items] of Object.entries(sections)) {
-      prompt += `\n${category.toUpperCase()}:\n`;
-      for (const item of items) {
-        prompt += `• ${item}\n`;
-      }
-    }
-    prompt += '\n[Always use the user\'s name when appropriate. Maintain a personalized, friendly tone based on saved preferences.]\n';
-
-    return prompt;
+    return memStr ? `\n[User context: ${memStr}]` : '';
   } catch (err: any) {
     logger.warn(`Failed to load user memories: ${err.message}`);
     return '';
