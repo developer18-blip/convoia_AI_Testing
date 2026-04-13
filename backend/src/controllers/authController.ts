@@ -331,7 +331,8 @@ export const googleMobileRedirect = asyncHandler(async (_req: Request, res: Resp
 export const googleCallback = asyncHandler(async (req: Request, res: Response) => {
   const { code } = req.query;
   if (!code || typeof code !== 'string') {
-    res.redirect('https://localhost/login?error=google_failed');
+    // Mobile flow — return to app via deep link so it can surface the error
+    res.redirect('convoia://auth?error=google_failed');
     return;
   }
 
@@ -340,7 +341,7 @@ export const googleCallback = asyncHandler(async (req: Request, res: Response) =
     const { tokens } = await mobileOAuthClient.getToken(code);
     const idToken = tokens.id_token;
     if (!idToken) {
-      res.redirect('https://localhost/login?error=no_token');
+      res.redirect('convoia://auth?error=no_token');
       return;
     }
 

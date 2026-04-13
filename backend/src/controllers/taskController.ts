@@ -4,6 +4,46 @@ import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { isValidUUID } from '../utils/validators.js';
 import { createNotification } from '../utils/notify.js';
 
+// Task access policy: creator, assignee, platform_admin, or
+// org_owner/manager in the same org.
+async function canAccessTask(
+  taskId: string,
+  userId: string,
+  userRole: string,
+  userOrgId: string | null,
+): Promise<boolean> {
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { createdById: true, assignedToId: true, organizationId: true },
+  });
+  if (!task) return false;
+  if (task.createdById === userId) return true;
+  if (task.assignedToId === userId) return true;
+  if (userRole === 'platform_admin') return true;
+  if (
+    task.organizationId &&
+    task.organizationId === userOrgId &&
+    (userRole === 'org_owner' || userRole === 'manager')
+  ) {
+    return true;
+  }
+  return false;
+}
+
+async function canAccessSubtask(
+  subtaskId: string,
+  userId: string,
+  userRole: string,
+  userOrgId: string | null,
+): Promise<boolean> {
+  const subtask = await prisma.subTask.findUnique({
+    where: { id: subtaskId },
+    select: { taskId: true },
+  });
+  if (!subtask) return false;
+  return canAccessTask(subtask.taskId, userId, userRole, userOrgId);
+}
+
 // ============ 1. POST /api/tasks ============
 export const createTask = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) throw new AppError('Unauthorized', 401);
@@ -402,6 +442,10 @@ export const addSubtask = asyncHandler(async (req: Request, res: Response) => {
   const task = await prisma.task.findUnique({ where: { id } });
   if (!task) throw new AppError('Task not found', 404);
 
+  if (!(await canAccessTask(id, req.user.userId, req.user.role, req.user.organizationId ?? null))) {
+    throw new AppError('You do not have permission to modify this task', 403);
+  }
+
   const count = await prisma.subTask.count({ where: { taskId: id } });
   const subtask = await prisma.subTask.create({
     data: { taskId: id, title: title.trim(), sortOrder: count },
@@ -417,6 +461,10 @@ export const toggleSubtask = asyncHandler(async (req: Request, res: Response) =>
   const subtask = await prisma.subTask.findUnique({ where: { id: subtaskId } });
   if (!subtask) throw new AppError('Subtask not found', 404);
 
+  if (!(await canAccessSubtask(subtaskId, req.user.userId, req.user.role, req.user.organizationId ?? null))) {
+    throw new AppError('You do not have permission to modify this subtask', 403);
+  }
+
   const updated = await prisma.subTask.update({
     where: { id: subtaskId },
     data: { isCompleted: !subtask.isCompleted },
@@ -429,6 +477,10 @@ export const deleteSubtask = asyncHandler(async (req: Request, res: Response) =>
   if (!req.user) throw new AppError('Unauthorized', 401);
   const { subtaskId } = req.params;
 
+  if (!(await canAccessSubtask(subtaskId, req.user.userId, req.user.role, req.user.organizationId ?? null))) {
+    throw new AppError('You do not have permission to delete this subtask', 403);
+  }
+
   await prisma.subTask.delete({ where: { id: subtaskId } });
   res.json({ success: true, message: 'Subtask deleted' });
 });
@@ -438,6 +490,10 @@ export const getTaskDetail = asyncHandler(async (req: Request, res: Response) =>
   if (!req.user) throw new AppError('Unauthorized', 401);
   const { id } = req.params;
   if (!isValidUUID(id)) throw new AppError('Invalid task ID', 400);
+
+  if (!(await canAccessTask(id, req.user.userId, req.user.role, req.user.organizationId ?? null))) {
+    throw new AppError('You do not have permission to view this task', 403);
+  }
 
   const task = await prisma.task.findUnique({
     where: { id },

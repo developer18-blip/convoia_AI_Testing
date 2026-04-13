@@ -12,7 +12,53 @@
 
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import { URL } from 'url';
 import logger from '../config/logger.js';
+
+// ── SSRF Protection ──────────────────────────────────────────────────
+// Search engines return arbitrary URLs. crawlUrl() must refuse internal
+// hosts and private IP ranges so an attacker can't use search results
+// to probe the server's network (AWS metadata, localhost, RFC1918, etc.).
+
+const SSRF_BLOCKED_HOSTS = new Set([
+  'localhost',
+  '127.0.0.1',
+  '0.0.0.0',
+  '::1',
+  '[::1]',
+  'metadata.google.internal',
+  'metadata.google.com',
+  '169.254.169.254', // AWS/GCP instance metadata
+]);
+
+const SSRF_PRIVATE_IP_PREFIXES = [
+  '127.',          // loopback
+  '10.',           // RFC1918 class A
+  '172.16.', '172.17.', '172.18.', '172.19.', '172.20.', '172.21.',
+  '172.22.', '172.23.', '172.24.', '172.25.', '172.26.', '172.27.',
+  '172.28.', '172.29.', '172.30.', '172.31.', // RFC1918 class B
+  '192.168.',      // RFC1918 class C
+  '169.254.',      // link-local / AWS metadata
+  '0.',            // current network
+  '198.18.',       // benchmarking
+  'fc00:', 'fd00:', // IPv6 unique local
+  'fe80:',         // IPv6 link-local
+];
+
+function isBlockedCrawlURL(urlStr: string): boolean {
+  try {
+    const parsed = new URL(urlStr);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return true;
+    const host = parsed.hostname.toLowerCase();
+    if (SSRF_BLOCKED_HOSTS.has(host)) return true;
+    for (const prefix of SSRF_PRIVATE_IP_PREFIXES) {
+      if (host.startsWith(prefix)) return true;
+    }
+    return false;
+  } catch {
+    return true;
+  }
+}
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -368,6 +414,13 @@ interface CrawlResult {
 
 async function crawlUrl(url: string): Promise<CrawlResult> {
   const empty: CrawlResult = { content: '' };
+
+  // SSRF guard — refuse localhost, RFC1918, AWS metadata, etc.
+  if (isBlockedCrawlURL(url)) {
+    logger.warn(`SSRF blocked crawl to: ${url}`);
+    return empty;
+  }
+
   try {
     // Skip known problematic sites
     if (/\.(pdf|zip|exe|dmg|mp4|mp3|avi)$/i.test(url)) return empty;

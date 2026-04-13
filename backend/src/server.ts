@@ -79,13 +79,13 @@ const allowedOrigins = [
   process.env.CORS_ORIGIN,
   process.env.FRONTEND_URL,
   'https://intellect.convoia.com',
-  // Capacitor native app origins (Android uses https://localhost, iOS uses capacitor://localhost)
+  // Capacitor native app origins — Android uses https://localhost, iOS uses capacitor://localhost
   'https://localhost',
   'capacitor://localhost',
   'ionic://localhost',
-  'http://localhost',
-  // Development origins — excluded in production
+  // Development-only origins
   ...(isDev ? [
+    'http://localhost',
     'http://localhost:5173',
     'http://localhost:5175',
     'http://localhost:8080',
@@ -99,8 +99,16 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-      // Allow: ngrok domains, convoia.com subdomains, Capacitor native, configured origins
-      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.convoia.com') || origin.endsWith('.ngrok-free.dev') || origin.endsWith('.ngrok.io') || origin.startsWith('capacitor://') || origin.startsWith('ionic://')) {
+      // Always allowed: configured origins, convoia.com subdomains, Capacitor/Ionic native.
+      // Ngrok tunnels only in dev (used for mobile testing against a local backend).
+      const allowed =
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        origin.endsWith('.convoia.com') ||
+        origin.startsWith('capacitor://') ||
+        origin.startsWith('ionic://') ||
+        (isDev && (origin.endsWith('.ngrok-free.dev') || origin.endsWith('.ngrok.io') || origin.endsWith('.ngrok-free.app')));
+      if (allowed) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));
@@ -110,7 +118,9 @@ app.use(
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
   })
-); 
+);
+
+logger.info(`CORS: env=${isDev ? 'dev' : 'prod'} allowedOrigins=[${allowedOrigins.join(', ')}]`); 
 
 // ============== COMPRESSION ==============
 // Skip compression for SSE streaming endpoints (compression buffers chunks)
