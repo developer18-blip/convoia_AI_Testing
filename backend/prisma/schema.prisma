@@ -8,29 +8,29 @@ datasource db {
 }
 
 model Organization {
-  id              String          @id @default(uuid())
-  name            String
-  email           String          @unique
-  phone           String?
-  website         String?
-  logo            String?
-  industry        String?
-  tier            String          @default("free")
-  status          String          @default("active")
-  orgTokenBalance Int             @default(0)
-  monthlyBudget   Float?
-  budgetAlertSent Boolean         @default(false)
-  allowEmployeeAvatar Boolean      @default(true)
-  ownerId         String
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  apiKeys         APIKey[]
-  billingRecords  BillingRecord[]
-  budgets         Budget[]
-  owner           User            @relation("OrganizationOwner", fields: [ownerId], references: [id])
-  subscriptions   Subscription[]
-  usageLogs       UsageLog[]
-  users           User[]          @relation("OrganizationUsers")
+  id                  String          @id @default(uuid())
+  name                String
+  email               String          @unique
+  phone               String?
+  website             String?
+  logo                String?
+  industry            String?
+  tier                String          @default("free")
+  status              String          @default("active")
+  orgTokenBalance     Int             @default(0)
+  monthlyBudget       Float?
+  budgetAlertSent     Boolean         @default(false)
+  allowEmployeeAvatar Boolean         @default(true)
+  ownerId             String
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  apiKeys             APIKey[]
+  billingRecords      BillingRecord[]
+  budgets             Budget[]
+  owner               User            @relation("OrganizationOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  subscriptions       Subscription[]
+  usageLogs           UsageLog[]
+  users               User[]          @relation("OrganizationUsers")
 
   // Enterprise features
   tokenAllocations TokenAllocation[]
@@ -72,23 +72,23 @@ model User {
   ownedOrganizations Organization[]  @relation("OrganizationOwner")
   subscriptions      Subscription[]
   usageLogs          UsageLog[]
-  manager            User?           @relation("ManagerEmployee", fields: [managerId], references: [id])
+  manager            User?           @relation("ManagerEmployee", fields: [managerId], references: [id], onDelete: SetNull)
   employees          User[]          @relation("ManagerEmployee")
-  organization       Organization?   @relation("OrganizationUsers", fields: [organizationId], references: [id])
+  organization       Organization?   @relation("OrganizationUsers", fields: [organizationId], references: [id], onDelete: SetNull)
   wallet             Wallet?
 
   // Enterprise features
-  tokenAllocationsGiven    TokenAllocation[] @relation("AssignedBy")
-  tokenAllocationsReceived TokenAllocation[] @relation("AssignedTo")
-  tasksCreated             Task[]            @relation("TaskCreator")
-  tasksAssigned            Task[]            @relation("TaskAssignee")
+  tokenAllocationsGiven    TokenAllocation[]  @relation("AssignedBy")
+  tokenAllocationsReceived TokenAllocation[]  @relation("AssignedTo")
+  tasksCreated             Task[]             @relation("TaskCreator")
+  tasksAssigned            Task[]             @relation("TaskAssignee")
   taskComments             TaskComment[]
   notifications            Notification[]
   agents                   Agent[]
-  invitesCreated           OrgInvite[]       @relation("InviteCreator")
-  invitesAccepted          OrgInvite[]       @relation("InviteAcceptor")
-  activityLogsAsActor      ActivityLog[]     @relation("ActivityActor")
-  activityLogsAsTarget     ActivityLog[]     @relation("ActivityTarget")
+  invitesCreated           OrgInvite[]        @relation("InviteCreator")
+  invitesAccepted          OrgInvite[]        @relation("InviteAcceptor")
+  activityLogsAsActor      ActivityLog[]      @relation("ActivityActor")
+  activityLogsAsTarget     ActivityLog[]      @relation("ActivityTarget")
   tokenPurchases           TokenPurchase[]
   tokenWallet              TokenWallet?
   tokenTransactions        TokenTransaction[]
@@ -97,9 +97,9 @@ model User {
   memories                 UserMemory[]
 
   // Autonomous agent relations
-  agentMemories            AgentMemory[]
-  agentProjects            AgentProject[]
-  toolExecutions           ToolExecution[]
+  agentMemories  AgentMemory[]
+  agentProjects  AgentProject[]
+  toolExecutions ToolExecution[]
 
   @@index([organizationId])
   @@index([managerId])
@@ -130,7 +130,7 @@ model AIModel {
   id               String          @id @default(uuid())
   name             String          @unique
   provider         String
-  modelId          String
+  modelId          String          @unique
   description      String?
   inputTokenPrice  Float
   outputTokenPrice Float
@@ -167,7 +167,7 @@ model UsageLog {
   status             String        @default("completed")
   errorMessage       String?
   createdAt          DateTime      @default(now())
-  model              AIModel       @relation(fields: [modelId], references: [id])
+  model              AIModel       @relation(fields: [modelId], references: [id], onDelete: Restrict)
   organization       Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -241,7 +241,7 @@ model HourlySession {
   isActive      Boolean  @default(true)
   isExpired     Boolean  @default(false)
   createdAt     DateTime @default(now())
-  model         AIModel  @relation(fields: [modelId], references: [id])
+  model         AIModel  @relation(fields: [modelId], references: [id], onDelete: Restrict)
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -294,8 +294,8 @@ model BillingRecord {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  subscription    Subscription? @relation(fields: [subscriptionId], references: [id])
-  user            User          @relation(fields: [userId], references: [id])
+  subscription    Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([organizationId])
@@ -307,35 +307,35 @@ model BillingRecord {
 // ============== AI EMPLOYEES / AGENTS ==============
 
 model Agent {
-  id              String    @id @default(uuid())
-  name            String
-  role            String                          // e.g. "Senior Backend Developer"
-  avatar          String?                         // emoji or icon identifier
-  description     String?
-  systemPrompt    String    @db.Text
-  personality     String    @default("professional") // professional, friendly, strict, creative
-  defaultModelId  String?
-  defaultModel    AIModel?  @relation(fields: [defaultModelId], references: [id])
-  temperature     Float     @default(0.7)
-  maxTokens       Int       @default(2000)
-  topP            Float     @default(0.9)
-  industry        String?
-  isDefault       Boolean   @default(false)       // platform-level default employee
-  isActive        Boolean   @default(true)
-  toolsEnabled    Boolean   @default(false)       // enable autonomous tool use
-  tools           Json      @default("[]")        // allowed tools: ['file_read','file_write','terminal_exec','web_search','git_op']
-  maxToolCalls    Int       @default(10)           // max tool calls per user message
-  sandboxConfig   Json?                            // resource limits per agent
-  userId          String?                         // null = platform default, set = user-created
-  user            User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organizationId  String?                         // org-shared employee
-  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id             String        @id @default(uuid())
+  name           String
+  role           String // e.g. "Senior Backend Developer"
+  avatar         String? // emoji or icon identifier
+  description    String?
+  systemPrompt   String        @db.Text
+  personality    String        @default("professional") // professional, friendly, strict, creative
+  defaultModelId String?
+  defaultModel   AIModel?      @relation(fields: [defaultModelId], references: [id], onDelete: SetNull)
+  temperature    Float         @default(0.7)
+  maxTokens      Int           @default(2000)
+  topP           Float         @default(0.9)
+  industry       String?
+  isDefault      Boolean       @default(false) // platform-level default employee
+  isActive       Boolean       @default(true)
+  toolsEnabled   Boolean       @default(false) // enable autonomous tool use
+  tools          Json          @default("[]") // allowed tools: ['file_read','file_write','terminal_exec','web_search','git_op']
+  maxToolCalls   Int           @default(10) // max tool calls per user message
+  sandboxConfig  Json? // resource limits per agent
+  userId         String? // null = platform default, set = user-created
+  user           User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String? // org-shared employee
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   // Autonomous agent relations
-  agentMemories   AgentMemory[]
-  agentProjects   AgentProject[]
+  agentMemories AgentMemory[]
+  agentProjects AgentProject[]
 
   @@index([userId])
   @@index([organizationId])
@@ -348,11 +348,11 @@ model Agent {
 model TokenAllocation {
   id              String       @id @default(uuid())
   assignedById    String
-  assignedBy      User         @relation("AssignedBy", fields: [assignedById], references: [id])
+  assignedBy      User         @relation("AssignedBy", fields: [assignedById], references: [id], onDelete: Cascade)
   assignedToId    String
-  assignedTo      User         @relation("AssignedTo", fields: [assignedToId], references: [id])
+  assignedTo      User         @relation("AssignedTo", fields: [assignedToId], references: [id], onDelete: Cascade)
   organizationId  String
-  organization    Organization @relation(fields: [organizationId], references: [id])
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   tokensAllocated Int
   tokensUsed      Int          @default(0)
   tokensRemaining Int
@@ -371,7 +371,7 @@ model TokenAllocation {
 model TokenPool {
   id              String       @id @default(uuid())
   organizationId  String       @unique
-  organization    Organization @relation(fields: [organizationId], references: [id])
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   totalTokens     Int
   allocatedTokens Int          @default(0)
   usedTokens      Int          @default(0)
@@ -384,11 +384,11 @@ model Task {
   title            String
   description      String?
   createdById      String
-  createdBy        User          @relation("TaskCreator", fields: [createdById], references: [id])
-  assignedToId     String
-  assignedTo       User          @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  createdBy        User          @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  assignedToId     String?
+  assignedTo       User?         @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   organizationId   String
-  organization     Organization  @relation(fields: [organizationId], references: [id])
+  organization     Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   priority         String        @default("medium")
   status           String        @default("pending")
   section          String?
@@ -423,7 +423,7 @@ model TaskComment {
   taskId    String
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   content   String
   createdAt DateTime @default(now())
 
@@ -450,22 +450,22 @@ model Notification {
 // ============== ORGANIZATION INVITES ==============
 
 model OrgInvite {
-  id              String    @id @default(uuid())
+  id              String       @id @default(uuid())
   organizationId  String
   organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   invitedById     String
-  invitedBy       User      @relation("InviteCreator", fields: [invitedById], references: [id])
+  invitedBy       User         @relation("InviteCreator", fields: [invitedById], references: [id], onDelete: Cascade)
   email           String
   role            String
-  token           String    @unique
-  status          String    @default("pending")
-  tokensAllocated Int       @default(0)
+  token           String       @unique
+  status          String       @default("pending")
+  tokensAllocated Int          @default(0)
   expiresAt       DateTime
   acceptedAt      DateTime?
   acceptedById    String?
-  acceptedBy      User?     @relation("InviteAcceptor", fields: [acceptedById], references: [id])
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  acceptedBy      User?        @relation("InviteAcceptor", fields: [acceptedById], references: [id], onDelete: SetNull)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
   @@index([token])
   @@index([organizationId])
@@ -476,16 +476,16 @@ model OrgInvite {
 // ============== ACTIVITY LOG ==============
 
 model ActivityLog {
-  id              String       @id @default(uuid())
-  organizationId  String
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  actorId         String
-  actor           User         @relation("ActivityActor", fields: [actorId], references: [id])
-  targetId        String?
-  target          User?        @relation("ActivityTarget", fields: [targetId], references: [id])
-  action          String       // token_assigned, token_revoked, member_invited, member_joined, member_removed, query_executed
-  details         Json?
-  createdAt       DateTime     @default(now())
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actorId        String
+  actor          User         @relation("ActivityActor", fields: [actorId], references: [id], onDelete: Cascade)
+  targetId       String?
+  target         User?        @relation("ActivityTarget", fields: [targetId], references: [id], onDelete: SetNull)
+  action         String // token_assigned, token_revoked, member_invited, member_joined, member_removed, query_executed
+  details        Json?
+  createdAt      DateTime     @default(now())
 
   @@index([organizationId, createdAt])
   @@index([actorId])
@@ -512,7 +512,7 @@ model TokenPurchase {
   userId          String
   user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   organizationId  String?
-  organization    Organization? @relation(fields: [organizationId], references: [id])
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   packageId       String
   packageName     String
   tokensPurchased Int
@@ -530,8 +530,8 @@ model TokenTransaction {
   id           String   @id @default(uuid())
   userId       String
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type         String   // purchase, usage, allocation_received, allocation_given, adjustment
-  tokens       Int      // positive = added, negative = deducted
+  type         String // purchase, usage, allocation_received, allocation_given, adjustment
+  tokens       Int // positive = added, negative = deducted
   balanceAfter Int
   description  String
   reference    String?
@@ -543,20 +543,20 @@ model TokenTransaction {
 }
 
 model Review {
-  id        String   @id @default(uuid())
-  userId    String?
-  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  name      String
-  role      String?
-  company   String?
-  avatar    String?
-  rating    Int      @default(5)
-  title     String
-  content   String
-  isPublic  Boolean  @default(true)
-  isFeatured Boolean @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name       String
+  role       String?
+  company    String?
+  avatar     String?
+  rating     Int      @default(5)
+  title      String
+  content    String
+  isPublic   Boolean  @default(true)
+  isFeatured Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@index([isPublic])
   @@index([isFeatured])
@@ -564,21 +564,21 @@ model Review {
 }
 
 model Conversation {
-  id             String          @id @default(uuid())
-  userId         String
-  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title          String          @default("New Chat")
-  modelId        String?
-  modelName      String?
-  agentId        String?
-  industry       String?
-  isPinned       Boolean         @default(false)
-  folderId       String?
-  totalCost      Float           @default(0)
-  totalTokens    Int             @default(0)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  messages       ChatMessage[]
+  id          String        @id @default(uuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String        @default("New Chat")
+  modelId     String?
+  modelName   String?
+  agentId     String?
+  industry    String?
+  isPinned    Boolean       @default(false)
+  folderId    String?
+  totalCost   Float         @default(0)
+  totalTokens Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  messages    ChatMessage[]
 
   @@index([userId])
   @@index([userId, updatedAt])
@@ -586,21 +586,21 @@ model Conversation {
 }
 
 model ChatMessage {
-  id              String       @id @default(uuid())
-  conversationId  String
-  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  role            String       // user, assistant, system
-  content         String
-  model           String?
-  provider        String?
-  tokensInput     Int?
-  tokensOutput    Int?
-  cost            Float?
-  imageUrl        String?
-  imagePrompt     String?
-  videoUrl        String?
-  webSearchData   String?      // JSON string of search results
-  createdAt       DateTime     @default(now())
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String // user, assistant, system
+  content        String
+  model          String?
+  provider       String?
+  tokensInput    Int?
+  tokensOutput   Int?
+  cost           Float?
+  imageUrl       String?
+  imagePrompt    String?
+  videoUrl       String?
+  webSearchData  String? // JSON string of search results
+  createdAt      DateTime     @default(now())
 
   @@index([conversationId])
   @@index([conversationId, createdAt])
@@ -610,10 +610,10 @@ model UserMemory {
   id        String   @id @default(uuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category  String   // name, preference, fact, instruction, context
-  key       String   // "user_name", "nickname", "language", etc.
-  value     String   // The actual memory content
-  source    String?  // "user_explicit" | "extracted" — how it was created
+  category  String // name, preference, fact, instruction, context
+  key       String // "user_name", "nickname", "language", etc.
+  value     String // The actual memory content
+  source    String? // "user_explicit" | "extracted" — how it was created
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -627,8 +627,8 @@ model AgentMemory {
   id        String   @id @default(uuid())
   userId    String
   agentId   String
-  type      String   // 'user_preference' | 'project_context'
-  key       String   // 'languages', 'frameworks', 'project:myapp:stack'
+  type      String // 'user_preference' | 'project_context'
+  key       String // 'languages', 'frameworks', 'project:myapp:stack'
   value     Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

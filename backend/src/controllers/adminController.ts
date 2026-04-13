@@ -825,27 +825,35 @@ export const deleteOrganization = asyncHandler(async (req: Request, res: Respons
   });
   if (!org) throw new AppError('Organization not found', 404);
 
-  // Detach all users from the org first
-  await prisma.user.updateMany({
-    where: { organizationId: orgId },
-    data: { organizationId: null, role: 'user' },
-  });
+  // Full cleanup in a single transaction so org deletion is atomic.
+  // Previously tokenPool, tasks, and subscriptions were orphaned.
+  await prisma.$transaction(async (tx) => {
+    // Detach users first — they survive the org deletion as personal accounts.
+    await tx.user.updateMany({
+      where: { organizationId: orgId },
+      data: { organizationId: null, role: 'user' },
+    });
 
-  // Delete org-related data
-  await Promise.allSettled([
-    prisma.budget.deleteMany({ where: { organizationId: orgId } }),
-    prisma.usageLog.deleteMany({ where: { organizationId: orgId } }),
-    prisma.billingRecord.deleteMany({ where: { organizationId: orgId } }),
-    prisma.tokenPurchase.deleteMany({ where: { organizationId: orgId } }),
-    prisma.tokenAllocation.deleteMany({ where: { organizationId: orgId } }),
-    prisma.activityLog.deleteMany({ where: { organizationId: orgId } }),
-    prisma.orgInvite.deleteMany({ where: { organizationId: orgId } }),
-    prisma.agent.deleteMany({ where: { organizationId: orgId } }),
-    prisma.aPIKey.deleteMany({ where: { organizationId: orgId } }),
-  ]);
+    // Tasks: delete in order so cascading FKs don't fight us.
+    // (SubTask and TaskComment cascade on Task delete.)
+    await tx.task.deleteMany({ where: { organizationId: orgId } });
 
-  // Delete the org
-  await prisma.organization.delete({ where: { id: orgId } });
+    await tx.budget.deleteMany({ where: { organizationId: orgId } });
+    await tx.usageLog.deleteMany({ where: { organizationId: orgId } });
+    await tx.billingRecord.deleteMany({ where: { organizationId: orgId } });
+    await tx.tokenPurchase.deleteMany({ where: { organizationId: orgId } });
+    await tx.tokenAllocation.deleteMany({ where: { organizationId: orgId } });
+    await tx.activityLog.deleteMany({ where: { organizationId: orgId } });
+    await tx.orgInvite.deleteMany({ where: { organizationId: orgId } });
+    await tx.agent.deleteMany({ where: { organizationId: orgId } });
+    await tx.aPIKey.deleteMany({ where: { organizationId: orgId } });
+    await tx.subscription.deleteMany({ where: { organizationId: orgId } });
+
+    // TokenPool is @unique on organizationId, so deleteMany is safe.
+    await (tx as any).tokenPool?.deleteMany({ where: { organizationId: orgId } });
+
+    await tx.organization.delete({ where: { id: orgId } });
+  }, { timeout: 30000 });
 
   logger.info(`Admin ${req.user.userId} deleted org ${org.name} (${org.id}) with ${org._count.users} members`);
 

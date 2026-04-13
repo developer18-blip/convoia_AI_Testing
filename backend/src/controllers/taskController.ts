@@ -316,11 +316,12 @@ export const updateTaskStatus = asyncHandler(async (req: Request, res: Response)
 
   // Notify creator on completion
   if (status === 'completed' && task.createdById !== req.user.userId) {
+    const assigneeName = task.assignedTo?.name ?? 'Someone';
     await createNotification(
       task.createdById,
       'task_completed',
       'Task completed',
-      `${task.assignedTo.name} completed: ${task.title}`,
+      `${assigneeName} completed: ${task.title}`,
       task.id,
       'task'
     );
@@ -372,8 +373,10 @@ export const addComment = asyncHandler(async (req: Request, res: Response) => {
     },
   });
 
-  // Notify creator and assignee (except commenter)
-  const notifyUserIds = new Set([task.createdById, task.assignedToId]);
+  // Notify creator and assignee (except commenter). assignedToId is
+  // nullable now so skip it when null.
+  const notifyUserIds = new Set<string>([task.createdById]);
+  if (task.assignedToId) notifyUserIds.add(task.assignedToId);
   notifyUserIds.delete(req.user.userId);
 
   for (const userId of notifyUserIds) {

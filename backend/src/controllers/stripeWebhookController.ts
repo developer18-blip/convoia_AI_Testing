@@ -64,9 +64,12 @@ export const handleStripeWebhook = async (
         logger.info(`Unhandled Stripe event type: ${event.type}`);
     }
   } catch (err: any) {
-    logger.error(`Error processing Stripe event ${event.type}: ${err.message}`);
-    // Return 200 so Stripe doesn't retry — we logged the error
-    res.status(200).json({ received: true, error: err.message });
+    // Return 500 so Stripe retries the webhook. Transient DB failures
+    // and wallet crediting errors must NOT be silently swallowed — if
+    // we return 200 here, the event is gone forever and the user paid
+    // without getting tokens.
+    logger.error(`Error processing Stripe event ${event.type}: ${err.message}`, { stack: err.stack });
+    res.status(500).json({ error: 'Processing failed, will retry' });
     return;
   }
 
@@ -118,51 +121,89 @@ async function handleTokenPurchaseCompleted(
     return;
   }
 
-  // Idempotency
-  const existing = await prisma.tokenPurchase.findFirst({
+  // Idempotency — fast path. DB errors are NOT swallowed: they bubble
+  // up so the outer handler returns 500 and Stripe retries the webhook.
+  const existing = await prisma.tokenPurchase.findUnique({
     where: { stripePaymentId: session.id },
-  }).catch(() => null);
+  });
   if (existing) {
     logger.info(`Token purchase ${session.id} already processed — skipping`);
     return;
   }
 
-  // Record purchase
-  await prisma.tokenPurchase.create({
-    data: {
-      userId,
-      organizationId: organizationId || null,
-      packageId,
-      packageName,
-      tokensPurchased: tokens,
-      amountPaid: amount,
-      stripePaymentId: session.id,
-      expiresAt: null, // never expires
-    },
-  });
+  // Atomic credit: tokenPurchase + wallet + tokenTransaction + orgBalance
+  // + billingRecord all succeed together or all roll back. The
+  // @unique constraint on stripePaymentId is a hard safety net against
+  // races between concurrent webhook deliveries — P2002 means another
+  // delivery already processed this event.
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.tokenPurchase.create({
+        data: {
+          userId,
+          organizationId: organizationId || null,
+          packageId,
+          packageName,
+          tokensPurchased: tokens,
+          amountPaid: amount,
+          stripePaymentId: session.id,
+          expiresAt: null,
+        },
+      });
 
-  // Credit tokens to user's wallet
-  await TokenWalletService.addTokens({
-    userId,
-    tokens,
-    reference: session.id,
-    description: `Purchased ${packageName} (${TokenWalletService.formatTokens(tokens)} tokens)`,
-    organizationId,
-  });
+      const wallet = await tx.tokenWallet.upsert({
+        where: { userId },
+        update: {
+          tokenBalance: { increment: tokens },
+          totalTokensPurchased: { increment: tokens },
+        },
+        create: {
+          userId,
+          tokenBalance: tokens,
+          totalTokensPurchased: tokens,
+          totalTokensUsed: 0,
+          allocatedTokens: 0,
+        },
+      });
 
-  // Create billing record
-  await prisma.billingRecord.create({
-    data: {
-      userId,
-      organizationId: organizationId || null,
-      amount,
-      description: `Token purchase — ${packageName}`,
-      type: 'token_purchase',
-      status: 'paid',
-      stripePaymentId: session.id,
-      paidDate: new Date(),
-    },
-  });
+      await tx.tokenTransaction.create({
+        data: {
+          userId,
+          type: 'purchase',
+          tokens,
+          balanceAfter: wallet.tokenBalance,
+          description: `Purchased ${packageName} (${TokenWalletService.formatTokens(tokens)} tokens)`,
+          reference: session.id,
+        },
+      });
+
+      if (organizationId) {
+        await tx.organization.update({
+          where: { id: organizationId },
+          data: { orgTokenBalance: { increment: tokens } },
+        }).catch(() => { /* org may be missing for personal accounts */ });
+      }
+
+      await tx.billingRecord.create({
+        data: {
+          userId,
+          organizationId: organizationId || null,
+          amount,
+          description: `Token purchase — ${packageName}`,
+          type: 'token_purchase',
+          status: 'paid',
+          stripePaymentId: session.id,
+          paidDate: new Date(),
+        },
+      });
+    }, { timeout: 15000 });
+  } catch (err: any) {
+    if (err.code === 'P2002') {
+      logger.info(`Token purchase ${session.id} already processed (P2002 race) — treating as duplicate`);
+      return;
+    }
+    throw err;
+  }
 
   // Send receipt email
   const user = await prisma.user.findUnique({ where: { id: userId } });

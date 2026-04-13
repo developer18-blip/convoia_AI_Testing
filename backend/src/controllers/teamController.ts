@@ -373,13 +373,53 @@ export const removeMember = asyncHandler(async (req: Request, res: Response) => 
 
   const hardDelete = req.query.permanent === 'true';
 
+  // Return unspent allocated tokens back to the org pool. Best-effort
+  // FIFO assumption: tokens granted via allocation are considered used
+  // first, so returnable = min(balance, max(0, allocatedTokens - used)).
+  // This caps at the current wallet balance so we never over-return.
+  const memberWallet = await prisma.tokenWallet.findUnique({ where: { userId } });
+  const orgId = targetUser.organizationId;
+  let returnedToOrg = 0;
+  if (memberWallet && orgId) {
+    const unspentAllocated = Math.max(0, memberWallet.allocatedTokens - memberWallet.totalTokensUsed);
+    returnedToOrg = Math.min(memberWallet.tokenBalance, unspentAllocated);
+    if (returnedToOrg > 0) {
+      await prisma.$transaction(async (tx) => {
+        await tx.organization.update({
+          where: { id: orgId },
+          data: { orgTokenBalance: { increment: returnedToOrg } },
+        });
+        const walletAfter = await tx.tokenWallet.update({
+          where: { userId },
+          data: {
+            tokenBalance: { decrement: returnedToOrg },
+            allocatedTokens: { decrement: returnedToOrg },
+          },
+        });
+        await tx.tokenTransaction.create({
+          data: {
+            userId,
+            type: 'allocation_revoked',
+            tokens: -returnedToOrg,
+            balanceAfter: walletAfter.tokenBalance,
+            description: `Unspent allocated tokens returned to org on member removal`,
+            reference: orgId,
+          },
+        });
+        await tx.tokenAllocation.updateMany({
+          where: { assignedToId: userId, organizationId: orgId, status: 'active' },
+          data: { status: 'revoked' },
+        });
+      });
+      logger.info(`Returned ${returnedToOrg} unspent tokens to org ${orgId} from removed member ${userId}`);
+    }
+  }
+
   if (hardDelete && requester?.role === 'org_owner') {
     // Hard delete — remove user and all their data from database
     const p = prisma as any;
 
-    // 1. Handle token allocations — DON'T return tokens to pool, just delete the records
-    //    The employee's tokens are already spent/used. We preserve org pool as-is.
-    // Delete allocations without modifying org token pool
+    // 1. Delete any remaining allocations (their tokens were already returned above)
     await p.tokenAllocation?.deleteMany({
       where: { OR: [{ assignedToId: userId }, { assignedById: userId }] },
     }).catch(() => {});

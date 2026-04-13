@@ -84,8 +84,13 @@ export class TokenWalletService {
 
   /**
    * Deduct tokens from wallet. If user has fewer tokens than requested,
-   * deducts whatever is available (never lets a query go free).
-   * Returns the number of tokens actually deducted.
+   * deducts whatever is available (never lets a query go free — we've
+   * already paid the provider for the response).
+   *
+   * Atomicity: locks the wallet row with SELECT ... FOR UPDATE inside
+   * a transaction so concurrent deductions can't read the same balance
+   * and double-spend it. Without this, two simultaneous queries could
+   * each see balance=100 and both decrement it, producing a -100 wallet.
    */
   static async deductTokens(params: {
     userId: string;
@@ -98,15 +103,20 @@ export class TokenWalletService {
 
     try {
       return await prisma.$transaction(async (tx) => {
-        const wallet = await tx.tokenWallet.findUnique({ where: { userId } });
-        if (!wallet || wallet.tokenBalance <= 0) {
+        // Pessimistic row lock — held until the transaction commits.
+        const locked = await tx.$queryRaw<Array<{ tokenBalance: number }>>`
+          SELECT "tokenBalance" FROM "TokenWallet"
+          WHERE "userId" = ${userId}
+          FOR UPDATE
+        `;
+
+        if (locked.length === 0 || locked[0].tokenBalance <= 0) {
           logger.warn(`Token deduction BLOCKED — wallet empty: userId=${userId} orgId=${organizationId || 'none'} requested=${tokens}`);
           return 0;
         }
 
-        const balanceBefore = wallet.tokenBalance;
-        // Deduct up to what's available — never let a query go completely free
-        const actualDeduct = Math.min(tokens, wallet.tokenBalance);
+        const balanceBefore = locked[0].tokenBalance;
+        const actualDeduct = Math.min(tokens, balanceBefore);
 
         const updated = await tx.tokenWallet.update({
           where: { userId },
@@ -127,7 +137,6 @@ export class TokenWalletService {
           },
         });
 
-        // Decrement org-level balance so it reflects actual usage
         if (organizationId) {
           await tx.organization.update({
             where: { id: organizationId },
@@ -142,7 +151,7 @@ export class TokenWalletService {
         logger.info(`Token deduction: userId=${userId} orgId=${organizationId || 'none'} before=${balanceBefore} deducted=${actualDeduct} after=${updated.tokenBalance}`);
 
         return actualDeduct;
-      });
+      }, { timeout: 10000 });
     } catch (err) {
       logger.error('Token deduction error:', err);
       return 0;
@@ -163,8 +172,14 @@ export class TokenWalletService {
     const { fromUserId, toUserId, tokens } = params;
 
     return await prisma.$transaction(async (tx) => {
-      const fromWallet = await tx.tokenWallet.findUnique({ where: { userId: fromUserId } });
-      if (!fromWallet || fromWallet.tokenBalance < tokens) {
+      // Lock the source wallet row so a concurrent allocation can't
+      // read the same balance and over-allocate.
+      const locked = await tx.$queryRaw<Array<{ tokenBalance: number }>>`
+        SELECT "tokenBalance" FROM "TokenWallet"
+        WHERE "userId" = ${fromUserId}
+        FOR UPDATE
+      `;
+      if (locked.length === 0 || locked[0].tokenBalance < tokens) {
         throw new Error('Insufficient token balance to allocate');
       }
 
