@@ -268,7 +268,7 @@ export function getSystemPrompt(
     .find(k => modelIdLower.includes(k)) || '';
   const modelOverride = MODEL_PERSONALITY_OVERRIDES[modelKey] || '';
   const personalitySection = (providerPersonality || modelOverride)
-    ? `━━━ PERSONALITY & VOICE ━━━\n${providerPersonality}${modelOverride}\n\n`
+    ? `${providerPersonality}${modelOverride ? '\n' + modelOverride : ''}\n\n`
     : '';
 
   // ── Industry context (applies to ALL modes) ──
