@@ -634,6 +634,10 @@ export const getOrgUsageStats = asyncHandler(async (req: Request, res: Response)
   const stats: OrganizationUsageStats = {
     organizationId: org.id,
     organizationName: org.name,
+    organizationEmail: org.email ?? null,
+    organizationTier: (org as any).tier ?? null,
+    organizationStatus: (org as any).status ?? null,
+    organizationIndustry: (org as any).industry ?? null,
     totalUsers: userCount,
     totalQueries,
     totalTokensUsed,

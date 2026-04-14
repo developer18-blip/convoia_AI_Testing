@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DollarSign, TrendingUp, BarChart3, Activity, Building2, Users, Search, Download } from 'lucide-react'
 import { StatCard } from '../../../components/shared/StatCard'
@@ -28,6 +28,8 @@ export function AdminView() {
   const navigate = useNavigate()
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [partialLoad, setPartialLoad] = useState(false)
   const [orgSearch, setOrgSearch] = useState('')
   const [searchResults, setSearchResults] = useState<{ users: any[]; orgs: any[] } | null>(null)
   const [isSearching, setIsSearching] = useState(false)
@@ -52,13 +54,26 @@ export function AdminView() {
     return () => clearTimeout(timer)
   }, [orgSearch])
 
-  useEffect(() => {
+  const fetchDashboard = useCallback(() => {
+    setIsLoading(true); setLoadError(null); setPartialLoad(false)
     Promise.allSettled([
       api.get('/usage/admin'),
       api.get('/admin/stats'),
     ]).then(([revRes, statsRes]) => {
-      const rev = revRes.status === 'fulfilled' ? revRes.value.data?.data : null
-      const st = statsRes.status === 'fulfilled' ? statsRes.value.data?.data : null
+      const revOk = revRes.status === 'fulfilled'
+      const statsOk = statsRes.status === 'fulfilled'
+
+      if (!revOk && !statsOk) {
+        setLoadError('Failed to load dashboard data — both sources unavailable')
+        setIsLoading(false)
+        return
+      }
+      if (!revOk || !statsOk) {
+        setPartialLoad(true)
+      }
+
+      const rev = revOk ? revRes.value.data?.data : null
+      const st = statsOk ? statsRes.value.data?.data : null
 
       const totalRev = Number(rev?.thisMonth?.customerRevenue ?? rev?.allTime?.totalCustomerRevenue ?? 0) || 0
       const totalCost = Number(rev?.thisMonth?.providerCost ?? rev?.allTime?.totalProviderCost ?? 0) || 0
@@ -98,6 +113,20 @@ export function AdminView() {
     })
   }, [])
 
+  useEffect(() => { fetchDashboard() }, [fetchDashboard])
+
+  if (loadError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
+        <p className="text-sm text-danger mb-3">{loadError}</p>
+        <button onClick={fetchDashboard}
+          className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors">
+          Retry
+        </button>
+      </div>
+    )
+  }
+
   if (isLoading || !stats) {
     return (
       <div className="space-y-6 animate-pulse">
@@ -111,6 +140,11 @@ export function AdminView() {
 
   return (
     <div className="space-y-6">
+      {partialLoad && (
+        <div className="px-4 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs">
+          Partial data loaded — some dashboard sources failed to respond. Stats below may be incomplete.
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold text-text-primary">Admin Dashboard</h2>
         <button onClick={() => {

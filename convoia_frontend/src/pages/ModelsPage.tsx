@@ -21,7 +21,6 @@ const providerTabs = [
   { id: 'google', label: 'Google' },
   { id: 'deepseek', label: 'DeepSeek' },
   { id: 'mistral', label: 'Mistral' },
-  { id: 'groq', label: 'Groq' },
   { id: 'perplexity', label: 'Perplexity' },
   { id: 'xai', label: 'xAI (Grok)' },
 ]

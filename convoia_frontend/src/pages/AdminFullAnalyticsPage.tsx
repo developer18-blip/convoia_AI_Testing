@@ -70,7 +70,13 @@ export function AdminFullAnalyticsPage() {
     // Daily
     rows.push(['DAILY USAGE'])
     rows.push(['Date', 'Queries', 'Revenue ($)', 'Cost ($)', 'Tokens'])
-    data.dailyUsage.forEach((d: any) => rows.push([d.date, d.queries, d.revenue, d.cost, d.tokens]))
+    ;(data.dailyUsage || []).forEach((d: any) => rows.push([
+      String(d.date ?? ''),
+      String(d.queries ?? 0),
+      String(d.revenue ?? d.customerRevenue ?? 0),
+      String(d.cost ?? d.providerCost ?? 0),
+      String(d.tokens ?? 0),
+    ]))
 
     const csv = rows.map((r) => r.join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })

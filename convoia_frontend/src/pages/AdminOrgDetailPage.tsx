@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Download, Building2, Users, DollarSign, Activity, Zap, BarChart3 } from 'lucide-react'
 import { Card } from '../components/ui/Card'
@@ -15,6 +15,10 @@ import api from '../lib/api'
 interface OrgStats {
   organizationId: string
   organizationName: string
+  organizationEmail: string | null
+  organizationTier: string | null
+  organizationStatus: string | null
+  organizationIndustry: string | null
   totalUsers: number
   totalQueries: number
   totalTokensUsed: number
@@ -28,30 +32,23 @@ export function AdminOrgDetailPage() {
   const { orgId } = useParams<{ orgId: string }>()
   const navigate = useNavigate()
   const [stats, setStats] = useState<OrgStats | null>(null)
-  const [org, setOrg] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
+  const fetchStats = useCallback(async () => {
     if (!orgId) return
-    setIsLoading(true)
-    Promise.allSettled([
-      api.get(`/admin/organizations/${orgId}/stats`),
-      api.get(`/admin/orgs?search=&page=1`),
-    ]).then(([statsRes, orgsRes]) => {
-      if (statsRes.status === 'fulfilled') {
-        setStats(statsRes.value.data.data)
-      } else {
-        setError('Failed to load organization stats')
-      }
-      if (orgsRes.status === 'fulfilled') {
-        const allOrgs = orgsRes.value.data.data?.data || orgsRes.value.data.data || []
-        const found = allOrgs.find((o: any) => o.id === orgId)
-        if (found) setOrg(found)
-      }
+    setIsLoading(true); setError(null)
+    try {
+      const res = await api.get(`/admin/organizations/${orgId}/stats`)
+      setStats(res.data.data)
+    } catch {
+      setError('Failed to load organization stats')
+    } finally {
       setIsLoading(false)
-    })
+    }
   }, [orgId])
+
+  useEffect(() => { fetchStats() }, [fetchStats])
 
   const downloadCSV = () => {
     if (!stats) return
@@ -96,7 +93,7 @@ export function AdminOrgDetailPage() {
   }
 
   if (isLoading) return <LoadingPage />
-  if (error || !stats) return <ErrorState message={error || 'Organization not found'} onRetry={() => navigate(-1)} />
+  if (error || !stats) return <ErrorState message={error || 'Organization not found'} onRetry={fetchStats} />
 
   return (
     <div className="space-y-6">
@@ -111,10 +108,10 @@ export function AdminOrgDetailPage() {
               <Building2 size={24} className="text-primary" /> {stats.organizationName}
             </h2>
             <div className="flex items-center gap-3 text-sm text-text-muted mt-1">
-              {org?.email && <span>{org.email}</span>}
-              {org?.tier && <Badge size="sm" variant="primary">{org.tier}</Badge>}
-              {org?.status && <Badge size="sm" variant={org.status === 'active' ? 'success' : 'danger'}>{org.status}</Badge>}
-              {org?.industry && <span>· {org.industry}</span>}
+              {stats.organizationEmail && <span>{stats.organizationEmail}</span>}
+              {stats.organizationTier && <Badge size="sm" variant="primary">{stats.organizationTier}</Badge>}
+              {stats.organizationStatus && <Badge size="sm" variant={stats.organizationStatus === 'active' ? 'success' : 'danger'}>{stats.organizationStatus}</Badge>}
+              {stats.organizationIndustry && <span>· {stats.organizationIndustry}</span>}
             </div>
           </div>
         </div>

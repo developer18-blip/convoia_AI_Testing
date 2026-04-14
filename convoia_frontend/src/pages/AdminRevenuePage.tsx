@@ -15,13 +15,18 @@ export function AdminRevenuePage() {
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
 
-  useEffect(() => {
-    api.get('/admin/revenue/dashboard').then((res) => setData(res.data.data))
-      .catch(() => setError('Failed to load revenue data')).finally(() => setIsLoading(false))
-  }, [])
+  const fetchRevenue = () => {
+    setIsLoading(true); setError(null)
+    api.get('/admin/revenue/dashboard')
+      .then((res) => setData(res.data.data))
+      .catch(() => setError('Failed to load revenue data'))
+      .finally(() => setIsLoading(false))
+  }
+
+  useEffect(() => { fetchRevenue() }, [])
 
   if (isLoading) return <LoadingPage />
-  if (error) return <ErrorState message={error} />
+  if (error) return <ErrorState message={error} onRetry={fetchRevenue} />
 
   const revenue = data?.revenue ?? data?.totalRevenue ?? 0
   const cost = data?.cost ?? data?.totalProviderCost ?? 0

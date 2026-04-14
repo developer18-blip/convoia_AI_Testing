@@ -32,9 +32,9 @@ export function AdminModelsPage() {
   const handleEdit = (model: any) => {
     setEditingId(model.id)
     setEditValues({
-      inputPrice: String(model.inputTokenPrice),
-      outputPrice: String(model.outputTokenPrice),
-      markup: String(model.markupPercentage),
+      inputPrice: String(Number(model.inputTokenPrice ?? 0)),
+      outputPrice: String(Number(model.outputTokenPrice ?? 0)),
+      markup: String(Number(model.markupPercentage ?? 0)),
     })
   }
 
@@ -104,9 +104,9 @@ export function AdminModelsPage() {
                     </>
                   ) : (
                     <>
-                      <td className="px-4 py-3 text-sm font-mono text-text-secondary text-right">${model.inputTokenPrice.toFixed(2)}</td>
-                      <td className="px-4 py-3 text-sm font-mono text-text-secondary text-right">${model.outputTokenPrice.toFixed(2)}</td>
-                      <td className="px-4 py-3 text-sm font-mono text-text-secondary text-right">{model.markupPercentage}%</td>
+                      <td className="px-4 py-3 text-sm font-mono text-text-secondary text-right">${Number(model.inputTokenPrice ?? 0).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-sm font-mono text-text-secondary text-right">${Number(model.outputTokenPrice ?? 0).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-sm font-mono text-text-secondary text-right">{Number(model.markupPercentage ?? 0)}%</td>
                     </>
                   )}
                   <td className="px-4 py-3 text-center">

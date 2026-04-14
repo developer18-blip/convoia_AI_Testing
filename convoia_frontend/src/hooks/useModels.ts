@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import api from '../lib/api'
 import type { AIModel } from '../types'
 
+const HIDDEN_PROVIDERS = new Set(['groq'])
+
 export function useModels() {
   const [models, setModels] = useState<AIModel[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -13,7 +15,9 @@ export function useModels() {
       setError(null)
       const res = await api.get('/models')
       // Backend filters inactive models; trust what the API returns.
-      const all = (res.data.data || []) as AIModel[]
+      const all = ((res.data.data || []) as AIModel[]).filter(
+        (m) => !HIDDEN_PROVIDERS.has(m.provider)
+      )
       setModels(all)
     } catch (err: unknown) {
       const errObj = err as { response?: { status?: number } }

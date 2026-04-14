@@ -271,6 +271,10 @@ export interface UserUsageStats {
 export interface OrganizationUsageStats {
   organizationId: string;
   organizationName: string;
+  organizationEmail: string | null;
+  organizationTier: string | null;
+  organizationStatus: string | null;
+  organizationIndustry: string | null;
   totalUsers: number;
   totalQueries: number;
   totalTokensUsed: number;
@@ -279,6 +283,7 @@ export interface OrganizationUsageStats {
     userId: string;
     email: string;
     name: string;
+    avatar?: string | null;
     queries: number;
     cost: number;
   }>;

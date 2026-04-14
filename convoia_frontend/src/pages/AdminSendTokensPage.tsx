@@ -46,8 +46,13 @@ export function AdminSendTokensPage() {
 
   const handleSend = async () => {
     if (!target) { toast.error('Select a recipient'); return }
-    const parsedTokens = parseInt(tokens)
-    if (!parsedTokens || parsedTokens <= 0) { toast.error('Enter a valid token amount'); return }
+    const parsedTokens = Number.parseInt(tokens, 10)
+    if (!Number.isFinite(parsedTokens) || parsedTokens <= 0) {
+      toast.error('Enter a valid token amount'); return
+    }
+    if (parsedTokens > 10_000_000) {
+      toast.error('Amount exceeds safety cap (10M tokens per grant)'); return
+    }
 
     try {
       setIsSending(true)
@@ -166,7 +171,7 @@ export function AdminSendTokensPage() {
               <button onClick={handleSend} disabled={isSending || !target || !tokens}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50">
                 <Send size={18} />
-                {isSending ? 'Sending...' : `Send ${tokens ? formatNumber(parseInt(tokens) || 0) : '0'} Tokens`}
+                {isSending ? 'Sending...' : `Send ${tokens ? formatNumber(Number.parseInt(tokens, 10) || 0) : '0'} Tokens`}
               </button>
             </div>
           </Card>
