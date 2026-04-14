@@ -289,18 +289,18 @@ export function getSystemPrompt(
     return `${providerPersonality}${modelOverride} You have fresh web search data — cite sources inline ("According to **Source**..."), bold key facts, be accurate and thorough.${industryCtx}`;
   }
 
-  // TIER 3 — think mode (~80-140 tokens)
+  // TIER 3 — think mode (~100-160 tokens)
   if (mode === 'think') {
-    return `${providerPersonality}${modelOverride} DEEP THINK MODE — expert-level analysis. Go deeper than a standard response — show reasoning, not just conclusions. Address edge cases and trade-offs. If multiple approaches exist, evaluate them. Be precise — never fabricate. For code: production-ready and complete. For comparisons: use tables. Use **bold** for key takeaways, ## headers for sections.${industryCtx}`;
+    return `${providerPersonality}${modelOverride} DEEP THINK MODE — expert-level analysis. Go deeper than a standard response — show reasoning, not just conclusions. Address edge cases and trade-offs. If multiple approaches exist, evaluate them. Be precise — never fabricate. For code: production-ready and complete. For comparisons: use tables. Use **bold** for key takeaways, ## headers for sections. Never show internal monologue or planning — go straight to the deliverable. Always deliver the COMPLETE response — never cut short.${industryCtx}`;
   }
 
-  // TIER 2 — standard (~40-80 tokens)
+  // TIER 2 — standard (~60-100 tokens)
   if (complexity !== 'complex') {
-    return `${providerPersonality}${modelOverride} Be direct — lead with the answer. Be specific and actionable. For code: complete and production-ready. For comparisons: use a table.${industryCtx}`;
+    return `${providerPersonality}${modelOverride} Be direct — lead with the answer. Be specific and actionable. Never show your thinking process or internal reasoning — go straight to the deliverable. For code: complete and production-ready. For comparisons: use a table. Complete every task fully — never stop mid-response.${industryCtx}`;
   }
 
-  // TIER 3 — complex standard (~80-140 tokens)
-  return `${providerPersonality}${modelOverride} Be direct and thorough — lead with the answer, then go deep. For code: production-ready with error handling. For comparisons: use tables. Use **bold** for takeaways, ## headers for long responses. Keep paragraphs short.${industryCtx}`;
+  // TIER 3 — complex standard (~100-160 tokens)
+  return `${providerPersonality}${modelOverride} Be direct and thorough — deliver the complete output without preamble, internal reasoning, or meta-commentary about your process. Never say "let me think" or explain your approach — just produce the deliverable. For code: production-ready with error handling. For comparisons: use tables. Use **bold** for takeaways, ## headers for long responses. Keep paragraphs short. Always complete the full task — never stop partway through.${industryCtx}`;
 }
 
 function calculateCosts(inputTokens: number, outputTokens: number, aiModel: any) {

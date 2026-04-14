@@ -693,8 +693,29 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const retryLastMessage = useCallback((modelId: string, industry?: string, agentId?: string) => {
-    const lastUser = [...messages].reverse().find((m) => m.role === 'user')
-    if (lastUser) {
+    const reversed = [...messages].reverse()
+    const lastAssistant = reversed.find((m) => m.role === 'assistant')
+    const lastUser = reversed.find((m) => m.role === 'user')
+    if (!lastUser) return
+
+    // If the previous assistant response looks truncated (long, and doesn't
+    // end on a sentence terminator), treat retry as "continue from cutoff"
+    // instead of a clean regenerate. This matches user expectation — clicking
+    // retry after a half-finished blog should preserve the first half and
+    // pick up seamlessly, not start over.
+    const assistantText = lastAssistant?.content?.trim() || ''
+    const looksTruncated =
+      assistantText.length > 300 &&
+      !/[.!?\])"'`]\s*$/.test(assistantText)
+
+    if (looksTruncated && lastAssistant) {
+      const tail = assistantText.slice(-400)
+      const continuation = `Your previous response was cut off. It ended at:\n\n"${tail}"\n\nContinue from exactly where you stopped. Do not restart, recap, or repeat any content — pick up seamlessly in the same voice and formatting.`
+      // Remove only the stale assistant message; keep the original user turn
+      setMessages((prev) => prev.filter((m) => m.id !== lastAssistant.id))
+      sendMessage(continuation, modelId, industry, agentId)
+    } else {
+      // Clean regenerate — remove user + assistant, resend original
       setMessages((prev) => prev.slice(0, -2))
       sendMessage(lastUser.content, modelId, industry, agentId)
     }

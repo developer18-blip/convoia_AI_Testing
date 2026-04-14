@@ -79,7 +79,10 @@ export const config = {
   openWebUIUrl: process.env.OPEN_WEBUI_URL || 'http://localhost:3001',
 
   // AI Gateway
-  aiRequestTimeout: parseInt(process.env.AI_REQUEST_TIMEOUT || '120000', 10),
+  // 600s default — long-form content (1000+ word blogs, deep research)
+  // can stream for 2-4 minutes. 120s was cutting off legitimate completions.
+  // Nginx /api/ai/query/stream is also at 600s so these match.
+  aiRequestTimeout: parseInt(process.env.AI_REQUEST_TIMEOUT || '600000', 10),
 };
 
 export default config;
