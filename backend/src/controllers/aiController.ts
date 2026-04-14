@@ -1,5 +1,8 @@
 import { Request, Response } from 'express';
 import AIGatewayService, { getSystemPrompt, classifyQueryComplexity } from '../services/aiGatewayService.js';
+import { classifyIntent, type ClassifiedIntent } from '../services/intentClassifier.js';
+import { getTaskPrompt } from '../services/taskPrompts.js';
+import { cleanResponseStart, isResponseIncomplete } from '../services/outputQualityGate.js';
 import prisma from '../config/db.js';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { afterQueryMiddleware } from '../middleware/tokenTracker.js';
@@ -873,6 +876,14 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
       : rawUserContent;
     let enrichedMessages = cappedMessages;
 
+    // ── INTENT CLASSIFICATION ─────────────────────────────────
+    // Determines the task-specific system prompt + parameters used when
+    // the user has NOT selected an agent and is NOT in think mode. For
+    // those cases, this is a no-op (the agent/think prompt takes over).
+    // Kept at outer scope so onDone can use `intent.intent` for the
+    // completeness check.
+    const intent: ClassifiedIntent = classifyIntent(userQuery || lastUserText || '', hasDocContext);
+
     if (userQuery && needsWebSearch(userQuery, hasDocContext)) {
       try {
         res.write(`data: ${JSON.stringify({ type: 'status', content: 'Searching the web...' })}\n\n`);
@@ -1163,6 +1174,34 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
       }
     }
 
+    // ── ORCHESTRATION: synthesize a task-specific agentConfig when
+    // neither an agent nor think mode is active. Agent mode already has
+    // its own systemPrompt; think mode built one above. In those paths,
+    // `agentConfig` is already set and we respect it. In the default
+    // path, we swap the generic prompt for a task-tuned one based on
+    // the classified intent. Memory (when present) is appended so the
+    // synthesized prompt is self-contained — sendMessageStream will see
+    // it like any other agent config and skip its own getSystemPrompt().
+    if (!agentConfig && !thinkingEnabled) {
+      const taskSystemPrompt = getTaskPrompt(
+        intent.intent,
+        streamModelCheck?.provider || '',
+        streamModelCheck?.modelId || '',
+        industry || user.organization?.industry || undefined
+      );
+      const systemPromptWithMemory = memoryPrompt
+        ? `${taskSystemPrompt}${memoryPrompt}`
+        : taskSystemPrompt;
+      agentConfig = {
+        systemPrompt: systemPromptWithMemory,
+        temperature: intent.temperature,
+        maxTokens: Math.min(intent.maxTokens, streamMaxOutput),
+        topP: 0.9,
+        name: 'ConvoiaAI',
+      };
+      logger.info(`[orchestration] Task prompt applied: intent=${intent.intent}, temp=${intent.temperature}, maxTokens=${agentConfig.maxTokens}, model=${finalModelId}`);
+    }
+
     // ── STREAMING CALL (handles normal, clarification, and Pass 2 refinement) ──
     await AIGatewayService.sendMessageStream(
       {
@@ -1183,6 +1222,20 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
           res.write(`data: ${JSON.stringify({ type: 'chunk', content: text })}\n\n`);
         },
         onDone: (rawInputTokens: number, rawOutputTokens: number) => {
+          // Quality gate: strip any leading thinking preamble or meta-
+          // commentary from the ASSEMBLED response before persisting.
+          // This runs post-stream, so the user has already seen the
+          // live (un-cleaned) output — we just make the saved copy
+          // (DB, cache, history reload) cleaner. Task prompts are the
+          // primary defense; this is the safety net.
+          const cleaned = cleanResponseStart(fullResponse);
+          if (cleaned !== null) {
+            fullResponse = cleaned;
+          }
+          if (isResponseIncomplete(fullResponse, intent.intent)) {
+            logger.warn(`[stream] Response looks incomplete (intent=${intent.intent}, len=${fullResponse.length})`);
+          }
+
           // Fire-and-forget the async post-processing
           (async () => {
             try {
