@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import prismaClient from '../config/db.js';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
+import { isValidUUID } from '../utils/validators.js';
 import logger from '../config/logger.js';
 
 // Cast to any until prisma generate runs with new Conversation/ChatMessage models
@@ -89,16 +90,35 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 // POST /api/conversations — Create a new conversation
+// Accepts a client-provided `id` so the frontend's local conversation id
+// matches what lands in the DB. Without this, every subsequent call to
+// /:id/messages 404s because the backend generated a different UUID than
+// the one the frontend is tracking. Upsert makes the call idempotent if
+// the same id is sent twice (retry/race).
 router.post('/', asyncHandler(async (req: Request, res: Response) => {
-  const { title, modelId, modelName, agentId, industry } = req.body;
+  const { id, title, modelId, modelName, agentId, industry } = req.body;
+  const userId = req.user!.userId;
 
-  const conv = await prisma.conversation.create({
-    data: {
-      userId: req.user!.userId,
-      title: title || 'New Chat',
-      modelId, modelName, agentId, industry,
-    },
-  });
+  const baseData = {
+    userId,
+    title: title || 'New Chat',
+    modelId, modelName, agentId, industry,
+  };
+
+  const conv = id && isValidUUID(id)
+    ? await prisma.conversation.upsert({
+        where: { id },
+        create: { id, ...baseData },
+        update: {}, // idempotent — already exists, return it
+      })
+    : await prisma.conversation.create({ data: baseData });
+
+  // Defense in depth: if upsert found an existing row owned by another
+  // user, don't leak it (UUIDv4 collisions are astronomically unlikely
+  // but still — fail closed).
+  if (conv.userId !== userId) {
+    throw new AppError('Conversation id conflict', 409);
+  }
 
   res.status(201).json({ success: true, data: conv });
 }));

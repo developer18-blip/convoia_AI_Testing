@@ -13,6 +13,22 @@
 import { PROVIDER_PERSONALITIES, MODEL_PERSONALITY_OVERRIDES } from '../ai/providerPersonalities.js';
 import type { TaskIntent } from './intentClassifier.js';
 
+/**
+ * Model overrides that should ONLY apply when the task intent matches.
+ * Without this, Codestral's "production-ready code only — no stubs"
+ * leaks into math/editing/translation prompts, DeepSeek Reasoner's
+ * "show full reasoning chain" leaks into casual conversation, etc.
+ *
+ * Models not listed here have their override applied universally
+ * (e.g. Claude Opus 4.6's "Depth over speed — think fully" is a
+ * stylistic nudge, not task-specific).
+ */
+const INTENT_SPECIFIC_OVERRIDES: Record<string, TaskIntent[]> = {
+  'codestral-latest': ['coding'],
+  'deepseek-reasoner': ['math', 'analysis', 'coding', 'research'],
+  'sonar-deep-research': ['research'],
+};
+
 const INDUSTRY_SNIPPETS: Record<string, string> = {
   legal: ' Legal domain — be precise, note when professional counsel is recommended.',
   healthcare: ' Healthcare — evidence-based, recommend consulting professionals.',
@@ -24,13 +40,22 @@ const INDUSTRY_SNIPPETS: Record<string, string> = {
   ecommerce: ' E-commerce — conversion optimization, customer experience.',
 };
 
-function resolveIdentity(provider: string, modelId: string): string {
+function resolveIdentity(provider: string, modelId: string, intent: TaskIntent): string {
   const personality = PROVIDER_PERSONALITIES[provider] || 'You are ConvoiaAI.';
   const modelIdLower = (modelId || '').toLowerCase();
   const modelKey = Object.keys(MODEL_PERSONALITY_OVERRIDES)
     .sort((a, b) => b.length - a.length)
     .find((k) => modelIdLower.includes(k)) || '';
-  const modelOverride = MODEL_PERSONALITY_OVERRIDES[modelKey] || '';
+  let modelOverride = MODEL_PERSONALITY_OVERRIDES[modelKey] || '';
+
+  // Gate intent-specific overrides — skip them when the intent doesn't match
+  if (modelKey && INTENT_SPECIFIC_OVERRIDES[modelKey]) {
+    const allowed = INTENT_SPECIFIC_OVERRIDES[modelKey];
+    if (!allowed.includes(intent)) {
+      modelOverride = '';
+    }
+  }
+
   return `${personality}${modelOverride}`;
 }
 
@@ -40,7 +65,7 @@ export function getTaskPrompt(
   modelId: string,
   industry?: string
 ): string {
-  const identity = resolveIdentity(provider, modelId);
+  const identity = resolveIdentity(provider, modelId, intent);
   const industryCtx = INDUSTRY_SNIPPETS[industry || ''] || '';
 
   switch (intent) {

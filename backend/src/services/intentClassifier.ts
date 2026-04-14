@@ -235,6 +235,59 @@ export function classifyIntent(message: string, hasDocumentContext = false): Cla
     return { ...CONVERSATION_DEFAULT };
   }
 
+  // ── PRIORITY SIGNALS ─────────────────────────────────────────
+  // Scoring alone misclassifies queries where a high-signal verb
+  // ("compare", "how to", "write a blog") collides with a high-volume
+  // noun ("AWS", "Lambda", "Express"). These checks fire first so intent
+  // matches the user's INTENT, not the topic they're asking about.
+  const hasComparisonSignal = /\b(compare|versus|vs\.?|comparison|which is better|pros and cons|advantages|disadvantages)\b/i.test(trimmed);
+  const hasInstructionSignal = /\b(how to|how do I|steps to|guide me|tutorial|walkthrough|set up|setup|install|configure|deploy|migrate)\b/i.test(trimmed);
+  const hasWritingSignal = /\b(write|draft|create|compose)\b.{0,30}\b(blog|article|post|essay|report|guide|content|copy|page|story|poem|script|novel)\b/i.test(trimmed);
+  const hasTranslationSignal = /\b(translate|translation)\b/i.test(trimmed);
+  const hasExtractionSignal = /\b(summarize|summary|extract|key points|TL;?DR|condense)\b/i.test(trimmed);
+  const hasEditingSignal = /\b(rewrite|rephrase|proofread|proof-read|revise|polish|make it more)\b/i.test(trimmed);
+
+  if (hasTranslationSignal) {
+    logger.info(`Intent: translation (priority) "${trimmed.substring(0, 80)}"`);
+    return { intent: 'translation', confidence: 0.9, temperature: 0.2, maxTokens: 4096, shouldStream: true, needsWebSearch: false, formatHint: 'prose' };
+  }
+
+  if (hasEditingSignal && !hasWritingSignal) {
+    logger.info(`Intent: editing (priority) "${trimmed.substring(0, 80)}"`);
+    return { intent: 'editing', confidence: 0.85, temperature: 0.4, maxTokens: 8192, shouldStream: true, needsWebSearch: false, formatHint: 'prose' };
+  }
+
+  if (hasExtractionSignal) {
+    logger.info(`Intent: extraction (priority) "${trimmed.substring(0, 80)}"`);
+    return { intent: 'extraction', confidence: 0.85, temperature: 0.2, maxTokens: 4096, shouldStream: true, needsWebSearch: false, formatHint: 'structured' };
+  }
+
+  if (hasWritingSignal) {
+    const isCreative = /\b(story|poem|script|novel|chapter|scene|dialogue|lyrics|song|fiction|narrative)\b/i.test(trimmed);
+    const intent: TaskIntent = isCreative ? 'creative_writing' : 'long_form_writing';
+    logger.info(`Intent: ${intent} (priority) "${trimmed.substring(0, 80)}"`);
+    return {
+      intent,
+      confidence: 0.9,
+      temperature: isCreative ? 0.85 : 0.7,
+      maxTokens: 16384,
+      shouldStream: true,
+      needsWebSearch: false,
+      formatHint: isCreative ? 'prose' : 'document',
+    };
+  }
+
+  if (hasComparisonSignal) {
+    logger.info(`Intent: analysis (priority — comparison) "${trimmed.substring(0, 80)}"`);
+    return { intent: 'analysis', confidence: 0.85, temperature: 0.4, maxTokens: 8192, shouldStream: true, needsWebSearch: false, formatHint: 'structured' };
+  }
+
+  if (hasInstructionSignal) {
+    logger.info(`Intent: instruction (priority — how-to) "${trimmed.substring(0, 80)}"`);
+    return { intent: 'instruction', confidence: 0.85, temperature: 0.3, maxTokens: 8192, shouldStream: true, needsWebSearch: false, formatHint: 'structured' };
+  }
+
+  // ── SCORING LOOP — for queries without a clear priority signal ──
   const contextBoost = hasDocumentContext ? 0.1 : 0;
 
   let bestMatch: ClassifiedIntent | null = null;
