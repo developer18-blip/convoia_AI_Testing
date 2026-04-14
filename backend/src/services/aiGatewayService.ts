@@ -175,6 +175,8 @@ interface SendMessageParams {
   thinkingEnabled?: boolean; // Enable extended thinking (Claude only)
   webSearchActive?: boolean; // Augment system prompt with web search formatting rules
   complexity?: 'simple' | 'standard' | 'complex'; // Query complexity for prompt sizing
+  thinkingBudget?: number; // Claude budget_tokens + Gemini thinkingConfig.thinkingBudget
+  reasoningEffort?: 'low' | 'medium' | 'high'; // OpenAI reasoning_effort + GPT-5 reasoning.effort
 }
 
 interface SendVisionParams {
@@ -337,6 +339,8 @@ interface ProviderOverrides {
   maxTokens?: number;
   topP?: number;
   thinkingEnabled?: boolean;
+  thinkingBudget?: number; // Claude budget_tokens + Gemini thinkingBudget
+  reasoningEffort?: 'low' | 'medium' | 'high'; // OpenAI o-series + GPT-5 family
 }
 
 // PURE reasoning models (o1/o3/o4-mini) — reject temperature, top_p; require 'developer' role
@@ -405,11 +409,23 @@ async function callOpenAI(modelId: string, messages: any[], systemPrompt: string
     };
 
     if (pureReasoning) {
+      // o-series: only max_completion_tokens, no temperature/top_p
       body.max_completion_tokens = overrides?.maxTokens ?? 16384;
+      // Native reasoning effort — when think mode is active OR caller
+      // explicitly set a level. 'high' is the default for think mode.
+      if (overrides?.thinkingEnabled || overrides?.reasoningEffort) {
+        body.reasoning_effort = overrides?.reasoningEffort || 'high';
+        body.max_completion_tokens = Math.max(body.max_completion_tokens, 32768);
+      }
     } else if (gpt5) {
       body.max_completion_tokens = overrides?.maxTokens ?? 16384;
       body.temperature = forceTemp1 ? 1 : (overrides?.temperature ?? 0.7);
       if (!forceTemp1 && overrides?.topP != null) body.top_p = overrides.topP;
+      // GPT-5 family: optional native reasoning via reasoning.effort
+      if (overrides?.thinkingEnabled || overrides?.reasoningEffort) {
+        body.reasoning = { effort: overrides?.reasoningEffort || 'high' };
+        body.max_completion_tokens = Math.max(body.max_completion_tokens, 32768);
+      }
     } else {
       body.max_tokens = overrides?.maxTokens ?? 16384;
       body.temperature = forceTemp1 ? 1 : (overrides?.temperature ?? 0.7);
@@ -454,8 +470,14 @@ async function callAnthropic(modelId: string, messages: any[], systemPrompt: str
     };
 
     if (overrides?.thinkingEnabled) {
-      body.thinking = { type: 'enabled', budget_tokens: 10000 };
-      body.max_tokens = Math.max(body.max_tokens, 32000);
+      // Scale thinking budget with the caller's hint. budget_tokens
+      // costs real money (Anthropic charges for thinking tokens), so
+      // simple queries should use less. Default 10000 keeps parity
+      // with pre-scaling behavior.
+      const thinkBudget = overrides?.thinkingBudget || 10000;
+      body.thinking = { type: 'enabled', budget_tokens: thinkBudget };
+      // max_tokens must exceed budget_tokens — add 8000 headroom for the answer
+      body.max_tokens = Math.max(body.max_tokens, thinkBudget + 8000);
       body.temperature = 1; // REQUIRED by Anthropic when thinking is enabled
       headers['anthropic-beta'] = 'interleaved-thinking-2025-05-14';
     } else if (forceTemp1) {
@@ -515,6 +537,10 @@ async function callGoogle(modelId: string, messages: any[], systemPrompt: string
           temperature: forceTemp1 ? 1 : (overrides?.temperature ?? 0.7),
           maxOutputTokens: overrides?.maxTokens ?? 16384,
           ...(!forceTemp1 && overrides?.topP != null ? { topP: overrides.topP } : {}),
+          // Native Gemini 2.5+ thinking — allocate tokens for reasoning
+          ...(overrides?.thinkingEnabled ? {
+            thinkingConfig: { thinkingBudget: overrides?.thinkingBudget || 8000 },
+          } : {}),
         },
       },
       {
@@ -522,8 +548,16 @@ async function callGoogle(modelId: string, messages: any[], systemPrompt: string
         timeout: config.aiRequestTimeout,
       }
     );
+    // Parts can include thought parts (thinking) and text parts (answer).
+    // Concatenate non-thought text for the returned response; upstream
+    // callers (non-streaming) only see the final answer.
+    const parts = response.data.candidates?.[0]?.content?.parts || [];
+    const answerText = parts
+      .filter((p: any) => !p.thought)
+      .map((p: any) => p.text || '')
+      .join('');
     return {
-      response: response.data.candidates[0].content.parts[0].text,
+      response: answerText || parts[0]?.text || '',
       inputTokens: response.data.usageMetadata?.promptTokenCount || 0,
       outputTokens: response.data.usageMetadata?.candidatesTokenCount || 0,
     };
@@ -563,6 +597,10 @@ function callGoogleStream(
       temperature: effectiveTemp,
       maxOutputTokens: overrides?.maxTokens ?? 16384,
       ...(effectiveTemp !== 1 && overrides?.topP != null ? { topP: overrides.topP } : {}),
+      // Native Gemini 2.5+ thinking — allocate tokens for reasoning
+      ...(overrides?.thinkingEnabled ? {
+        thinkingConfig: { thinkingBudget: overrides?.thinkingBudget || 8000 },
+      } : {}),
     },
   };
 
@@ -583,6 +621,7 @@ function callGoogleStream(
       let outputTokens = 0;
       let buffer = '';
       let gotAnyChunk = false;
+      let inThoughtBlock = false; // Track thinking-vs-answer transition for formatting
 
       response.data.on('data', (chunk: Buffer) => {
         buffer += chunk.toString();
@@ -594,10 +633,26 @@ function callGoogleStream(
           if (!trimmed || !trimmed.startsWith('data: ')) continue;
           try {
             const json = JSON.parse(trimmed.slice(6));
-            const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (text) {
-              gotAnyChunk = true;
-              callbacks.onChunk(text);
+            // Iterate all parts — a single chunk may contain thought parts
+            // and text parts interleaved. Match Claude's blockquote format
+            // for thinking so the frontend renders them consistently.
+            const parts = json?.candidates?.[0]?.content?.parts || [];
+            for (const part of parts) {
+              if (part.thought && part.text) {
+                if (!inThoughtBlock) {
+                  callbacks.onChunk('\n> 🧠 **Thinking...**\n>\n> ');
+                  inThoughtBlock = true;
+                }
+                gotAnyChunk = true;
+                callbacks.onChunk(part.text.replace(/\n/g, '\n> '));
+              } else if (part.text) {
+                if (inThoughtBlock) {
+                  callbacks.onChunk('\n\n---\n\n**Answer:**\n\n');
+                  inThoughtBlock = false;
+                }
+                gotAnyChunk = true;
+                callbacks.onChunk(part.text);
+              }
             }
             if (json?.usageMetadata) {
               inputTokens = json.usageMetadata.promptTokenCount || inputTokens;
@@ -1037,19 +1092,21 @@ function callOpenAIStream(
   if (pureReasoning) {
     // o-series: only max_completion_tokens, no temperature/top_p
     body.max_completion_tokens = overrides?.maxTokens ?? 16384;
-    if (thinkingEnabled) {
+    if (thinkingEnabled || overrides?.reasoningEffort) {
+      body.reasoning_effort = overrides?.reasoningEffort || 'high';
       body.max_completion_tokens = Math.max(body.max_completion_tokens, 32768);
     }
   } else if (gpt5) {
-    // GPT-5 family: max_completion_tokens + temperature
+    // GPT-5 family: max_completion_tokens + temperature + native reasoning
     body.max_completion_tokens = overrides?.maxTokens ?? 16384;
     body.temperature = overrides?.temperature ?? 0.7;
     if (overrides?.topP != null) body.top_p = overrides.topP;
-    if (thinkingEnabled) {
+    if (thinkingEnabled || overrides?.reasoningEffort) {
+      body.reasoning = { effort: overrides?.reasoningEffort || 'high' };
       body.max_completion_tokens = Math.max(body.max_completion_tokens, 32768);
     }
   } else {
-    // Legacy models (GPT-4o, GPT-4.1, etc.)
+    // Legacy models (GPT-4o, GPT-4.1, etc.) — no native reasoning
     body.max_tokens = overrides?.maxTokens ?? 16384;
     body.temperature = overrides?.temperature ?? 0.7;
     if (overrides?.topP != null) body.top_p = overrides.topP;
@@ -1061,8 +1118,11 @@ function callOpenAIStream(
     delete body.top_p;
   }
 
-  // For OpenAI models with thinking enabled: use structured prompt with <think> tags
-  if (thinkingEnabled) {
+  // Prompt-based <think> fallback for LEGACY OpenAI models only (gpt-4o,
+  // gpt-4.1). o-series and GPT-5 family now use native reasoning params
+  // above — wrapping their prompt in <think> tags would fight with it.
+  const usesNativeReasoning = pureReasoning || gpt5;
+  if (thinkingEnabled && !usesNativeReasoning) {
     body.max_completion_tokens = Math.max(body.max_completion_tokens || body.max_tokens || 16384, 32768);
     const thinkPrompt = `You MUST structure your response in two parts:
 
@@ -1237,9 +1297,10 @@ function callAnthropicStream(
 
   // Extended thinking mode (Claude only)
   if (overrides?.thinkingEnabled) {
-    body.thinking = { type: 'enabled', budget_tokens: 10000 };
-    // Extended thinking requires higher max_tokens (must be > budget_tokens)
-    body.max_tokens = Math.max(body.max_tokens, 32000);
+    const thinkBudget = overrides?.thinkingBudget || 10000;
+    body.thinking = { type: 'enabled', budget_tokens: thinkBudget };
+    // Extended thinking requires max_tokens > budget_tokens — add 8000 headroom
+    body.max_tokens = Math.max(body.max_tokens, thinkBudget + 8000);
     body.temperature = 1; // REQUIRED by Anthropic when thinking is enabled
     delete body.top_p;    // Anthropic rejects both temperature AND top_p together
   } else {
@@ -1774,6 +1835,11 @@ export class AIGatewayService {
       temperature: agentConfig?.temperature,
       maxTokens: effectiveMaxTokens,
       topP: agentConfig?.topP,
+      // Pass 1 research calls use sendMessage, so thinking params MUST
+      // reach the provider from here — previously they were dropped.
+      thinkingEnabled: params.thinkingEnabled,
+      thinkingBudget: params.thinkingBudget,
+      reasoningEffort: params.reasoningEffort,
     };
     let result;
     let fallbackUsed = false;
@@ -1958,6 +2024,8 @@ export class AIGatewayService {
       maxTokens: effectiveMaxTokens,
       topP: agentConfig?.topP,
       thinkingEnabled: params.thinkingEnabled,
+      thinkingBudget: params.thinkingBudget,
+      reasoningEffort: params.reasoningEffort,
     };
 
     await routeToProviderStream(effectiveModel, messages, systemPrompt, callbacks, overrides);

@@ -69,7 +69,7 @@ export async function analyzeQuery(
 
   if (apiKey && (ruleResult.confidenceScore >= 0.4 && ruleResult.confidenceScore <= 0.85 || wordCount < 12)) {
     try {
-      const aiResult = await runAIClassifier(query, messageHistory, apiKey, fastModelId || 'gpt-4o-mini');
+      const aiResult = await runAIClassifier(query, messageHistory, apiKey, fastModelId || 'gpt-5.4-nano');
 
       // Merge: AI takes precedence for key fields
       if (aiResult) {
@@ -102,9 +102,18 @@ export async function analyzeQuery(
   const intel = modelId ? getModelIntelligence(modelId) : null;
 
   if (intel) {
+    // Only elevate to research when the query ALSO has research signals.
+    // Previously every flagship reasoning model was blindly upgraded from
+    // deep → research, which over-escalated simple think-mode queries and
+    // burned thinking tokens unnecessarily.
     if (intel.tier === 'flagship' && intel.isReasoningModel && ruleResult.depthLevel === 'deep') {
-      ruleResult.depthLevel = 'research';
-      ruleResult.reasons.push(`${intel.displayName} is a reasoning model — elevated to research depth`);
+      const wc = query.trim().split(/\s+/).length;
+      const hasResearchSignals = wc >= 20 ||
+        /\b(comprehensive|in-depth|thorough|detailed|compare|trade-?off|strategy|architecture)\b/i.test(query);
+      if (hasResearchSignals) {
+        ruleResult.depthLevel = 'research';
+        ruleResult.reasons.push(`${intel.displayName} is a flagship reasoning model + query has research signals — elevated to research depth`);
+      }
     }
     if (intel.tier === 'fast' && ruleResult.depthLevel === 'research') {
       ruleResult.depthLevel = 'deep';
@@ -223,8 +232,15 @@ function ruleBasedAnalysis(
   else if (wordCount < 8 && !hasConversationContext) { confidence -= 0.1; }
 
   if (wordCount < 4 && hasConversationContext) {
-    confidence -= 0.15;
-    reasons.push('very short follow-up — may need clarification on what aspect to address');
+    // Only penalize if the follow-up is truly ambiguous (no clear topic).
+    // "what about pricing?" in an ongoing conversation is unambiguous —
+    // the topic word carries the signal. Blanket penalty caused every
+    // short follow-up to trip clarification unnecessarily.
+    const hasTopicWord = /\b(price|pricing|cost|security|performance|scale|deploy|design|test|feature|bug|error|data|auth|api|ui|ux|mobile|backend|frontend|database|schema|model|prompt|token|cache|latency)\b/i.test(query);
+    if (!hasTopicWord) {
+      confidence -= 0.10;
+      reasons.push('short follow-up without clear topic — may benefit from clarification');
+    }
   }
 
   const VAGUE_PATTERNS = [
@@ -261,8 +277,10 @@ function ruleBasedAnalysis(
 
   confidence = Math.max(0, Math.min(1, confidence));
 
+  // In active conversations we have more context, so clarify less often.
+  // Outside conversations (first message), clarify when confidence is low.
   const needsClarification = hasConversationContext
-    ? confidence < 0.5 && wordCount < 5
+    ? confidence < 0.4 && wordCount < 4
     : confidence < 0.65;
 
   return { needsClarification, confidenceScore: confidence, depthLevel, taskType, reasons, hypotheses };
@@ -274,7 +292,7 @@ async function runAIClassifier(
   query: string,
   messageHistory: Array<{ role: string; content: any }>,
   apiKey: string,
-  fastModelId: string
+  fastModelId: string = 'gpt-5.4-nano'
 ): Promise<{
   needsClarification: boolean;
   clarificationReason: string | null;
@@ -602,8 +620,14 @@ export function buildRefinementPrompt(
     ? `Cite sources inline as you make claims. Lead with answer, support with evidence. Distinguish established fact from inference.`
     : `Clear, structured, expert. Lead with the answer. Support with reasoning. Use formatting where it helps.`;
 
-  const truncatedResearch = researchOutput.length > 3000
-    ? researchOutput.slice(0, 3000) + '\n[analysis continues — synthesize the key points]'
+  // Scale truncation by depth — research queries need more Pass 1 context
+  // for good refinement. Was fixed at 3000 chars, which lost up to half of
+  // research-depth analysis.
+  const maxResearchChars = analysis.depthLevel === 'research' ? 8000
+    : analysis.depthLevel === 'deep' ? 5000
+    : 3000;
+  const truncatedResearch = researchOutput.length > maxResearchChars
+    ? researchOutput.slice(0, maxResearchChars) + '\n[analysis continues — synthesize all key points above]'
     : researchOutput;
 
   const taskHint = analysis.taskType === 'coding'

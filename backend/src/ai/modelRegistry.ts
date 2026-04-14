@@ -15,10 +15,11 @@ export interface ModelIntelligence {
 
 const MODEL_INTELLIGENCE: Record<string, ModelIntelligence> = {
   // ── OpenAI ──
-  'gpt-5.4':      { displayName: 'GPT-5.4', provider: 'openai', tier: 'flagship', isReasoningModel: false },
+  'gpt-5.4':      { displayName: 'GPT-5.4', provider: 'openai', tier: 'flagship', isReasoningModel: true },
+  'gpt-5.4-pro':  { displayName: 'GPT-5.4 Pro', provider: 'openai', tier: 'flagship', isReasoningModel: true },
   'gpt-5.4-mini': { displayName: 'GPT-5.4 Mini', provider: 'openai', tier: 'fast', isReasoningModel: false },
   'gpt-5.4-nano': { displayName: 'GPT-5.4 Nano', provider: 'openai', tier: 'fast', isReasoningModel: false },
-  'gpt-5':        { displayName: 'GPT-5', provider: 'openai', tier: 'flagship', isReasoningModel: false },
+  'gpt-5':        { displayName: 'GPT-5', provider: 'openai', tier: 'flagship', isReasoningModel: true },
   'gpt-5-mini':   { displayName: 'GPT-5 Mini', provider: 'openai', tier: 'fast', isReasoningModel: false },
   'gpt-4.1':      { displayName: 'GPT-4.1', provider: 'openai', tier: 'standard', isReasoningModel: false },
   'gpt-4.1-mini': { displayName: 'GPT-4.1 Mini', provider: 'openai', tier: 'fast', isReasoningModel: false },
@@ -85,4 +86,7 @@ export function getModelIntelligence(modelId: string): ModelIntelligence | null 
     .sort((a, b) => b.length - a.length)
     .find(k => lower.includes(k));
   return matchedKey ? MODEL_INTELLIGENCE[matchedKey] : null;
+
+
+  
 }

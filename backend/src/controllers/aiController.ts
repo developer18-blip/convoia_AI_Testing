@@ -964,6 +964,11 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
     let pass1ExtraInputTokens = 0;
     let pass1ExtraOutputTokens = 0;
     let useProviderThinking = !!thinkingEnabled;
+    // Captured from analysis inside the think block so the outer
+    // sendMessageStream call can pass depth-scaled thinking params even
+    // though `analysis` itself is scoped inside the if-block.
+    let depthThinkingBudget: number | undefined;
+    let depthReasoningEffort: 'low' | 'medium' | 'high' | undefined;
 
     if (thinkingEnabled) {
       const analysis = await analyzeQuery(
@@ -971,8 +976,14 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
         enrichedMessages,
         selectedModel?.modelId,
         config.apiKeys.openai || undefined,
-        'gpt-4o-mini'
+        'gpt-5.4-nano'
       );
+      depthThinkingBudget = analysis.depthLevel === 'research' ? 20000
+        : analysis.depthLevel === 'deep' ? 10000
+        : 5000;
+      depthReasoningEffort = analysis.depthLevel === 'research' ? 'high'
+        : analysis.depthLevel === 'deep' ? 'medium'
+        : 'low';
       const thinkIntel = getModelIntelligence(selectedModel?.modelId || '');
       logger.info(`Deep research: depth=${analysis.depthLevel}, task=${analysis.taskType}, confidence=${analysis.confidenceScore.toFixed(2)}, hypotheses=${analysis.hypotheses.length}, clarify=${analysis.needsClarification}`);
 
@@ -1038,7 +1049,12 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
             messages: enrichedMessages,
             agentConfig: {
               systemPrompt: researchPrompt,
-              temperature: pass1Tp.tier === 'B' ? undefined as any : (pass1Tp.temperature === 1 ? 0.3 : 0.3),
+              // Tier A (Claude): must be 1 when thinking is enabled
+              // Tier B (o-series): no temperature allowed at all
+              // Tier C/D: 0.3 for precise research
+              temperature: pass1Tp.tier === 'A' ? 1
+                : pass1Tp.tier === 'B' ? (undefined as any)
+                : 0.3,
               maxTokens: pass1MaxTokens,
               topP: 0.9,
               name: agentConfig?.name || 'AI',
@@ -1046,6 +1062,11 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
             maxOutputTokens: pass1MaxTokens,
             memoryContext: memoryPrompt || undefined,
             thinkingEnabled: pass1UseNativeThinking,
+            // Pass 1 uses a slightly smaller budget than Pass 2 — research
+            // still gets the lion's share but we leave headroom for the
+            // refinement pass that follows.
+            thinkingBudget: analysis.depthLevel === 'research' ? 16000 : 8000,
+            reasoningEffort: analysis.depthLevel === 'research' ? 'high' : 'medium',
           });
 
           pass1ExtraInputTokens = pass1Result.inputTokens;
@@ -1214,6 +1235,11 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
         thinkingEnabled: useProviderThinking,
         webSearchActive: webSearched,
         complexity: queryComplexity,
+        // Native thinking parameters — scaled by analysis depth. Only
+        // meaningful when thinkingEnabled is true; provider functions
+        // ignore them otherwise.
+        thinkingBudget: thinkingEnabled ? depthThinkingBudget : undefined,
+        reasoningEffort: thinkingEnabled ? depthReasoningEffort : undefined,
       },
       {
         onChunk: (text: string) => {
