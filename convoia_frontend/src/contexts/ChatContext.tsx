@@ -36,15 +36,31 @@ async function syncConversationToBackend(conv: Conversation) {
   try {
     await api.post('/conversations', {
       id: conv.id, title: conv.title, modelName: conv.modelName,
-    }).catch(() => {}) // ignore if already exists
+    }).catch(() => {}) // idempotent upsert on server
   } catch { /* silent */ }
 }
 
-async function syncMessagesToBackend(convId: string, messages: Message[]) {
+// Sync last-N messages to backend. Self-healing on 404: if the conv
+// doesn't exist server-side (stale localStorage id from before the
+// upsert fix), re-POST the conv and retry once. Silent on all errors.
+async function syncMessagesToBackend(conv: Conversation, messages: Message[]) {
   try {
-    const newMsgs = messages.filter(m => m.content && m.role !== 'system').slice(-50) // sync last 50
+    const newMsgs = messages.filter(m => m.content && m.role !== 'system').slice(-50)
     if (newMsgs.length === 0) return
-    await api.post(`/conversations/${convId}/messages`, { messages: newMsgs }).catch(() => {})
+
+    const postMessages = () =>
+      api.post(`/conversations/${conv.id}/messages`, { messages: newMsgs })
+
+    try {
+      await postMessages()
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        // Stale local conv id — upsert the conv, then retry messages once
+        await syncConversationToBackend(conv)
+        await postMessages().catch(() => {})
+      }
+      // Other errors: silent (network blip, auth, etc.)
+    }
   } catch { /* silent */ }
 }
 
@@ -262,7 +278,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       // Debounced sync to backend (don't send on every keystroke/chunk)
       if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current)
       syncTimeoutRef.current = setTimeout(() => {
-        syncMessagesToBackend(activeId, messages)
+        const activeConv = conversations.find((c) => c.id === activeId)
+        if (activeConv) syncMessagesToBackend(activeConv, messages)
       }, 2000)
     }
   }, [messages, activeId])
