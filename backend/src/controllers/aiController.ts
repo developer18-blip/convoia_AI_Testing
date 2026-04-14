@@ -884,12 +884,14 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
     // completeness check.
     const intent: ClassifiedIntent = classifyIntent(userQuery || lastUserText || '', hasDocContext);
 
+    let webSearchSource: string | null = null;
     if (userQuery && needsWebSearch(userQuery, hasDocContext)) {
       try {
         res.write(`data: ${JSON.stringify({ type: 'status', content: 'Searching the web...' })}\n\n`);
-        const searchResult = await searchWeb(userQuery, 5);
+        const searchResult = await searchWeb(userQuery, 5, { userId: user.id, email: user.email });
         if (searchResult.searched && searchResult.results.length > 0) {
           webSearched = true;
+          webSearchSource = searchResult.source;
           // Append search data to user message (formatting rules go in system prompt below)
           const searchPrefix = `\n\n[LIVE WEB SEARCH DATA — searched on ${new Date().toISOString().split('T')[0]}]\n\n${searchResult.contextText}`;
           enrichedMessages = [...cappedMessages];
@@ -1315,6 +1317,8 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
                     markupPercentage: aiModel.markupPercentage,
                     customerPrice,
                     status: 'completed',
+                    webSearchUsed: webSearched,
+                    webSearchSource: webSearchSource,
                   },
                 });
                 logger.info(`UsageLog created successfully for user ${user.id}`);

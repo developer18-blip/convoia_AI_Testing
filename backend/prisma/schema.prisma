@@ -172,6 +172,8 @@ model UsageLog {
   sessionId          String?
   status             String        @default("completed")
   errorMessage       String?
+  webSearchUsed      Boolean       @default(false)
+  webSearchSource    String?
   createdAt          DateTime      @default(now())
   model              AIModel       @relation(fields: [modelId], references: [id], onDelete: Restrict)
   organization       Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)

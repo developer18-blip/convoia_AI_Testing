@@ -618,6 +618,11 @@ function scoreResults(query: string, results: SearchResult[]): { results: Search
 
 // ── Perplexity Primary (fresh, cited, first-party search) ───────────
 
+export interface WebSearchContext {
+  userId?: string;
+  email?: string;
+}
+
 async function searchPerplexity(
   query: string,
   maxResults = 5,
@@ -757,7 +762,11 @@ const CONFIDENCE_THRESHOLD = 0.5; // Higher threshold = Tavily kicks in more oft
  * Perplexity is primary because it reliably returns fresh news with citations.
  * DDG/Tavily only fire if Perplexity is unavailable or returns nothing useful.
  */
-export async function searchWeb(query: string, maxResults = 5): Promise<WebSearchResponse> {
+export async function searchWeb(
+  query: string,
+  maxResults = 5,
+  ctx?: WebSearchContext
+): Promise<WebSearchResponse> {
   // 1. Check cache
   const cached = getFromCache(query);
   if (cached) {
@@ -775,7 +784,8 @@ export async function searchWeb(query: string, maxResults = 5): Promise<WebSearc
   if (perplexityResults.length > 0) {
     results = await enrichResults(perplexityResults);
     source = 'perplexity';
-    logger.info(`Perplexity returned ${perplexityResults.length} citations for: "${query}" (recency=${recency.perplexity || 'any'})`);
+    const who = ctx?.email || ctx?.userId || 'unknown';
+    logger.info(`Perplexity returned ${perplexityResults.length} citations · user=${who} · query="${query}" (recency=${recency.perplexity || 'any'})`);
   }
 
   // 3. DDG fallback — only if Perplexity failed or is not configured
