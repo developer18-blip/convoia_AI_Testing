@@ -787,10 +787,13 @@ async function callPerplexity(modelId: string, messages: any[], systemPrompt: st
     if (citations && Array.isArray(citations) && citations.length > 0) {
       text += '\n\n---\n**Sources:**\n' + citations.map((url: string, i: number) => `${i + 1}. ${url}`).join('\n');
     }
+    const usage = response.data.usage || {};
     return {
       response: text,
-      inputTokens: response.data.usage.prompt_tokens,
-      outputTokens: response.data.usage.completion_tokens,
+      inputTokens: usage.prompt_tokens || 0,
+      outputTokens: usage.completion_tokens || 0,
+      reasoningTokens: usage.reasoning_tokens || 0,
+      searchQueries: usage.num_search_queries || 0,
     };
   };
 
@@ -1066,9 +1069,18 @@ async function findFallbackModel(excludeProvider: string) {
 
 // ─── Streaming provider calls (SSE) ───
 
+// Optional metadata providers can pass alongside the normal token counts.
+// Right now only Perplexity uses this (reasoning_tokens + num_search_queries
+// are only emitted by sonar-reasoning-pro / sonar-deep-research). All other
+// providers keep calling onDone with 2 args and `meta` is undefined.
+export interface StreamUsageMeta {
+  reasoningTokens?: number;
+  searchQueries?: number;
+}
+
 interface StreamCallbacks {
   onChunk: (text: string) => void;
-  onDone: (inputTokens: number, outputTokens: number) => void;
+  onDone: (inputTokens: number, outputTokens: number, meta?: StreamUsageMeta) => void;
   onError: (error: Error) => void;
 }
 
@@ -1576,6 +1588,7 @@ function callPerplexityStream(
       );
 
       let inputTokens = 0, outputTokens = 0;
+      let reasoningTokens = 0, searchQueries = 0;
       let buffer = '';
       let citations: string[] = [];
       // Buffer-safe <think>...</think> stripping. The old code used
@@ -1657,6 +1670,10 @@ function callPerplexityStream(
             if (json.usage) {
               inputTokens = json.usage.prompt_tokens || 0;
               outputTokens = json.usage.completion_tokens || 0;
+              // Perplexity sonar-reasoning-pro / sonar-deep-research emit
+              // these; non-reasoning sonar models leave them at 0.
+              reasoningTokens = json.usage.reasoning_tokens || 0;
+              searchQueries = json.usage.num_search_queries || 0;
             }
           } catch { /* skip malformed chunks */ }
         }
@@ -1677,7 +1694,7 @@ function callPerplexityStream(
             citations.map((url: string, i: number) => `${i + 1}. ${url}`).join('\n');
           callbacks.onChunk(citationBlock);
         }
-        callbacks.onDone(inputTokens, outputTokens);
+        callbacks.onDone(inputTokens, outputTokens, { reasoningTokens, searchQueries });
         resolve();
       });
       response.data.on('error', (err: Error) => {

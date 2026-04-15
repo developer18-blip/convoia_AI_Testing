@@ -133,14 +133,16 @@ model APIKey {
 }
 
 model AIModel {
-  id               String          @id @default(uuid())
-  name             String          @unique
-  provider         String
-  modelId          String          @unique
-  description      String?
-  inputTokenPrice  Float
-  outputTokenPrice Float
-  markupPercentage Float           @default(25)
+  id                  String          @id @default(uuid())
+  name                String          @unique
+  provider            String
+  modelId             String          @unique
+  description         String?
+  inputTokenPrice     Float
+  outputTokenPrice    Float
+  reasoningTokenPrice Float           @default(0)
+  perQueryFee         Float           @default(0)
+  markupPercentage    Float           @default(25)
   capabilities     String[]
   contextWindow    Int
   isActive         Boolean         @default(true)
@@ -164,6 +166,8 @@ model UsageLog {
   response           String?
   tokensInput        Int
   tokensOutput       Int
+  reasoningTokens    Int           @default(0)
+  searchQueries      Int           @default(0)
   totalTokens        Int
   providerCost       Float
   markupPercentage   Float

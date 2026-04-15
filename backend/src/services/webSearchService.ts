@@ -72,12 +72,23 @@ export interface SearchResult {
   snippet?: string;
 }
 
+// Usage metadata from a Perplexity-backed web search. Only populated
+// when source === 'perplexity'. Everything else stays at 0 so the
+// caller can unconditionally read and add these to a UsageLog row.
+export interface WebSearchUsage {
+  inputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  searchQueries: number;
+}
+
 export interface WebSearchResponse {
   searched: boolean;
   query: string;
   source: 'cache' | 'perplexity' | 'duckduckgo' | 'tavily' | 'none';
   confidence: number;
   results: SearchResult[];
+  usage?: WebSearchUsage;
   contextText: string;
 }
 
@@ -623,13 +634,24 @@ export interface WebSearchContext {
   email?: string;
 }
 
+// Return shape now includes the usage metadata so the caller
+// can write a proper UsageLog row for every web search.
+interface PerplexitySearchReturn {
+  results: SearchResult[];
+  usage: WebSearchUsage;
+}
+
+const EMPTY_USAGE: WebSearchUsage = {
+  inputTokens: 0, outputTokens: 0, reasoningTokens: 0, searchQueries: 0,
+};
+
 async function searchPerplexity(
   query: string,
   maxResults = 5,
   recency: 'day' | 'week' | 'month' | 'year' | null = null
-): Promise<SearchResult[]> {
+): Promise<PerplexitySearchReturn> {
   const apiKey = process.env.PERPLEXITY_API_KEY;
-  if (!apiKey) return [];
+  if (!apiKey) return { results: [], usage: { ...EMPTY_USAGE } };
 
   try {
     const body: Record<string, any> = {
@@ -662,31 +684,48 @@ async function searchPerplexity(
     const data = response.data;
     const answer: string = data?.choices?.[0]?.message?.content || '';
     const citations: string[] = Array.isArray(data?.citations) ? data.citations : [];
+    const usage: WebSearchUsage = {
+      inputTokens: data?.usage?.prompt_tokens || 0,
+      outputTokens: data?.usage?.completion_tokens || 0,
+      reasoningTokens: data?.usage?.reasoning_tokens || 0,
+      // Every successful Perplexity call counts as at least 1 search
+      // query for billing purposes — even if the API doesn't emit
+      // num_search_queries (older sonar models don't).
+      searchQueries: data?.usage?.num_search_queries || 1,
+    };
 
-    if (citations.length === 0 && !answer) return [];
+    if (citations.length === 0 && !answer) {
+      return { results: [], usage };
+    }
 
     // If Perplexity returned an answer but no citations, still use the answer as fresh context
     if (citations.length === 0) {
-      return [{
-        title: 'Perplexity research summary',
-        url: 'https://www.perplexity.ai',
-        content: answer.slice(0, 2000),
-        score: 1,
-      }];
+      return {
+        results: [{
+          title: 'Perplexity research summary',
+          url: 'https://www.perplexity.ai',
+          content: answer.slice(0, 2000),
+          score: 1,
+        }],
+        usage,
+      };
     }
 
     // Turn each citation into a SearchResult stub — crawlUrl() in enrichResults
     // will fetch the real page title + body. Seed the first result with
     // Perplexity's answer so the model still gets fresh context even if a crawl fails.
-    return citations.slice(0, maxResults).map((url, i) => ({
-      title: url,
-      url,
-      content: i === 0 ? answer.slice(0, 1500) : '',
-      score: 1 - (i * 0.1),
-    }));
+    return {
+      results: citations.slice(0, maxResults).map((url, i) => ({
+        title: url,
+        url,
+        content: i === 0 ? answer.slice(0, 1500) : '',
+        score: 1 - (i * 0.1),
+      })),
+      usage,
+    };
   } catch (err: any) {
     logger.error(`Perplexity search failed: ${err?.response?.status || ''} ${err.message}`);
-    return [];
+    return { results: [], usage: { ...EMPTY_USAGE } };
   }
 }
 
@@ -778,14 +817,16 @@ export async function searchWeb(
   const recency = getRecencyFilter(query);
   let source: 'perplexity' | 'duckduckgo' | 'tavily' = 'duckduckgo';
   let results: SearchResult[] = [];
+  let perplexityUsage: WebSearchUsage | null = null;
 
   // 2. Perplexity primary — fresh, cited, handles recency natively
-  const perplexityResults = await searchPerplexity(query, maxResults, recency.perplexity);
-  if (perplexityResults.length > 0) {
-    results = await enrichResults(perplexityResults);
+  const pplxResult = await searchPerplexity(query, maxResults, recency.perplexity);
+  if (pplxResult.results.length > 0) {
+    results = await enrichResults(pplxResult.results);
     source = 'perplexity';
+    perplexityUsage = pplxResult.usage;
     const who = ctx?.email || ctx?.userId || 'unknown';
-    logger.info(`Perplexity returned ${perplexityResults.length} citations · user=${who} · query="${query}" (recency=${recency.perplexity || 'any'})`);
+    logger.info(`Perplexity returned ${pplxResult.results.length} citations · user=${who} · query="${query}" · tokens in=${pplxResult.usage.inputTokens} out=${pplxResult.usage.outputTokens} reasoning=${pplxResult.usage.reasoningTokens} searches=${pplxResult.usage.searchQueries} (recency=${recency.perplexity || 'any'})`);
   }
 
   // 3. DDG fallback — only if Perplexity failed or is not configured
@@ -825,6 +866,9 @@ export async function searchWeb(
     confidence,
     results: scored,
     contextText,
+    // Only attach usage when Perplexity was the winning source.
+    // DDG/Tavily are free at call-time so there's nothing to bill.
+    ...(source === 'perplexity' && perplexityUsage ? { usage: perplexityUsage } : {}),
   };
 
   if (scored.length > 0) {

@@ -892,6 +892,78 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
         if (searchResult.searched && searchResult.results.length > 0) {
           webSearched = true;
           webSearchSource = searchResult.source;
+
+          // ── Bill internal Perplexity web search ─────────────────
+          // searchWeb() auto-fires Perplexity as the web research
+          // backend. That call costs us real money (input/output/
+          // reasoning tokens + a flat per-query fee) but prior to
+          // this commit it produced zero UsageLog rows — completely
+          // invisible to billing. Now we write a dedicated UsageLog
+          // row attributed to the triggering user with the correct
+          // cost including markup, then deduct from their wallet.
+          // If DDG/Tavily was the winning source, searchResult.usage
+          // is undefined and this block is a no-op.
+          if (searchResult.source === 'perplexity' && searchResult.usage) {
+            try {
+              const sonarModel = await prisma.aIModel.findFirst({
+                where: { provider: 'perplexity', modelId: 'sonar' },
+              });
+              if (sonarModel) {
+                const u = searchResult.usage;
+                const searchTotalTokens = u.inputTokens + u.outputTokens + u.reasoningTokens;
+                const searchReasoningCost = u.reasoningTokens * ((sonarModel as any).reasoningTokenPrice ?? 0);
+                const searchFeeCost = u.searchQueries * ((sonarModel as any).perQueryFee ?? 0);
+                const searchProviderCost =
+                  u.inputTokens * sonarModel.inputTokenPrice
+                  + u.outputTokens * sonarModel.outputTokenPrice
+                  + searchReasoningCost
+                  + searchFeeCost;
+                const searchCustomerPrice = searchProviderCost * (1 + sonarModel.markupPercentage / 100);
+
+                await prisma.usageLog.create({
+                  data: {
+                    userId: user.id,
+                    organizationId,
+                    modelId: sonarModel.id,
+                    prompt: `[internal web search] ${userQuery.substring(0, 460)}`,
+                    response: `[${searchResult.results.length} citations]`,
+                    tokensInput: u.inputTokens,
+                    tokensOutput: u.outputTokens,
+                    reasoningTokens: u.reasoningTokens,
+                    searchQueries: u.searchQueries,
+                    totalTokens: searchTotalTokens,
+                    providerCost: searchProviderCost,
+                    markupPercentage: sonarModel.markupPercentage,
+                    customerPrice: searchCustomerPrice,
+                    status: 'completed',
+                    webSearchUsed: true,
+                    webSearchSource: 'perplexity',
+                  },
+                });
+
+                // Deduct from user wallet — wrap in try/catch so a
+                // wallet failure doesn't break the main query.
+                try {
+                  const searchWalletTokens = costAdjustedTokens(searchCustomerPrice, searchTotalTokens);
+                  await TokenWalletService.deductTokens({
+                    userId: user.id,
+                    tokens: searchWalletTokens,
+                    reference: sonarModel.id,
+                    description: `Internal web search: ${sonarModel.name}`,
+                    organizationId,
+                  });
+                } catch (walletErr: any) {
+                  logger.error(`Wallet deduction for internal web search failed: ${walletErr.message}`);
+                }
+
+                logger.info(`[internal-pplx-search] user=${user.email} cost=$${searchCustomerPrice.toFixed(6)} tokens=${searchTotalTokens} reasoning=${u.reasoningTokens} searches=${u.searchQueries}`);
+              } else {
+                logger.warn('[internal-pplx-search] No AIModel row found for provider=perplexity modelId=sonar — skipping billing. Add the row to enable tracking.');
+              }
+            } catch (billErr: any) {
+              logger.error(`[internal-pplx-search] Billing failed: ${billErr.message}`);
+            }
+          }
           // Append search data to user message (formatting rules go in system prompt below)
           const searchPrefix = `\n\n[LIVE WEB SEARCH DATA — searched on ${new Date().toISOString().split('T')[0]}]\n\n${searchResult.contextText}`;
           enrichedMessages = [...cappedMessages];
@@ -1249,7 +1321,7 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
           fullResponse += text;
           res.write(`data: ${JSON.stringify({ type: 'chunk', content: text })}\n\n`);
         },
-        onDone: (rawInputTokens: number, rawOutputTokens: number) => {
+        onDone: (rawInputTokens: number, rawOutputTokens: number, meta?: { reasoningTokens?: number; searchQueries?: number }) => {
           // Quality gate: strip any leading thinking preamble or meta-
           // commentary from the ASSEMBLED response before persisting.
           // This runs post-stream, so the user has already seen the
@@ -1297,12 +1369,29 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
                 logger.warn(`Provider reported 0 tokens — using estimates: input=${inputTokens} output=${outputTokens} total=${totalTokensUsed}`);
               }
 
-              const providerCost = inputTokens * aiModel.inputTokenPrice + outputTokens * aiModel.outputTokenPrice;
+              // Perplexity-style extras. Non-Perplexity providers pass
+              // undefined and both default to 0. Cost formula is:
+              //   providerCost = input*inPrice + output*outPrice
+              //                + reasoning*reasoningPrice
+              //                + searchQueries*perQueryFee
+              // Markup applies to the FULL providerCost, so every kind
+              // of upstream charge (tokens OR flat fees) is marked up.
+              const reasoningTokens = meta?.reasoningTokens ?? 0;
+              const searchQueries = meta?.searchQueries ?? 0;
+              const reasoningTokenPrice = (aiModel as any).reasoningTokenPrice ?? 0;
+              const perQueryFee = (aiModel as any).perQueryFee ?? 0;
+              const reasoningCost = reasoningTokens * reasoningTokenPrice;
+              const searchFeeCost = searchQueries * perQueryFee;
+              const providerCost =
+                inputTokens * aiModel.inputTokenPrice
+                + outputTokens * aiModel.outputTokenPrice
+                + reasoningCost
+                + searchFeeCost;
               const customerPrice = providerCost * (1 + aiModel.markupPercentage / 100);
 
               // 1. ALWAYS create usage log directly (bulletproof — no middleware dependency)
               try {
-                logger.info(`Creating usageLog: userId=${user.id}, orgId=${organizationId}, model=${aiModel.name}, tokens=${totalTokensUsed}, cost=$${customerPrice.toFixed(6)}${pass1ExtraInputTokens > 0 ? ' (multi-pass)' : ''}`);
+                logger.info(`Creating usageLog: userId=${user.id}, orgId=${organizationId}, model=${aiModel.name}, tokens=${totalTokensUsed}, reasoning=${reasoningTokens}, searches=${searchQueries}, cost=$${customerPrice.toFixed(6)}${pass1ExtraInputTokens > 0 ? ' (multi-pass)' : ''}`);
                 await prisma.usageLog.create({
                   data: {
                     userId: user.id,
@@ -1312,6 +1401,8 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
                     response: fullResponse.substring(0, 500),
                     tokensInput: inputTokens,
                     tokensOutput: outputTokens,
+                    reasoningTokens,
+                    searchQueries,
                     totalTokens: totalTokensUsed,
                     providerCost,
                     markupPercentage: aiModel.markupPercentage,
