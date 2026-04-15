@@ -18,13 +18,55 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 // ── CLI args ────────────────────────────────────────────
+// --top N         limit to top N users by revenue
+// --breakdown     show per-model breakdown inside each user
+// --since STR     filter UsageLog.createdAt >= STR
+//                 accepts: "YYYY-MM-DD", "YYYY-MM-DD HH:MM", full ISO,
+//                 or relative shorthand "24h" / "48h" / "7d"
+// --until STR     filter UsageLog.createdAt < STR (same formats)
 const args = process.argv.slice(2);
 let topN = 0;
 let showBreakdown = false;
+let sinceRaw = null;
+let untilRaw = null;
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--top' && args[i + 1]) { topN = parseInt(args[++i], 10) || 0; }
   else if (args[i] === '--breakdown') { showBreakdown = true; }
+  else if (args[i] === '--since' && args[i + 1]) { sinceRaw = args[++i]; }
+  else if (args[i] === '--until' && args[i + 1]) { untilRaw = args[++i]; }
 }
+
+function parseTimeArg(s) {
+  if (!s) return null;
+  const rel = /^(\d+)([hd])$/.exec(s);
+  if (rel) {
+    const n = parseInt(rel[1], 10);
+    const ms = rel[2] === 'h' ? n * 3600_000 : n * 86_400_000;
+    return new Date(Date.now() - ms);
+  }
+  // "YYYY-MM-DD HH:MM" → treat as UTC so it's unambiguous
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(s)) {
+    return new Date(s.replace(' ', 'T') + ':00Z');
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    return new Date(s + 'T00:00:00Z');
+  }
+  const d = new Date(s);
+  if (isNaN(d.getTime())) {
+    console.error(`Invalid time argument: "${s}". Use YYYY-MM-DD, "YYYY-MM-DD HH:MM", ISO, or 24h/7d.`);
+    process.exit(1);
+  }
+  return d;
+}
+
+const since = parseTimeArg(sinceRaw);
+const until = parseTimeArg(untilRaw);
+
+// Build the date filter object reused in every query
+const dateFilter = {};
+if (since) dateFilter.gte = since;
+if (until) dateFilter.lt = until;
+const hasTimeWindow = !!(since || until);
 
 // ── Find all Anthropic models ──────────────────────────
 const anthropicModels = await prisma.aIModel.findMany({
@@ -45,9 +87,14 @@ if (anthropicModels.length === 0) {
 const anthropicModelIds = anthropicModels.map((m) => m.id);
 const modelById = new Map(anthropicModels.map((m) => [m.id, m]));
 
+// Base WHERE clause reused across all queries so --since / --until
+// slice UsageLog identically everywhere.
+const anthropicWhere = { modelId: { in: anthropicModelIds } };
+if (hasTimeWindow) anthropicWhere.createdAt = dateFilter;
+
 // ── Platform totals for Anthropic ──────────────────────
 const total = await prisma.usageLog.aggregate({
-  where: { modelId: { in: anthropicModelIds } },
+  where: anthropicWhere,
   _count: { _all: true },
   _sum: {
     tokensInput: true,
@@ -61,7 +108,7 @@ const total = await prisma.usageLog.aggregate({
 // ── Per model breakdown ────────────────────────────────
 const perModel = await prisma.usageLog.groupBy({
   by: ['modelId'],
-  where: { modelId: { in: anthropicModelIds } },
+  where: anthropicWhere,
   _count: { _all: true },
   _sum: {
     tokensInput: true,
@@ -75,7 +122,7 @@ const perModel = await prisma.usageLog.groupBy({
 // ── Per user breakdown ─────────────────────────────────
 const perUser = await prisma.usageLog.groupBy({
   by: ['userId'],
-  where: { modelId: { in: anthropicModelIds } },
+  where: anthropicWhere,
   _count: { _all: true },
   _sum: {
     tokensInput: true,
@@ -103,12 +150,14 @@ const userById = new Map(users.map((u) => [u.id, u]));
 let perUserModel = [];
 if (showBreakdown && userIds.length) {
   const limitUserIds = topN > 0 ? userIds.slice(0, topN) : userIds;
+  const breakdownWhere = {
+    userId: { in: limitUserIds },
+    modelId: { in: anthropicModelIds },
+  };
+  if (hasTimeWindow) breakdownWhere.createdAt = dateFilter;
   perUserModel = await prisma.usageLog.groupBy({
     by: ['userId', 'modelId'],
-    where: {
-      userId: { in: limitUserIds },
-      modelId: { in: anthropicModelIds },
-    },
+    where: breakdownWhere,
     _count: { _all: true },
     _sum: {
       totalTokens: true,
@@ -118,20 +167,23 @@ if (showBreakdown && userIds.length) {
   });
 }
 
-// ── First / last usage ─────────────────────────────────
+// ── First / last usage (within window if set) ─────────
 const firstUsage = await prisma.usageLog.findFirst({
-  where: { modelId: { in: anthropicModelIds } },
+  where: anthropicWhere,
   orderBy: { createdAt: 'asc' },
   select: { createdAt: true },
 });
 const lastUsage = await prisma.usageLog.findFirst({
-  where: { modelId: { in: anthropicModelIds } },
+  where: anthropicWhere,
   orderBy: { createdAt: 'desc' },
   select: { createdAt: true },
 });
 
 // ── Platform-wide totals (for share %) ─────────────────
+// Apply same time window so "share of platform" compares apples to apples.
+const platformWhere = hasTimeWindow ? { createdAt: dateFilter } : {};
 const platformTotal = await prisma.usageLog.aggregate({
+  where: platformWhere,
   _count: { _all: true },
   _sum: { providerCost: true, customerPrice: true },
 });
@@ -162,8 +214,15 @@ const rpad = (s, n) => String(s).padStart(n);
 // ── Output ─────────────────────────────────────────────
 console.log('');
 console.log(line);
+const periodLabel = (() => {
+  if (since && until) return `${since.toISOString()} → ${until.toISOString()}`;
+  if (since) return `since ${since.toISOString()}`;
+  if (until) return `until ${until.toISOString()}`;
+  return 'all time';
+})();
+
 console.log('  ANTHROPIC / CLAUDE USAGE REPORT');
-console.log(`  Scope: entire platform · all users · all time`);
+console.log(`  Scope: entire platform · all users · ${periodLabel}`);
 console.log(`  Generated: ${new Date().toISOString()}`);
 console.log(line);
 console.log('');
