@@ -42,9 +42,19 @@ export function AreaChart({
             backgroundColor: 'var(--color-surface)',
             border: '1px solid var(--color-border)',
             borderRadius: '8px',
-            color: '#F8F8FF',
+            color: 'var(--color-text-primary)',
             fontSize: '13px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
           }}
+          labelStyle={{
+            color: 'var(--color-text-primary)',
+            fontWeight: 600,
+            marginBottom: '4px',
+          }}
+          itemStyle={{
+            color: 'var(--color-text-primary)',
+          }}
+          cursor={{ stroke: 'var(--color-border)', strokeWidth: 1 }}
         />
         <Area
           type="monotone"

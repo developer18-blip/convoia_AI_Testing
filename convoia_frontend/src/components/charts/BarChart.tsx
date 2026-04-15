@@ -36,9 +36,19 @@ export function BarChart({
             backgroundColor: 'var(--color-surface)',
             border: '1px solid var(--color-border)',
             borderRadius: '8px',
-            color: '#F8F8FF',
+            color: 'var(--color-text-primary)',
             fontSize: '13px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
           }}
+          labelStyle={{
+            color: 'var(--color-text-primary)',
+            fontWeight: 600,
+            marginBottom: '4px',
+          }}
+          itemStyle={{
+            color: 'var(--color-text-primary)',
+          }}
+          cursor={{ fill: 'var(--color-primary-light)' }}
         />
         <Bar dataKey={yKey} fill={color} radius={[4, 4, 0, 0]} />
       </RechartsBarChart>
