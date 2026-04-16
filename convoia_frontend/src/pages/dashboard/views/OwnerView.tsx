@@ -189,19 +189,26 @@ export function OwnerView({ stats, userName, orgName }: OwnerViewProps) {
 
         {tokenBalance > 0 || totalPurchased > 0 ? (
           <>
-            <ProgressBar value={totalUsed} max={totalPurchased || 1} size="lg" />
-            <div className="grid grid-cols-3 gap-4 mt-4 text-center">
+            {/* Progress bar: used + allocated = what's left the owner's wallet */}
+            <ProgressBar value={totalUsed + Math.max(0, totalPurchased - tokenBalance - totalUsed)} max={totalPurchased || 1} size="lg" />
+            <div className="grid grid-cols-4 gap-2 mt-4 text-center">
               <div>
-                <p className="text-lg font-semibold font-mono" style={{ color: 'var(--color-text-primary)' }}>{fmtTokens(totalUsed)}</p>
+                <p className="text-base font-semibold font-mono" style={{ color: 'var(--color-text-primary)' }}>{fmtTokens(totalUsed)}</p>
                 <p className="text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>Used</p>
               </div>
               <div>
-                <p className="text-lg font-semibold font-mono" style={{ color: 'var(--color-warning)' }}>{fmtTokens(totalPurchased)}</p>
-                <p className="text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>Purchased</p>
+                <p className="text-base font-semibold font-mono" style={{ color: 'var(--color-primary)' }}>
+                  {fmtTokens(Math.max(0, totalPurchased - tokenBalance - totalUsed))}
+                </p>
+                <p className="text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>Sent to Team</p>
               </div>
               <div>
-                <p className="text-lg font-semibold font-mono" style={{ color: 'var(--color-success)' }}>{formattedBalance}</p>
+                <p className="text-base font-semibold font-mono" style={{ color: 'var(--color-success)' }}>{formattedBalance}</p>
                 <p className="text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>Available</p>
+              </div>
+              <div>
+                <p className="text-base font-semibold font-mono" style={{ color: 'var(--color-warning)' }}>{fmtTokens(totalPurchased)}</p>
+                <p className="text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>Purchased</p>
               </div>
             </div>
           </>
