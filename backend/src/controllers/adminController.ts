@@ -24,26 +24,26 @@ export const getAdminStats = asyncHandler(async (req: Request, res: Response) =>
     totalQueries,
     _unused,
     newUsersThisMonth,
-    usageAggregates,
     revenueAggregates,
+    walletUsageAggregate,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.organization.count(),
     prisma.usageLog.count(),
     Promise.resolve(0), // subscription system removed — token-only billing
     prisma.user.count({ where: { createdAt: { gte: monthStart } } }),
-    prisma.usageLog.aggregate({
-      _sum: { tokensInput: true, tokensOutput: true, customerPrice: true },
-    }),
     prisma.billingRecord.aggregate({
       _sum: { amount: true },
       where: { status: 'paid' },
     }),
+    // Use wallet-adjusted token spend (not raw API tokens) so video/image/voice costs
+    // are reflected correctly and model markup amplification is included.
+    prisma.tokenWallet.aggregate({ _sum: { totalTokensUsed: true } }),
   ]);
 
-  const totalTokensUsed =
-    (usageAggregates._sum.tokensInput || 0) +
-    (usageAggregates._sum.tokensOutput || 0);
+  // Wallet tokens consumed (cost-adjusted) — this is what users actually see deducted.
+  // Raw API token counts (usageAggregates) are 2-4x lower and exclude video/image/voice costs.
+  const totalTokensUsed = walletUsageAggregate._sum.totalTokensUsed || 0;
   const totalRevenue = revenueAggregates._sum.amount || 0;
 
   // Get top models using groupBy with proper field reference
@@ -350,35 +350,31 @@ export const getUserUsageStats = asyncHandler(async (req: Request, res: Response
     (dateFilter.createdAt as any).lte = new Date(endDate as string);
   }
 
-  // Get usage logs for the user
-  const usageLogs = await prisma.usageLog.findMany({
-    where: {
-      userId,
-      ...dateFilter,
-    },
-    include: {
-      model: {
-        select: {
-          id: true,
-          name: true,
-          provider: true,
-          modelId: true,
-          description: true,
-          inputTokenPrice: true,
-          outputTokenPrice: true,
-          capabilities: true,
-          contextWindow: true,
-          isActive: true,
-          createdAt: true,
-          updatedAt: true,
+  // Get usage logs and wallet deductions in parallel
+  const [usageLogs, walletDeductionAgg] = await Promise.all([
+    prisma.usageLog.findMany({
+      where: { userId, ...dateFilter },
+      include: {
+        model: {
+          select: {
+            id: true, name: true, provider: true, modelId: true, description: true,
+            inputTokenPrice: true, outputTokenPrice: true, capabilities: true,
+            contextWindow: true, isActive: true, createdAt: true, updatedAt: true,
+          }
         }
-      }
-    },
-  });
+      },
+    }),
+    // Sum actual wallet-adjusted token deductions — includes video/image/voice costs
+    // and model markup amplification that raw UsageLog tokens don't capture.
+    prisma.tokenTransaction.aggregate({
+      where: { userId, type: 'usage', ...(dateFilter.createdAt ? { createdAt: dateFilter.createdAt } : {}) },
+      _sum: { tokens: true },
+    }),
+  ]);
 
   // Calculate aggregate stats
   const totalQueries = usageLogs.length;
-  const totalTokensUsed = usageLogs.reduce((sum: number, log: any) => sum + log.tokensInput + log.tokensOutput, 0);
+  const totalTokensUsed = Math.abs(walletDeductionAgg._sum.tokens || 0);
   const totalCost = usageLogs.reduce((sum: number, log: any) => sum + log.customerPrice, 0);
 
   // Group by model
@@ -571,21 +567,32 @@ export const getOrgUsageStats = asyncHandler(async (req: Request, res: Response)
     (dateFilter.createdAt as any).lte = new Date(endDate as string);
   }
 
-  // Get usage logs for the organization
-  const [usageLogs, userCount] = await Promise.all([
+  // Get usage logs, user count, and wallet deductions in parallel
+  const orgMemberIds = await prisma.user
+    .findMany({ where: { organizationId: orgId }, select: { id: true } })
+    .then((rows: { id: string }[]) => rows.map((r) => r.id));
+
+  const [usageLogs, userCount, walletDeductionAgg] = await Promise.all([
     prisma.usageLog.findMany({
-      where: {
-        organizationId: orgId,
-        ...dateFilter,
-      },
+      where: { organizationId: orgId, ...dateFilter },
       include: { model: true, user: true },
     }),
     prisma.user.count({ where: { organizationId: orgId } }),
+    // Sum wallet-adjusted token deductions across all org members —
+    // reflects actual cost including markup, video/image/voice.
+    prisma.tokenTransaction.aggregate({
+      where: {
+        userId: { in: orgMemberIds },
+        type: 'usage',
+        ...(dateFilter.createdAt ? { createdAt: dateFilter.createdAt } : {}),
+      },
+      _sum: { tokens: true },
+    }),
   ]);
 
   // Calculate aggregate stats
   const totalQueries = usageLogs.length;
-  const totalTokensUsed = usageLogs.reduce((sum: number, log: any) => sum + log.tokensInput + log.tokensOutput, 0);
+  const totalTokensUsed = Math.abs(walletDeductionAgg._sum.tokens || 0);
   const totalCost = usageLogs.reduce((sum: number, log: any) => sum + log.customerPrice, 0);
 
   // Get top users
@@ -1232,7 +1239,7 @@ export const getAdminAnalytics = asyncHandler(async (req: Request, res: Response
 
   // Aggregations
   const dailyMap = new Map<string, { queries: number; revenue: number; cost: number; tokens: number }>();
-  let totalRevenue = 0, totalCostAgg = 0, totalTokensUsed = 0;
+  let totalRevenue = 0, totalCostAgg = 0;
   const userAgg = new Map<string, { name: string; email: string; avatar: string | null; orgId: string | null; queries: number; cost: number; tokens: number }>();
   const modelAgg = new Map<string, { name: string; provider: string; queries: number; cost: number }>();
   const providerAgg = new Map<string, { queries: number; revenue: number; cost: number }>();
@@ -1241,7 +1248,6 @@ export const getAdminAnalytics = asyncHandler(async (req: Request, res: Response
     const dateKey = log.createdAt.toISOString().split('T')[0];
     totalRevenue += log.customerPrice;
     totalCostAgg += log.providerCost;
-    totalTokensUsed += log.tokensInput + log.tokensOutput;
 
     const d = dailyMap.get(dateKey);
     if (d) { d.queries++; d.revenue += log.customerPrice; d.cost += log.providerCost; d.tokens += log.tokensInput + log.tokensOutput; }
@@ -1284,7 +1290,7 @@ export const getAdminAnalytics = asyncHandler(async (req: Request, res: Response
   res.json({
     success: true,
     data: {
-      overview: { totalUsers, totalOrgs, activeUsers, totalQueries: usageLogs.length, totalRevenue: parseFloat(totalRevenue.toFixed(4)), totalCost: parseFloat(totalCostAgg.toFixed(4)), totalProfit: parseFloat((totalRevenue - totalCostAgg).toFixed(4)), profitMargin: totalRevenue > 0 ? parseFloat(((totalRevenue - totalCostAgg) / totalRevenue * 100).toFixed(1)) : 0, totalTokensUsed },
+      overview: { totalUsers, totalOrgs, activeUsers, totalQueries: usageLogs.length, totalRevenue: parseFloat(totalRevenue.toFixed(4)), totalCost: parseFloat(totalCostAgg.toFixed(4)), totalProfit: parseFloat((totalRevenue - totalCostAgg).toFixed(4)), profitMargin: totalRevenue > 0 ? parseFloat(((totalRevenue - totalCostAgg) / totalRevenue * 100).toFixed(1)) : 0, totalTokensUsed: totalTokensSpent },
       tokenSummary: { totalTokenBalance, totalTokensPurchased, totalTokensSpent, transactionsByType: Object.fromEntries(tokenByType) },
       dailyUsage, topUsers, topModels, providerBreakdown, topTokenHolders,
       dateRange: { from: fromDate.toISOString(), to: toDate.toISOString() },
