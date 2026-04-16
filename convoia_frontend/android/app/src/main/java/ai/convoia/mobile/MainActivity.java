@@ -1,4 +1,4 @@
-package com.convoia.ai;
+package ai.convoia.mobile;
 
 import com.getcapacitor.BridgeActivity;
 

@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { MobileBottomTabs } from './MobileBottomTabs'
 import { ScreenErrorBoundary } from '../shared/ErrorBoundary'
@@ -12,6 +13,21 @@ export function MobileAppShell() {
   const location = useLocation()
   // Chat page manages its own full-bleed layout
   const isChat = location.pathname === '/chat'
+
+  // Strip rich formatting on copy — prevents background colors / boxes from
+  // ending up in the clipboard when the user copies text from styled bubbles.
+  useEffect(() => {
+    const handleCopy = (e: ClipboardEvent) => {
+      const selection = window.getSelection()
+      if (!selection || selection.isCollapsed) return
+      const plainText = selection.toString()
+      if (!plainText) return
+      e.preventDefault()
+      e.clipboardData?.setData('text/plain', plainText)
+    }
+    document.addEventListener('copy', handleCopy)
+    return () => document.removeEventListener('copy', handleCopy)
+  }, [])
 
   return (
     <div className="mobile-app" style={{

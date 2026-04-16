@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.convoia.ai',
+  appId: 'ai.convoia.mobile',
   appName: 'ConvoiaAI',
   webDir: 'dist',
 

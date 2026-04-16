@@ -98,6 +98,17 @@
   border: 1px solid #E0DCF0 !important;
 }
 
+/* ── Text selection: plain purple highlight, no box inheritance ── */
+.mobile-app ::selection {
+  background-color: rgba(124, 58, 237, 0.25) !important;
+  color: inherit !important;
+  -webkit-text-fill-color: inherit !important;
+}
+.mobile-app ::-moz-selection {
+  background-color: rgba(124, 58, 237, 0.25) !important;
+  color: inherit !important;
+}
+
 /* ── Mobile bottom tab safe area ── */
 .mobile-tab-bar {
   padding-bottom: env(safe-area-inset-bottom, 0px);
