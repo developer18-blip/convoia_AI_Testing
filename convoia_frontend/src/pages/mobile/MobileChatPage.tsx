@@ -30,10 +30,20 @@ export function MobileChatPage() {
   const [showModelPicker, setShowModelPicker] = useState(false)
   const [showAgentPicker, setShowAgentPicker] = useState(false)
 
-  // Auto-select first model
+  // Auto-select first model (skip if 'auto' is already chosen)
   useEffect(() => {
     if (models.length > 0 && !selectedModelId) setSelectedModelId(models[0].id)
   }, [models, selectedModelId])
+
+  // Listen for auto_model events emitted by ChatContext when the router picks a model
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { modelId } = (e as CustomEvent).detail
+      if (modelId) setSelectedModelId(modelId)
+    }
+    window.addEventListener('convoia:auto_model', handler)
+    return () => window.removeEventListener('convoia:auto_model', handler)
+  }, [])
 
   // When agent is selected (from MobileAgentsPage), auto-select its default model
   useEffect(() => {
@@ -56,6 +66,7 @@ export function MobileChatPage() {
 
   const handleSend = async (content: string) => {
     if (!selectedModelId) { toast.error('Please select a model'); return }
+    // 'auto' is a valid virtual modelId — the router resolves it server-side
     if (tokenBalance <= 0) {
       toast.error(authUser?.organizationId ? 'No tokens. Contact your admin.' : 'No tokens remaining.')
       return
@@ -236,6 +247,22 @@ export function MobileChatPage() {
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           {/* Scrollable model chips */}
           <div style={{ flex: 1, display: 'flex', gap: '6px', overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', minWidth: 0 }}>
+            {/* Auto chip — always first */}
+            <button
+              onClick={() => setSelectedModelId('auto')}
+              style={{
+                padding: '6px 12px', borderRadius: '100px', fontSize: '11px', fontWeight: 700,
+                border: selectedModelId === 'auto' ? '1.5px solid #10B981' : '1px solid var(--color-border)',
+                background: selectedModelId === 'auto'
+                  ? 'linear-gradient(135deg, #10B981, #059669)'
+                  : 'var(--color-surface)',
+                color: selectedModelId === 'auto' ? 'white' : 'var(--color-text-muted)',
+                cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                display: 'flex', alignItems: 'center', gap: '4px',
+              }}>
+              <span style={{ fontSize: '11px' }}>✦</span> Auto
+            </button>
+
             {activeModels.slice(0, 8).map(m => {
               const isActive = selectedModelId === m.id
               const shortName = m.name.replace('Claude ', '').replace('Gemini ', '').replace('GPT-', 'GPT ').replace(' (Groq)', '')

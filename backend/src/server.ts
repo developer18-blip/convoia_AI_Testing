@@ -396,11 +396,14 @@ async function migrateApiKeysToHashed(): Promise<void> {
   }
 }
 
+import { hydrateModelProfiles } from './ai/modelProfiles.js';
+
 // ============== START SERVER ==============
 const startServer = async (): Promise<void> => {
   try {
     await validateModels();
     await migrateApiKeysToHashed();
+    await hydrateModelProfiles(prisma); // maps LLM Router profiles to active DB model IDs
 
     const server = app.listen(config.port, () => {
       logger.info(`🚀 Server is running on port ${config.port}`);

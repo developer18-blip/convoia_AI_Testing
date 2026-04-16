@@ -15,6 +15,7 @@ import { FileProcessingService } from '../services/fileProcessingService.js';
 import { generateVideo as generateVideoFn, VIDEO_TOKEN_COST, type MediaRequest } from '../services/mediaGenerationService.js';
 import { TOKEN_BASE_RATE, costAdjustedTokens } from '../config/tokenPackages.js';
 import { buildThinkModeParams } from '../ai/thinkModeParams.js';
+import { routeToOptimalModel, type RouterInput, type RouterResult } from '../services/llmRouter.js';
 
 // ── SAFE ERROR SERIALIZER (prevents circular reference crash) ────
 // Axios errors contain TLSSocket → ClientRequest → socket circular refs.
@@ -255,6 +256,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
       return;
     }
     const { modelId, messages, industry, agentId, thinkingEnabled, referenceImage, referenceImages } = req.body;
+    const isAutoMode = modelId === 'auto';
     // Debug: log multi-file info
     if (referenceImages?.length > 0 || referenceImage) {
       logger.info(`Files received: referenceImages=${referenceImages?.length || 0}, referenceImage=${referenceImage ? 'yes' : 'no'}`);
@@ -492,11 +494,11 @@ export const queryAIStream = async (req: Request, res: Response) => {
     // ── AUTO-ROUTE LONG INPUTS TO LARGER MODEL ──────────────────
     // If input exceeds the selected model's context window, auto-route
     // to the largest available model instead of truncating and losing data.
-    const selectedModel = await prisma.aIModel.findUnique({ where: { id: finalModelId }, select: { modelId: true, contextWindow: true, name: true, provider: true } });
+    let selectedModel = await prisma.aIModel.findUnique({ where: { id: finalModelId }, select: { modelId: true, contextWindow: true, name: true, provider: true } });
     const modelContextWindow = selectedModel?.contextWindow || 128000;
     const maxInputForModel = Math.floor(modelContextWindow * 0.7);
 
-    if (estimatedInputTokens > maxInputForModel) {
+    if (estimatedInputTokens > maxInputForModel && !isAutoMode) {
       // Find the largest active model that can fit this input
       const largerModel = await prisma.aIModel.findFirst({
         where: { isActive: true, contextWindow: { gte: Math.ceil(estimatedInputTokens / 0.7) } },
@@ -883,6 +885,57 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
     // Kept at outer scope so onDone can use `intent.intent` for the
     // completeness check.
     const intent: ClassifiedIntent = classifyIntent(userQuery || lastUserText || '', hasDocContext);
+
+    // ── LLM ROUTER — Auto Model Selection ─────────────────────────────────
+    // Fires only when the user selected "Auto". Scores all active models for
+    // the detected intent + complexity and picks the optimal one. The result
+    // is sent as the very first SSE event so the UI chip updates immediately.
+    let routerResult: RouterResult | null = null;
+    if (isAutoMode) {
+      try {
+        const routerInput: RouterInput = {
+          intent,
+          complexity: queryComplexity,
+          hasVisionContent: !!referenceImage || !!(referenceImages && referenceImages.length > 0),
+          thinkingEnabled: !!thinkingEnabled,
+          tokenBalance: streamTokenBalance.tokenBalance,
+          estimatedInputTokens,
+          preferredProvider: req.body.preferredProvider,
+          excludeModelIds: req.body.excludeModels,
+          conversationModelId: undefined, // no prior model in auto mode
+        };
+
+        routerResult = routeToOptimalModel(routerInput);
+
+        if (routerResult.selectedModel.dbId) {
+          finalModelId = routerResult.selectedModel.dbId;
+
+          // Re-fetch selectedModel so think mode + orchestration get real model info
+          selectedModel = await prisma.aIModel.findUnique({
+            where: { id: finalModelId },
+            select: { modelId: true, contextWindow: true, name: true, provider: true },
+          });
+
+          // Send auto_model as first SSE event — UI updates the model chip immediately
+          if (!res.writableEnded) {
+            res.write(`data: ${JSON.stringify({
+              type: 'auto_model',
+              model: routerResult.selectedModel.displayName,
+              modelId: routerResult.selectedModel.dbId,
+              reason: routerResult.reason,
+              confidence: routerResult.confidence,
+              ...(routerResult.costSavings ? { costSavings: routerResult.costSavings } : {}),
+              alternatives: routerResult.alternatives.slice(0, 2).map(a => ({
+                name: a.displayName,
+                id: a.dbId,
+              })),
+            })}\n\n`);
+          }
+        }
+      } catch (routerErr: any) {
+        logger.warn(`LLM Router failed, using first available model: ${routerErr.message}`);
+      }
+    }
 
     let webSearchSource: string | null = null;
     if (userQuery && needsWebSearch(userQuery, hasDocContext)) {
@@ -1280,8 +1333,8 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
     if (!agentConfig && !thinkingEnabled) {
       const taskSystemPrompt = getTaskPrompt(
         intent.intent,
-        streamModelCheck?.provider || '',
-        streamModelCheck?.modelId || '',
+        streamModelCheck?.provider || selectedModel?.provider || '',
+        streamModelCheck?.modelId || selectedModel?.modelId || '',
         industry || user.organization?.industry || undefined
       );
       const systemPromptWithMemory = memoryPrompt

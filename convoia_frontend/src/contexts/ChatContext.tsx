@@ -462,6 +462,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               setMessages((prev) => prev.map((m) =>
                 m.id === assistantId ? { ...m, content: accumulated, isLoading: false } : m
               ))
+            } else if (parsed.type === 'auto_model') {
+              // Notify chat pages which model was auto-selected so the chip updates immediately
+              window.dispatchEvent(new CustomEvent('convoia:auto_model', {
+                detail: { modelId: parsed.modelId, modelName: parsed.model, reason: parsed.reason },
+              }))
             } else if (parsed.type === 'done') {
               metadata = parsed
             } else if (parsed.type === 'error') {
@@ -642,6 +647,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               setMessages((prev) => prev.map((m) =>
                 m.id === assistantId ? { ...m, content: accumulated, isLoading: false } : m
               ))
+            } else if (parsed.type === 'auto_model') {
+              // Notify chat pages which model was auto-selected so the chip updates immediately
+              window.dispatchEvent(new CustomEvent('convoia:auto_model', {
+                detail: { modelId: parsed.modelId, modelName: parsed.model, reason: parsed.reason },
+              }))
             } else if (parsed.type === 'done') {
               metadata = parsed
             } else if (parsed.type === 'error') {
