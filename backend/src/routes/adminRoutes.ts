@@ -19,6 +19,7 @@ import {
   adminCreateAccount,
   adminSendTokens,
   getAdminAnalytics,
+  getTokenDrainDiagnostic,
 } from '../controllers/adminController.js';
 import { authMiddleware, requireRole } from '../middleware/authMiddleware.js';
 
@@ -68,6 +69,10 @@ router.post('/send-tokens', requireRole('admin', 'platform_admin'), adminSendTok
 
 // Admin analytics
 router.get('/analytics', requireRole('admin', 'platform_admin'), getAdminAnalytics);
+
+// Token drain diagnostic — shows largest recent deductions to identify leakage
+// GET /api/admin/token-drain?hours=24&limit=50&userId=<optional>
+router.get('/token-drain', requireRole('admin', 'platform_admin'), getTokenDrainDiagnostic);
 
 export default router;
 

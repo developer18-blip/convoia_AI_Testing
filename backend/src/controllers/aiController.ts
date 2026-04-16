@@ -14,6 +14,7 @@ import { enhanceImagePrompt } from '../services/imageIntentService.js';
 import { FileProcessingService } from '../services/fileProcessingService.js';
 import { generateVideo as generateVideoFn, VIDEO_TOKEN_COST, type MediaRequest } from '../services/mediaGenerationService.js';
 import { TOKEN_BASE_RATE, costAdjustedTokens } from '../config/tokenPackages.js';
+import { MAX_SINGLE_DEDUCTION } from '../services/tokenWalletService.js';
 import { buildThinkModeParams } from '../ai/thinkModeParams.js';
 import { routeToOptimalModel, type RouterInput, type RouterResult } from '../services/llmRouter.js';
 
@@ -473,6 +474,18 @@ export const queryAIStream = async (req: Request, res: Response) => {
         canBuyTokens: !isOrgMember || user.role === 'org_owner',
       });
       return;
+    }
+
+    // Drain-rate guard: if the estimated cost for this query already exceeds
+    // MAX_SINGLE_DEDUCTION, log a critical warning.  The deductTokens() cap will
+    // prevent actual over-billing, but the log helps diagnose runaway configs.
+    const estimatedWalletCost = Math.ceil(estimatedInputTokens / 4); // rough pre-model estimate
+    if (estimatedWalletCost > MAX_SINGLE_DEDUCTION) {
+      logger.warn(
+        `DRAIN_GUARD: userId=${user.id} estimatedInputTokens=${estimatedInputTokens} ` +
+        `estimatedWalletCost=${estimatedWalletCost} exceeds MAX_SINGLE_DEDUCTION=${MAX_SINGLE_DEDUCTION} — ` +
+        `cap will apply at deduction time.`
+      );
     }
 
     // Budget check

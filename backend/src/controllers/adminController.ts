@@ -1091,11 +1091,21 @@ export const adminSendTokens = asyncHandler(async (req: Request, res: Response) 
       select: { id: true },
     });
 
+    // Each member receives the FULL parsedTokens (not split).
+    // Total tokens created = parsedTokens × memberCount.
+    // Log clearly so admins can audit token creation volume.
+    const totalCreated = parsedTokens * members.length;
+    logger.info(
+      `Admin org grant: org=${org.name} members=${members.length} ` +
+      `perMember=${parsedTokens} totalCreated=${totalCreated} by=${req.user!.userId}`
+    );
+
+    const grantRef = `admin_org_grant_${Date.now()}`;
     for (const member of members) {
       await TokenWalletService.addTokens({
         userId: member.id,
         tokens: parsedTokens,
-        reference: `admin_org_grant_${Date.now()}`,
+        reference: grantRef,
         description: reason || `Admin org token grant to ${org.name}`,
       });
     }
@@ -1104,11 +1114,81 @@ export const adminSendTokens = asyncHandler(async (req: Request, res: Response) 
 
     res.json({
       success: true,
-      message: `${parsedTokens.toLocaleString()} tokens sent to ${members.length} members of ${org.name}`,
-      data: { orgName: org.name, memberCount: members.length, tokensPerMember: parsedTokens },
+      message: `${parsedTokens.toLocaleString()} tokens sent to each of ${members.length} members of ${org.name} (${totalCreated.toLocaleString()} tokens total created)`,
+      data: { orgName: org.name, memberCount: members.length, tokensPerMember: parsedTokens, totalTokensCreated: totalCreated },
       timestamp: new Date().toISOString(),
     });
   }
+});
+
+// ── Token Drain Diagnostic ───────────────────────────────────────────
+// Shows the largest recent deductions across all users — helps identify runaway
+// cost events (big model + long context, accidental high markup, etc.)
+export const getTokenDrainDiagnostic = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user || !['admin', 'platform_admin'].includes(req.user.role)) {
+    throw new AppError('Admin access required', 403);
+  }
+
+  const { userId, hours = '24', limit = '50' } = req.query;
+  const since = new Date(Date.now() - Number(hours) * 60 * 60 * 1000);
+
+  const where: any = {
+    type: 'usage',
+    createdAt: { gte: since },
+    tokens: { lte: -10_000 }, // only large negative (deduction) entries
+  };
+  if (userId) where.userId = String(userId);
+
+  const large = await prisma.tokenTransaction.findMany({
+    where,
+    orderBy: { tokens: 'asc' }, // most negative first
+    take: Math.min(Number(limit), 200),
+    include: {
+      user: { select: { id: true, email: true, name: true } },
+    },
+  });
+
+  // Summary: total drained and how many events
+  const totalDrained = large.reduce((s, t) => s + Math.abs(t.tokens), 0);
+
+  // Group by user
+  const byUser = new Map<string, { email: string; name: string; totalDrained: number; events: number; largestSingle: number }>();
+  for (const t of large) {
+    const key = t.userId;
+    const abs = Math.abs(t.tokens);
+    const existing = byUser.get(key);
+    if (existing) {
+      existing.totalDrained += abs;
+      existing.events += 1;
+      if (abs > existing.largestSingle) existing.largestSingle = abs;
+    } else {
+      byUser.set(key, { email: t.user.email, name: t.user.name, totalDrained: abs, events: 1, largestSingle: abs });
+    }
+  }
+
+  res.json({
+    success: true,
+    data: {
+      windowHours: Number(hours),
+      since: since.toISOString(),
+      totalEventsOver10k: large.length,
+      totalTokensDrained: totalDrained,
+      topUsers: Array.from(byUser.entries())
+        .map(([id, u]) => ({ userId: id, ...u }))
+        .sort((a, b) => b.totalDrained - a.totalDrained),
+      recentLargeDeductions: large.slice(0, 30).map((t) => ({
+        id: t.id,
+        userId: t.userId,
+        email: t.user.email,
+        tokens: t.tokens,
+        balanceAfter: t.balanceAfter,
+        description: t.description,
+        reference: t.reference,
+        createdAt: t.createdAt,
+      })),
+    },
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // ── Admin Full Analytics ─────────────────────────────────────────────

@@ -1,6 +1,16 @@
 import prisma from '../config/db.js';
 import logger from '../config/logger.js';
 
+// Alert threshold: log a CRITICAL warning when a single deduction exceeds this many tokens.
+// A Starter pack = 500k tokens. Losing >100k in one call is unusual and worth tracking.
+const LARGE_DEDUCTION_THRESHOLD = 100_000;
+
+// Hard safety cap: a single query can never drain more than this many wallet tokens,
+// regardless of model price + markup. Prevents a misconfigured markup or a runaway
+// long-context query from zeroing the wallet in one shot.
+// 300k = 60% of a Starter pack — still large, but leaves the user some balance.
+export const MAX_SINGLE_DEDUCTION = 300_000;
+
 export class TokenWalletService {
   static async getOrCreateWallet(userId: string) {
     return await prisma.tokenWallet.upsert({
@@ -99,7 +109,16 @@ export class TokenWalletService {
     description: string;
     organizationId?: string;
   }): Promise<number> {
-    const { userId, tokens, reference, description, organizationId } = params;
+    const { userId, tokens: rawTokens, reference, description, organizationId } = params;
+
+    // Apply the hard per-query safety cap before anything touches the DB.
+    const tokens = Math.min(rawTokens, MAX_SINGLE_DEDUCTION);
+    if (tokens < rawTokens) {
+      logger.warn(
+        `DEDUCTION_CAP_APPLIED: userId=${userId} requested=${rawTokens} capped=${tokens} ` +
+        `(MAX_SINGLE_DEDUCTION=${MAX_SINGLE_DEDUCTION}) — possible misconfigured markup or huge context.`
+      );
+    }
 
     try {
       return await prisma.$transaction(async (tx) => {
@@ -117,6 +136,15 @@ export class TokenWalletService {
 
         const balanceBefore = locked[0].tokenBalance;
         const actualDeduct = Math.min(tokens, balanceBefore);
+
+        // Alert when a single call drains a lot of tokens — helps diagnose runaway costs.
+        if (actualDeduct >= LARGE_DEDUCTION_THRESHOLD) {
+          logger.warn(
+            `LARGE_DEDUCTION_ALERT: userId=${userId} orgId=${organizationId || 'none'} ` +
+            `deducting=${actualDeduct} walletBefore=${balanceBefore} ` +
+            `remainingAfter=${balanceBefore - actualDeduct} ref=${reference}`
+          );
+        }
 
         const updated = await tx.tokenWallet.update({
           where: { userId },
