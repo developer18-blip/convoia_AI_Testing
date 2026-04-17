@@ -72,6 +72,7 @@ export function ChatPage() {
 
   const handleModelChange = (id: string) => {
     setSelectedModelId(id)
+    if (id === 'auto') { toast.info('Auto — router will pick the best model per query'); return }
     const model = models.find((m) => m.id === id)
     if (model) toast.info(`${model.name} is running`)
   }
@@ -79,6 +80,19 @@ export function ChatPage() {
   useEffect(() => {
     if (models.length > 0 && !selectedModelId) setSelectedModelId(models[0].id)
   }, [models, selectedModelId])
+
+  // Router picked a model — flip the selector to the resolved modelId
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { modelId?: string } | undefined
+      const resolved = detail?.modelId
+      if (!resolved) return
+      const match = models.find((m) => m.modelId === resolved || m.id === resolved)
+      if (match) setSelectedModelId(match.id)
+    }
+    window.addEventListener('convoia:auto_model', handler)
+    return () => window.removeEventListener('convoia:auto_model', handler)
+  }, [models])
 
   useEffect(() => {
     if (activeConversation) {

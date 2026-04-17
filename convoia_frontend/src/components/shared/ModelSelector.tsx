@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
-import { Search, Check, ChevronDown, ImageIcon } from 'lucide-react'
+import { Search, Check, ChevronDown, ImageIcon, Sparkles } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import type { AIModel } from '../../types'
+
+const AUTO_GREEN = '#10B981'
 
 interface ModelSelectorProps {
   models: AIModel[]
@@ -33,6 +35,7 @@ export function ModelSelector({ models, selectedId, onChange, className }: Model
   const [search, setSearch] = useState('')
   const ref = useRef<HTMLDivElement>(null)
 
+  const isAuto = selectedId === 'auto'
   const selected = models.find((m) => m.id === selectedId)
 
   useEffect(() => {
@@ -89,11 +92,12 @@ export function ModelSelector({ models, selectedId, onChange, className }: Model
         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--chat-hover)'}
         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
       >
-        {selected && isImageModel(selected) && (
+        {isAuto && <Sparkles size={14} style={{ color: AUTO_GREEN }} />}
+        {!isAuto && selected && isImageModel(selected) && (
           <ImageIcon size={14} style={{ color: '#F59E0B' }} />
         )}
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 'min(180px, 35vw)' }}>
-          {selected?.name ?? 'Select model'}
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 'min(180px, 35vw)', color: isAuto ? AUTO_GREEN : undefined, fontWeight: isAuto ? 700 : 600 }}>
+          {isAuto ? 'Auto' : (selected?.name ?? 'Select model')}
         </span>
         <ChevronDown size={14} style={{ color: 'var(--chat-text-muted)', flexShrink: 0 }} />
       </button>
@@ -126,6 +130,32 @@ export function ModelSelector({ models, selectedId, onChange, className }: Model
           </div>
 
           <div style={{ maxHeight: '450px', overflowY: 'auto' }}>
+            {/* ─── Auto (LLM Router) — always first ─── */}
+            {!search && (
+              <button
+                onClick={() => handleSelectModel('auto')}
+                className="w-full text-left"
+                style={{
+                  padding: '10px 12px', borderRadius: '8px', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  border: 'none',
+                  background: isAuto ? `${AUTO_GREEN}15` : 'transparent',
+                  transition: 'background-color 150ms', marginBottom: '4px',
+                }}
+                onMouseEnter={(e) => { if (!isAuto) e.currentTarget.style.backgroundColor = 'var(--chat-hover)' }}
+                onMouseLeave={(e) => { if (!isAuto) e.currentTarget.style.backgroundColor = 'transparent' }}
+              >
+                <Sparkles size={14} style={{ color: AUTO_GREEN, flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '14px', color: AUTO_GREEN, fontWeight: 700 }}>Auto</div>
+                  <div style={{ fontSize: '12px', color: 'var(--chat-text-muted)', marginTop: '1px' }}>
+                    Smart routing · picks the best model per query
+                  </div>
+                </div>
+                {isAuto && <Check size={16} style={{ color: AUTO_GREEN, flexShrink: 0 }} />}
+              </button>
+            )}
+
             {/* ─── Chat Models ─── */}
             {groupedChat.map((group) => (
               <div key={group.provider}>

@@ -126,7 +126,7 @@ export const MODEL_PROFILES: ModelProfile[] = [
     bestFor: ['Coding', 'General tasks', 'Computer use'],
   },
   {
-    modelId: 'gemini-3.1-pro', provider: 'google', displayName: 'Gemini 3.1 Pro',
+    modelId: 'gemini-3.1-pro-preview', provider: 'google', displayName: 'Gemini 3.1 Pro',
     costTier: 3, qualityTier: 4, speedTier: 3, contextWindow: 1000000,
     supportsVision: true, supportsThinking: true,
     strengths: ['research', 'analysis', 'coding', 'math', 'question'],
