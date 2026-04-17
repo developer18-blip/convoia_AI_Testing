@@ -356,7 +356,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
         res.end();
         // Log usage
         const orgId = imgUser?.organizationId || undefined;
-        await prisma.usageLog.create({ data: { userId: req.user.userId, organizationId: orgId, modelId: streamModelCheck.id, prompt: lastMsg.substring(0, 500), response: `[Image: ${result.revisedPrompt?.substring(0, 200)}]`, tokensInput: 0, tokensOutput: imageTokenCost, totalTokens: imageTokenCost, providerCost: 0, markupPercentage: 20, customerPrice: imgCustomerPrice, status: 'completed' } });
+        await prisma.usageLog.create({ data: { userId: req.user.userId, organizationId: orgId, modelId: streamModelCheck.id, prompt: lastMsg.substring(0, 500), response: `[Image: ${result.revisedPrompt?.substring(0, 200)}]`, tokensInput: 0, tokensOutput: imageTokenCost, totalTokens: imageTokenCost, providerCost: imageProviderCost, markupPercentage: 25, customerPrice: imgCustomerPrice, status: 'completed' } });
       } catch (err: any) {
         res.write(`data: ${JSON.stringify({ type: 'chunk', content: `\n\nImage generation failed: ${err.message}` })}\n\n`);
         res.write(`data: ${JSON.stringify({ type: 'done', tokens: { input: 0, output: 0, total: 0 }, tokensUsed: 0, cost: { charged: '0' }, model: streamModelCheck.name, provider: 'openai' })}\n\n`);
@@ -766,7 +766,7 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
             prompt: lastUserText.substring(0, 500),
             response: `[Image generated: ${result.revisedPrompt?.substring(0, 200) || enhancedPrompt.substring(0, 200)}]`,
             tokensInput: 0, tokensOutput: imageTokenCost, totalTokens: imageTokenCost,
-            providerCost: 0, markupPercentage: 20, customerPrice: imgCustomerPrice,
+            providerCost: imgProvCost, markupPercentage: 25, customerPrice: imgCustomerPrice,
             status: 'completed',
           },
         });
