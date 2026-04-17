@@ -17,6 +17,7 @@ import { TOKEN_BASE_RATE, costAdjustedTokens } from '../config/tokenPackages.js'
 import { MAX_SINGLE_DEDUCTION } from '../services/tokenWalletService.js';
 import { buildThinkModeParams } from '../ai/thinkModeParams.js';
 import { routeToOptimalModel, type RouterInput, type RouterResult } from '../services/llmRouter.js';
+import { runCouncil } from '../services/councilService.js';
 
 // ── SAFE ERROR SERIALIZER (prevents circular reference crash) ────
 // Axios errors contain TLSSocket → ClientRequest → socket circular refs.
@@ -898,6 +899,126 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
     // Kept at outer scope so onDone can use `intent.intent` for the
     // completeness check.
     const intent: ClassifiedIntent = classifyIntent(userQuery || lastUserText || '', hasDocContext);
+
+    // ── COUNCIL MODE — Multi-Model Consensus ───────────────────────────────
+    // Fires when the frontend requests the LLM Council. Runs the 3-phase
+    // pipeline (parallel queries → cross-examination → verdict) and streams
+    // structured SSE events so the UI can render live execution state.
+    const isCouncilMode = req.body.councilMode === true && Array.isArray(req.body.councilModelIds);
+    if (isCouncilMode) {
+      const councilModelIds: string[] = req.body.councilModelIds;
+      if (councilModelIds.length < 2 || councilModelIds.length > 5) {
+        res.write(`data: ${JSON.stringify({ type: 'error', content: 'Council requires 2-5 models.' })}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+        return;
+      }
+
+      try {
+        await runCouncil(
+          {
+            userId: user.id,
+            organizationId,
+            modelIds: councilModelIds,
+            query: latestUserText,
+            intent: intent?.intent || 'question',
+            thinkingEnabled: !!thinkingEnabled,
+            memoryContext: memoryPrompt || undefined,
+          },
+          {
+            onModelStart: (name, index, status) => {
+              if (!streamEnded && !res.writableEnded) {
+                res.write(`data: ${JSON.stringify({ type: 'council_model_start', modelName: name, modelIndex: index, status })}\n\n`);
+              }
+            },
+            onModelProgress: (name, index, status) => {
+              if (!streamEnded && !res.writableEnded) {
+                res.write(`data: ${JSON.stringify({ type: 'council_model_progress', modelName: name, modelIndex: index, status })}\n\n`);
+              }
+            },
+            onModelComplete: (name, index, durationMs, tokenCount) => {
+              if (!streamEnded && !res.writableEnded) {
+                res.write(`data: ${JSON.stringify({ type: 'council_model_complete', modelName: name, modelIndex: index, durationMs, tokenCount })}\n\n`);
+              }
+            },
+            onModelError: (name, index, error) => {
+              if (!streamEnded && !res.writableEnded) {
+                res.write(`data: ${JSON.stringify({ type: 'council_model_error', modelName: name, modelIndex: index, error })}\n\n`);
+              }
+            },
+            onCrossExamStart: () => {
+              if (!streamEnded && !res.writableEnded) {
+                res.write(`data: ${JSON.stringify({ type: 'council_crossexam_start', status: 'Cross-examining all responses...' })}\n\n`);
+              }
+            },
+            onCrossExamComplete: (durationMs) => {
+              if (!streamEnded && !res.writableEnded) {
+                res.write(`data: ${JSON.stringify({ type: 'council_crossexam_complete', durationMs })}\n\n`);
+              }
+            },
+            onVerdictStart: () => {
+              if (!streamEnded && !res.writableEnded) {
+                res.write(`data: ${JSON.stringify({ type: 'council_verdict_start', status: 'ConvoiaAI Council is synthesizing the final verdict...' })}\n\n`);
+              }
+            },
+            onVerdictChunk: (text) => {
+              if (!streamEnded && !res.writableEnded) {
+                res.write(`data: ${JSON.stringify({ type: 'council_verdict_chunk', content: text })}\n\n`);
+              }
+            },
+            onVerdictComplete: () => {
+              // Verdict streaming done — final metadata follows in onDone
+            },
+            onDone: (metadata) => {
+              if (!streamEnded && !res.writableEnded) {
+                res.write(`data: ${JSON.stringify({
+                  type: 'council_responses',
+                  models: metadata.modelResults.map(r => ({
+                    name: r.modelName,
+                    response: r.response,
+                    durationMs: r.durationMs,
+                    tokens: r.inputTokens + r.outputTokens,
+                  })),
+                })}\n\n`);
+
+                res.write(`data: ${JSON.stringify({
+                  type: 'done',
+                  council: true,
+                  tokens: { input: metadata.totalInputTokens, output: metadata.totalOutputTokens, total: metadata.totalTokens },
+                  tokensUsed: metadata.totalWalletTokens,
+                  cost: { charged: metadata.totalCost.toFixed(6) },
+                  model: 'ConvoiaAI Council',
+                  provider: 'council',
+                  councilMeta: {
+                    modelsUsed: metadata.modelResults.length,
+                    crossExamDurationMs: metadata.crossExamDurationMs,
+                    verdictDurationMs: metadata.verdictDurationMs,
+                    totalDurationMs: metadata.totalDurationMs,
+                  },
+                })}\n\n`);
+                res.write('data: [DONE]\n\n');
+                res.end();
+              }
+            },
+            onError: (error) => {
+              if (!streamEnded && !res.writableEnded) {
+                res.write(`data: ${JSON.stringify({ type: 'error', content: `Council error: ${error.message}` })}\n\n`);
+                res.write('data: [DONE]\n\n');
+                res.end();
+              }
+            },
+          },
+        );
+      } catch (err: any) {
+        logger.error(`Council setup failed: ${err.message}`);
+        if (!streamEnded && !res.writableEnded) {
+          res.write(`data: ${JSON.stringify({ type: 'error', content: err.message })}\n\n`);
+          res.write('data: [DONE]\n\n');
+          res.end();
+        }
+      }
+      return;
+    }
 
     // ── LLM ROUTER — Auto Model Selection ─────────────────────────────────
     // Fires only when the user selected "Auto". Scores all active models for
