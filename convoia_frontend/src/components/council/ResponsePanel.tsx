@@ -4,56 +4,48 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
 import type { CouncilModelResponse } from '../../types'
+import { providerBadgeClass } from './councilConstants'
 
 interface Props {
   resp: CouncilModelResponse
 }
 
+// Best-effort provider detection from the model's display name.
+// Falls back to 'xai' badge style (neutral grey) for unknowns.
+function inferProvider(modelName: string): string {
+  const n = modelName.toLowerCase()
+  if (n.includes('claude')) return 'anthropic'
+  if (n.includes('gpt') || n.startsWith('o3') || n.startsWith('o4')) return 'openai'
+  if (n.includes('gemini')) return 'google'
+  if (n.includes('deepseek')) return 'deepseek'
+  if (n.includes('sonar') || n.includes('perplexity')) return 'perplexity'
+  if (n.includes('grok')) return 'xai'
+  if (n.includes('mistral') || n.includes('codestral')) return 'mistral'
+  if (n.includes('llama') || n.includes('mixtral') || n.includes('groq')) return 'groq'
+  return 'xai'
+}
+
 export function ResponsePanel({ resp }: Props) {
   const [open, setOpen] = useState(false)
+  const provider = inferProvider(resp.name)
+  const providerLabel = provider.charAt(0).toUpperCase() + provider.slice(1)
+
   return (
-    <div
-      style={{
-        margin: '4px 0',
-        borderRadius: '10px',
-        border: '1px solid var(--color-border, var(--chat-border))',
-        overflow: 'hidden',
-        background: 'var(--color-surface, var(--chat-surface))',
-      }}
-    >
-      <button
-        onClick={() => setOpen((v) => !v)}
-        style={{
-          width: '100%', padding: '10px 12px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          cursor: 'pointer', userSelect: 'none',
-          background: 'var(--color-surface-2, rgba(0,0,0,0.02))',
-          border: 'none',
-          color: 'var(--chat-text, var(--color-text-primary))',
-          fontSize: '12px', fontWeight: 600,
-        }}
-      >
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0, textAlign: 'left' }}>
-          {resp.name}
-        </span>
-        <span style={{ fontSize: '11px', color: 'var(--chat-text-muted)', marginRight: 8, fontWeight: 400, fontVariantNumeric: 'tabular-nums' }}>
-          {(resp.durationMs / 1000).toFixed(1)}s · {resp.tokens.toLocaleString()} tokens
-        </span>
-        <ChevronDown
-          size={14}
-          style={{ color: 'var(--chat-text-muted)', transform: open ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 180ms ease' }}
-        />
+    <div className={`council-response-panel ${open ? 'council-response-panel--open' : ''}`}>
+      <button className="council-response-header" onClick={() => setOpen((v) => !v)}>
+        <div className="council-response-name">
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{resp.name}</span>
+          <span className={`council-provider-badge ${providerBadgeClass(provider)}`}>{providerLabel}</span>
+        </div>
+        <div className="council-response-meta">
+          <span className="council-response-dur">{(resp.durationMs / 1000).toFixed(1)}s</span>
+          <span>·</span>
+          <span className="council-response-dur">{resp.tokens.toLocaleString()} tok</span>
+          <ChevronDown size={13} className="council-response-arrow" />
+        </div>
       </button>
       {open && (
-        <div
-          style={{
-            padding: '10px 12px',
-            fontSize: '12px', lineHeight: 1.65,
-            color: 'var(--chat-text-secondary, var(--color-text-secondary))',
-            borderTop: '1px solid var(--color-border, var(--chat-border))',
-            maxHeight: '280px', overflowY: 'auto',
-          }}
-        >
+        <div className="council-response-body">
           <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{resp.response}</ReactMarkdown>
         </div>
       )}

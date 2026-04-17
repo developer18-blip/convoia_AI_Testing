@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Check, X as XIcon, Circle } from 'lucide-react'
 import type { CouncilModelState } from '../../types'
 
 interface Props {
   model: CouncilModelState
+  dimmed?: boolean
 }
 
-export function ModelStatusCard({ model }: Props) {
+export function ModelStatusCard({ model, dimmed }: Props) {
   const { status, statusMessage, modelName, durationMs, tokenCount, error, startTime } = model
   const [elapsed, setElapsed] = useState(0)
 
@@ -24,71 +24,42 @@ export function ModelStatusCard({ model }: Props) {
         ? 'Failed'
         : 'Queued'
 
-  const borderColor = status === 'complete'
-    ? 'rgba(34,197,94,0.35)'
-    : status === 'error'
-      ? 'rgba(239,68,68,0.35)'
-      : 'var(--color-border, var(--chat-border))'
+  const cardClasses = [
+    'council-exec-card',
+    status === 'complete' ? 'council-exec-card--complete' : '',
+    status === 'error' ? 'council-exec-card--error' : '',
+    dimmed ? 'council-exec-card--dimmed' : '',
+  ].filter(Boolean).join(' ')
+
+  const iconClass = status === 'thinking'
+    ? 'council-exec-icon council-exec-icon--thinking'
+    : status === 'complete'
+      ? 'council-exec-icon council-exec-icon--complete'
+      : status === 'error'
+        ? 'council-exec-icon council-exec-icon--error'
+        : 'council-exec-icon'
 
   return (
-    <div
-      style={{
-        margin: '6px 0',
-        padding: '10px 12px',
-        borderRadius: '10px',
-        border: `1px solid ${borderColor}`,
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-        background: 'var(--color-surface, var(--chat-surface, #fff))',
-        transition: 'border-color 300ms ease',
-      }}
-    >
-      <div style={{ width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        {status === 'thinking' && <Spinner color="#F59E0B" />}
-        {status === 'complete' && (
-          <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#22C55E', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Check size={11} color="white" strokeWidth={3} />
-          </div>
-        )}
-        {status === 'error' && (
-          <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#EF4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <XIcon size={11} color="white" strokeWidth={3} />
-          </div>
-        )}
-        {status === 'waiting' && <Circle size={14} color="var(--chat-text-muted)" />}
+    <div className={cardClasses}>
+      <div className={iconClass}>
+        {status === 'thinking' && <span className="council-spinner" />}
+        {status === 'complete' && <span className="council-check">✓</span>}
+        {status === 'error' && <span className="council-error-icon">×</span>}
+        {status === 'waiting' && <span className="council-spinner" style={{ opacity: 0.4 }} />}
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--chat-text, var(--color-text-primary))', marginBottom: '2px' }}>
-          {modelName}
-        </div>
-        <div style={{
-          fontSize: '11px',
-          color: status === 'error' ? '#EF4444' : 'var(--chat-text-muted, var(--color-text-muted))',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {status === 'error' ? (error || 'Failed') : status === 'complete' ? `Analysis complete · ${tokenCount.toLocaleString()} tokens` : statusMessage}
+      <div className="council-exec-body">
+        <div className="council-exec-name">{modelName}</div>
+        <div className={`council-exec-status council-exec-status--${status === 'waiting' ? 'thinking' : status}`}>
+          {status === 'error'
+            ? (error || 'Failed')
+            : status === 'complete'
+              ? `Analysis complete · ${tokenCount.toLocaleString()} tokens`
+              : statusMessage || 'Queued…'}
         </div>
       </div>
-      <div style={{ fontSize: '11px', color: 'var(--chat-text-muted)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+      <div className={`council-exec-time ${status === 'complete' ? 'council-exec-time--complete' : ''}`}>
         {displayTime}
       </div>
     </div>
-  )
-}
-
-function Spinner({ color }: { color: string }) {
-  return (
-    <>
-      <style>{`@keyframes council-spin { to { transform: rotate(360deg); } }`}</style>
-      <div
-        style={{
-          width: 16, height: 16, borderRadius: '50%',
-          border: '2px solid var(--color-border, rgba(0,0,0,0.1))',
-          borderTopColor: color,
-          animation: 'council-spin 0.75s linear infinite',
-        }}
-      />
-    </>
   )
 }

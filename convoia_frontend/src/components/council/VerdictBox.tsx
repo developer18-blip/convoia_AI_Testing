@@ -1,6 +1,4 @@
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import remarkBreaks from 'remark-breaks'
+import { renderCouncilVerdict } from './verdictRenderer'
 
 interface Props {
   verdict: string
@@ -8,61 +6,22 @@ interface Props {
   agreementLevel: { text: string; color: 'green' | 'amber' }
 }
 
-const PURPLE = '#7C3AED'
-
 export function VerdictBox({ verdict, isStreaming, agreementLevel }: Props) {
-  const badgeColor = agreementLevel.color === 'green' ? '#22C55E' : '#F59E0B'
-  const badgeBg = agreementLevel.color === 'green' ? 'rgba(34,197,94,0.12)' : 'rgba(245,158,11,0.12)'
+  const badgeClass = agreementLevel.color === 'green'
+    ? 'council-verdict-badge--agree'
+    : 'council-verdict-badge--mixed'
 
   return (
-    <div
-      style={{
-        margin: '12px 0',
-        padding: '14px 16px',
-        borderRadius: '14px',
-        border: '1px solid rgba(124,58,237,0.22)',
-        background: 'var(--color-surface, var(--chat-surface, #fff))',
-        boxShadow: '0 2px 12px rgba(124,58,237,0.05)',
-      }}
-    >
-      <style>{`
-        @keyframes council-cursor-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
-        .v-text, .v-bullet, .v-section { font-size: 14px; line-height: 1.65; color: var(--chat-text, var(--color-text-primary)); }
-        .v-bullet { margin: 4px 0 4px 14px; position: relative; }
-        .v-bullet::before { content: '•'; color: ${PURPLE}; position: absolute; left: -12px; font-weight: 700; }
-        .v-section { font-weight: 700; margin-top: 10px; margin-bottom: 4px; }
-        .v-strong { font-weight: 700; }
-      `}</style>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-        <div style={{
-          width: 26, height: 26, borderRadius: '8px',
-          background: `linear-gradient(135deg, ${PURPLE}, #5B21B6)`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'white', fontWeight: 800, fontSize: '13px',
-        }}>C</div>
-        <div style={{ flex: 1, fontSize: '13px', fontWeight: 700, color: 'var(--chat-text, var(--color-text-primary))' }}>
-          ConvoiaAI Council
-        </div>
-        <div style={{
-          fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '100px',
-          background: badgeBg, color: badgeColor, textTransform: 'uppercase', letterSpacing: '0.05em',
-        }}>
+    <div className="council-verdict-card">
+      <div className="council-verdict-header">
+        <div className="council-verdict-icon">C</div>
+        <div className="council-verdict-title">ConvoiaAI Council</div>
+        <div className={`council-verdict-badge ${badgeClass}`}>
           {agreementLevel.text}
         </div>
       </div>
-
-      <div style={{ fontSize: '14px', lineHeight: 1.65, color: 'var(--chat-text, var(--color-text-primary))' }}>
-        <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{verdict}</ReactMarkdown>
-        {isStreaming && (
-          <span
-            style={{
-              display: 'inline-block', width: 2, height: 14, marginLeft: 2,
-              background: PURPLE, verticalAlign: 'text-bottom',
-              animation: 'council-cursor-pulse 0.8s ease-in-out infinite',
-            }}
-          />
-        )}
+      <div className="council-verdict-body">
+        {renderCouncilVerdict(verdict, isStreaming)}
       </div>
     </div>
   )

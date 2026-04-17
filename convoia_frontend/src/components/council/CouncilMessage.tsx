@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { Zap, AlertCircle } from 'lucide-react'
-import type { CouncilState } from '../../types'
+import type { CouncilState, CouncilPhase } from '../../types'
 import { ModelStatusCard } from './ModelStatusCard'
 import { CrossExamCard } from './CrossExamCard'
 import { VerdictBox, getAgreementLevel } from './VerdictBox'
@@ -9,6 +9,24 @@ import { CouncilFooter } from './CouncilFooter'
 
 interface Props {
   council: CouncilState
+}
+
+function badgeForPhase(phase: CouncilPhase, modelCount: number): { label: string; cls: string } {
+  switch (phase) {
+    case 'executing':
+      return { label: modelCount > 0 ? `${modelCount} models running` : 'Running…', cls: 'council-badge--executing' }
+    case 'crossexam':
+    case 'crossexam_done':
+      return { label: 'Cross-examining', cls: 'council-badge--synthesizing' }
+    case 'verdict':
+      return { label: 'Synthesizing verdict', cls: 'council-badge--synthesizing' }
+    case 'complete':
+      return { label: 'Complete', cls: 'council-badge--complete' }
+    case 'error':
+      return { label: 'Error', cls: 'council-badge--error' }
+    default:
+      return { label: 'Council', cls: 'council-badge--selecting' }
+  }
 }
 
 export function CouncilMessage({ council }: Props) {
@@ -29,22 +47,23 @@ export function CouncilMessage({ council }: Props) {
 
   const agreementLevel = useMemo(() => getAgreementLevel(verdict), [verdict])
 
-  // Phase 3+ dims the Phase 1 cards (they're secondary now)
   const cardsDim = phase === 'verdict' || phase === 'complete'
-
-  // Cross-exam card visibility: shown from 'crossexam' onward
   const showCrossExam = phase === 'crossexam' || phase === 'crossexam_done' || phase === 'verdict' || phase === 'complete'
   const crossExamActive = phase === 'crossexam'
-  // Cross-exam card start time for the live timer: set when we entered crossexam
-  const crossExamStart = useMemo(() => Date.now() - (crossExamDurationMs || 0), [phase === 'crossexam'])
+  const crossExamStart = useMemo(
+    () => Date.now() - (crossExamDurationMs || 0),
+    // intentionally only set when entering crossexam phase
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [phase === 'crossexam'],
+  )
 
-  // Verdict visibility: from 'verdict' onward
   const showVerdict = phase === 'verdict' || phase === 'complete'
   const verdictStreaming = phase === 'verdict'
-
-  // Responses + footer: only after 'complete'
   const showResponses = phase === 'complete' && modelResponses.length > 0
   const showFooter = phase === 'complete' && meta
+  const showProgress = totalCount > 0 && phase === 'executing'
+
+  const badge = badgeForPhase(phase, totalCount)
 
   return (
     <div style={{ marginBottom: '28px', animation: 'fadeSlideIn 200ms ease-out' }}>
@@ -53,28 +72,30 @@ export function CouncilMessage({ council }: Props) {
       {/* Council header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
         <div style={{
-          width: 30, height: 30, borderRadius: '9px',
+          width: 32, height: 32, borderRadius: '10px',
           background: 'linear-gradient(135deg, #F59E0B, #D97706)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
         }}>
           <Zap size={15} color="white" fill="white" />
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--chat-text, var(--color-text-primary))' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--chat-text, var(--council-text))' }}>
             ConvoiaAI Council
           </div>
-          <div style={{ fontSize: '11px', color: 'var(--chat-text-muted, var(--color-text-muted))' }}>
-            {totalCount > 0 ? `${totalCount} models · ${phase === 'complete' ? 'Complete' : phase === 'error' ? 'Error' : 'Running…'}` : 'Starting…'}
+          <div style={{ fontSize: '11px', color: 'var(--council-text-dim)' }}>
+            {totalCount > 0 ? `${totalCount} models consulted` : 'Starting…'}
           </div>
         </div>
+        <span className={`council-badge ${badge.cls}`}>{badge.label}</span>
       </div>
 
       {/* Error banner */}
       {phase === 'error' && (
         <div style={{
           padding: '10px 12px', borderRadius: '10px', marginBottom: '10px',
-          background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
-          display: 'flex', alignItems: 'center', gap: '10px', color: '#DC2626', fontSize: '13px',
+          background: 'var(--council-red-bg)', border: '0.5px solid var(--council-red-border)',
+          display: 'flex', alignItems: 'center', gap: '10px',
+          color: 'var(--council-red)', fontSize: '13px',
         }}>
           <AlertCircle size={16} />
           <span>{errorMessage || 'Council failed'}</span>
@@ -83,30 +104,24 @@ export function CouncilMessage({ council }: Props) {
 
       {/* Phase 1: Model cards */}
       {totalCount > 0 && (
-        <div style={{ opacity: cardsDim ? 0.55 : 1, transition: 'opacity 350ms ease' }}>
+        <div>
           {models
             .slice()
             .sort((a, b) => a.modelIndex - b.modelIndex)
-            .map((m) => <ModelStatusCard key={m.modelIndex} model={m} />)}
+            .map((m) => <ModelStatusCard key={m.modelIndex} model={m} dimmed={cardsDim} />)}
         </div>
       )}
 
-      {/* Progress bar (hidden after phase 1) */}
-      {totalCount > 0 && phase === 'executing' && (
-        <div style={{ marginTop: '8px', marginBottom: '4px' }}>
-          <div style={{
-            height: 3, borderRadius: '100px',
-            background: 'var(--color-border, rgba(0,0,0,0.08))', overflow: 'hidden',
-          }}>
-            <div style={{
-              height: '100%', width: `${progressPct}%`,
-              background: doneCount === totalCount ? '#22C55E' : '#F59E0B',
-              transition: 'width 300ms ease, background 300ms ease',
-            }} />
+      {/* Progress bar (hidden once Phase 1 is done) */}
+      {showProgress && (
+        <div className="council-progress">
+          <div className="council-progress-track">
+            <div
+              className={`council-progress-fill ${doneCount === totalCount ? 'council-progress-fill--complete' : 'council-progress-fill--active'}`}
+              style={{ width: `${progressPct}%` }}
+            />
           </div>
-          <div style={{ marginTop: 4, fontSize: '11px', color: 'var(--chat-text-muted)' }}>
-            {progressLabel}
-          </div>
+          <div className="council-progress-label">{progressLabel}</div>
         </div>
       )}
 
@@ -128,10 +143,8 @@ export function CouncilMessage({ council }: Props) {
 
       {/* Phase 4: Individual responses */}
       {showResponses && (
-        <div style={{ marginTop: '10px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--chat-text-muted)', marginBottom: '6px' }}>
-            Individual model responses
-          </div>
+        <div>
+          <div className="council-responses-label">Individual model responses</div>
           {modelResponses.map((r, i) => <ResponsePanel key={`${r.name}-${i}`} resp={r} />)}
         </div>
       )}
