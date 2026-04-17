@@ -307,15 +307,6 @@ export function ChatPage() {
     toast.success('Conversation cleared')
   }
 
-  const industries = [
-    { value: '', label: 'General' },
-    { value: 'legal', label: 'Legal' },
-    { value: 'healthcare', label: 'Healthcare' },
-    { value: 'finance', label: 'Finance' },
-    { value: 'hr', label: 'HR' },
-    { value: 'marketing', label: 'Marketing' },
-  ]
-
   const totalTokens = messages.reduce((s, m) => s + (m.tokensInput || 0) + (m.tokensOutput || 0), 0)
   const totalCost = messages.reduce((s, m) => s + (m.cost || 0), 0)
 
@@ -406,7 +397,7 @@ export function ChatPage() {
               )}
             </div>
 
-            {/* Desktop-only: agent, think, industry inline */}
+            {/* Desktop-only: agent + think (industry is driven by selected agent) */}
             <div className="hidden md:flex items-center gap-2">
               <AgentSelector agents={agents} models={models} selectedId={selectedAgent?.id || null} onChange={handleAgentChange} onCreateAgent={createAgent} />
               <button onClick={() => { const next = !thinkingEnabled; setThinkingEnabled(next); if (next) toast.warning('Thinking mode ON — uses 2x tokens per message') }} title={thinkingEnabled ? 'Extended thinking ON' : 'Enable extended thinking'}
@@ -419,11 +410,6 @@ export function ChatPage() {
                 </svg>
                 Think
               </button>
-              <select value={industry} onChange={(e) => setIndustry(e.target.value)}
-                className="hidden xl:block"
-                style={{ padding: '5px 8px', backgroundColor: 'var(--chat-surface)', border: '1px solid var(--chat-border)', borderRadius: '8px', color: 'var(--color-text-secondary)', fontSize: '11px', outline: 'none', cursor: 'pointer' }}>
-                {industries.map((i) => <option key={i.value} value={i.value}>{i.label}</option>)}
-              </select>
             </div>
 
             {/* Spacer */}
