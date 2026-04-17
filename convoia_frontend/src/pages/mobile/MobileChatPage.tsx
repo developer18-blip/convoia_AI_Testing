@@ -10,6 +10,8 @@ import { useTokens } from '../../contexts/TokenContext'
 import { useToast } from '../../hooks/useToast'
 import { Menu, Plus, X, Clock, ChevronDown, Sparkles } from 'lucide-react'
 import type { Agent, Message } from '../../types'
+import { CouncilChip } from '../../components/council/CouncilChip'
+import { CouncilPicker } from '../../components/council/CouncilPicker'
 
 export function MobileChatPage() {
   const { models } = useModels()
@@ -29,6 +31,9 @@ export function MobileChatPage() {
   const [showHistory, setShowHistory] = useState(false)
   const [showModelPicker, setShowModelPicker] = useState(false)
   const [showAgentPicker, setShowAgentPicker] = useState(false)
+  const [councilMode, setCouncilMode] = useState(false)
+  const [councilModelIds, setCouncilModelIds] = useState<string[]>([])
+  const [showCouncilPicker, setShowCouncilPicker] = useState(false)
 
   // Auto-select first model (skip if 'auto' is already chosen)
   useEffect(() => {
@@ -65,25 +70,53 @@ export function MobileChatPage() {
   }
 
   const handleSend = async (content: string) => {
-    if (!selectedModelId) { toast.error('Please select a model'); return }
-    // 'auto' is a valid virtual modelId — the router resolves it server-side
+    // Council mode uses councilModelIds; selectedModelId doesn't matter for validation.
+    if (!councilMode && !selectedModelId) { toast.error('Please select a model'); return }
+    if (councilMode && councilModelIds.length < 2) {
+      toast.error('Select at least 2 models for Council')
+      return
+    }
     if (tokenBalance <= 0) {
       toast.error(authUser?.organizationId ? 'No tokens. Contact your admin.' : 'No tokens remaining.')
       return
     }
     if (!activeConversationId) {
-      createConversation(selectedModelId, selectedModel?.name || 'AI')
+      createConversation(
+        councilMode ? councilModelIds[0] : selectedModelId,
+        councilMode ? 'ConvoiaAI Council' : (selectedModel?.name || 'AI'),
+      )
     }
-    await sendMessage(content, selectedModelId, undefined, selectedAgent?.id, thinkingEnabled)
+    const councilOpts = councilMode ? { modelIds: councilModelIds } : undefined
+    await sendMessage(
+      content,
+      councilMode ? councilModelIds[0] : selectedModelId,
+      undefined,
+      selectedAgent?.id,
+      thinkingEnabled,
+      councilOpts,
+    )
   }
 
   const handleSendWithContext = (text: string, systemContext: string | null, extras?: any) => {
-    if (!activeConversationId) createConversation(selectedModelId, selectedModel?.name || 'AI')
+    if (!activeConversationId) createConversation(
+      councilMode ? councilModelIds[0] : selectedModelId,
+      councilMode ? 'ConvoiaAI Council' : (selectedModel?.name || 'AI'),
+    )
     const messageExtras: Partial<Message> = {}
     if (extras?.fileAttachment) messageExtras.fileAttachment = extras.fileAttachment
     if (extras?.imagePreview) messageExtras.imagePreview = extras.imagePreview
     if (extras?.imagePreviews) messageExtras.imagePreviews = extras.imagePreviews
-    sendWithContext(text, selectedModelId, systemContext, messageExtras, undefined, selectedAgent?.id, thinkingEnabled)
+    const councilOpts = councilMode ? { modelIds: councilModelIds } : undefined
+    sendWithContext(
+      text,
+      councilMode ? councilModelIds[0] : selectedModelId,
+      systemContext,
+      messageExtras,
+      undefined,
+      selectedAgent?.id,
+      thinkingEnabled,
+      councilOpts,
+    )
   }
 
   const handleImageGenerated = (data: { url: string; prompt: string }) => {
@@ -100,6 +133,22 @@ export function MobileChatPage() {
       height: 'calc(100dvh - env(safe-area-inset-top, 0px) - 60px - env(safe-area-inset-bottom, 0px))',
       background: 'var(--chat-bg)',
     }}>
+      {/* Council picker — bottom sheet */}
+      {showCouncilPicker && (
+        <CouncilPicker
+          activeModels={activeModels}
+          initialSelectedIds={councilModelIds}
+          variant="sheet"
+          onConfirm={(ids) => {
+            setCouncilModelIds(ids)
+            setCouncilMode(true)
+            setShowCouncilPicker(false)
+            toast.success(`Council activated — ${ids.length} models`)
+          }}
+          onClose={() => setShowCouncilPicker(false)}
+        />
+      )}
+
       {/* History drawer */}
       {showHistory && (
         <>
@@ -247,9 +296,17 @@ export function MobileChatPage() {
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           {/* Scrollable model chips */}
           <div style={{ flex: 1, display: 'flex', gap: '6px', overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', minWidth: 0 }}>
+            {/* Council chip — multi-model consensus */}
+            <CouncilChip
+              active={councilMode}
+              count={councilModelIds.length}
+              onClick={() => setShowCouncilPicker(true)}
+              variant="mobile"
+            />
+
             {/* Auto chip — always first */}
             <button
-              onClick={() => setSelectedModelId('auto')}
+              onClick={() => { setCouncilMode(false); setSelectedModelId('auto') }}
               style={{
                 padding: '6px 12px', borderRadius: '100px', fontSize: '11px', fontWeight: 700,
                 border: selectedModelId === 'auto' ? '1.5px solid #10B981' : '1px solid var(--color-border)',
@@ -264,10 +321,10 @@ export function MobileChatPage() {
             </button>
 
             {activeModels.slice(0, 8).map(m => {
-              const isActive = selectedModelId === m.id
+              const isActive = !councilMode && selectedModelId === m.id
               const shortName = m.name.replace('Claude ', '').replace('Gemini ', '').replace('GPT-', 'GPT ').replace(' (Groq)', '')
               return (
-                <button key={m.id} onClick={() => setSelectedModelId(m.id)}
+                <button key={m.id} onClick={() => { setCouncilMode(false); setSelectedModelId(m.id) }}
                   style={{
                     padding: '6px 12px', borderRadius: '100px', fontSize: '11px', fontWeight: 600,
                     border: isActive ? '1.5px solid #7C3AED' : '1px solid var(--color-border)',

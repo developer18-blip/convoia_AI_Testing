@@ -11,6 +11,7 @@ import { isDocumentWorthy } from '../../lib/documentDetector'
 import { formatCurrency, formatTokens } from '../../lib/utils'
 import type { Message } from '../../types'
 import type { ComponentPropsWithoutRef } from 'react'
+import { CouncilMessage } from '../council/CouncilMessage'
 
 interface MessageBubbleProps {
   message: Message
@@ -76,6 +77,23 @@ function getDisplayContent(content: string, hasFileAttachment: boolean): string 
 }
 
 export const MessageBubble = memo(function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRunCode, onOpenInCanvas }: MessageBubbleProps) {
+  // Council messages render via a dedicated component — bypasses the normal
+  // assistant-message pipeline. User messages still render normally.
+  if (message.role === 'assistant' && message.council) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '28px' }}>
+        <div style={{
+          width: 32, height: 32, borderRadius: '10px', flexShrink: 0,
+          background: 'linear-gradient(135deg, #F59E0B, #D97706)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'white', fontSize: '14px',
+        }}>⚡</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <CouncilMessage council={message.council} />
+        </div>
+      </div>
+    )
+  }
   const isUser = message.role === 'user'
   const [copied, setCopied] = useState(false)
   const [isEditing, setIsEditing] = useState(false)

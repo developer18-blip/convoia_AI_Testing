@@ -179,6 +179,54 @@ export interface Message {
     query: string
     sources: { title: string; url: string; image?: string; siteName?: string; snippet?: string }[]
   }
+  council?: CouncilState
+}
+
+export type CouncilPhase =
+  | 'executing'       // Phase 1 — models answering in parallel
+  | 'crossexam'       // Phase 2 — cross-examination running
+  | 'crossexam_done'  // Phase 2 complete, about to start verdict
+  | 'verdict'         // Phase 3 — verdict streaming
+  | 'complete'        // All phases done — terminal state
+  | 'error'
+
+export interface CouncilModelState {
+  modelName: string
+  modelIndex: number
+  status: 'waiting' | 'thinking' | 'complete' | 'error'
+  statusMessage: string
+  durationMs: number
+  tokenCount: number
+  error?: string
+  startTime: number
+}
+
+export interface CouncilModelResponse {
+  name: string
+  response: string
+  durationMs: number
+  tokens: number
+}
+
+export interface CouncilMeta {
+  totalTokens: number
+  totalCost: string
+  totalDurationMs: number
+  crossExamDurationMs: number
+  verdictDurationMs: number
+  modelsUsed: number
+}
+
+export interface CouncilState {
+  phase: CouncilPhase
+  userQuery: string
+  models: CouncilModelState[]
+  verdict: string
+  modelResponses: CouncilModelResponse[]
+  crossExamStatus: string
+  crossExamDurationMs: number
+  meta: CouncilMeta | null
+  errorMessage?: string
 }
 
 export interface ChatFolder {

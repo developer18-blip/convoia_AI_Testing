@@ -20,6 +20,8 @@ import { formatTokens } from '../lib/utils'
 import { useNavigate } from 'react-router-dom'
 import { Zap, PanelLeftClose, PanelLeft, MoreHorizontal, Trash2, Download, Menu, Headphones } from 'lucide-react'
 import { VoiceConversationMode } from '../components/VoiceConversationMode'
+import { CouncilChip } from '../components/council/CouncilChip'
+import { CouncilPicker } from '../components/council/CouncilPicker'
 
 export function ChatPage() {
   const { models } = useModels()
@@ -38,6 +40,9 @@ export function ChatPage() {
 
   const [selectedModelId, setSelectedModelId] = useState('')
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
+  const [councilMode, setCouncilMode] = useState(false)
+  const [councilModelIds, setCouncilModelIds] = useState<string[]>([])
+  const [showCouncilPicker, setShowCouncilPicker] = useState(false)
   const [lastResponseModel, setLastResponseModel] = useState<string | null>(null)
   const prevStreaming = useRef(false)
   // Image generation is handled by backend intent detection
@@ -125,9 +130,13 @@ export function ChatPage() {
   const selectedModel = models.find((m) => m.id === selectedModelId) || null
 
   const handleSend = async (content: string) => {
-    // Ensure a model is selected
-    if (!selectedModelId) {
+    // Council mode uses its own model list; bypass the usual selectedModelId check.
+    if (!councilMode && !selectedModelId) {
       toast.error('Please select a model first. If models are not loading, check your connection.')
+      return
+    }
+    if (councilMode && councilModelIds.length < 2) {
+      toast.error('Select at least 2 models for Council')
       return
     }
 
@@ -143,21 +152,21 @@ export function ChatPage() {
       return
     }
 
-    // Image generation is now handled automatically by the backend
-    // via intent detection in the streaming endpoint. No frontend detection needed.
-
     const estimated = Math.ceil(content.length / 4) + 500
     if (tokenBalance < estimated) {
       toast.warning(`Low token balance: ${formattedBalance} remaining. This message may fail.`)
-      // Still allow — backend will do the final check
     }
+
+    const primaryModelId = councilMode ? councilModelIds[0] : selectedModelId
+    const primaryModelName = councilMode ? 'ConvoiaAI Council' : (selectedModel?.name || 'AI')
 
     let convId = activeConversationId
     if (!convId) {
-      const conv = createConversation(selectedModelId, selectedModel?.name || 'AI', industry || undefined)
+      const conv = createConversation(primaryModelId, primaryModelName, industry || undefined)
       convId = conv.id
     }
-    await sendMessage(content, selectedModelId, industry || undefined, selectedAgent?.id, thinkingEnabled)
+    const councilOpts = councilMode ? { modelIds: councilModelIds } : undefined
+    await sendMessage(content, primaryModelId, industry || undefined, selectedAgent?.id, thinkingEnabled, councilOpts)
   }
 
   const handleNew = () => setActiveConversation(null)
@@ -273,7 +282,9 @@ export function ChatPage() {
     if (extras?.fileAttachment) messageExtras.fileAttachment = extras.fileAttachment
     if (extras?.imagePreview) messageExtras.imagePreview = extras.imagePreview
     if (extras?.imagePreviews) messageExtras.imagePreviews = extras.imagePreviews
-    sendWithContext(text, selectedModelId, systemContext, messageExtras, industry || undefined, selectedAgent?.id, thinkingEnabled)
+    const primaryModelId = councilMode ? councilModelIds[0] : selectedModelId
+    const councilOpts = councilMode ? { modelIds: councilModelIds } : undefined
+    sendWithContext(text, primaryModelId, systemContext, messageExtras, industry || undefined, selectedAgent?.id, thinkingEnabled, councilOpts)
   }
 
   const handleExport = () => {
@@ -366,10 +377,34 @@ export function ChatPage() {
 
             {/* Model selector */}
             {models.length > 0 ? (
-              <ModelSelector models={models} selectedId={selectedModelId} onChange={handleModelChange} />
+              <ModelSelector models={models} selectedId={councilMode ? '' : selectedModelId} onChange={(id) => { setCouncilMode(false); handleModelChange(id) }} />
             ) : (
               <span style={{ fontSize: '14px', color: 'var(--chat-text-muted)', padding: '6px 8px' }}>Loading models...</span>
             )}
+
+            {/* Council chip — multi-model consensus */}
+            <div style={{ position: 'relative' }}>
+              <CouncilChip
+                active={councilMode}
+                count={councilModelIds.length}
+                onClick={() => setShowCouncilPicker((v) => !v)}
+                variant="desktop"
+              />
+              {showCouncilPicker && (
+                <CouncilPicker
+                  activeModels={models.filter((m) => m.isActive)}
+                  initialSelectedIds={councilModelIds}
+                  variant="popover"
+                  onConfirm={(ids) => {
+                    setCouncilModelIds(ids)
+                    setCouncilMode(true)
+                    setShowCouncilPicker(false)
+                    toast.success(`Council activated — ${ids.length} models`)
+                  }}
+                  onClose={() => setShowCouncilPicker(false)}
+                />
+              )}
+            </div>
 
             {/* Desktop-only: agent, think, industry inline */}
             <div className="hidden md:flex items-center gap-2">

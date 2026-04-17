@@ -2,7 +2,120 @@ import { createContext, useCallback, useEffect, useRef, useState, type ReactNode
 import { v4 as uuidv4 } from 'uuid'
 import { useAuth } from '../hooks/useAuth'
 import api from '../lib/api'
-import type { Agent, Conversation, Message, ChatFolder } from '../types'
+import type { Agent, Conversation, Message, ChatFolder, CouncilState } from '../types'
+
+export type CouncilOpts = { modelIds: string[] }
+
+function emptyCouncilState(userQuery: string): CouncilState {
+  return {
+    phase: 'executing',
+    userQuery,
+    models: [],
+    verdict: '',
+    modelResponses: [],
+    crossExamStatus: '',
+    crossExamDurationMs: 0,
+    meta: null,
+  }
+}
+
+/**
+ * Apply a council SSE event to the streaming assistant message.
+ * Returns true if the event was handled (caller should skip other handlers).
+ */
+function applyCouncilEvent(
+  parsed: any,
+  assistantId: string,
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>,
+): boolean {
+  const patch = (mutator: (c: CouncilState) => CouncilState) => {
+    setMessages((msgs) =>
+      msgs.map((m) =>
+        m.id === assistantId
+          ? { ...m, council: mutator(m.council || emptyCouncilState('')) }
+          : m,
+      ),
+    )
+  }
+
+  switch (parsed.type) {
+    case 'council_model_start':
+      patch((c) => {
+        const existing = c.models.find((m) => m.modelIndex === parsed.modelIndex)
+        if (existing) {
+          return {
+            ...c,
+            models: c.models.map((m) =>
+              m.modelIndex === parsed.modelIndex
+                ? { ...m, status: 'thinking', statusMessage: parsed.status, startTime: Date.now() }
+                : m,
+            ),
+          }
+        }
+        return {
+          ...c,
+          models: [
+            ...c.models,
+            {
+              modelName: parsed.modelName,
+              modelIndex: parsed.modelIndex,
+              status: 'thinking',
+              statusMessage: parsed.status,
+              durationMs: 0,
+              tokenCount: 0,
+              startTime: Date.now(),
+            },
+          ],
+        }
+      })
+      return true
+    case 'council_model_progress':
+      patch((c) => ({
+        ...c,
+        models: c.models.map((m) =>
+          m.modelIndex === parsed.modelIndex ? { ...m, statusMessage: parsed.status } : m,
+        ),
+      }))
+      return true
+    case 'council_model_complete':
+      patch((c) => ({
+        ...c,
+        models: c.models.map((m) =>
+          m.modelIndex === parsed.modelIndex
+            ? { ...m, status: 'complete', durationMs: parsed.durationMs, tokenCount: parsed.tokenCount }
+            : m,
+        ),
+      }))
+      return true
+    case 'council_model_error':
+      patch((c) => ({
+        ...c,
+        models: c.models.map((m) =>
+          m.modelIndex === parsed.modelIndex
+            ? { ...m, status: 'error', error: parsed.error }
+            : m,
+        ),
+      }))
+      return true
+    case 'council_crossexam_start':
+      patch((c) => ({ ...c, phase: 'crossexam', crossExamStatus: parsed.status || 'Cross-examining...' }))
+      return true
+    case 'council_crossexam_complete':
+      patch((c) => ({ ...c, phase: 'crossexam_done', crossExamDurationMs: parsed.durationMs }))
+      return true
+    case 'council_verdict_start':
+      patch((c) => ({ ...c, phase: 'verdict', verdict: '' }))
+      return true
+    case 'council_verdict_chunk':
+      patch((c) => ({ ...c, verdict: c.verdict + (parsed.content || '') }))
+      return true
+    case 'council_responses':
+      patch((c) => ({ ...c, modelResponses: parsed.models || [] }))
+      return true
+    default:
+      return false
+  }
+}
 
 const MAX_CONVERSATIONS = 30
 const MAX_MESSAGES_PER_CONV = 50
@@ -127,8 +240,8 @@ export interface ChatContextType {
   moveToFolder: (convId: string, folderId: string | undefined) => void
   createFolder: (name: string) => void
   deleteFolder: (id: string) => void
-  sendMessage: (content: string, modelId: string, industry?: string, agentId?: string, thinkingEnabled?: boolean) => Promise<void>
-  sendWithContext: (content: string, modelId: string, systemContext: string | null, messageExtras?: Partial<Message>, industry?: string, agentId?: string, thinkingEnabled?: boolean) => Promise<void>
+  sendMessage: (content: string, modelId: string, industry?: string, agentId?: string, thinkingEnabled?: boolean, councilOpts?: CouncilOpts) => Promise<void>
+  sendWithContext: (content: string, modelId: string, systemContext: string | null, messageExtras?: Partial<Message>, industry?: string, agentId?: string, thinkingEnabled?: boolean, councilOpts?: CouncilOpts) => Promise<void>
   editAndResend: (messageId: string, newContent: string, modelId: string, industry?: string, agentId?: string) => Promise<void>
   deleteMessage: (messageId: string) => void
   clearMessages: () => void
@@ -357,10 +470,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setConversations((prev) => prev.map((c) => c.folderId === id ? { ...c, folderId: undefined } : c))
   }, [])
 
-  const sendMessage = useCallback(async (content: string, modelId: string, industry?: string, agentId?: string, thinkingEnabled?: boolean) => {
+  const sendMessage = useCallback(async (content: string, modelId: string, industry?: string, agentId?: string, thinkingEnabled?: boolean, councilOpts?: CouncilOpts) => {
     const userMsg: Message = { id: uuidv4(), role: 'user', content, timestamp: new Date().toISOString() }
     const assistantId = uuidv4()
-    const streamingMsg: Message = { id: assistantId, role: 'assistant', content: '', timestamp: new Date().toISOString(), isLoading: true }
+    const streamingMsg: Message = {
+      id: assistantId, role: 'assistant', content: '', timestamp: new Date().toISOString(), isLoading: true,
+      ...(councilOpts ? { council: emptyCouncilState(content) } : {}),
+    }
 
     setMessages((prev) => [...prev, userMsg, streamingMsg])
     setIsStreaming(true)
@@ -387,7 +503,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ modelId, messages: allMsgs, industry, agentId, thinkingEnabled, ...(lastImage ? { referenceImage: lastImage } : {}) }),
+        body: JSON.stringify({
+          modelId, messages: allMsgs, industry, agentId, thinkingEnabled,
+          ...(lastImage ? { referenceImage: lastImage } : {}),
+          ...(councilOpts ? { councilMode: true, councilModelIds: councilOpts.modelIds } : {}),
+        }),
         signal: controller.signal,
       })
 
@@ -402,7 +522,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const decoder = new TextDecoder()
       let buffer = ''
       let accumulated = ''
-      let metadata: { model?: string; provider?: string; tokens?: { input: number; output: number }; cost?: { charged: string }; imageUrl?: string; videoUrl?: string; videoGenerated?: boolean; imageGenerated?: boolean } = {}
+      let metadata: { model?: string; provider?: string; tokens?: { input: number; output: number }; cost?: { charged: string }; imageUrl?: string; videoUrl?: string; videoGenerated?: boolean; imageGenerated?: boolean; council?: boolean; councilMeta?: any } = {}
       let _ft: ReturnType<typeof setTimeout> | null = null
       const _flush = () => { const s = accumulated; setMessages((p) => p.map((m) => m.id === assistantId ? { ...m, content: s, isLoading: false } : m)) }
 
@@ -421,6 +541,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
           try {
             const parsed = JSON.parse(trimmed.slice(6))
+
+            // Council events get their own handler — returns true if handled
+            if (applyCouncilEvent(parsed, assistantId, setMessages)) {
+              continue
+            }
 
             if (parsed.type === 'chunk') {
               accumulated += parsed.content
@@ -480,8 +605,36 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
       // Clear throttle timer BEFORE final state (prevents overwriting videoUrl/imageUrl)
       if (_ft) clearTimeout(_ft)
-      setMessages((prev) => prev.map((m) =>
-        m.id === assistantId ? {
+      setMessages((prev) => prev.map((m) => {
+        if (m.id !== assistantId) return m
+        // Council mode: bake final phase + meta into council state; content becomes the verdict text
+        if (m.council && metadata.council) {
+          return {
+            ...m,
+            content: m.council.verdict || accumulated,
+            isLoading: false,
+            tokensInput: metadata.tokens?.input || 0,
+            tokensOutput: metadata.tokens?.output || 0,
+            cost: Number(metadata.cost?.charged || 0) || 0,
+            model: metadata.model || 'ConvoiaAI Council',
+            provider: metadata.provider || 'council',
+            council: {
+              ...m.council,
+              phase: 'complete',
+              meta: {
+                totalTokens: metadata.tokens?.input && metadata.tokens?.output
+                  ? metadata.tokens.input + metadata.tokens.output
+                  : (metadata.tokens as any)?.total || 0,
+                totalCost: metadata.cost?.charged || '0',
+                totalDurationMs: metadata.councilMeta?.totalDurationMs || 0,
+                crossExamDurationMs: metadata.councilMeta?.crossExamDurationMs || 0,
+                verdictDurationMs: metadata.councilMeta?.verdictDurationMs || 0,
+                modelsUsed: metadata.councilMeta?.modelsUsed || m.council.models.length,
+              },
+            },
+          }
+        }
+        return {
           ...m,
           content: accumulated,
           isLoading: false,
@@ -492,8 +645,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           provider: metadata.provider,
           ...(metadata.imageUrl ? { imageUrl: metadata.imageUrl } : {}),
           ...(metadata.videoUrl ? { videoUrl: metadata.videoUrl } : {}),
-        } : m
-      ))
+        }
+      }))
 
       // Refresh wallet balance after tokens were used
       window.dispatchEvent(new Event('tokens:refresh'))
@@ -508,7 +661,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setMessages((prev) => prev.map((m) => m.id === assistantId && m.isLoading ? { ...m, isLoading: false } : m))
       } else {
         const errorMsg = err instanceof Error ? err.message : 'Failed to get response'
-        setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, isLoading: false, error: errorMsg, content: errorMsg } : m))
+        setMessages((prev) => prev.map((m) =>
+          m.id === assistantId
+            ? (m.council
+                ? { ...m, isLoading: false, error: errorMsg, council: { ...m.council, phase: 'error', errorMessage: errorMsg } }
+                : { ...m, isLoading: false, error: errorMsg, content: errorMsg })
+            : m
+        ))
       }
     } finally {
       abortRef.current = null
@@ -516,7 +675,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   }, [messages])
 
-  const sendWithContext = useCallback(async (content: string, modelId: string, systemContext: string | null, messageExtras?: Partial<Message>, industry?: string, agentId?: string, thinkingEnabled?: boolean) => {
+  const sendWithContext = useCallback(async (content: string, modelId: string, systemContext: string | null, messageExtras?: Partial<Message>, industry?: string, agentId?: string, thinkingEnabled?: boolean, councilOpts?: CouncilOpts) => {
     const userMsg: Message = {
       id: uuidv4(),
       role: 'user',
@@ -525,7 +684,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       ...messageExtras,
     }
     const assistantId = uuidv4()
-    const streamingMsg: Message = { id: assistantId, role: 'assistant', content: '', timestamp: new Date().toISOString(), isLoading: true }
+    const streamingMsg: Message = {
+      id: assistantId, role: 'assistant', content: '', timestamp: new Date().toISOString(), isLoading: true,
+      ...(councilOpts ? { council: emptyCouncilState(content) } : {}),
+    }
 
     setMessages((prev) => [...prev, userMsg, streamingMsg])
     setIsStreaming(true)
@@ -575,6 +737,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           modelId, messages: messagesForAPI, industry, agentId, thinkingEnabled,
           ...(referenceImages.length === 1 ? { referenceImage: referenceImages[0] } : {}),
           ...(referenceImages.length > 1 ? { referenceImages } : {}),
+          ...(councilOpts ? { councilMode: true, councilModelIds: councilOpts.modelIds } : {}),
         }),
         signal: controller.signal,
       })
@@ -590,7 +753,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const decoder = new TextDecoder()
       let buffer = ''
       let accumulated = ''
-      let metadata: { model?: string; provider?: string; tokens?: { input: number; output: number }; cost?: { charged: string }; imageUrl?: string; videoUrl?: string; videoGenerated?: boolean; imageGenerated?: boolean } = {}
+      let metadata: { model?: string; provider?: string; tokens?: { input: number; output: number }; cost?: { charged: string }; imageUrl?: string; videoUrl?: string; videoGenerated?: boolean; imageGenerated?: boolean; council?: boolean; councilMeta?: any } = {}
       let _ft: ReturnType<typeof setTimeout> | null = null
       const _flush = () => { const s = accumulated; setMessages((p) => p.map((m) => m.id === assistantId ? { ...m, content: s, isLoading: false } : m)) }
 
@@ -609,6 +772,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
           try {
             const parsed = JSON.parse(trimmed.slice(6))
+
+            // Council events get their own handler — returns true if handled
+            if (applyCouncilEvent(parsed, assistantId, setMessages)) {
+              continue
+            }
 
             if (parsed.type === 'chunk') {
               accumulated += parsed.content
@@ -665,8 +833,33 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
       // Clear throttle timer BEFORE final state (prevents overwriting videoUrl/imageUrl)
       if (_ft) clearTimeout(_ft)
-      setMessages((prev) => prev.map((m) =>
-        m.id === assistantId ? {
+      setMessages((prev) => prev.map((m) => {
+        if (m.id !== assistantId) return m
+        if (m.council && metadata.council) {
+          return {
+            ...m,
+            content: m.council.verdict || accumulated,
+            isLoading: false,
+            tokensInput: metadata.tokens?.input || 0,
+            tokensOutput: metadata.tokens?.output || 0,
+            cost: Number(metadata.cost?.charged || 0) || 0,
+            model: metadata.model || 'ConvoiaAI Council',
+            provider: metadata.provider || 'council',
+            council: {
+              ...m.council,
+              phase: 'complete',
+              meta: {
+                totalTokens: (metadata.tokens?.input || 0) + (metadata.tokens?.output || 0) || ((metadata.tokens as any)?.total || 0),
+                totalCost: metadata.cost?.charged || '0',
+                totalDurationMs: metadata.councilMeta?.totalDurationMs || 0,
+                crossExamDurationMs: metadata.councilMeta?.crossExamDurationMs || 0,
+                verdictDurationMs: metadata.councilMeta?.verdictDurationMs || 0,
+                modelsUsed: metadata.councilMeta?.modelsUsed || m.council.models.length,
+              },
+            },
+          }
+        }
+        return {
           ...m,
           content: accumulated,
           isLoading: false,
@@ -677,8 +870,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           provider: metadata.provider,
           ...(metadata.imageUrl ? { imageUrl: metadata.imageUrl } : {}),
           ...(metadata.videoUrl ? { videoUrl: metadata.videoUrl } : {}),
-        } : m
-      ))
+        }
+      }))
 
       // Refresh wallet balance after tokens were used
       window.dispatchEvent(new Event('tokens:refresh'))
@@ -693,7 +886,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setMessages((prev) => prev.map((m) => m.id === assistantId && m.isLoading ? { ...m, isLoading: false } : m))
       } else {
         const errorMsg = err instanceof Error ? err.message : 'Failed to get response'
-        setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, isLoading: false, error: errorMsg, content: errorMsg } : m))
+        setMessages((prev) => prev.map((m) =>
+          m.id === assistantId
+            ? (m.council
+                ? { ...m, isLoading: false, error: errorMsg, council: { ...m.council, phase: 'error', errorMessage: errorMsg } }
+                : { ...m, isLoading: false, error: errorMsg, content: errorMsg })
+            : m
+        ))
       }
     } finally {
       abortRef.current = null
