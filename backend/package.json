@@ -20,7 +20,9 @@
     "test": "tsx --test src/**/*.test.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1032.0",
     "@aws-sdk/client-ses": "^3.1018.0",
+    "@aws-sdk/s3-request-presigner": "^3.1032.0",
     "@prisma/client": "5.7.0",
     "axios": "1.6.2",
     "bcryptjs": "2.4.3",

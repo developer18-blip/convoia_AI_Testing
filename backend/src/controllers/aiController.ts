@@ -18,6 +18,9 @@ import { MAX_SINGLE_DEDUCTION } from '../services/tokenWalletService.js';
 import { buildThinkModeParams } from '../ai/thinkModeParams.js';
 import { routeToOptimalModel, type RouterInput, type RouterResult } from '../services/llmRouter.js';
 import { runCouncil } from '../services/councilService.js';
+import { detectFileIntent, type FileIntent } from '../services/fileDetector.js';
+import { generateFile } from '../services/fileGenerationService.js';
+import { getFilePrompt } from '../services/filePrompts.js';
 
 // ── SAFE ERROR SERIALIZER (prevents circular reference crash) ────
 // Axios errors contain TLSSocket → ClientRequest → socket circular refs.
@@ -1069,6 +1072,189 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
       } catch (routerErr: any) {
         logger.warn(`LLM Router failed, using first available model: ${routerErr.message}`);
       }
+    }
+
+    // ── FILE GENERATION MODE ──────────────────────────────────────────────
+    // Fires when the user asks for a PDF / DOCX / PPTX / XLSX document.
+    // The AI model produces structured JSON; a Python script turns that into
+    // a real file; the file ships to S3 with a pre-signed download URL.
+    // Billed at 30% markup (vs the standard 25%) to cover file-gen compute.
+    const fileIntent: FileIntent | null = detectFileIntent(latestUserText);
+    if (fileIntent) {
+      logger.info(`File generation detected: ${fileIntent.format} — "${latestUserText.substring(0, 80)}"`);
+
+      // Re-fetch with billing-complete fields (findUnique above only grabbed basic columns).
+      const billingModel = await prisma.aIModel.findUnique({
+        where: { id: finalModelId },
+        select: { id: true, modelId: true, name: true, provider: true, inputTokenPrice: true, outputTokenPrice: true },
+      });
+      if (!billingModel) {
+        res.write(`data: ${JSON.stringify({ type: 'error', content: 'Selected model is no longer available.' })}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+        return;
+      }
+
+      try {
+        // Kick off a Phase 1 SSE event so the UI can show "Generating your PDF…"
+        res.write(`data: ${JSON.stringify({
+          type: 'file_generation_start',
+          format: fileIntent.format,
+          formatLabel: fileIntent.formatLabel,
+        })}\n\n`);
+
+        // Ask the current model to produce structured JSON.
+        const fileSystemPrompt = getFilePrompt(fileIntent.format, latestUserText);
+        const aiResult = await AIGatewayService.sendMessage({
+          userId: user.id,
+          organizationId,
+          modelId: finalModelId,
+          messages: [{ role: 'user', content: fileSystemPrompt }],
+          agentConfig: {
+            systemPrompt: 'You are a document content generator. Output ONLY valid JSON. No markdown, no backticks, no explanation. Just the JSON object.',
+            temperature: 0.3,
+            maxTokens: 8192,
+            topP: 0.95,
+            name: 'File Generator',
+          },
+          maxOutputTokens: 8192,
+        });
+
+        // Parse the model's JSON. Strip common wrappers defensively.
+        let contentJson: object;
+        try {
+          const cleaned = aiResult.response
+            .replace(/^[\s\S]*?```(?:json)?\s*/i, (m) => (m.includes('```') ? '' : m))
+            .replace(/```[\s\S]*$/i, '')
+            .trim();
+          contentJson = JSON.parse(cleaned || aiResult.response);
+        } catch (parseErr: any) {
+          logger.warn(`File content JSON parse failed: ${parseErr.message}`);
+          // Still bill the user for the AI call; fall back to showing the raw content.
+          const failProviderCost = aiResult.inputTokens * billingModel.inputTokenPrice + aiResult.outputTokens * billingModel.outputTokenPrice;
+          const failCustomerPrice = failProviderCost * 1.30;
+          const failTotal = aiResult.inputTokens + aiResult.outputTokens;
+          const failWalletTokens = costAdjustedTokens(failCustomerPrice, failTotal);
+          await TokenWalletService.deductTokens({
+            userId: user.id, tokens: failWalletTokens, reference: billingModel.id,
+            description: `File gen (parse failed): ${fileIntent.format}`, organizationId,
+          });
+          await prisma.usageLog.create({
+            data: {
+              userId: user.id, organizationId, modelId: billingModel.id,
+              prompt: latestUserText.substring(0, 500),
+              response: `[File gen parse-failed; raw text shown]`,
+              tokensInput: aiResult.inputTokens, tokensOutput: aiResult.outputTokens,
+              totalTokens: failTotal,
+              providerCost: failProviderCost, markupPercentage: 30, customerPrice: failCustomerPrice,
+              status: 'completed',
+            },
+          });
+
+          res.write(`data: ${JSON.stringify({
+            type: 'chunk',
+            content: `I generated the content for your ${fileIntent.formatLabel}, but couldn't package it as a file. Here it is inline:\n\n${aiResult.response}`,
+          })}\n\n`);
+          res.write(`data: ${JSON.stringify({
+            type: 'done',
+            tokens: { input: aiResult.inputTokens, output: aiResult.outputTokens, total: failTotal },
+            tokensUsed: failWalletTokens,
+            cost: { charged: failCustomerPrice.toFixed(6) },
+            model: billingModel.name, provider: billingModel.provider,
+          })}\n\n`);
+          res.write('data: [DONE]\n\n');
+          res.end();
+          return;
+        }
+
+        // Actual file generation.
+        res.write(`data: ${JSON.stringify({
+          type: 'file_generation_progress',
+          status: `Creating your ${fileIntent.formatLabel}…`,
+        })}\n\n`);
+
+        const fileResult = await generateFile(fileIntent.format, contentJson, user.id);
+
+        // Bill the AI call regardless of whether S3 upload succeeded
+        // (user got content even if delivery failed).
+        const providerCost = aiResult.inputTokens * billingModel.inputTokenPrice + aiResult.outputTokens * billingModel.outputTokenPrice;
+        const FILE_MARKUP = 30;
+        const customerPrice = providerCost * (1 + FILE_MARKUP / 100);
+        const totalTokens = aiResult.inputTokens + aiResult.outputTokens;
+        const walletTokens = costAdjustedTokens(customerPrice, totalTokens);
+
+        await TokenWalletService.deductTokens({
+          userId: user.id, tokens: walletTokens, reference: billingModel.id,
+          description: `File gen: ${fileIntent.format}`, organizationId,
+        });
+        await prisma.usageLog.create({
+          data: {
+            userId: user.id, organizationId, modelId: billingModel.id,
+            prompt: latestUserText.substring(0, 500),
+            response: fileResult.success
+              ? `[${fileIntent.formatLabel} generated: ${fileResult.fileName}]`
+              : `[File gen failed: ${fileResult.error?.substring(0, 200) || 'unknown'}]`,
+            tokensInput: aiResult.inputTokens, tokensOutput: aiResult.outputTokens,
+            totalTokens,
+            providerCost, markupPercentage: FILE_MARKUP, customerPrice,
+            status: 'completed',
+          },
+        });
+
+        if (!fileResult.success) {
+          res.write(`data: ${JSON.stringify({
+            type: 'chunk',
+            content: `I prepared the ${fileIntent.formatLabel} content but couldn't package it as a file: ${fileResult.error}. Here's the raw content:\n\n${aiResult.response}`,
+          })}\n\n`);
+          res.write(`data: ${JSON.stringify({
+            type: 'done',
+            tokens: { input: aiResult.inputTokens, output: aiResult.outputTokens, total: totalTokens },
+            tokensUsed: walletTokens,
+            cost: { charged: customerPrice.toFixed(6) },
+            model: billingModel.name, provider: billingModel.provider,
+          })}\n\n`);
+          res.write('data: [DONE]\n\n');
+          res.end();
+          return;
+        }
+
+        const title = (contentJson as any).title || 'Your document';
+        const fileSizeKB = Math.round((fileResult.fileSize || 0) / 1024);
+
+        res.write(`data: ${JSON.stringify({
+          type: 'chunk',
+          content: `I've created your ${fileIntent.formatLabel}: **${title}**\n\nThe document is ready to download.`,
+        })}\n\n`);
+
+        res.write(`data: ${JSON.stringify({
+          type: 'file_generated',
+          downloadUrl: fileResult.downloadUrl,
+          fileName: fileResult.fileName,
+          fileSize: fileResult.fileSize,
+          fileSizeLabel: `${fileSizeKB} KB`,
+          format: fileIntent.format,
+          formatLabel: fileIntent.formatLabel,
+          title,
+          s3Key: fileResult.s3Key,
+        })}\n\n`);
+
+        res.write(`data: ${JSON.stringify({
+          type: 'done',
+          tokens: { input: aiResult.inputTokens, output: aiResult.outputTokens, total: totalTokens },
+          tokensUsed: walletTokens,
+          cost: { charged: customerPrice.toFixed(6) },
+          model: billingModel.name, provider: billingModel.provider,
+          fileGenerated: true,
+        })}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+      } catch (err: any) {
+        logger.error(`File generation error: ${err.message}`);
+        res.write(`data: ${JSON.stringify({ type: 'error', content: `File generation failed: ${err.message}` })}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+      }
+      return;
     }
 
     let webSearchSource: string | null = null;
