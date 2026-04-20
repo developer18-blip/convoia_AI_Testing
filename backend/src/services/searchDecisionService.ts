@@ -54,15 +54,33 @@ function isHardOverrideNoSearch(message: string): boolean {
     return true;
   }
 
-  // Dense with code / markup / shortcodes. Examples that previously
-  // false-positive as searches:
+  // ── Strong structural signals that the message contains code ──
+  // These fire on the shapes themselves regardless of how much of the
+  // message is code. One shortcode or HTML tag mixed into a sentence is
+  // still clearly "user is showing me code", not "user is asking a
+  // search query".
+
+  // Shortcodes: [prefix* name attr="value"] — CF7, WordPress, etc.
   //   [select* course-date "June 01, 2026"]
-  //   <div class="container">fix this</div>
-  //   SELECT * FROM users WHERE id = 5
-  //
-  // Threshold 15% of characters being code-ish ([]{}()<>=;:/\|@#$%^&*`~)
-  // reliably catches shortcodes, HTML, regex, SQL without catching
-  // normal prose (which sits around 2-4%).
+  //   [contact-form-7 id=5]
+  if (/\[[a-z_][\w-]{1,}\*?(?:\s+[\w-]|\s*\])/i.test(message)) return true;
+
+  // HTML tags: <div ...>, <br/>, <!-- comment -->
+  if (/<[a-z][\w-]*(?:\s+[\w-]+(?:\s*=\s*["'][^"']*["'])?)*\s*\/?>/i.test(message)) return true;
+  if (/<!--[\s\S]*?-->/.test(message)) return true;
+
+  // Fenced code block — user is showing us code to work with
+  if (/```/.test(message)) return true;
+
+  // SQL statements
+  if (/\b(SELECT|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|CREATE\s+TABLE|ALTER\s+TABLE|DROP\s+TABLE)\b/i.test(message)) return true;
+
+  // Starts with { or [ (JSON, array, shortcode, code snippet)
+  if (/^\s*[{[]/.test(message)) return true;
+
+  // Fallback: dense with syntax chars — catches multi-line code snippets
+  // that don't match the structural rules above. 15% threshold still
+  // well above normal prose (~2–4%).
   const codeLikeChars = message.match(/[\[\]{}()<>=;:/\\|@#$%^&*`~]/g);
   if (codeLikeChars && codeLikeChars.length / message.length > 0.15) {
     return true;
