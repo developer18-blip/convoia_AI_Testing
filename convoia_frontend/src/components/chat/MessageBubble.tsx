@@ -15,6 +15,11 @@ import type { Message } from '../../types'
 import type { ComponentPropsWithoutRef } from 'react'
 import { CouncilMessage } from '../council/CouncilMessage'
 
+// Stable module-level reference — ReactMarkdown does a shallow compare
+// and rebuilds the rendered DOM if this array is recreated on each
+// parent re-render, which would wipe any active text selection mid-drag.
+const REMARK_PLUGINS = [remarkGfm, remarkBreaks]
+
 interface MessageBubbleProps {
   message: Message
   onRetry?: () => void
@@ -179,6 +184,91 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
     return isDocumentWorthy(message.content)
   }, [message.content, isUser, message.isLoading])
 
+  // Memoized ReactMarkdown `components` map. Without this, every
+  // re-render (e.g. showActions hover toggling) produces a fresh object
+  // reference — ReactMarkdown then rebuilds the entire rendered DOM,
+  // which wipes any active text selection the user has made. Keep deps
+  // minimal so routine state changes don't invalidate the rendered tree.
+  const aiMessageComponents = useMemo(() => ({
+    p: ({ children }: { children?: React.ReactNode }) => {
+      const text = typeof children === 'string' ? children :
+        Array.isArray(children) ? children.map(c => typeof c === 'string' ? c : '').join('') :
+        String(children || '')
+      const chartMatch = text.match(/\[CONVOIA_CHART_(\d+)\]/)
+      if (chartMatch) {
+        const idx = parseInt(chartMatch[1])
+        if (charts[idx]) return <InlineChart chart={charts[idx]} />
+      }
+      return <p style={{ marginBottom: '16px', lineHeight: '1.75', color: 'var(--chat-text)' }} className="last:mb-0">{children}</p>
+    },
+    h1: ({ children }: { children?: React.ReactNode }) => <h1 className="first:mt-0" style={{ fontSize: '20px', fontWeight: 700, color: 'var(--chat-text)', marginBottom: '12px', marginTop: '24px' }}>{children}</h1>,
+    h2: ({ children }: { children?: React.ReactNode }) => <h2 className="first:mt-0" style={{ fontSize: '17px', fontWeight: 600, color: 'var(--chat-text)', marginBottom: '10px', marginTop: '20px' }}>{children}</h2>,
+    h3: ({ children }: { children?: React.ReactNode }) => <h3 className="first:mt-0" style={{ fontSize: '15px', fontWeight: 600, color: 'var(--chat-text)', marginBottom: '8px', marginTop: '16px' }}>{children}</h3>,
+    ul: ({ children }: { children?: React.ReactNode }) => <ul style={{ paddingLeft: '24px', marginBottom: '16px', listStyleType: 'disc' }}>{children}</ul>,
+    ol: ({ children }: { children?: React.ReactNode }) => <ol style={{ paddingLeft: '24px', marginBottom: '16px', listStyleType: 'decimal' }}>{children}</ol>,
+    li: ({ children }: { children?: React.ReactNode }) => <li style={{ marginBottom: '6px', lineHeight: '1.65', color: 'var(--chat-text)' }}>{children}</li>,
+    blockquote: ({ children }: { children?: React.ReactNode }) => (
+      <blockquote style={{
+        borderLeft: '3px solid var(--chat-border)', paddingLeft: '16px',
+        margin: '16px 0', color: 'var(--chat-text-secondary)', fontStyle: 'italic',
+      }}>{children}</blockquote>
+    ),
+    strong: ({ children }: { children?: React.ReactNode }) => <strong style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{children}</strong>,
+    em: ({ children }: { children?: React.ReactNode }) => <em style={{ color: 'var(--chat-text-secondary)', fontStyle: 'italic' }}>{children}</em>,
+    a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
+      <a href={href} target="_blank" rel="noopener noreferrer"
+        style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>{children}</a>
+    ),
+    hr: () => <hr style={{ border: 'none', borderTop: '1px solid var(--chat-border)', margin: '20px 0' }} />,
+    pre: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
+    table: ({ children }: { children?: React.ReactNode }) => (
+      <div className="table-wrapper" style={{ margin: '16px 0', overflow: 'auto', borderRadius: '8px', border: '1px solid var(--chat-border)' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>{children}</table>
+      </div>
+    ),
+    th: ({ children }: { children?: React.ReactNode }) => (
+      <th style={{
+        backgroundColor: 'var(--chat-surface)', padding: '10px 14px', textAlign: 'left',
+        fontWeight: 600, color: 'var(--chat-text)', borderBottom: '1px solid var(--chat-border)', fontSize: '13px',
+      }}>{children}</th>
+    ),
+    td: ({ children }: { children?: React.ReactNode }) => (
+      <td style={{ padding: '10px 14px', borderBottom: '1px solid var(--chat-surface)', color: 'var(--chat-text-secondary)' }}>{children}</td>
+    ),
+    img: ({ src, alt }: { src?: string; alt?: string }) => (
+      <div style={{ margin: '16px 0' }}>
+        <img src={src ? resolveMediaUrl(src) : ''} alt={alt || 'Generated image'}
+          style={{ maxWidth: '100%', maxHeight: '512px', borderRadius: '12px', border: '1px solid var(--chat-border)', objectFit: 'contain', cursor: 'pointer' }}
+          onClick={() => { if (src) window.open(resolveMediaUrl(src), '_blank') }}
+        />
+        {alt && alt !== 'Generated image' && alt !== 'Generated Image' && (
+          <p style={{ fontSize: '12px', color: 'var(--chat-text-muted)', marginTop: '6px', fontStyle: 'italic' }}>{alt}</p>
+        )}
+      </div>
+    ),
+    code(props: ComponentPropsWithoutRef<'code'> & { inline?: boolean; className?: string; node?: any }) {
+      const { inline, className, children, node, ...rest } = props
+      const match = /language-(\w+)/.exec(className || '')
+      const codeStr = String(children).replace(/\n$/, '')
+      const isBlock = !inline && (match || node?.position?.start?.line !== node?.position?.end?.line || codeStr.includes('\n'))
+      if (isBlock) {
+        const lang = match ? match[1] : 'text'
+        return <CodeBlock language={lang}
+          onRun={onRunCode ? () => onRunCode(codeStr, lang) : undefined}
+          onOpenInCanvas={onOpenInCanvas ? (code, l) => onOpenInCanvas(code, l, 'code') : undefined}>
+          {codeStr}
+        </CodeBlock>
+      }
+      return (
+        <code style={{
+          backgroundColor: 'var(--chat-surface)', color: 'var(--chat-text)',
+          padding: '1px 6px', borderRadius: '4px', fontSize: '13.5px',
+          fontFamily: "'Fira Code', monospace", border: '1px solid var(--chat-border)',
+        }} {...rest}>{children}</code>
+      )
+    },
+  }), [charts, onRunCode, onOpenInCanvas])
+
   const handleCopy = async (e?: React.MouseEvent) => {
     // Don't let the click bubble into parent handlers (e.g. hover/focus logic)
     // or collide with the browser's native Ctrl+C on any active text selection.
@@ -224,7 +314,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
           {/* Show accumulated content (e.g. thinking result) while still loading */}
           {hasContent && (
             <div className="message-content" style={{ fontSize: '15px', lineHeight: '1.75', color: 'var(--chat-text)' }}>
-              <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{message.content}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>{message.content}</ReactMarkdown>
             </div>
           )}
 
@@ -403,7 +493,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
                           maxHeight: showFullUserMsg ? 'none' : '120px', overflow: 'hidden',
                           position: 'relative', whiteSpace: 'pre-wrap',
                         }}>
-                          <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}
+                          <ReactMarkdown remarkPlugins={REMARK_PLUGINS}
                             components={{
                               code(codeProps: ComponentPropsWithoutRef<'code'> & { inline?: boolean; className?: string }) {
                                 const { inline, className, children: codeChildren, ...codeRest } = codeProps
@@ -437,7 +527,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
                     )
                   }
                   return (
-                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}
+                    <ReactMarkdown remarkPlugins={REMARK_PLUGINS}
                       components={{
                         code(codeProps: ComponentPropsWithoutRef<'code'> & { inline?: boolean; className?: string }) {
                           const { inline, className, children: codeChildren, ...codeRest } = codeProps
@@ -677,89 +767,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
         })()}
 
         <div ref={contentRef} className="prose prose-sm max-w-none message-content" style={{ fontSize: '15px', lineHeight: '1.75', color: 'var(--chat-text)' }}>
-          <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}
-            components={{
-              p: ({ children }) => {
-                // Check if this paragraph is a chart placeholder
-                const text = typeof children === 'string' ? children :
-                  Array.isArray(children) ? children.map(c => typeof c === 'string' ? c : '').join('') :
-                  String(children || '')
-                const chartMatch = text.match(/\[CONVOIA_CHART_(\d+)\]/)
-                if (chartMatch) {
-                  const idx = parseInt(chartMatch[1])
-                  if (charts[idx]) return <InlineChart chart={charts[idx]} />
-                }
-                return <p style={{ marginBottom: '16px', lineHeight: '1.75', color: 'var(--chat-text)' }} className="last:mb-0">{children}</p>
-              },
-              h1: ({ children }) => <h1 className="first:mt-0" style={{ fontSize: '20px', fontWeight: 700, color: 'var(--chat-text)', marginBottom: '12px', marginTop: '24px' }}>{children}</h1>,
-              h2: ({ children }) => <h2 className="first:mt-0" style={{ fontSize: '17px', fontWeight: 600, color: 'var(--chat-text)', marginBottom: '10px', marginTop: '20px' }}>{children}</h2>,
-              h3: ({ children }) => <h3 className="first:mt-0" style={{ fontSize: '15px', fontWeight: 600, color: 'var(--chat-text)', marginBottom: '8px', marginTop: '16px' }}>{children}</h3>,
-              ul: ({ children }) => <ul style={{ paddingLeft: '24px', marginBottom: '16px', listStyleType: 'disc' }}>{children}</ul>,
-              ol: ({ children }) => <ol style={{ paddingLeft: '24px', marginBottom: '16px', listStyleType: 'decimal' }}>{children}</ol>,
-              li: ({ children }) => <li style={{ marginBottom: '6px', lineHeight: '1.65', color: 'var(--chat-text)' }}>{children}</li>,
-              blockquote: ({ children }) => (
-                <blockquote style={{
-                  borderLeft: '3px solid var(--chat-border)', paddingLeft: '16px',
-                  margin: '16px 0', color: 'var(--chat-text-secondary)', fontStyle: 'italic',
-                }}>{children}</blockquote>
-              ),
-              strong: ({ children }) => <strong style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{children}</strong>,
-              em: ({ children }) => <em style={{ color: 'var(--chat-text-secondary)', fontStyle: 'italic' }}>{children}</em>,
-              a: ({ href, children }) => (
-                <a href={href} target="_blank" rel="noopener noreferrer"
-                  style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>{children}</a>
-              ),
-              hr: () => <hr style={{ border: 'none', borderTop: '1px solid var(--chat-border)', margin: '20px 0' }} />,
-              pre: ({ children }) => <>{children}</>,
-              table: ({ children }) => (
-                <div className="table-wrapper" style={{ margin: '16px 0', overflow: 'auto', borderRadius: '8px', border: '1px solid var(--chat-border)' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>{children}</table>
-                </div>
-              ),
-              th: ({ children }) => (
-                <th style={{
-                  backgroundColor: 'var(--chat-surface)', padding: '10px 14px', textAlign: 'left',
-                  fontWeight: 600, color: 'var(--chat-text)', borderBottom: '1px solid var(--chat-border)', fontSize: '13px',
-                }}>{children}</th>
-              ),
-              td: ({ children }) => (
-                <td style={{ padding: '10px 14px', borderBottom: '1px solid var(--chat-surface)', color: 'var(--chat-text-secondary)' }}>{children}</td>
-              ),
-              img: ({ src, alt }) => (
-                <div style={{ margin: '16px 0' }}>
-                  <img src={src ? resolveMediaUrl(src) : ''} alt={alt || 'Generated image'}
-                    style={{ maxWidth: '100%', maxHeight: '512px', borderRadius: '12px', border: '1px solid var(--chat-border)', objectFit: 'contain', cursor: 'pointer' }}
-                    onClick={() => { if (src) window.open(resolveMediaUrl(src), '_blank') }}
-                  />
-                  {alt && alt !== 'Generated image' && alt !== 'Generated Image' && (
-                    <p style={{ fontSize: '12px', color: 'var(--chat-text-muted)', marginTop: '6px', fontStyle: 'italic' }}>{alt}</p>
-                  )}
-                </div>
-              ),
-              code(props: ComponentPropsWithoutRef<'code'> & { inline?: boolean; className?: string; node?: any }) {
-                const { inline, className, children, node, ...rest } = props
-                const match = /language-(\w+)/.exec(className || '')
-                const codeStr = String(children).replace(/\n$/, '')
-                // Detect block code: has language class, or parent is <pre>, or contains newlines (multi-line)
-                const isBlock = !inline && (match || node?.position?.start?.line !== node?.position?.end?.line || codeStr.includes('\n'))
-                if (isBlock) {
-                  const lang = match ? match[1] : 'text'
-                  return <CodeBlock language={lang}
-                    onRun={onRunCode ? () => onRunCode(codeStr, lang) : undefined}
-                    onOpenInCanvas={onOpenInCanvas ? (code, l) => onOpenInCanvas(code, l, 'code') : undefined}>
-                    {codeStr}
-                  </CodeBlock>
-                }
-                return (
-                  <code style={{
-                    backgroundColor: 'var(--chat-surface)', color: 'var(--chat-text)',
-                    padding: '1px 6px', borderRadius: '4px', fontSize: '13.5px',
-                    fontFamily: "'Fira Code', monospace", border: '1px solid var(--chat-border)',
-                  }} {...rest}>{children}</code>
-                )
-              },
-            }}
-          >
+          <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={aiMessageComponents}>
             {cleanText || renderedContent}
           </ReactMarkdown>
 
