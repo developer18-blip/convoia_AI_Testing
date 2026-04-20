@@ -1153,7 +1153,7 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
 
           res.write(`data: ${JSON.stringify({
             type: 'chunk',
-            content: `I generated the content for your ${fileIntent.formatLabel}, but couldn't package it as a file. Here it is inline:\n\n${aiResult.response}`,
+            content: `I couldn't generate your ${fileIntent.formatLabel} — the model returned an unusable format. Please try again.`,
           })}\n\n`);
           res.write(`data: ${JSON.stringify({
             type: 'done',
@@ -1204,8 +1204,9 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
         if (!fileResult.success) {
           res.write(`data: ${JSON.stringify({
             type: 'chunk',
-            content: `I prepared the ${fileIntent.formatLabel} content but couldn't package it as a file: ${fileResult.error}. Here's the raw content:\n\n${aiResult.response}`,
+            content: `I couldn't package your ${fileIntent.formatLabel}. Please try again in a moment.`,
           })}\n\n`);
+          logger.warn(`File generation user-facing failure: ${fileResult.error?.substring(0, 300)}`);
           res.write(`data: ${JSON.stringify({
             type: 'done',
             tokens: { input: aiResult.inputTokens, output: aiResult.outputTokens, total: totalTokens },

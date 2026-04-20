@@ -7,6 +7,7 @@ import { CodeBlock } from './CodeBlock'
 import { AgentPanel } from './AgentPanel'
 import { InlineChart, extractCharts } from './InlineChart'
 import { DocumentDownloadBar } from './DocumentDownloadBar'
+import { FileDownloadCard } from './FileDownloadCard'
 import { isDocumentWorthy } from '../../lib/documentDetector'
 import { formatCurrency, formatTokens } from '../../lib/utils'
 import type { Message } from '../../types'
@@ -829,6 +830,11 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
         {/* Document Download Bar — at the end after all content */}
         {documentInfo?.worthy && !message.isLoading && (
           <DocumentDownloadBar content={message.content} contentRef={contentRef} title={documentInfo.title} />
+        )}
+
+        {/* Generated file (PDF / DOCX / PPTX / XLSX) — download card */}
+        {message.fileGeneration && (
+          <FileDownloadCard file={message.fileGeneration} />
         )}
 
         {/* Try with another model — lazy execution */}

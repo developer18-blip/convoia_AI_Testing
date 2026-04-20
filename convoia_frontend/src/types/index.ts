@@ -179,6 +179,15 @@ export interface Message {
     query: string
     sources: { title: string; url: string; image?: string; siteName?: string; snippet?: string }[]
   }
+  fileGeneration?: {
+    downloadUrl: string
+    fileName: string
+    fileSize: number
+    fileSizeLabel: string
+    format: 'pdf' | 'docx' | 'pptx' | 'xlsx' | string
+    formatLabel: string
+    title: string
+  }
   council?: CouncilState
 }
 

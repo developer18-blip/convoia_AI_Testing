@@ -587,6 +587,31 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               setMessages((prev) => prev.map((m) =>
                 m.id === assistantId ? { ...m, content: accumulated, isLoading: false } : m
               ))
+            } else if (parsed.type === 'file_generation_start') {
+              setMessages((prev) => prev.map((m) =>
+                m.id === assistantId ? { ...m, content: '', isLoading: true, statusText: `Generating your ${parsed.formatLabel}...` } : m
+              ))
+            } else if (parsed.type === 'file_generation_progress') {
+              setMessages((prev) => prev.map((m) =>
+                m.id === assistantId ? { ...m, isLoading: true, statusText: parsed.status } : m
+              ))
+            } else if (parsed.type === 'file_generated') {
+              setMessages((prev) => prev.map((m) =>
+                m.id === assistantId
+                  ? {
+                      ...m,
+                      fileGeneration: {
+                        downloadUrl: parsed.downloadUrl,
+                        fileName: parsed.fileName,
+                        fileSize: parsed.fileSize,
+                        fileSizeLabel: parsed.fileSizeLabel,
+                        format: parsed.format,
+                        formatLabel: parsed.formatLabel,
+                        title: parsed.title,
+                      },
+                    }
+                  : m
+              ))
             } else if (parsed.type === 'auto_model') {
               // Notify chat pages which model was auto-selected so the chip updates immediately
               window.dispatchEvent(new CustomEvent('convoia:auto_model', {
@@ -645,6 +670,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           provider: metadata.provider,
           ...(metadata.imageUrl ? { imageUrl: metadata.imageUrl } : {}),
           ...(metadata.videoUrl ? { videoUrl: metadata.videoUrl } : {}),
+          ...(m.fileGeneration ? { fileGeneration: m.fileGeneration } : {}),
+          statusText: undefined,
         }
       }))
 
@@ -815,6 +842,31 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               setMessages((prev) => prev.map((m) =>
                 m.id === assistantId ? { ...m, content: accumulated, isLoading: false } : m
               ))
+            } else if (parsed.type === 'file_generation_start') {
+              setMessages((prev) => prev.map((m) =>
+                m.id === assistantId ? { ...m, content: '', isLoading: true, statusText: `Generating your ${parsed.formatLabel}...` } : m
+              ))
+            } else if (parsed.type === 'file_generation_progress') {
+              setMessages((prev) => prev.map((m) =>
+                m.id === assistantId ? { ...m, isLoading: true, statusText: parsed.status } : m
+              ))
+            } else if (parsed.type === 'file_generated') {
+              setMessages((prev) => prev.map((m) =>
+                m.id === assistantId
+                  ? {
+                      ...m,
+                      fileGeneration: {
+                        downloadUrl: parsed.downloadUrl,
+                        fileName: parsed.fileName,
+                        fileSize: parsed.fileSize,
+                        fileSizeLabel: parsed.fileSizeLabel,
+                        format: parsed.format,
+                        formatLabel: parsed.formatLabel,
+                        title: parsed.title,
+                      },
+                    }
+                  : m
+              ))
             } else if (parsed.type === 'auto_model') {
               // Notify chat pages which model was auto-selected so the chip updates immediately
               window.dispatchEvent(new CustomEvent('convoia:auto_model', {
@@ -870,6 +922,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           provider: metadata.provider,
           ...(metadata.imageUrl ? { imageUrl: metadata.imageUrl } : {}),
           ...(metadata.videoUrl ? { videoUrl: metadata.videoUrl } : {}),
+          ...(m.fileGeneration ? { fileGeneration: m.fileGeneration } : {}),
+          statusText: undefined,
         }
       }))
 
