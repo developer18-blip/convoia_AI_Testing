@@ -8,6 +8,7 @@ import { AgentPanel } from './AgentPanel'
 import { InlineChart, extractCharts } from './InlineChart'
 import { DocumentDownloadBar } from './DocumentDownloadBar'
 import { FileDownloadCard } from './FileDownloadCard'
+import { copyText, stripHtmlAndEntities } from '../../lib/clipboard'
 import { isDocumentWorthy } from '../../lib/documentDetector'
 import { formatCurrency, formatTokens } from '../../lib/utils'
 import type { Message } from '../../types'
@@ -178,11 +179,26 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
     return isDocumentWorthy(message.content)
   }, [message.content, isUser, message.isLoading])
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(message.content)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-    onCopy?.(message.content)
+  const handleCopy = async (e?: React.MouseEvent) => {
+    // Don't let the click bubble into parent handlers (e.g. hover/focus logic)
+    // or collide with the browser's native Ctrl+C on any active text selection.
+    e?.stopPropagation()
+    e?.preventDefault()
+
+    // Prefer what the user actually sees: the rendered plain text from
+    // the DOM (strips **bold** asterisks, list bullets, etc. so pasting
+    // into an email / Slack doesn't show raw markdown syntax).
+    // Falls back to the raw message string if the ref isn't mounted yet
+    // (e.g. user-message bubble, which has no contentRef).
+    const rendered = contentRef.current?.innerText?.trim()
+    const textToCopy = rendered || stripHtmlAndEntities(message.content)
+
+    const ok = await copyText(textToCopy)
+    if (ok) {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+      onCopy?.(message.content)
+    }
   }
 
   const handleSaveEdit = () => {

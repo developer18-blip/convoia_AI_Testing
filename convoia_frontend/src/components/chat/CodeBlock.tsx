@@ -12,6 +12,7 @@ import markdown from 'react-syntax-highlighter/dist/esm/languages/prism/markdown
 import jsx from 'react-syntax-highlighter/dist/esm/languages/prism/jsx'
 import tsx from 'react-syntax-highlighter/dist/esm/languages/prism/tsx'
 import { Copy, Check, Play, PanelRight } from 'lucide-react'
+import { copyText } from '../../lib/clipboard'
 
 SyntaxHighlighter.registerLanguage('javascript', javascript)
 SyntaxHighlighter.registerLanguage('js', javascript)
@@ -39,10 +40,16 @@ interface CodeBlockProps {
 export function CodeBlock({ language = 'text', children, onRun, onOpenInCanvas }: CodeBlockProps) {
   const [copied, setCopied] = useState(false)
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(children)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  const handleCopy = async (e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    e?.preventDefault()
+    // Copy code exactly as-is — never strip whitespace, entities, or tags,
+    // or we'd corrupt real code (e.g. JSX with `<div>`, regex with `&`).
+    const ok = await copyText(children)
+    if (ok) {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
   }
 
   const displayLang = language === 'py' ? 'python'
