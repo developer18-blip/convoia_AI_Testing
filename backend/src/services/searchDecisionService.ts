@@ -54,6 +54,12 @@ function isHardOverrideNoSearch(message: string): boolean {
     return true;
   }
 
+  // Meta-question about the capability itself — handled here too so the
+  // AI layer never sees it and can't hallucinate a "yes search" answer.
+  if (isMetaCapabilityQuestion(message)) {
+    return true;
+  }
+
   // ── Strong structural signals that the message contains code ──
   // These fire on the shapes themselves regardless of how much of the
   // message is code. One shortcode or HTML tag mixed into a sentence is
@@ -90,12 +96,33 @@ function isHardOverrideNoSearch(message: string): boolean {
 }
 
 /**
+ * Meta-questions about the assistant's capabilities — "do you do web
+ * search?", "can you search the web?", "is web search supported?".
+ * The user is asking ABOUT the feature, not asking to use it on a
+ * specific topic, so don't trigger a search.
+ */
+function isMetaCapabilityQuestion(message: string): boolean {
+  // "do you do/have/support web search", "is web search supported/available"
+  if (/\b(do|does|can|could|are|will|would|is|was)\s+(you|there|this|it|web\s*search)\b[^?.!]*\b(search|google|browse|look\s*up|web\s*search)\b\s*\??/i.test(message)) {
+    // …unless it clearly names an object to search for (e.g. "can you
+    // search the web for the current weather in Seattle"). A short
+    // bare-capability question has no "for <topic>" tail.
+    const hasRealObject = /\b(for|about|on)\b\s+\S+\s+\S+/i.test(message);
+    if (!hasRealObject) return true;
+  }
+  return false;
+}
+
+/**
  * Messages where the user explicitly asked us to search. Short-circuits
  * to "yes search" without consulting the AI.
  */
 function isHardOverrideYesSearch(message: string): boolean {
   const explicit = /\b(search\s+(the\s+)?(web|internet|online|for)|google\s+(this|for|it)|look\s*up\s+(online|on\s*(the\s*)?web)|browse\s+(online|the\s*web))\b/i;
   if (!explicit.test(message)) return false;
+  // Meta-capability question — user is asking whether we CAN search,
+  // not asking us to search something specific.
+  if (isMetaCapabilityQuestion(message)) return false;
   // …but not if they're asking about how a code-level "search" works
   if (/\b(code|function|script|shortcode|syntax|css|html|sql|regex|array|string)\b/i.test(message)) return false;
   return true;
@@ -127,6 +154,7 @@ Return needs_search=false for:
 - general knowledge, explanations of concepts
 - how-to questions where the answer comes from understanding
 - anything where quoted dates or numbers are DATA the user is showing you (not things to look up)
+- META-QUESTIONS about the assistant's own capabilities ("do you do web search?", "can you browse the web?", "is search supported?") — the user is asking ABOUT the feature, not asking to use it on a specific topic. Never search for these.
 
 If search IS needed, return a concise 2–6 word search_query — the CONCEPT, not the user's full sentence. Strip quotes, code, and filler.
 
