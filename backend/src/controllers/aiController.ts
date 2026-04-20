@@ -9,7 +9,8 @@ import { afterQueryMiddleware } from '../middleware/tokenTracker.js';
 import { getOrCreatePersonalOrg } from '../utils/orgHelper.js';
 import { TokenWalletService } from '../services/tokenWalletService.js';
 import { NotificationService } from '../services/notificationService.js';
-import { needsWebSearch, searchWeb } from '../services/webSearchService.js';
+import { searchWeb } from '../services/webSearchService.js';
+import { decideWebSearch } from '../services/searchDecisionService.js';
 import { enhanceImagePrompt } from '../services/imageIntentService.js';
 import { FileProcessingService } from '../services/fileProcessingService.js';
 import { generateVideo as generateVideoFn, VIDEO_TOKEN_COST, type MediaRequest } from '../services/mediaGenerationService.js';
@@ -1259,10 +1260,19 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
     }
 
     let webSearchSource: string | null = null;
-    if (userQuery && needsWebSearch(userQuery, hasDocContext)) {
+    const searchDecision = userQuery
+      ? await decideWebSearch(userQuery, { hasDocumentContext: hasDocContext })
+      : null;
+    if (searchDecision?.needsSearch) {
+      logger.info(
+        `Search decision [${searchDecision.source}]: YES — query="${(searchDecision.searchQuery || userQuery).substring(0, 80)}" reason="${searchDecision.reason}"`,
+      );
       try {
         res.write(`data: ${JSON.stringify({ type: 'status', content: 'Searching the web...' })}\n\n`);
-        const searchResult = await searchWeb(userQuery, 5, { userId: user.id, email: user.email });
+        // Prefer the AI-refined concept query over the raw user sentence —
+        // "what happened in the stock market today?" → "stock market today"
+        const queryForSearch = searchDecision.searchQuery || userQuery;
+        const searchResult = await searchWeb(queryForSearch, 5, { userId: user.id, email: user.email });
         if (searchResult.searched && searchResult.results.length > 0) {
           webSearched = true;
           webSearchSource = searchResult.source;

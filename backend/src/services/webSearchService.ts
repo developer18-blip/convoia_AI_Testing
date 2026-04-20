@@ -141,6 +141,14 @@ export function needsWebSearch(query: string, hasDocumentContext = false): boole
   if (query.length < 15) return false;
   if (hasDocumentContext) return false;
 
+  // Code-shape guard: dense in bracket/syntax characters = shortcodes,
+  // HTML, SQL, regex. Previously CF7 blocks like
+  //   [select* course-date "June 01, 2026"]
+  // got scored as "date query" and triggered a real search. 15% of
+  // chars being code-ish reliably catches those without catching prose.
+  const codeLikeChars = query.match(/[\[\]{}()<>=;:/\\|@#$%^&*`~]/g);
+  if (codeLikeChars && codeLikeChars.length / query.length > 0.15) return false;
+
   // ── ABSOLUTE NEGATIVES — skip search entirely ──
   const SKIP_PATTERNS = [
     // Document/file analysis
