@@ -4,10 +4,11 @@ import { Mail, Lock, Eye, EyeOff, Sparkles, Brain, Zap, Shield } from 'lucide-re
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
 import { hapticSuccess, hapticError } from '../../lib/haptics'
+import { nativeGoogleSignIn } from '../../lib/capacitor'
 import api from '../../lib/api'
 
 export function MobileLoginPage() {
-  const { login } = useAuth()
+  const { login, googleLogin } = useAuth()
   const toast = useToast()
   const [searchParams] = useSearchParams()
   const inviteToken = searchParams.get('inviteToken')
@@ -114,12 +115,24 @@ export function MobileLoginPage() {
           background: 'white', borderRadius: '24px', padding: '28px 24px',
           boxShadow: '0 8px 40px rgba(124,58,237,0.12)',
         }}>
-          {/* Google OAuth — custom button for mobile (Google blocks WebView iframe) */}
+          {/* Google OAuth — native Google Play Services first, system-browser fallback */}
           <div style={{ marginBottom: '20px' }}>
             <button
-              onClick={() => {
+              onClick={async () => {
+                try {
+                  const native = await nativeGoogleSignIn()
+                  if (native?.idToken) {
+                    await googleLogin(native.idToken)
+                    toast.success('Welcome back!')
+                    hapticSuccess()
+                    return
+                  }
+                } catch (err: any) {
+                  // Native failed with a real error (not user cancel) — fall through
+                  // to browser redirect so the user can still sign in.
+                  console.warn('Native Google sign-in failed, falling back to browser:', err?.message)
+                }
                 const baseUrl = import.meta.env.VITE_API_URL || 'https://intellect.convoia.com/api'
-                // Open in system browser (not WebView) — deep link brings user back
                 window.open(`${baseUrl}/auth/google/mobile`, '_system')
               }}
               style={{

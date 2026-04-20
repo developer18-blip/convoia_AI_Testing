@@ -36,6 +36,44 @@ function capImport(plugin: string): Promise<any> {
   return import(/* @vite-ignore */ '@capacitor/' + plugin)
 }
 
+/** Dynamic import for third-party Capacitor plugins (non-@capacitor/* scopes). */
+function thirdPartyImport(pkgName: string): Promise<any> {
+  return import(/* @vite-ignore */ pkgName)
+}
+
+let googleAuthInitialized = false
+
+/**
+ * Native Google Sign-In — invokes Google Play Services' account picker
+ * directly (no browser flip). Returns the Google ID token, which the
+ * backend already accepts at POST /api/auth/google.
+ *
+ * Returns null when the plugin isn't available (e.g. running on web, or
+ * when the GCP Android OAuth client hasn't been provisioned yet) so the
+ * caller can fall back to the system-browser redirect flow.
+ */
+export async function nativeGoogleSignIn(): Promise<{ idToken: string } | null> {
+  if (!isNative) return null
+  try {
+    const { GoogleAuth } = await thirdPartyImport('@codetrix-studio/capacitor-google-auth')
+    if (!googleAuthInitialized) {
+      await GoogleAuth.initialize()
+      googleAuthInitialized = true
+    }
+    const result = await GoogleAuth.signIn()
+    // Plugin returns { authentication: { idToken, accessToken, ... }, ... }
+    // The top-level object also exposes idToken on some versions — handle both.
+    const idToken = result?.authentication?.idToken || result?.idToken
+    if (!idToken) return null
+    return { idToken }
+  } catch (err: any) {
+    // User cancelled, plugin missing, or Play Services unavailable.
+    // Swallow and let the caller fall back; log for debugging.
+    console.warn('[GoogleAuth] native sign-in failed:', err?.message || err)
+    return null
+  }
+}
+
 /**
  * Initialize all native plugins. Call once on app startup.
  */

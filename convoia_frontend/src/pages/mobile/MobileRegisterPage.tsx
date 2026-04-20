@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { User, Building2, Mail, Lock, Eye, EyeOff, ArrowLeft, Sparkles, Check } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
+import { nativeGoogleSignIn } from '../../lib/capacitor'
 import { passwordStrength } from '../../lib/utils'
 
 const industries = [
@@ -24,7 +25,7 @@ const roleOptions = [
 ]
 
 export function MobileRegisterPage() {
-  const { register } = useAuth()
+  const { register, googleLogin } = useAuth()
   const toast = useToast()
   const [searchParams] = useSearchParams()
   const inviteToken = searchParams.get('token')
@@ -212,9 +213,19 @@ export function MobileRegisterPage() {
                 <div style={{ flex: 1, height: '1px', background: '#E8E5F0' }} />
               </div>
 
-              {/* Google — custom button for mobile */}
+              {/* Google — native Play Services first, system-browser fallback */}
               <button
-                onClick={() => {
+                onClick={async () => {
+                  try {
+                    const native = await nativeGoogleSignIn()
+                    if (native?.idToken) {
+                      await googleLogin(native.idToken)
+                      toast.success('Welcome!')
+                      return
+                    }
+                  } catch (err: any) {
+                    console.warn('Native Google sign-in failed, falling back to browser:', err?.message)
+                  }
                   const baseUrl = import.meta.env.VITE_API_URL || 'https://intellect.convoia.com/api'
                   window.open(`${baseUrl}/auth/google/mobile`, '_system')
                 }}

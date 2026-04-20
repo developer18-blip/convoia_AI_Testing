@@ -19,6 +19,18 @@ const config: CapacitorConfig = {
       splashFullScreen: true,
       splashImmersive: true,
     },
+    GoogleAuth: {
+      // The Web Client ID from Google Cloud Console — the idToken returned by
+      // GoogleAuth.signIn() is signed for this audience, so the backend can
+      // verify it with the same OAuth2Client it already uses for the web flow.
+      // A separate *Android* OAuth client ID must be created in GCP with the
+      // app's package + SHA-1 fingerprint — that one isn't referenced here
+      // (Google Play Services picks it up automatically from the package match).
+      clientId: '358969037364-srrjvmqlliir7ae72oic2phqake26sde.apps.googleusercontent.com',
+      serverClientId: '358969037364-srrjvmqlliir7ae72oic2phqake26sde.apps.googleusercontent.com',
+      scopes: ['profile', 'email'],
+      forceCodeForRefreshToken: true,
+    },
     StatusBar: {
       style: 'DARK',             // light text for dark background
       backgroundColor: '#0D0D0D',
