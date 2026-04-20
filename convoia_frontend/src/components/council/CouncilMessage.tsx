@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Zap, AlertCircle } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 import type { CouncilState, CouncilPhase } from '../../types'
 import { ModelStatusCard } from './ModelStatusCard'
 import { CrossExamCard } from './CrossExamCard'
@@ -69,20 +69,14 @@ export function CouncilMessage({ council }: Props) {
     <div style={{ marginBottom: '28px', animation: 'fadeSlideIn 200ms ease-out' }}>
       <style>{`@keyframes fadeSlideIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }`}</style>
 
-      {/* Council header */}
+      {/* Council header — the MessageBubble avatar already shows the ⚡ icon,
+          so we only render title + status + badge here (no duplicate circle). */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-        <div style={{
-          width: 32, height: 32, borderRadius: '10px',
-          background: 'linear-gradient(135deg, #F59E0B, #D97706)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-        }}>
-          <Zap size={15} color="white" fill="white" />
-        </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--chat-text, var(--council-text))' }}>
+          <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--council-text)' }}>
             ConvoiaAI Council
           </div>
-          <div style={{ fontSize: '11px', color: 'var(--council-text-dim)' }}>
+          <div style={{ fontSize: '11px', color: 'var(--council-text-dim)', marginTop: 1 }}>
             {totalCount > 0 ? `${totalCount} models consulted` : 'Starting…'}
           </div>
         </div>

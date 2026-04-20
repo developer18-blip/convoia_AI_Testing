@@ -37,26 +37,208 @@
   --council-modal-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    --council-amber-bg: rgba(245, 158, 11, 0.06);
-    --council-amber-border: rgba(245, 158, 11, 0.3);
-    --council-purple-bg: rgba(124, 58, 237, 0.04);
-    --council-purple-border: rgba(124, 58, 237, 0.18);
-    --council-purple-glow: rgba(124, 58, 237, 0.18);
-    --council-green-bg: rgba(16, 185, 129, 0.04);
-    --council-green-border: rgba(16, 185, 129, 0.2);
-    --council-surface: rgba(0, 0, 0, 0.02);
-    --council-surface-hover: rgba(0, 0, 0, 0.04);
-    --council-border: rgba(0, 0, 0, 0.08);
-    --council-border-hover: rgba(0, 0, 0, 0.14);
-    --council-text: #18181b;
-    --council-text-muted: #3f3f46;
-    --council-text-dim: #52525b;
-    --council-text-faint: #a1a1aa;
-    --council-modal-bg: rgba(255, 255, 255, 0.92);
-    --council-modal-shadow: 0 24px 64px rgba(0, 0, 0, 0.18);
-  }
+/* Light-mode overrides — app uses html.light class (not prefers-color-scheme) */
+html.light {
+  --council-amber: #d97706;
+  --council-amber-bg: #fef3c7;
+  --council-amber-border: #fcd34d;
+  --council-purple: #7c3aed;
+  --council-purple-light: #6d28d9;
+  --council-purple-bg: #f5f3ff;
+  --council-purple-border: #c4b5fd;
+  --council-purple-glow: rgba(124, 58, 237, 0.12);
+  --council-green: #059669;
+  --council-green-bg: #ecfdf5;
+  --council-green-border: #a7f3d0;
+  --council-red: #dc2626;
+  --council-red-bg: #fee2e2;
+  --council-red-border: #fecaca;
+  --council-surface: #ffffff;
+  --council-surface-hover: #f8fafc;
+  --council-border: #e2e8f0;
+  --council-border-hover: #cbd5e1;
+  --council-text: #1e293b;
+  --council-text-muted: #334155;
+  --council-text-dim: #64748b;
+  --council-text-faint: #94a3b8;
+  --council-modal-bg: #ffffff;
+  --council-modal-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+}
+
+/* Extra light-mode polish — stronger borders + shadows where transparent
+   surfaces disappear against the white chat background. */
+html.light .council-exec-card {
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+html.light .council-exec-card--complete {
+  border-color: #a7f3d0;
+}
+html.light .council-exec-card--error {
+  border-color: #fecaca;
+}
+html.light .council-exec-icon--thinking { background: #fef3c7; }
+html.light .council-exec-icon--complete { background: #d1fae5; }
+html.light .council-exec-icon--error    { background: #fee2e2; }
+
+html.light .council-verdict-card {
+  background: #faf8ff;
+  border: 1px solid #c4b5fd;
+  box-shadow: 0 2px 10px rgba(124, 58, 237, 0.06);
+}
+html.light .council-verdict-card::before {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(124, 58, 237, 0.45), transparent);
+}
+html.light .council-verdict-title { color: #6d28d9; }
+html.light .council-verdict-body { color: #1e293b; }
+html.light .council-verdict-body strong,
+html.light .council-verdict-label { color: #0f172a; font-weight: 700; }
+
+html.light .council-verdict-insight {
+  background: #f5f3ff;
+  border-left: 3px solid #7c3aed;
+  color: #4c1d95;
+}
+html.light .council-verdict-section { color: #475569; }
+html.light .council-verdict-bullet  { color: #334155; }
+html.light .council-verdict-bullet::before {
+  background: rgba(124, 58, 237, 0.25);
+  border-color: rgba(124, 58, 237, 0.55);
+}
+html.light .council-verdict-nextstep {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+}
+html.light .council-verdict-nextstep strong { color: #047857; }
+
+html.light .council-verdict-badge--agree {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #6ee7b7;
+}
+html.light .council-verdict-badge--mixed {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fcd34d;
+}
+
+html.light .council-crossexam-card--active {
+  background: #f5f3ff;
+  border: 1px solid #c4b5fd;
+}
+html.light .council-crossexam-card--complete {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+html.light .council-crossexam-name--active   { color: #6d28d9; }
+html.light .council-crossexam-name--complete { color: #047857; }
+
+html.light .council-badge--executing,
+html.light .council-badge--selecting {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fcd34d;
+}
+html.light .council-badge--synthesizing {
+  background: #f5f3ff;
+  color: #6d28d9;
+  border: 1px solid #c4b5fd;
+}
+html.light .council-badge--complete {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+html.light .council-badge--error {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+html.light .council-response-panel {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+html.light .council-response-header { background: #f8fafc; }
+html.light .council-response-body   { color: #475569; border-top-color: #e2e8f0; }
+html.light .council-response-name   { color: #1e293b; }
+html.light .council-response-meta,
+html.light .council-response-arrow  { color: #94a3b8; }
+html.light .council-response-dur    { color: #64748b; }
+
+html.light .council-provider-badge--anthropic { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+html.light .council-provider-badge--openai    { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+html.light .council-provider-badge--google    { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+html.light .council-provider-badge--deepseek  { background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; }
+html.light .council-provider-badge--perplexity{ background: #f5f3ff; color: #6d28d9; border: 1px solid #c4b5fd; }
+html.light .council-provider-badge--xai       { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+html.light .council-provider-badge--mistral   { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+
+html.light .council-footer { border-top-color: #e2e8f0; }
+html.light .council-footer-stats,
+html.light .council-footer-mod { color: #64748b; }
+
+html.light .council-progress-track { background: #e2e8f0; }
+html.light .council-progress-label { color: #64748b; }
+
+html.light .council-spinner {
+  border-color: #e2e8f0;
+  border-top-color: #d97706;
+}
+html.light .council-spinner--purple {
+  border-color: #e2e8f0;
+  border-top-color: #7c3aed;
+}
+html.light .council-check { background: #d1fae5; color: #047857; }
+html.light .council-error-icon { background: #fee2e2; color: #dc2626; }
+
+html.light .council-picker-modal,
+html.light .council-picker-sheet {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+html.light .council-picker-modal::before {
+  background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.08), transparent);
+}
+html.light .council-picker-title    { color: #1e293b; }
+html.light .council-picker-subtitle,
+html.light .council-picker-desc     { color: #64748b; }
+html.light .council-category-label  { color: #94a3b8; }
+html.light .council-category-label::after { background: #e2e8f0; }
+html.light .council-model-chip {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+}
+html.light .council-model-chip:hover:not(.council-model-chip--maxed):not(:disabled) {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #1e293b;
+}
+html.light .council-model-chip--selected {
+  background: #f5f3ff;
+  border-color: #7c3aed;
+  color: #6d28d9;
+  box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.15);
+}
+html.light .council-picker-footer {
+  border-top-color: #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+}
+html.light .council-picker-close {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+}
+html.light .council-picker-close:hover { background: #f1f5f9; color: #1e293b; }
+html.light .council-picker-confirm--disabled {
+  background: #f1f5f9;
+  color: #94a3b8;
 }
 
 /* ── Header badge (state-aware) ───────────────────────────────────────── */

@@ -97,13 +97,17 @@ function stripMarkdownWrappers(s: string): string {
 
 /**
  * Parse inline **bold** markers safely (no dangerouslySetInnerHTML — no XSS risk).
+ * Non-greedy match tolerates nested content; stray **s that don't form a pair
+ * (LLMs occasionally emit a dangling `**` on line breaks) get stripped so the
+ * user never sees raw asterisks.
  */
 function parseInline(text: string): ReactNode {
   if (!text.includes('**')) return text
-  const parts = text.split(/(\*\*[^*]+\*\*)/g)
+  const parts = text.split(/(\*\*[^*]+?\*\*)/g)
   return parts.map((p, idx) => {
     const m = p.match(/^\*\*(.+)\*\*$/)
     if (m) return <strong key={idx}>{m[1]}</strong>
-    return <Fragment key={idx}>{p}</Fragment>
+    // Strip any dangling ** that never paired up
+    return <Fragment key={idx}>{p.replace(/\*\*/g, '')}</Fragment>
   })
 }
