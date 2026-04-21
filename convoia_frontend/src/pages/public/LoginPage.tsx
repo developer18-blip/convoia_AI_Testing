@@ -191,10 +191,10 @@ export function LoginPage() {
             <h2 className="text-4xl xl:text-5xl font-bold leading-tight mb-6">
               One platform.<br />
               Every AI model.<br />
-              <span className="text-white/70">Unlimited potential.</span>
+              <span className="text-white/85">Unlimited potential.</span>
             </h2>
 
-            <p className="text-lg text-white/70 mb-12 max-w-md leading-relaxed">
+            <p className="text-lg text-white/85 mb-12 max-w-md leading-relaxed">
               Access GPT-5, Claude Opus, Gemini Pro, and 30+ more models through a single, powerful interface.
             </p>
 
@@ -205,29 +205,30 @@ export function LoginPage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.4 + i * 0.1 }}
-                  className="flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3.5"
+                  className="flex items-center gap-3 bg-white/15 backdrop-blur-md rounded-xl px-4 py-3.5 border border-white/15 shadow-sm"
                 >
-                  <div className="w-10 h-10 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
+                  <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
                     <f.icon size={20} />
                   </div>
                   <div>
-                    <p className="font-semibold text-sm">{f.label}</p>
-                    <p className="text-xs text-white/60">{f.desc}</p>
+                    <p className="font-semibold text-sm text-white">{f.label}</p>
+                    <p className="text-xs text-white/75">{f.desc}</p>
                   </div>
                 </motion.div>
               ))}
             </div>
 
             {/* Social proof */}
-            <div className="mt-14 flex items-center gap-4">
-              <div className="flex -space-x-2">
-                {['#FF6B6B', '#4ECDC4', '#45B7D1', '#96E6A1', '#DDA0DD'].map((color, i) => (
-                  <div key={i} className="w-8 h-8 rounded-full border-2 border-white/20" style={{ background: color }} />
-                ))}
+            <div className="mt-14 flex items-center gap-3">
+              <div
+                className="w-9 h-9 rounded-full bg-white/15 border border-white/25 flex items-center justify-center text-white/90"
+                aria-hidden="true"
+              >
+                <Sparkles size={16} />
               </div>
               <div>
-                <p className="text-sm font-semibold">Trusted by 500+ teams</p>
-                <p className="text-xs text-white/60">From startups to enterprises</p>
+                <p className="text-sm font-semibold text-white">Trusted by 500+ teams</p>
+                <p className="text-xs text-white/75">From startups to enterprises</p>
               </div>
             </div>
           </motion.div>
