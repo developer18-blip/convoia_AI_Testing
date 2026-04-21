@@ -223,6 +223,24 @@ function AppRoutes() {
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
+// TEMP DIAGNOSTIC — remove after origin_mismatch is resolved.
+// These three values are exactly what Google receives:
+//   origin       → what Google compares against "Authorized JavaScript origins"
+//   clientIdLen  → confirms VITE_GOOGLE_CLIENT_ID wasn't empty at build time
+//   clientIdTail → last 20 chars of the client id so we can verify it
+//                  matches the OAuth client we edited in Console (without
+//                  leaking the full value in case the screenshot is shared)
+if (typeof window !== 'undefined') {
+  // eslint-disable-next-line no-console
+  console.log('[google-auth-debug]', {
+    origin: window.location.origin,
+    href: window.location.href,
+    clientIdLen: GOOGLE_CLIENT_ID.length,
+    clientIdTail: GOOGLE_CLIENT_ID.slice(-20),
+    clientIdHasWhitespace: /\s/.test(GOOGLE_CLIENT_ID),
+  })
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
