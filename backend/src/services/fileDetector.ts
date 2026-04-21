@@ -36,8 +36,23 @@ export function detectFileIntent(userMessage: string): FileIntent | null {
     return { format: 'docx', formatLabel: 'Word Document', description: userMessage };
   }
 
-  // PPTX — "powerpoint", "pptx", "slide deck", "pitch deck"
+  // PPTX — unambiguous format tokens (match anywhere)
   if (/\b(powerpoint|pptx?|slide\s*deck|pitch\s*deck|\.pptx?)\b/.test(msg)) {
+    return { format: 'pptx', formatLabel: 'PowerPoint', description: userMessage };
+  }
+
+  // PPTX — "presentation" / "slides" on their own are more ambiguous
+  // ("my presentation went well", "the slides in the deck") so require a
+  // command-shaped verb nearby. Catches:
+  //   "create a presentation about AI trends"
+  //   "make me slides on quarterly results"
+  //   "design a presentation for investors"
+  //   "i need a presentation on X" / "give me slides for Y"
+  // Verbs like "prepare"/"produce" are intentionally excluded because
+  // "prepare for the presentation" is a far more common phrasing than
+  // "prepare a presentation" in chat, so they produce more false
+  // positives than true matches.
+  if (/\b(create|make|generate|build|design|draft|write|compose|give\s*me|i\s*(want|need))\b[\s\S]{1,60}\b(presentation|slides?)\b/.test(msg)) {
     return { format: 'pptx', formatLabel: 'PowerPoint', description: userMessage };
   }
 
