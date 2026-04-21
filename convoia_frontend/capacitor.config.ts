@@ -26,8 +26,8 @@ const config: CapacitorConfig = {
       // A separate *Android* OAuth client ID must be created in GCP with the
       // app's package + SHA-1 fingerprint — that one isn't referenced here
       // (Google Play Services picks it up automatically from the package match).
-      clientId: '358969037364-srrjvmqlliir7ae72oic2phqake26sde.apps.googleusercontent.com',
-      serverClientId: '358969037364-srrjvmqlliir7ae72oic2phqake26sde.apps.googleusercontent.com',
+      clientId: '793440624394-09248vssleqnt5d475l2j81eesaorgcl.apps.googleusercontent.com',
+      serverClientId: '793440624394-09248vssleqnt5d475l2j81eesaorgcl.apps.googleusercontent.com',
       scopes: ['profile', 'email'],
       forceCodeForRefreshToken: true,
     },
