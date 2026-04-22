@@ -27,6 +27,9 @@ interface AttachedFile {
 export interface MessageInputHandle {
   /** Adds files to the staged list (used by DragDropOverlay). */
   addFiles: (files: File[]) => void
+  /** Replace the current composer text. Used by WelcomeScreen card
+   *  clicks so the user can edit a suggested prompt before sending. */
+  setInputText: (text: string) => void
 }
 
 export interface ImageGeneratedData {
@@ -105,6 +108,18 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   useImperativeHandle(ref, () => ({
     addFiles: (files: File[]) => {
       files.forEach((f) => handleFileSelect(f))
+    },
+    setInputText: (text: string) => {
+      setValue(text)
+      // Focus + move caret to end so the user can keep typing where
+      // the suggestion left off.
+      requestAnimationFrame(() => {
+        const el = textareaRef.current
+        if (!el) return
+        el.focus()
+        const len = text.length
+        el.setSelectionRange(len, len)
+      })
     },
   }))
 
@@ -452,7 +467,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
             }}
             onFocus={() => setInputFocused(true)}
             onBlur={() => setInputFocused(false)}
-            placeholder={disabled ? "No tokens available — contact your admin or purchase tokens" : "Message ConvoiaAI..."}
+            placeholder={disabled ? "No tokens available — contact your admin or purchase tokens" : "Ask Intellect AI anything..."}
             rows={1}
             disabled={disabled || fileLoading}
             aria-label="Message input"

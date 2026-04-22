@@ -1,0 +1,386 @@
+/*
+ * Welcome Screen — premium empty state for the chat surface.
+ *
+ * Theme strategy: the app toggles dark/light via a class on <html>
+ * (see contexts/ThemeContext.tsx). We mirror that by scoping dark
+ * overrides under `html.dark`. No `prefers-color-scheme` — the user's
+ * explicit toggle must win over the OS setting.
+ */
+
+.welcome-screen {
+  position: relative;
+  width: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 32px;
+  overflow: hidden;
+}
+
+/* ── Ambient background glows ────────────────────────────── */
+.welcome-ambient {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.5;
+  z-index: 0;
+}
+
+.welcome-ambient--top {
+  top: -100px;
+  left: -50px;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.08), transparent 70%);
+}
+
+.welcome-ambient--bottom {
+  bottom: -100px;
+  right: -50px;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(56, 139, 237, 0.06), transparent 70%);
+}
+
+html.dark .welcome-ambient--top {
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.15), transparent 70%);
+}
+
+html.dark .welcome-ambient--bottom {
+  background: radial-gradient(circle, rgba(56, 139, 237, 0.1), transparent 70%);
+}
+
+/* ── Hero section ────────────────────────────────────────── */
+.welcome-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 44px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Sparkle logo — subtle float + very slow sparkle spin */
+.welcome-logo {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background: linear-gradient(135deg, #7c3aed, #5b21b6);
+  box-shadow:
+    0 12px 40px rgba(124, 58, 237, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  animation: welcome-logo-float 6s ease-in-out infinite;
+}
+
+.welcome-logo::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.5), transparent, rgba(56, 139, 237, 0.3));
+  z-index: -1;
+  opacity: 0.6;
+  filter: blur(8px);
+}
+
+.welcome-logo svg {
+  width: 36px;
+  height: 36px;
+  animation: welcome-sparkle-spin 20s linear infinite;
+}
+
+@keyframes welcome-logo-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+
+@keyframes welcome-sparkle-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Greeting text ───────────────────────────────────────── */
+.welcome-greeting {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.welcome-eyebrow {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  color: #7c3aed;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.welcome-eyebrow::before,
+.welcome-eyebrow::after {
+  content: '';
+  width: 24px;
+  height: 0.5px;
+}
+
+.welcome-eyebrow::before {
+  background: linear-gradient(90deg, transparent, rgba(124, 58, 237, 0.4));
+}
+
+.welcome-eyebrow::after {
+  background: linear-gradient(90deg, rgba(124, 58, 237, 0.4), transparent);
+}
+
+html.dark .welcome-eyebrow {
+  color: #a78bfa;
+}
+
+html.dark .welcome-eyebrow::before {
+  background: linear-gradient(90deg, transparent, rgba(167, 139, 250, 0.35));
+}
+
+html.dark .welcome-eyebrow::after {
+  background: linear-gradient(90deg, rgba(167, 139, 250, 0.35), transparent);
+}
+
+.welcome-title {
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: -0.8px;
+  line-height: 1.2;
+  margin: 0;
+  color: #18181b;
+}
+
+html.dark .welcome-title {
+  background: linear-gradient(135deg, #ffffff, #a1a1aa);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.welcome-subtitle {
+  font-size: 14px;
+  color: #52525b;
+  font-weight: 400;
+  margin: 4px 0 0;
+}
+
+html.dark .welcome-subtitle {
+  color: #a1a1aa;
+}
+
+/* ── Cards grid ──────────────────────────────────────────── */
+.welcome-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  width: 100%;
+  max-width: 640px;
+  position: relative;
+  z-index: 1;
+}
+
+@media (max-width: 640px) {
+  .welcome-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.welcome-card {
+  padding: 20px;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 120px;
+  text-align: left;
+  font-family: inherit;
+
+  background: rgba(255, 255, 255, 0.7);
+  border: 0.5px solid rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    0 1px 2px rgba(0, 0, 0, 0.02);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: inherit;
+}
+
+html.dark .welcome-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 0.5px solid rgba(255, 255, 255, 0.06);
+  box-shadow: none;
+}
+
+/* Top highlight line on hover — accent-tinted */
+.welcome-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--card-accent, rgba(124, 58, 237, 0.3)), transparent);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.welcome-card:hover::before {
+  opacity: 1;
+}
+
+.welcome-card:hover {
+  transform: translateY(-2px);
+  background: #ffffff;
+  border-color: var(--card-accent-border, rgba(124, 58, 237, 0.25));
+  box-shadow: 0 8px 24px var(--card-accent-glow, rgba(124, 58, 237, 0.08));
+}
+
+html.dark .welcome-card:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--card-accent-border, rgba(124, 58, 237, 0.2));
+  box-shadow: 0 12px 32px var(--card-accent-glow, rgba(124, 58, 237, 0.1));
+}
+
+.welcome-card:focus-visible {
+  outline: 2px solid var(--card-accent, #7c3aed);
+  outline-offset: 2px;
+}
+
+/* Category accent colors — set via CSS vars the shared hover rules read */
+.welcome-card--write {
+  --card-accent: #ec4899;
+  --card-accent-border: rgba(236, 72, 153, 0.25);
+  --card-accent-glow: rgba(236, 72, 153, 0.1);
+}
+.welcome-card--code {
+  --card-accent: #3b82f6;
+  --card-accent-border: rgba(59, 130, 246, 0.25);
+  --card-accent-glow: rgba(59, 130, 246, 0.1);
+}
+.welcome-card--research {
+  --card-accent: #10b981;
+  --card-accent-border: rgba(16, 185, 129, 0.25);
+  --card-accent-glow: rgba(16, 185, 129, 0.1);
+}
+.welcome-card--analyze {
+  --card-accent: #f59e0b;
+  --card-accent-border: rgba(245, 158, 11, 0.25);
+  --card-accent-glow: rgba(245, 158, 11, 0.1);
+}
+
+/* Card inner content */
+.welcome-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.welcome-card-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.3s;
+}
+
+.welcome-card:hover .welcome-card-icon {
+  transform: scale(1.08) rotate(-4deg);
+}
+
+.welcome-card--write .welcome-card-icon {
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.15), rgba(236, 72, 153, 0.05));
+  color: #ec4899;
+  border: 0.5px solid rgba(236, 72, 153, 0.2);
+}
+.welcome-card--code .welcome-card-icon {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.05));
+  color: #3b82f6;
+  border: 0.5px solid rgba(59, 130, 246, 0.2);
+}
+.welcome-card--research .welcome-card-icon {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05));
+  color: #10b981;
+  border: 0.5px solid rgba(16, 185, 129, 0.2);
+}
+.welcome-card--analyze .welcome-card-icon {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(245, 158, 11, 0.05));
+  color: #f59e0b;
+  border: 0.5px solid rgba(245, 158, 11, 0.2);
+}
+
+.welcome-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  color: #18181b;
+}
+
+html.dark .welcome-card-title {
+  color: #f4f4f5;
+}
+
+.welcome-card-desc {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #52525b;
+  font-weight: 400;
+}
+
+html.dark .welcome-card-desc {
+  color: #a1a1aa;
+}
+
+/* Arrow fades in on hover */
+.welcome-card-arrow {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  opacity: 0;
+  transition: all 0.3s;
+  color: var(--card-accent, #7c3aed);
+}
+
+.welcome-card:hover .welcome-card-arrow {
+  opacity: 1;
+  transform: translateX(2px);
+}
+
+/* ── Footer hint ─────────────────────────────────────────── */
+.welcome-hint {
+  margin-top: 32px;
+  font-size: 12px;
+  color: #52525b;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  z-index: 1;
+}
+
+html.dark .welcome-hint {
+  color: #71717a;
+}
+
+.welcome-hint-dot {
+  opacity: 0.4;
+}

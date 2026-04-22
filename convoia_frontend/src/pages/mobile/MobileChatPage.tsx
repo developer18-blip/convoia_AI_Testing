@@ -163,7 +163,7 @@ export function MobileChatPage() {
             <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
               <button onClick={() => { setActiveConversation(null); setShowHistory(false) }}
                 style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px dashed var(--color-border)', background: 'transparent', color: 'var(--color-primary)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
-                <Plus size={16} /> New chat
+                <Plus size={16} /> New conversation
               </button>
               {conversations.filter(c => (c.messages?.length > 0) || (c.title && c.title !== 'New Chat')).map(conv => (
                 <button key={conv.id} onClick={() => { setActiveConversation(conv.id); setShowHistory(false) }}

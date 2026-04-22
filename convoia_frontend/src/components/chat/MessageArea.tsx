@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Pencil, Code2, Search, BarChart3, ArrowDown } from 'lucide-react'
+import { ArrowDown } from 'lucide-react'
 import { MessageBubble } from './MessageBubble'
+import { WelcomeScreen } from './WelcomeScreen'
 import type { Message } from '../../types'
 
 interface MessageAreaProps {
@@ -13,13 +14,6 @@ interface MessageAreaProps {
   onRunCode?: (code: string, language: string) => void
   onOpenInCanvas?: (content: string, language: string, type: 'code' | 'text') => void
 }
-
-const suggestions = [
-  { icon: <Pencil size={16} style={{ color: 'var(--color-primary)' }} />, title: 'Write something', prompt: 'Help me write a professional email to request a project deadline extension' },
-  { icon: <Code2 size={16} style={{ color: 'var(--color-primary)' }} />, title: 'Code something', prompt: 'Write a Python script to analyze CSV data and generate summary statistics' },
-  { icon: <Search size={16} style={{ color: 'var(--color-primary)' }} />, title: 'Research something', prompt: 'Compare the top 5 cloud providers for deploying a Node.js application' },
-  { icon: <BarChart3 size={16} style={{ color: 'var(--color-primary)' }} />, title: 'Analyze something', prompt: 'Explain how transformer models work in natural language processing' },
-]
 
 export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, onEditMessage, onDeleteMessage, onRunCode, onOpenInCanvas }: MessageAreaProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -82,46 +76,8 @@ export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, o
 
   if (messages.length === 0) {
     return (
-      <div style={{ height: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 16px 120px', backgroundColor: 'var(--chat-bg)' }}>
-        {/* Welcome heading — big, clean, ChatGPT-style */}
-        <div style={{ animation: 'fade-in 0.4s ease-out', textAlign: 'center', marginBottom: '36px' }}>
-          <div style={{
-            width: '48px', height: '48px', borderRadius: '14px', margin: '0 auto 20px',
-            background: 'linear-gradient(135deg, var(--color-primary-light), rgba(16,163,127,0.05))',
-            border: '1px solid rgba(16,163,127,0.2)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '24px', color: 'var(--color-primary)',
-          }}>✦</div>
-          <h2 style={{
-            fontSize: '26px', fontWeight: 700, letterSpacing: '-0.5px',
-            color: 'var(--color-text-primary)', margin: 0,
-          }}>
-            How can I help you today?
-          </h2>
-          <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginTop: '8px' }}>
-            Choose a suggestion or type your message below
-          </p>
-        </div>
-
-        {/* Suggestion cards — responsive 2x2 grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px', width: '100%', maxWidth: '680px', animation: 'slideUp 0.5s ease-out' }}>
-          {suggestions.map((s, i) => (
-            <button key={s.title} onClick={() => onSuggestedPrompt?.(s.prompt)}
-              className="suggestion-card"
-              style={{
-                padding: '16px 18px', backgroundColor: 'var(--chat-surface)', border: '1px solid var(--chat-border)',
-                borderRadius: '16px', cursor: 'pointer', textAlign: 'left',
-                animationDelay: `${i * 60}ms`, animationFillMode: 'backwards',
-                animation: `fadeSlideIn 0.3s ease-out ${i * 60}ms backwards`,
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--chat-hover)'; e.currentTarget.style.borderColor = 'var(--color-primary)' }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--chat-surface)'; e.currentTarget.style.borderColor = 'var(--chat-border)' }}>
-              <div style={{ marginBottom: '10px' }}>{s.icon}</div>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '4px' }}>{s.title}</div>
-              <p style={{ fontSize: '12.5px', color: 'var(--color-text-muted)', margin: 0, lineHeight: '1.5', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden' }}>{s.prompt}</p>
-            </button>
-          ))}
-        </div>
+      <div style={{ height: '100%', overflowY: 'auto', backgroundColor: 'var(--chat-bg)' }}>
+        <WelcomeScreen onSuggestionClick={(prompt) => onSuggestedPrompt?.(prompt)} />
       </div>
     )
   }

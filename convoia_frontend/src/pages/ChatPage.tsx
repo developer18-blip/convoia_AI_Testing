@@ -519,7 +519,7 @@ export function ChatPage() {
             messages={messages}
             isLoading={isStreaming}
             onRetry={() => retryLastMessage(selectedModelId, industry || undefined, selectedAgent?.id)}
-            onSuggestedPrompt={(prompt) => handleSend(prompt)}
+            onSuggestedPrompt={(prompt) => messageInputRef.current?.setInputText(prompt)}
             onEditMessage={handleEditMessage}
             onDeleteMessage={deleteMessage}
             onRunCode={handleRunCode}

@@ -11,7 +11,7 @@ import api from '../../lib/api'
 
 const pageTitles: Record<string, string> = {
   '/dashboard': 'Dashboard',
-  '/chat': 'Intellect',
+  '/chat': 'Intellect AI',
   '/models': 'AI Models',
   '/usage': 'Usage',
   '/api-keys': 'API Keys',
@@ -39,7 +39,7 @@ interface Notification {
 }
 
 const searchItems = [
-  { label: 'Intellect', path: '/chat', icon: <MessageSquare size={14} /> },
+  { label: 'Intellect AI', path: '/chat', icon: <MessageSquare size={14} /> },
   { label: 'Dashboard', path: '/dashboard', icon: <BarChart3 size={14} /> },
   { label: 'Models', path: '/models', icon: <Bot size={14} /> },
   { label: 'Buy Tokens', path: '/tokens/buy', icon: <Zap size={14} /> },
