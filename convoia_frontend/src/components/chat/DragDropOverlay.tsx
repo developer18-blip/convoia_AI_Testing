@@ -1,10 +1,23 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, useRef, type ReactNode } from 'react'
 
 /**
- * Full-screen drag-and-drop overlay. Listens at the window level so a
- * file dragged anywhere over the chat page is caught, not just over the
- * composer. Uses a counter pattern (enter++ / leave--) so the overlay
- * doesn't flicker off when the pointer crosses inner element boundaries.
+ * Full-screen drag-and-drop overlay.
+ *
+ * Why a ref (not state) for the counter: React batches setState, so two
+ * close-together drag events could fire before the counter update from
+ * the first one lands, leaving dragCounter stuck at > 0 after the drop.
+ * A ref mutates synchronously.
+ *
+ * Why `pointerEvents: 'none'` on the overlay: during a drag, the
+ * browser routes the `drop` event to whatever element is under the
+ * cursor. If the overlay has default pointer-events, the drop lands
+ * ON THE OVERLAY (which has no drop handler), the window-level
+ * listener never fires, and the overlay sticks. Making it purely
+ * visual forwards the drop to whatever's beneath it.
+ *
+ * Safety nets: if the counter ever gets stuck (edge cases where the
+ * browser misses a dragleave — happens with some window managers and
+ * plugins), pressing Escape or alt-tabbing away dismisses the overlay.
  */
 
 interface Props {
@@ -14,54 +27,70 @@ interface Props {
 
 export function DragDropOverlay({ onFilesDropped, children }: Props) {
   const [isDragging, setIsDragging] = useState(false)
+  const dragCounterRef = useRef(0)
 
   useEffect(() => {
-    let counter = 0
+    const resetOverlay = () => {
+      dragCounterRef.current = 0
+      setIsDragging(false)
+    }
 
     const handleDragEnter = (e: DragEvent) => {
-      if (!e.dataTransfer?.types.includes('Files')) return
       e.preventDefault()
       e.stopPropagation()
-      counter += 1
+      // Ignore drags that aren't files (text selection, image inside the page, etc.)
+      if (!e.dataTransfer?.types.includes('Files')) return
+      dragCounterRef.current += 1
       setIsDragging(true)
     }
 
     const handleDragLeave = (e: DragEvent) => {
-      if (!e.dataTransfer?.types.includes('Files')) return
       e.preventDefault()
       e.stopPropagation()
-      counter = Math.max(0, counter - 1)
-      if (counter === 0) setIsDragging(false)
+      if (!e.dataTransfer?.types.includes('Files')) return
+      dragCounterRef.current -= 1
+      if (dragCounterRef.current <= 0) {
+        dragCounterRef.current = 0
+        setIsDragging(false)
+      }
     }
 
     const handleDragOver = (e: DragEvent) => {
-      if (!e.dataTransfer?.types.includes('Files')) return
       e.preventDefault()
       e.stopPropagation()
-      // Hint "copy" cursor so the OS doesn't show the forbidden icon
       if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
     }
 
     const handleDrop = (e: DragEvent) => {
-      if (!e.dataTransfer?.types.includes('Files')) return
       e.preventDefault()
       e.stopPropagation()
-      counter = 0
-      setIsDragging(false)
-      const files = Array.from(e.dataTransfer.files || [])
+      // Reset synchronously BEFORE firing the callback — guarantees the
+      // overlay is gone by the time the consumer starts upload work.
+      resetOverlay()
+      const files = Array.from(e.dataTransfer?.files || [])
       if (files.length > 0) onFilesDropped(files)
+    }
+
+    // Safety nets
+    const handleBlur = () => resetOverlay()
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') resetOverlay()
     }
 
     window.addEventListener('dragenter', handleDragEnter)
     window.addEventListener('dragleave', handleDragLeave)
     window.addEventListener('dragover', handleDragOver)
     window.addEventListener('drop', handleDrop)
+    window.addEventListener('blur', handleBlur)
+    window.addEventListener('keydown', handleKeyDown)
 
     return () => {
       window.removeEventListener('dragenter', handleDragEnter)
       window.removeEventListener('dragleave', handleDragLeave)
       window.removeEventListener('dragover', handleDragOver)
       window.removeEventListener('drop', handleDrop)
+      window.removeEventListener('blur', handleBlur)
+      window.removeEventListener('keydown', handleKeyDown)
     }
   }, [onFilesDropped])
 
@@ -80,6 +109,9 @@ export function DragDropOverlay({ onFilesDropped, children }: Props) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            // Purely visual — never intercept drop events, otherwise the
+            // drop lands on the overlay div and the window listener
+            // never fires, leaving the overlay stuck.
             pointerEvents: 'none',
           }}
         >
@@ -91,6 +123,7 @@ export function DragDropOverlay({ onFilesDropped, children }: Props) {
               border: '2px dashed #7c3aed',
               textAlign: 'center',
               boxShadow: '0 20px 60px rgba(124, 58, 237, 0.25)',
+              pointerEvents: 'none',
             }}
           >
             <div style={{ fontSize: 48, marginBottom: 12 }}>📎</div>

@@ -264,6 +264,9 @@ export const queryAIStream = async (req: Request, res: Response) => {
     const { modelId, messages, industry, agentId, thinkingEnabled, referenceImage, referenceImages } = req.body;
     const conversationId: string | undefined = typeof req.body.conversationId === 'string' ? req.body.conversationId : undefined;
     const attachmentIds: string[] = Array.isArray(req.body.attachmentIds) ? req.body.attachmentIds.filter((x: any) => typeof x === 'string') : [];
+    if (conversationId || attachmentIds.length > 0) {
+      logger.info(`[attachments] stream received: conversationId=${conversationId || 'none'}, attachmentIds=[${attachmentIds.join(',')}]`);
+    }
     const isAutoMode = modelId === 'auto';
     // Debug: log multi-file info
     if (referenceImages?.length > 0 || referenceImage) {
