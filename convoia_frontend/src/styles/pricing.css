@@ -1,0 +1,121 @@
+.pricing-page {
+  min-height: 100vh;
+  background: var(--surface-0);
+  color: var(--text-primary);
+}
+
+.pp-hero {
+  position: relative;
+  padding: var(--space-16) var(--space-6) var(--space-12);
+  overflow: hidden;
+}
+
+.pp-hero__ambient {
+  position: absolute;
+  top: 0; left: 50%;
+  transform: translateX(-50%);
+  width: 800px; height: 400px;
+  background: radial-gradient(ellipse, var(--accent-soft), transparent 70%);
+  filter: blur(100px);
+  opacity: 0.5;
+  pointer-events: none;
+  transition: var(--accent-transition);
+}
+
+.pp-hero__inner {
+  position: relative;
+  z-index: 1;
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pp-tiers {
+  padding: var(--space-12) var(--space-6);
+}
+
+.pp-tiers__inner {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.pp-tiers__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+}
+
+@media (max-width: 1100px) {
+  .pp-tiers__grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .pp-tiers__grid { grid-template-columns: 1fr; }
+}
+
+/* ─── FAQ accordion ─── */
+.pp-faq {
+  padding: var(--space-20) var(--space-6);
+  border-top: var(--border-thin) solid var(--border-subtle);
+}
+
+.pp-faq__inner {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.pp-faq__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.pp-faq__item {
+  background: var(--surface-1);
+  border: var(--border-thin) solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: all var(--duration-base) var(--ease-default);
+}
+
+.pp-faq__item[open] {
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.pp-faq__q {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  cursor: pointer;
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  list-style: none;
+  user-select: none;
+}
+
+.pp-faq__q::-webkit-details-marker { display: none; }
+.pp-faq__q::marker { content: ''; }
+
+.pp-faq__chevron {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  transition: transform var(--duration-base) var(--ease-default), color var(--duration-base) var(--ease-default);
+}
+
+.pp-faq__item[open] .pp-faq__chevron {
+  transform: rotate(180deg);
+  color: var(--accent);
+}
+
+.pp-faq__a {
+  padding: 0 var(--space-5) var(--space-5);
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+  color: var(--text-secondary);
+}

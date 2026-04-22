@@ -60,6 +60,7 @@ const PaymentSuccessPage = lazy(() => import('./pages/PaymentSuccessPage'))
 const PaymentCancelPage = lazy(() => import('./pages/PaymentCancelPage'))
 const PrivacyPolicyPage = lazy(() => import('./pages/public/PrivacyPolicyPage'))
 const TermsOfServicePage = lazy(() => import('./pages/public/TermsOfServicePage'))
+const PricingPage = lazy(() => import('./pages/public/PricingPage'))
 const ResetPasswordPage = lazy(() => import('./pages/public/ResetPasswordPage'))
 const DesignSystemPage = lazy(() => import('./pages/DesignSystemPage'))
 
@@ -159,6 +160,7 @@ function AppRoutes() {
         <Route path="/design" element={<DesignSystemPage />} />
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/terms" element={<TermsOfServicePage />} />
+        <Route path="/pricing" element={<PricingPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         {/* Protected */}
