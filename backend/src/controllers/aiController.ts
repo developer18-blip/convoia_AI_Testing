@@ -406,29 +406,82 @@ export const queryAIStream = async (req: Request, res: Response) => {
         if (allAttachments.length > 0) {
           const currentSet = new Set(attachmentIds);
           const current = allAttachments.filter(a => currentSet.has(a.id));
-          const prior = allAttachments.filter(a => !currentSet.has(a.id));
+          const prior = allAttachments.filter(a => !currentSet.has(a.id)); // ascending by createdAt
 
-          const parts: string[] = [];
+          // ── Token-budget guardrails ──────────────────────────────
+          // Current-turn attachments get FULL extracted text — the
+          // user is actively asking about them, so truncating would
+          // directly hurt answer quality. Prior attachments get a
+          // 2K-char preview each. A hard cap on the whole attachment
+          // block prevents a 20-PDF conversation from blowing past
+          // the model's context window.
+          const PRIOR_PREVIEW_CHARS = 2000;
+          const TOTAL_CONTEXT_CAP = 50_000;
+
+          const currentParts: string[] = [];
+          let currentChars = 0;
           if (current.length > 0) {
-            parts.push('=== FILES ATTACHED TO THIS MESSAGE ===');
+            const header = '=== FILES ATTACHED TO THIS MESSAGE ===';
+            currentParts.push(header);
+            currentChars += header.length + 1;
             for (const att of current) {
-              parts.push(`\n--- ${att.fileName} (${att.fileType}, ${(att.fileSize / 1024).toFixed(1)}KB) ---`);
-              parts.push(att.extractedText || '[binary file — no extractable text; reference by name]');
+              const head = `\n--- ${att.fileName} (${att.fileType}, ${(att.fileSize / 1024).toFixed(1)}KB) ---`;
+              const body = att.extractedText || '[binary file — no extractable text; reference by name]';
+              currentParts.push(head, body);
+              currentChars += head.length + body.length + 2;
             }
           }
+
+          // Build prior previews walking newest-first so, when we
+          // bump up against the cap, the OLDEST priors drop first.
+          // This preserves recency — the file you attached 2 turns
+          // ago outranks the one from 10 turns ago.
+          const budget = Math.max(0, TOTAL_CONTEXT_CAP - currentChars);
+          const priorHeader = (current.length > 0 ? '\n\n' : '') + '=== PREVIOUSLY ATTACHED FILES (earlier in conversation) ===';
+          const priorParts: string[] = [];
+          let priorChars = 0;
+          let priorKept = 0;
+          let priorDropped = 0;
           if (prior.length > 0) {
-            parts.push((current.length > 0 ? '\n\n' : '') + '=== PREVIOUSLY ATTACHED FILES (earlier in conversation) ===');
-            for (const att of prior) {
-              parts.push(`\n--- ${att.fileName} (${att.fileType}) ---`);
-              // Older files capped to 2000 chars to save tokens; current message gets the full text.
-              const preview = (att.extractedText || '').slice(0, 2000);
-              const didTruncate = (att.extractedText || '').length > 2000;
-              parts.push(preview + (didTruncate ? '\n[...truncated — ask to re-read for full text]' : ''));
+            // Reserve budget for the header only if we'll actually include any prior files
+            let headerReserved = false;
+            for (let i = prior.length - 1; i >= 0; i--) {
+              const att = prior[i];
+              const head = `\n--- ${att.fileName} (${att.fileType}) ---`;
+              const full = att.extractedText || '';
+              const preview = full.slice(0, PRIOR_PREVIEW_CHARS);
+              const didTruncate = full.length > PRIOR_PREVIEW_CHARS;
+              const body = preview + (didTruncate ? '\n[...truncated — ask to re-read for full text]' : '');
+              const fragmentSize = head.length + body.length + 2;
+              const headerCost = headerReserved ? 0 : priorHeader.length + 1;
+              if (priorChars + fragmentSize + headerCost > budget) {
+                // Can't fit this one OR any older — everything below
+                // gets dropped. Break (they're already older than this).
+                priorDropped += (i + 1);
+                break;
+              }
+              if (!headerReserved) {
+                priorParts.unshift(priorHeader);
+                priorChars += priorHeader.length + 1;
+                headerReserved = true;
+              }
+              // Insert at index 1 (after header) so final order stays
+              // chronological (oldest → newest) for the model.
+              priorParts.splice(1, 0, head, body);
+              priorChars += fragmentSize;
+              priorKept += 1;
             }
           }
+
+          const parts = [...currentParts, ...priorParts];
           if (parts.length > 0) {
             attachmentContextBlock = parts.join('\n') + '\n\n---\n\n';
-            logger.info(`Attachments loaded: ${current.length} current + ${prior.length} prior = ${attachmentContextBlock.length} chars in context`);
+            const totalChars = attachmentContextBlock.length;
+            const truncatedSome = priorDropped > 0;
+            const logFn = truncatedSome ? logger.warn.bind(logger) : logger.info.bind(logger);
+            logFn(
+              `Attachments: ${current.length} current (${currentChars} chars) + ${priorKept}/${prior.length} prior kept (${priorChars} chars), ${priorDropped} prior dropped, total=${totalChars}/${TOTAL_CONTEXT_CAP}${truncatedSome ? ' — CONTEXT TRUNCATED' : ''}`
+            );
           }
         }
       } catch (err: any) {
