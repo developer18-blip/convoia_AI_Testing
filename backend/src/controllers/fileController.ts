@@ -20,17 +20,61 @@ if (!fs.existsSync(ATTACHMENTS_DIR)) {
   fs.mkdirSync(ATTACHMENTS_DIR, { recursive: true })
 }
 
+/**
+ * Friendly language label for code files — "Python" instead of "py".
+ * Falls back to the raw extension when we don't have a mapping, so a
+ * `.elm` or `.kt` file still gets a usable label.
+ */
+const CODE_LANGUAGE_LABELS: Record<string, string> = {
+  '.py': 'Python',
+  '.ts': 'TypeScript',
+  '.tsx': 'TypeScript (React)',
+  '.js': 'JavaScript',
+  '.jsx': 'JavaScript (React)',
+  '.mjs': 'JavaScript',
+  '.cjs': 'JavaScript',
+  '.java': 'Java',
+  '.cpp': 'C++',
+  '.cc': 'C++',
+  '.cxx': 'C++',
+  '.c': 'C',
+  '.h': 'C Header',
+  '.hpp': 'C++ Header',
+  '.go': 'Go',
+  '.rs': 'Rust',
+  '.rb': 'Ruby',
+  '.php': 'PHP',
+  '.sh': 'Shell',
+  '.bash': 'Bash',
+  '.zsh': 'Zsh',
+  '.sql': 'SQL',
+  '.html': 'HTML',
+  '.htm': 'HTML',
+  '.css': 'CSS',
+  '.scss': 'SCSS',
+  '.less': 'Less',
+  '.xml': 'XML',
+  '.toml': 'TOML',
+  '.yaml': 'YAML',
+  '.yml': 'YAML',
+  '.json': 'JSON',
+  '.md': 'Markdown',
+  '.markdown': 'Markdown',
+  '.ini': 'INI',
+  '.env': 'Environment Variables',
+}
+
 function classifyAttachmentType(mimetype: string, filename: string): string {
   if (mimetype.startsWith('image/')) return 'image'
   if (mimetype.startsWith('audio/')) return 'audio'
   if (mimetype.startsWith('video/')) return 'video'
   if (mimetype === 'application/pdf') return 'pdf'
   if (mimetype.includes('wordprocessingml') || mimetype === 'application/msword') return 'docx'
-  if (mimetype.includes('spreadsheetml') || mimetype === 'application/vnd.ms-excel') return 'xlsx'
-  if (mimetype === 'text/csv' || filename.toLowerCase().endsWith('.csv')) return 'csv'
-  if (mimetype === 'text/plain') return 'text'
   const ext = path.extname(filename).toLowerCase()
-  if (/^\.(js|ts|tsx|jsx|py|java|c|cpp|h|rs|go|rb|php|sh|sql|yml|yaml|json|md|css|html|xml)$/.test(ext)) return 'code'
+  if (mimetype.includes('spreadsheetml') || mimetype === 'application/vnd.ms-excel' || ext === '.xlsx' || ext === '.xls') return 'xlsx'
+  if (mimetype === 'text/csv' || mimetype === 'application/csv' || ext === '.csv') return 'csv'
+  if (CODE_LANGUAGE_LABELS[ext]) return 'code'
+  if (mimetype === 'text/plain' || ext === '.txt') return 'text'
   return 'text'
 }
 
@@ -579,8 +623,54 @@ export const attachFile = asyncHandler(async (req: Request, res: Response): Prom
       const mammoth = await import('mammoth')
       const result = await mammoth.extractRawText({ path: file.path })
       extractedText = result.value || ''
-    } else if (fileType === 'text' || fileType === 'code' || fileType === 'csv') {
+    } else if (fileType === 'xlsx') {
+      // Parse every sheet to CSV and stitch them together with clear
+      // boundaries so the model can tell them apart. sheet_to_csv is
+      // the cheapest serialization — no style bloat, just values.
+      const XLSX = await import('xlsx')
+      const workbook = XLSX.readFile(file.path)
+      const parts: string[] = []
+      for (const sheetName of workbook.SheetNames) {
+        const sheet = workbook.Sheets[sheetName]
+        if (!sheet) continue
+        const csv = XLSX.utils.sheet_to_csv(sheet)
+        parts.push(`=== Sheet: ${sheetName} ===\n${csv}`)
+      }
+      extractedText = parts.join('\n\n')
+    } else if (fileType === 'csv') {
+      // Small CSVs: verbatim so headers + every row are visible.
+      // Large CSVs: parse, keep first 500 rows as structured JSON,
+      // tell the model the full row count so it can reason about
+      // scale even without seeing every row.
+      const raw = fs.readFileSync(file.path, 'utf-8')
+      if (raw.length <= 100_000) {
+        extractedText = raw
+      } else {
+        try {
+          const { parse } = await import('csv-parse/sync')
+          const records = parse(raw, { columns: true, skip_empty_lines: true }) as any[]
+          const preview = records.slice(0, 500)
+          extractedText = `[Showing first 500 rows of ${records.length} total]\n\n` +
+            JSON.stringify(preview, null, 2)
+        } catch (err: any) {
+          logger.warn(`CSV parse failed, falling back to raw truncation: ${err?.message}`)
+          extractedText = raw.slice(0, 100_000) + '\n\n[...CSV truncated at 100K chars]'
+        }
+      }
+    } else if (fileType === 'code') {
+      // Prepend a Linguist-style language hint so the model picks the
+      // right parsing mode without us having to detect it from content.
+      const ext = path.extname(file.originalname).toLowerCase()
+      const language = CODE_LANGUAGE_LABELS[ext] || ext.replace('.', '').toUpperCase()
+      const content = fs.readFileSync(file.path, 'utf-8')
+      extractedText = `[Language: ${language}]\n\n${content}`
+    } else if (fileType === 'text') {
       extractedText = fs.readFileSync(file.path, 'utf-8')
+    } else if (fileType === 'video') {
+      // Accept video uploads so the chip strip shows them, but be
+      // honest that we don't process them yet. Avoids silently lying
+      // to the user / wasting upload time.
+      extractedText = `[Video file: ${file.originalname} — not yet analyzed. Audio track extraction + frame sampling is on the roadmap.]`
     } else if (fileType === 'audio') {
       // Whisper transcription — same path as legacy endpoint
       const OpenAIMod = (await import('openai')).default

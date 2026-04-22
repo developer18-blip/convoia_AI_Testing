@@ -487,7 +487,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
                 ref={fileInputRef}
                 type="file"
                 className="hidden"
-                accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,audio/*,video/*"
+                accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain,text/markdown,application/json,application/x-yaml,text/yaml,audio/*,video/*,.py,.ts,.tsx,.js,.jsx,.mjs,.cjs,.java,.cpp,.cc,.cxx,.c,.h,.hpp,.go,.rs,.rb,.php,.sh,.bash,.sql,.html,.htm,.css,.scss,.xml,.toml,.yaml,.yml,.json,.md,.markdown,.ini,.env,.txt,.xlsx,.xls,.csv"
                 multiple
                 onChange={handleFileInputChange}
               />
