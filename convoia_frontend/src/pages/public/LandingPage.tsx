@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
+import type { CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { MarketingNav } from '../../components/marketing/MarketingNav'
 import { MarketingFooter } from '../../components/marketing/MarketingFooter'
 import { IntellectMark } from '../../components/brand/IntellectMark'
 import { Button } from '../../components/primitives/Button'
-import { Pill } from '../../components/primitives/Pill'
-import { SignalLine } from '../../components/primitives/SignalLine'
-import { PROVIDER_THEMES, getProviderFromModelId } from '../../config/providers'
+import { PROVIDER_THEMES } from '../../config/providers'
+import type { ProviderKey } from '../../config/providers'
 import { useAccent } from '../../contexts/AccentContext'
 
 const DEMO_MODELS = [
@@ -16,13 +16,95 @@ const DEMO_MODELS = [
   'deepseek-chat',
 ]
 
+const PROVIDERS_LIST: Array<{ key: ProviderKey; models: string }> = [
+  { key: 'openai', models: 'GPT-5.4, GPT-4.1, o3, o4-mini' },
+  { key: 'anthropic', models: 'Claude Opus 4.6, Sonnet 4.6, Haiku 4.5' },
+  { key: 'google', models: 'Gemini 3.1 Pro, 2.5 Pro, 2.5 Flash' },
+  { key: 'perplexity', models: 'Sonar Pro, Sonar Reasoning Pro' },
+  { key: 'xai', models: 'Grok 4.20, Grok 3, Grok 3 Mini' },
+  { key: 'deepseek', models: 'DeepSeek Chat, Reasoner' },
+  { key: 'mistral', models: 'Mistral Large, Mistral Small' },
+  { key: 'meta', models: 'Llama 3.3 70B, Mixtral 8x7B' },
+]
+
+type CtaVariant = 'primary' | 'secondary' | 'outline'
+
+const PRICING_TIERS: Array<{
+  name: string
+  icon: string
+  price: string
+  tokens: string
+  perMillion: string
+  badge: string | null
+  badgeColor?: 'success' | 'accent'
+  save?: string
+  approx: string[]
+  features: string[]
+  cta: string
+  ctaVariant: CtaVariant
+  featured?: boolean
+}> = [
+  {
+    name: 'Starter', icon: '⚡', price: '$5', tokens: '500K', perMillion: '$10.00',
+    badge: null,
+    approx: ['~500 messages with GPT-4o-mini', '~80 messages with GPT-4o'],
+    features: ['500,000 tokens', 'All 35+ AI models', 'Image & video generation', 'No expiry — use anytime'],
+    cta: 'Get started', ctaVariant: 'secondary',
+  },
+  {
+    name: 'Standard', icon: '🚀', price: '$14', tokens: '2M', perMillion: '$7.00',
+    badge: 'Recommended', badgeColor: 'success', save: 'Save 30%',
+    approx: ['~2,000 messages with GPT-4o-mini', '~320 messages with GPT-4o'],
+    features: ['2,000,000 tokens', 'All 35+ AI models', 'Deep Think Mode', 'Image & video generation', 'Usage analytics'],
+    cta: 'Buy 2M Tokens', ctaVariant: 'outline',
+  },
+  {
+    name: 'Popular', icon: '⭐', price: '$25', tokens: '5M', perMillion: '$5.00',
+    badge: 'Most Popular', badgeColor: 'accent', save: 'Save 50%',
+    approx: ['~5,000 messages with GPT-4o-mini', '~800 messages with GPT-4o'],
+    features: ['5,000,000 tokens', 'All 35+ AI models', 'Deep Think Mode', 'AI Agents', 'Team token allocation', 'Usage analytics'],
+    cta: 'Buy 5M Tokens', ctaVariant: 'primary', featured: true,
+  },
+  {
+    name: 'Power', icon: '💎', price: '$60', tokens: '15M', perMillion: '$4.00',
+    badge: null, save: 'Save 60%',
+    approx: ['~15,000 messages with GPT-4o-mini', '~2,400 messages with GPT-4o'],
+    features: ['15,000,000 tokens', 'All 35+ AI models', 'Deep Think Mode', 'AI Agents', 'Full org hierarchy', 'Team management', 'Budget controls'],
+    cta: 'Buy 15M Tokens', ctaVariant: 'secondary',
+  },
+]
+
+const TESTIMONIALS = [
+  {
+    title: 'Great AI Platform for Team Work',
+    body: "I really love the multi-LLM feature and the management system is the benchmark which is very unique. You have the tracking for your tokens, and if you are the owner of the organisation, this one application manages all the premium LLMs for you at an effective price.",
+    name: 'Anirudh Rai',
+    role: 'Applied AI Engineer at Convoia AI',
+    initials: 'AR',
+    rating: 5,
+  },
+]
+
+const HOW_IT_WORKS = [
+  { num: '01', title: 'Create your account', desc: 'Sign up in 30 seconds. Buy tokens and start chatting instantly.' },
+  { num: '02', title: 'Choose your model', desc: 'Pick from 35+ AI models across 8 providers. Switch models mid-conversation.' },
+  { num: '03', title: 'Chat, create, analyze', desc: 'Chat with AI, generate images & videos, use Deep Think Mode, deploy AI agents.' },
+]
+
+const FEATURE_CARDS = [
+  { icon: '🌐', title: 'Universal Gateway', desc: 'Access GPT-5.4, Claude Opus 4.6, Gemini 3.1, DeepSeek, and more through a single platform.' },
+  { icon: '$', title: 'Smart Cost Engine', desc: 'Cost-aware token deduction — cheap models cost less, expensive models cost more. Always transparent.' },
+  { icon: '🏢', title: 'Enterprise Hierarchy', desc: 'Organizations, teams, managers, budgets, token allocation. Built for how real companies work.' },
+  { icon: '🧠', title: 'Deep Think Mode', desc: 'Multi-pass reasoning with research, analysis, and refinement. Like having a senior consultant.' },
+  { icon: '🛡', title: 'Auto Fallback', desc: 'Set budget caps with automatic model downgrade. Provider goes down? Auto-switches. Zero downtime.' },
+  { icon: '✨', title: 'AI Agents', desc: 'Pre-built expert agents for coding, writing, analysis, marketing, and more. One-click expertise.' },
+]
+
 export function LandingPage() {
   const [demoModelIndex, setDemoModelIndex] = useState(0)
   const { setActiveModel } = useAccent()
 
   useEffect(() => {
-    // Skip auto-cycling when the user prefers reduced motion — no constant
-    // color flashing. The initial model still locks the page accent.
     const prefersReduced = typeof window !== 'undefined'
       && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
     setActiveModel(DEMO_MODELS[0])
@@ -36,321 +118,282 @@ export function LandingPage() {
       })
     }, 3500)
     return () => clearInterval(interval)
-  }, [setActiveModel])
+    // setActiveModel is stable from context; don't refire on identity change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  const activeDemo = DEMO_MODELS[demoModelIndex]
-  const activeProvider = PROVIDER_THEMES[getProviderFromModelId(activeDemo)]
+  // Keep the eslint disable narrow — demoModelIndex is only updated by the
+  // interval itself so we don't need it in the dep array.
+  void demoModelIndex
 
   return (
-    <div className="landing-page" data-theme="dark">
+    <div className="landing-page">
       <MarketingNav />
 
       {/* HERO */}
-      <section className="hero">
-        <div className="hero__ambient hero__ambient--left" />
-        <div className="hero__ambient hero__ambient--right" />
-        <div className="hero__inner">
-          <div className="hero__eyebrow">
-            <div className="hero__eyebrow-dot" />
-            <span className="mono-label">ONE INTERFACE · 40+ MODELS · ZERO LOCK-IN</span>
+      <section className="lp-hero">
+        <div className="lp-hero__ambient lp-hero__ambient--left" />
+        <div className="lp-hero__ambient lp-hero__ambient--right" />
+        <div className="lp-hero__inner">
+          <div className="lp-hero__eyebrow">
+            <div className="lp-hero__eyebrow-dot" />
+            <span className="mono-label">NOW WITH 35+ AI MODELS</span>
           </div>
 
-          <h1 className="hero__title">
-            The AI gateway that<br />
-            <span className="hero__title-accent">adopts every model's intelligence.</span>
+          <h1 className="lp-hero__title">
+            One platform.<br />
+            <span className="lp-hero__title-accent">Every AI model.</span><br />
+            Full control.
           </h1>
 
-          <p className="hero__subtitle">
-            Route between Claude, GPT, Gemini, and 40 more models from a single workspace.
-            Council mode cross-examines responses. Think mode runs deep reasoning. All billed together.
+          <p className="lp-hero__subtitle">
+            Access GPT-5.4, Claude Opus 4.6, Gemini 3.1, DeepSeek, and 30+ more through a single dashboard.
+            Track costs per query, manage team budgets, and never overspend on AI.
           </p>
 
-          <div className="hero__actions">
+          <div className="lp-hero__actions">
             <Link to="/register">
               <Button variant="primary" size="lg" rightIcon={
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                   <path d="M5 12h14M13 5l7 7-7 7" />
                 </svg>
               }>
-                Start free
+                Start for free
               </Button>
             </Link>
-            <Link to="/login">
-              <Button variant="ghost" size="lg">Sign in</Button>
-            </Link>
+            <a href="#how-it-works">
+              <Button variant="secondary" size="lg" rightIcon={
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              }>
+                See how it works
+              </Button>
+            </a>
           </div>
 
-          <div className="hero__trust mono-label">
-            <span>NO CREDIT CARD</span>
-            <span className="hero__trust-sep">·</span>
-            <span>FREE TIER INCLUDES 100K TOKENS</span>
-            <span className="hero__trust-sep">·</span>
-            <span>CANCEL ANYTIME</span>
-          </div>
-        </div>
-
-        {/* Hero product visual */}
-        <div className="hero__product">
-          <div className="hero__product-frame">
-            <div className="hero__product-chrome">
-              <div className="hero__product-dots">
-                <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#FF5F56' }} />
-                <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#FFBD2E' }} />
-                <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#27C93F' }} />
-              </div>
-              <div className="mono-label" style={{ fontSize: 10 }}>intellect.convoia.ai/chat</div>
-            </div>
-            <div className="hero__product-body grain-surface">
-              <div className="hero__product-sidebar">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px 12px' }}>
-                  <IntellectMark size={22} state="idle" />
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Intellect</div>
-                    <div className="mono-label" style={{ fontSize: 9, color: 'var(--accent)' }}>{activeDemo}</div>
+          {/* Provider cards grid */}
+          <div className="lp-hero__providers">
+            {PROVIDERS_LIST.map(p => {
+              const theme = PROVIDER_THEMES[p.key]
+              return (
+                <div key={p.key} className="lp-provider-card" style={{
+                  '--provider-color': theme.primary,
+                  '--provider-soft': theme.soft,
+                } as CSSProperties}>
+                  <div className="lp-provider-card__head">
+                    <div className="lp-provider-card__dot" />
+                    <div className="lp-provider-card__name">{theme.name}</div>
                   </div>
+                  <div className="lp-provider-card__models mono">{p.models}</div>
                 </div>
-                <div className="mono-label" style={{ padding: '8px 8px 4px', fontSize: 9 }}>ACTIVE MODEL</div>
-                {DEMO_MODELS.map(m => {
-                  const theme = PROVIDER_THEMES[getProviderFromModelId(m)]
-                  const isActive = m === activeDemo
-                  return (
-                    <div key={m} style={{
-                      padding: '6px 8px',
-                      borderRadius: 6,
-                      background: isActive ? theme.soft : 'transparent',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      position: 'relative',
-                      transition: 'all 0.4s ease',
-                    }}>
-                      {isActive && <div style={{
-                        position: 'absolute', left: 0, top: 6, bottom: 6, width: 2,
-                        background: theme.primary, borderRadius: '0 2px 2px 0',
-                      }} />}
-                      <div style={{ width: 6, height: 6, borderRadius: '50%', background: theme.primary }} />
-                      <div className="mono" style={{
-                        fontSize: 10,
-                        color: isActive ? theme.primary : 'var(--text-muted)',
-                        fontWeight: isActive ? 500 : 400,
-                      }}>{m}</div>
-                    </div>
-                  )
-                })}
-              </div>
-
-              <div className="hero__product-chat">
-                <div className="hero__product-pills">
-                  <Pill variant="accent" mono>⚡ Council</Pill>
-                  <Pill mono>◈ Think</Pill>
-                  <Pill mono>◎ Agent</Pill>
-                </div>
-                <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-                  <IntellectMark size={22} state="streaming" />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--text-primary)' }}>
-                      Analyzing your question across 3 models. Council verdict in 2.4s.
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 10, maxWidth: 280 }}>
-                      <div style={{ padding: '8px 10px', borderRadius: 6, background: 'var(--surface-2)', border: '0.5px solid var(--border-subtle)' }}>
-                        <div className="mono-label" style={{ fontSize: 9 }}>CONFIDENCE</div>
-                        <div className="mono-value" style={{ fontSize: 14, color: 'var(--accent)' }}>92%</div>
-                      </div>
-                      <div style={{ padding: '8px 10px', borderRadius: 6, background: 'var(--surface-2)', border: '0.5px solid var(--border-subtle)' }}>
-                        <div className="mono-label" style={{ fontSize: 9 }}>MODELS</div>
-                        <div className="mono-value" style={{ fontSize: 14, color: 'var(--text-primary)' }}>3/3</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div style={{ marginTop: 'auto', paddingTop: 16 }}>
-                  <SignalLine />
-                  <div style={{
-                    marginTop: 6,
-                    padding: '8px 12px',
-                    border: '0.5px solid var(--border-default)',
-                    borderRadius: 8,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    background: 'var(--surface-2)',
-                  }}>
-                    <div className="text-body-sm" style={{ flex: 1, color: 'var(--text-muted)' }}>Ask Intellect anything</div>
-                    <span className="mono-label" style={{ padding: '2px 5px', border: '0.5px solid currentColor', borderRadius: 3 }}>⌘K</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="hero__product-caption mono-label">
-            <div className="hero__product-caption-dot" />
-            <span>LIVE · ROUTING THROUGH {activeProvider.name.toUpperCase()}</span>
-          </div>
-        </div>
-      </section>
-
-      {/* PROVIDERS WALL */}
-      <section className="providers">
-        <div className="providers__inner">
-          <div className="mono-label" style={{ textAlign: 'center', marginBottom: 24 }}>
-            ROUTING ACROSS PROVIDERS YOU ALREADY TRUST
-          </div>
-          <div className="providers__grid">
-            {Object.entries(PROVIDER_THEMES)
-              .filter(([k]) => k !== 'default')
-              .map(([key, theme]) => (
-                <div key={key} className="providers__item">
-                  <div className="providers__dot" style={{ background: theme.primary }} />
-                  <div className="providers__name mono">{theme.name}</div>
-                </div>
-              ))}
-          </div>
-        </div>
-      </section>
-
-      {/* FEATURES */}
-      <section className="features">
-        <div className="features__inner">
-          <div className="features__header">
-            <div className="section-heading">Platform capabilities</div>
-            <h2 className="text-h1" style={{ color: 'var(--text-primary)' }}>Intelligence orchestration,<br />not another chat app.</h2>
-          </div>
-
-          <div className="features__grid">
-            <div className="feature-card feature-card--wide">
-              <div className="feature-card__icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="3" />
-                  <circle cx="5" cy="5" r="2" />
-                  <circle cx="19" cy="5" r="2" />
-                  <circle cx="19" cy="19" r="2" />
-                  <circle cx="5" cy="19" r="2" />
-                  <path d="M7 7l3 3M17 7l-3 3M17 17l-3-3M7 17l3-3" />
-                </svg>
-              </div>
-              <div className="mono-label" style={{ marginBottom: 6 }}>COUNCIL MODE</div>
-              <h3 className="text-h3" style={{ marginBottom: 8, color: 'var(--text-primary)' }}>Three models debate. You get the verdict.</h3>
-              <p className="text-body" style={{ color: 'var(--text-secondary)' }}>
-                Query 3 frontier models simultaneously. A moderator cross-examines their answers for contradictions, reasoning errors, and blind spots. Ship only with consensus.
-              </p>
-            </div>
-
-            <div className="feature-card">
-              <div className="feature-card__icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-                </svg>
-              </div>
-              <div className="mono-label" style={{ marginBottom: 6 }}>THINK MODE</div>
-              <h3 className="text-h3" style={{ marginBottom: 8, color: 'var(--text-primary)' }}>Deep reasoning on hard problems.</h3>
-              <p className="text-body-sm" style={{ color: 'var(--text-secondary)' }}>
-                For questions that need more than a fast answer. Reasoning budget scales with complexity.
-              </p>
-            </div>
-
-            <div className="feature-card">
-              <div className="feature-card__icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9" />
-                  <path d="M21 3l-9 9" />
-                  <path d="M21 3v6h-6" />
-                </svg>
-              </div>
-              <div className="mono-label" style={{ marginBottom: 6 }}>AGENT MODE</div>
-              <h3 className="text-h3" style={{ marginBottom: 8, color: 'var(--text-primary)' }}>Multi-step tasks with tool use.</h3>
-              <p className="text-body-sm" style={{ color: 'var(--text-secondary)' }}>
-                Autonomous workflows: web search, file analysis, code execution. Runs to completion.
-              </p>
-            </div>
-
-            <div className="feature-card">
-              <div className="feature-card__icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <path d="M9 9h6v6H9z" />
-                </svg>
-              </div>
-              <div className="mono-label" style={{ marginBottom: 6 }}>FILE UPLOADS</div>
-              <h3 className="text-h3" style={{ marginBottom: 8, color: 'var(--text-primary)' }}>PDFs, Excel, code, 25+ formats.</h3>
-              <p className="text-body-sm" style={{ color: 'var(--text-secondary)' }}>
-                Drop any file. Ask questions. Get cited answers with line numbers.
-              </p>
-            </div>
-
-            <div className="feature-card feature-card--wide">
-              <div className="feature-card__icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                </svg>
-              </div>
-              <div className="mono-label" style={{ marginBottom: 6 }}>UNIFIED BILLING</div>
-              <h3 className="text-h3" style={{ marginBottom: 8, color: 'var(--text-primary)' }}>One invoice for all models. Real-time token tracking.</h3>
-              <p className="text-body" style={{ color: 'var(--text-secondary)' }}>
-                No juggling API keys, no surprise bills. See every token spent, every cent charged, by user and by model.
-              </p>
-            </div>
+              )
+            })}
           </div>
         </div>
       </section>
 
       {/* STATS */}
-      <section className="stats">
-        <div className="stats__inner">
-          <div className="stats__grid">
-            <div className="stat">
-              <div className="stat__value mono">40+</div>
-              <div className="stat__label mono-label">MODELS ROUTED</div>
-            </div>
-            <div className="stat">
-              <div className="stat__value mono">99.95%</div>
-              <div className="stat__label mono-label">GATEWAY UPTIME</div>
-            </div>
-            <div className="stat">
-              <div className="stat__value mono">&lt; 200ms</div>
-              <div className="stat__label mono-label">ROUTING LATENCY</div>
-            </div>
-            <div className="stat">
-              <div className="stat__value mono">$0.01</div>
-              <div className="stat__label mono-label">MIN CHARGE / QUERY</div>
-            </div>
+      <section className="lp-stats">
+        <div className="lp-stats__inner">
+          <div className="lp-stat">
+            <div className="lp-stat__value mono">35+</div>
+            <div className="lp-stat__label">AI Models</div>
+          </div>
+          <div className="lp-stat">
+            <div className="lp-stat__value mono">8</div>
+            <div className="lp-stat__label">Providers</div>
+          </div>
+          <div className="lp-stat">
+            <div className="lp-stat__value mono">4</div>
+            <div className="lp-stat__label">Think Tiers</div>
+          </div>
+          <div className="lp-stat">
+            <div className="lp-stat__value mono">99.9%</div>
+            <div className="lp-stat__label">Uptime</div>
           </div>
         </div>
       </section>
 
-      {/* PRICING TEASER */}
-      <section className="pricing-teaser">
-        <div className="pricing-teaser__inner">
-          <div className="section-heading" style={{ textAlign: 'center' }}>Pricing</div>
-          <h2 className="text-h1" style={{ textAlign: 'center', marginBottom: 16, color: 'var(--text-primary)' }}>Pay for tokens. Keep your margins.</h2>
-          <p className="text-body-lg" style={{ textAlign: 'center', color: 'var(--text-secondary)', maxWidth: 520, margin: '0 auto 40px' }}>
-            No per-seat tax. No minimum commitments. You pay providers' published rates plus a flat 15% gateway fee.
-          </p>
+      {/* FEATURES */}
+      <section id="features" className="lp-features">
+        <div className="lp-features__inner">
+          <div className="lp-features__header">
+            <div className="section-heading">Everything you need</div>
+            <h2 className="text-h1" style={{ color: 'var(--text-primary)' }}>Everything you need to manage AI</h2>
+            <p className="text-body-lg" style={{ color: 'var(--text-secondary)', marginTop: 12 }}>
+              Built for teams that take AI seriously. Every feature designed for production use.
+            </p>
+          </div>
 
-          <div className="pricing-teaser__cta">
+          <div className="lp-features__grid">
+            {FEATURE_CARDS.map((f, i) => (
+              <div key={i} className="lp-feature-card">
+                <div className="lp-feature-card__icon">{f.icon}</div>
+                <h3 className="lp-feature-card__title">{f.title}</h3>
+                <p className="lp-feature-card__desc">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* HOW IT WORKS */}
+      <section id="how-it-works" className="lp-how">
+        <div className="lp-how__inner">
+          <div className="section-heading" style={{ textAlign: 'center' }}>Getting started</div>
+          <h2 className="text-h1" style={{ textAlign: 'center', marginBottom: 56, color: 'var(--text-primary)' }}>How it works</h2>
+          <div className="lp-how__steps">
+            {HOW_IT_WORKS.map(step => (
+              <div key={step.num} className="lp-how-step">
+                <div className="lp-how-step__num mono">{step.num}</div>
+                <div className="lp-how-step__body">
+                  <h3 className="text-h3" style={{ marginBottom: 8, color: 'var(--text-primary)' }}>{step.title}</h3>
+                  <p className="text-body" style={{ color: 'var(--text-secondary)', margin: 0 }}>{step.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* PRICING PREVIEW */}
+      <section id="pricing" className="lp-pricing">
+        <div className="lp-pricing__inner">
+          <div className="lp-pricing__header">
+            <div className="section-heading" style={{ textAlign: 'center' }}>Pricing</div>
+            <h2 className="text-h1" style={{ textAlign: 'center', marginBottom: 12, color: 'var(--text-primary)' }}>Pay only for what you use</h2>
+            <p className="text-body-lg" style={{ textAlign: 'center', color: 'var(--text-secondary)', maxWidth: 520, margin: '0 auto 40px' }}>
+              Buy tokens once. Use them anytime. No subscriptions. No monthly fees.
+            </p>
+          </div>
+
+          <div className="lp-pricing__grid">
+            {PRICING_TIERS.map(tier => (
+              <div key={tier.name} className={`lp-tier ${tier.featured ? 'lp-tier--featured' : ''}`}>
+                {tier.badge && (
+                  <div className={`lp-tier__badge lp-tier__badge--${tier.badgeColor}`}>
+                    {tier.badge}
+                  </div>
+                )}
+                <div className="lp-tier__head">
+                  <span className="lp-tier__icon">{tier.icon}</span>
+                  <span className="lp-tier__name mono-label">{tier.name.toUpperCase()}</span>
+                </div>
+                <div className="lp-tier__tokens">
+                  <span className="lp-tier__tokens-value mono">{tier.tokens}</span>
+                  <span className="lp-tier__tokens-label">tokens</span>
+                </div>
+                <div className="lp-tier__price">
+                  <span className="lp-tier__price-value mono">{tier.price}</span>
+                  <span className="lp-tier__price-label">one-time</span>
+                </div>
+                <div className="lp-tier__per-m">
+                  <span className="mono">{tier.perMillion}</span> per 1M tokens
+                </div>
+                {tier.save && <div className="lp-tier__save">{tier.save}</div>}
+                <div className="lp-tier__approx">
+                  {tier.approx.map((a, i) => <div key={i}>{a}</div>)}
+                </div>
+                <ul className="lp-tier__features">
+                  {tier.features.map(f => (
+                    <li key={f}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                      <span>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="lp-tier__cta">
+                  <Link to="/register">
+                    <Button variant={tier.ctaVariant} size="md" style={{ width: '100%' }}>
+                      {tier.cta}
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ textAlign: 'center', marginTop: 40 }}>
             <Link to="/pricing">
-              <Button variant="outline" size="lg" rightIcon={
+              <Button variant="ghost" size="md" rightIcon={
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                   <path d="M5 12h14M13 5l7 7-7 7" />
                 </svg>
               }>
-                See pricing
+                See full pricing details
               </Button>
             </Link>
           </div>
         </div>
       </section>
 
+      {/* REVIEWS */}
+      <section id="reviews" className="lp-reviews">
+        <div className="lp-reviews__inner">
+          <div className="lp-reviews__header">
+            <div className="section-heading" style={{ textAlign: 'center' }}>
+              ⭐ 5.0 AVERAGE FROM REVIEWS
+            </div>
+            <h2 className="text-h1" style={{ textAlign: 'center', marginBottom: 12, color: 'var(--text-primary)' }}>What our users say</h2>
+            <p className="text-body-lg" style={{ textAlign: 'center', color: 'var(--text-secondary)', marginBottom: 32 }}>
+              Real feedback from teams and individuals using Intellect AI every day.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 56 }}>
+              <Button variant="outline" size="md" leftIcon={
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+                </svg>
+              }>
+                Write a Review
+              </Button>
+            </div>
+          </div>
+
+          <div className="lp-reviews__grid">
+            {TESTIMONIALS.map((t, i) => (
+              <div key={i} className="lp-review-card">
+                <div className="lp-review-card__quote-mark">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M7 7h3l-2 5h3v6H6V10l1-3zm8 0h3l-2 5h3v6h-5V10l1-3z" />
+                  </svg>
+                </div>
+                <h3 className="lp-review-card__title">{t.title}</h3>
+                <p className="lp-review-card__body">{t.body}</p>
+                <div className="lp-review-card__footer">
+                  <div className="lp-review-card__author">
+                    <div className="lp-review-card__avatar">{t.initials}</div>
+                    <div>
+                      <div className="lp-review-card__name">{t.name}</div>
+                      <div className="lp-review-card__role mono-label">{t.role.toUpperCase()}</div>
+                    </div>
+                  </div>
+                  <div className="lp-review-card__stars">
+                    {[...Array(t.rating)].map((_, i) => (
+                      <svg key={i} width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                      </svg>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* FINAL CTA */}
-      <section className="final-cta">
-        <div className="final-cta__inner">
-          <div className="final-cta__ambient" />
-          <IntellectMark size={56} state="council" />
+      <section className="lp-final-cta">
+        <div className="lp-final-cta__inner">
+          <div className="lp-final-cta__ambient" />
+          <IntellectMark size={48} state="council" />
           <h2 className="text-h1" style={{ marginTop: 24, marginBottom: 12, color: 'var(--text-primary)' }}>
-            Stop managing API keys.<br />Start routing intelligence.
+            Ready to take control of your AI spend?
           </h2>
           <p className="text-body-lg" style={{ color: 'var(--text-secondary)', marginBottom: 32 }}>
-            Free tier includes 100K tokens. Takes 60 seconds to sign up.
+            Join teams who manage their AI costs without sacrificing capability.
           </p>
           <Link to="/register">
             <Button variant="primary" size="lg" rightIcon={
@@ -358,7 +401,7 @@ export function LandingPage() {
                 <path d="M5 12h14M13 5l7 7-7 7" />
               </svg>
             }>
-              Get started free
+              Start for free
             </Button>
           </Link>
         </div>

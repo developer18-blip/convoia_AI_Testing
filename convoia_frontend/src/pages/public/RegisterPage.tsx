@@ -156,8 +156,7 @@ export function RegisterPage() {
   }, [step])
 
   return (
-    <div data-theme="dark">
-      <AuthLayout
+    <AuthLayout
         wide={step === 2 && accountType === 'business'}
         title={step === 1 ? 'Create your account' : 'Your details'}
         subtitle={step === 1 ? 'Start routing across 40+ AI models in 60 seconds' : 'Fill in your information to continue'}
@@ -444,7 +443,6 @@ export function RegisterPage() {
           </form>
         )}
       </AuthLayout>
-    </div>
   )
 }
 

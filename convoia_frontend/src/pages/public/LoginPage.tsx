@@ -73,7 +73,7 @@ export function LoginPage() {
   }, [])
 
   return (
-    <div data-theme="dark">
+    <>
       <AuthLayout
         title="Welcome back"
         subtitle="Sign in to continue to Intellect AI"
@@ -237,7 +237,7 @@ export function LoginPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }
 
