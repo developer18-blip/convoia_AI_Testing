@@ -3,3 +3,16 @@
   background: linear-gradient(90deg, transparent, var(--accent), transparent);
   opacity: 0.55;
 }
+
+/* Council mode — gradient across up to 3 active provider colors. */
+.signal-line--council {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--council-color-1, var(--accent)),
+    var(--council-color-2, var(--accent)),
+    var(--council-color-3, var(--accent)),
+    transparent
+  );
+  opacity: 0.6;
+}

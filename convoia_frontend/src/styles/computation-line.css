@@ -16,6 +16,17 @@
   background: linear-gradient(90deg, transparent, var(--accent), transparent);
   animation: comp-pulse 1.4s linear infinite;
 }
+
+.comp-line__pulse--council {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--council-color-1, var(--accent)),
+    var(--council-color-2, var(--accent)),
+    var(--council-color-3, var(--accent)),
+    transparent
+  );
+}
 @keyframes comp-pulse {
   to { left: 130%; }
 }
