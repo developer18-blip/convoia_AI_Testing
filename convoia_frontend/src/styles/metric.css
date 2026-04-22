@@ -1,0 +1,27 @@
+.metric {
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-thin) solid var(--border-subtle);
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.metric__label { font-size: 10px; }
+.metric__value {
+  font-size: var(--text-h3);
+  color: var(--text-primary);
+  font-weight: var(--weight-medium);
+}
+.metric__value--accent { color: var(--accent); }
+.metric__unit {
+  font-size: var(--text-caption);
+  color: var(--text-tertiary);
+  font-weight: var(--weight-regular);
+  margin-left: 4px;
+}
+.metric__sublabel {
+  font-size: var(--text-caption);
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}

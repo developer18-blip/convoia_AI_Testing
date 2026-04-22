@@ -1,0 +1,48 @@
+/*
+   Grain surface — applies a subtle animated noise texture.
+   Use by adding .grain-surface to any container that should have it.
+   The chat background especially benefits.
+*/
+
+.grain-surface {
+  position: relative;
+}
+
+.grain-surface::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0.1 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  animation: grain-shift 8s steps(6) infinite;
+  z-index: 0;
+}
+
+.grain-surface > * {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes grain-shift {
+  0%   { transform: translate(0, 0); }
+  16%  { transform: translate(-1%, 1%); }
+  33%  { transform: translate(1%, -1%); }
+  50%  { transform: translate(-0.5%, -0.5%); }
+  66%  { transform: translate(1%, 0.5%); }
+  83%  { transform: translate(-0.5%, 0.5%); }
+  100% { transform: translate(0, 0); }
+}
+
+@media (max-width: 640px) {
+  .grain-surface::before {
+    animation-duration: 12s;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grain-surface::before {
+    animation: none;
+  }
+}

@@ -1,0 +1,24 @@
+.card {
+  background: var(--surface-1);
+  border: var(--border-thin) solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  transition: all var(--duration-base) var(--ease-default);
+  position: relative;
+  overflow: hidden;
+}
+.card--default { background: var(--surface-1); }
+.card--raised { background: var(--surface-1); box-shadow: var(--shadow-md); }
+.card--muted { background: var(--surface-2); border-color: transparent; }
+.card--accent { border-color: var(--accent-border); }
+.card--accent::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  opacity: 0.6;
+}
+.card--p-none { padding: 0; }
+.card--p-sm { padding: var(--space-3); }
+.card--p-md { padding: var(--space-5); }
+.card--p-lg { padding: var(--space-6); }

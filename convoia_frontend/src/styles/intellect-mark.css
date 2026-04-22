@@ -1,0 +1,65 @@
+.intellect-mark__nodes circle {
+  transform-origin: center;
+  transform-box: fill-box;
+  transition: all var(--duration-base) var(--ease-default);
+}
+
+/* IDLE — nodes breathe in sequence, 3.2s cycle */
+.intellect-mark--idle .intellect-mark__nodes circle {
+  animation: intellect-breathe 3.2s ease-in-out infinite;
+}
+.intellect-mark--idle .intellect-mark__nodes circle:nth-child(1) { animation-delay: 0s; }
+.intellect-mark--idle .intellect-mark__nodes circle:nth-child(2) { animation-delay: 0.4s; }
+.intellect-mark--idle .intellect-mark__nodes circle:nth-child(3) { animation-delay: 0.8s; }
+.intellect-mark--idle .intellect-mark__nodes circle:nth-child(4) { animation-delay: 1.2s; }
+
+@keyframes intellect-breathe {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 1; }
+}
+
+/* THINKING — slower, deeper pulse */
+.intellect-mark--thinking .intellect-mark__nodes circle {
+  animation: intellect-think 2s ease-in-out infinite;
+}
+@keyframes intellect-think {
+  0%, 100% { opacity: 0.3; r: 1.8; }
+  50%      { opacity: 1;   r: 2.2; }
+}
+
+/* STREAMING — rapid sequential flash */
+.intellect-mark--streaming .intellect-mark__nodes circle {
+  animation: intellect-stream 0.8s ease-in-out infinite;
+}
+.intellect-mark--streaming .intellect-mark__nodes circle:nth-child(1) { animation-delay: 0s; }
+.intellect-mark--streaming .intellect-mark__nodes circle:nth-child(2) { animation-delay: 0.15s; }
+.intellect-mark--streaming .intellect-mark__nodes circle:nth-child(3) { animation-delay: 0.3s; }
+.intellect-mark--streaming .intellect-mark__nodes circle:nth-child(4) { animation-delay: 0.45s; }
+@keyframes intellect-stream {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 1; }
+}
+
+/* COUNCIL — all nodes bright, lines connecting strongly */
+.intellect-mark--council .intellect-mark__nodes circle {
+  animation: intellect-council 2.5s ease-in-out infinite;
+}
+.intellect-mark--council .intellect-mark__lines line {
+  animation: intellect-council-lines 2.5s ease-in-out infinite;
+}
+@keyframes intellect-council {
+  0%, 100% { opacity: 0.9; }
+  50%      { opacity: 1; }
+}
+@keyframes intellect-council-lines {
+  0%, 100% { opacity: 0.2; }
+  50%      { opacity: 0.5; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intellect-mark__nodes circle,
+  .intellect-mark__lines line {
+    animation: none !important;
+    opacity: 0.8;
+  }
+}

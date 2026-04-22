@@ -1,0 +1,19 @@
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  border: var(--border-thin) solid var(--border-default);
+  background: var(--surface-2);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+.pill--accent { background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent); }
+.pill--success { background: var(--color-success-bg); color: var(--color-success); border-color: rgba(16, 185, 129, 0.2); }
+.pill--warning { background: var(--color-warning-bg); color: var(--color-warning); border-color: rgba(245, 158, 11, 0.2); }
+.pill--error { background: var(--color-error-bg); color: var(--color-error); border-color: rgba(239, 68, 68, 0.2); }
+.pill--mono { font-family: var(--font-mono); letter-spacing: 0.2px; }
+.pill__icon { display: flex; align-items: center; }
