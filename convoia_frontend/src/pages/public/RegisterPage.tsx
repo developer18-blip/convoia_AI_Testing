@@ -1,15 +1,15 @@
-import { useState, useEffect, type FormEvent } from 'react'
+import { useState, useEffect } from 'react'
+import type { FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { User, Building2, Mail, Lock, ArrowLeft, ArrowRight, Sparkles, Check } from 'lucide-react'
 import { GoogleLogin } from '@react-oauth/google'
-import { ThemeToggle } from '../../components/shared/ThemeToggle'
-import { Input } from '../../components/ui/Input'
-import { Select } from '../../components/ui/Select'
-import { Button } from '../../components/ui/Button'
+import { AuthLayout } from '../../components/auth/AuthLayout'
+import { Input } from '../../components/primitives/Input'
+import { Button } from '../../components/primitives/Button'
+import { SignalLine } from '../../components/primitives/SignalLine'
+import { ComputationLine } from '../../components/primitives/ComputationLine'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
-import { cn, passwordStrength } from '../../lib/utils'
+import { passwordStrength } from '../../lib/utils'
 
 const industries = [
   { value: '', label: 'Select industry' },
@@ -29,14 +29,51 @@ const roleOptions = [
   { value: 'manager', label: 'Manager' },
 ]
 
-const benefits = [
-  'Access to 35+ AI models including GPT-5, Claude, Gemini',
-  'Built-in web search for real-time information',
-  'Image generation with DALL-E, Gemini & GPT Image',
-  'Team management with token budgets',
-  'Interactive charts & data visualization',
-  'Persistent memory across conversations',
-]
+// Strength-bar colors mapped to our design tokens. passwordStrength() returns
+// Tailwind class names, but we want semantic CSS variable colors inside the
+// new theme boundary.
+const STRENGTH_COLORS = ['var(--color-error)', 'var(--color-error)', 'var(--color-warning)', 'var(--color-info)', 'var(--color-success)']
+
+const selectStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '0 36px 0 12px',
+  height: 36,
+  borderRadius: 'var(--radius-md)',
+  border: '0.5px solid var(--border-default)',
+  background: 'var(--surface-1)',
+  color: 'var(--text-primary)',
+  fontFamily: 'var(--font-sans)',
+  fontSize: 'var(--text-body)',
+  appearance: 'none',
+  cursor: 'pointer',
+  outline: 'none',
+}
+
+function LabeledSelect({ label, value, onChange, options, error }: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  options: Array<{ value: string; label: string }>
+  error?: string
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <label className="input-field__label">{label}</label>
+      <div style={{ position: 'relative' }}>
+        <select value={value} onChange={(e) => onChange(e.target.value)} style={selectStyle}>
+          {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        <svg
+          width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+          style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)', pointerEvents: 'none' }}
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </div>
+      {error && <p className="input-field__error">{error}</p>}
+    </div>
+  )
+}
 
 export function RegisterPage() {
   const { register, googleLogin } = useAuth()
@@ -46,23 +83,19 @@ export function RegisterPage() {
   const inviteOrg = searchParams.get('org')
   const inviteRole = searchParams.get('role')
 
-  const [isDark, setIsDark] = useState(document.documentElement.classList.contains('dark'))
-  useEffect(() => {
-    const obs = new MutationObserver(() => setIsDark(document.documentElement.classList.contains('dark')))
-    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
-    return () => obs.disconnect()
-  }, [])
-
   const [step, setStep] = useState(inviteToken ? 2 : 1)
   const [accountType, setAccountType] = useState<'individual' | 'business' | null>(inviteToken ? 'individual' : null)
-  const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '', organizationName: '', industry: '', role: 'org_owner' })
+  const [form, setForm] = useState({
+    name: '', email: '', password: '', confirmPassword: '',
+    organizationName: '', industry: '', role: 'org_owner',
+  })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(false)
   const [agreed, setAgreed] = useState(false)
 
   const updateField = (key: string, value: string) => {
-    setForm((prev) => ({ ...prev, [key]: value }))
-    setErrors((prev) => ({ ...prev, [key]: '' }))
+    setForm(prev => ({ ...prev, [key]: value }))
+    setErrors(prev => ({ ...prev, [key]: '' }))
   }
 
   const strength = passwordStrength(form.password)
@@ -110,253 +143,307 @@ export function RegisterPage() {
     }
   }
 
+  // Cmd/Ctrl+Enter submits the form (only on step 2)
+  useEffect(() => {
+    if (step !== 2) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        document.querySelector<HTMLFormElement>('form.auth-register-form')?.requestSubmit()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [step])
+
   return (
-    <div className="min-h-screen flex">
-      {/* Left — Feature Panel (hidden on mobile) */}
-      <div className="hidden lg:flex flex-1 relative overflow-hidden" style={{ background: isDark ? 'linear-gradient(160deg, #0c1425 0%, #110d24 40%, #1a1033 100%)' : 'linear-gradient(160deg, #2563EB 0%, #4F46E5 40%, #7C3AED 100%)' }}>
-        {/* Decorative */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-32 left-10 w-80 h-80 bg-white rounded-full blur-3xl" />
-          <div className="absolute bottom-10 right-10 w-64 h-64 bg-white rounded-full blur-3xl" />
-        </div>
-        <div className="absolute inset-0 opacity-5" style={{
-          backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
-          backgroundSize: '40px 40px',
-        }} />
-
-        <div className="relative z-10 flex flex-col justify-center px-16 xl:px-20 text-white w-full">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8 }}
-          >
-            <div className="flex items-center gap-2 mb-6">
-              <Sparkles size={20} />
-              <span className="text-sm font-medium text-white/80 uppercase tracking-wider">Get Started Free</span>
-            </div>
-
-            <h2 className="text-4xl xl:text-5xl font-bold leading-tight mb-4">
-              Build with the<br />
-              best AI models.<br />
-              <span className="text-white/70">Pay only for what you use.</span>
-            </h2>
-
-            <p className="text-lg text-white/60 mb-10 max-w-md">
-              No subscriptions. No commitments. Start with free tokens and scale as you grow.
-            </p>
-
-            <div className="space-y-4">
-              {benefits.map((b, i) => (
-                <motion.div
-                  key={b}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.4, delay: 0.3 + i * 0.08 }}
-                  className="flex items-center gap-3"
-                >
-                  <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                    <Check size={14} />
-                  </div>
-                  <span className="text-sm text-white/85">{b}</span>
-                </motion.div>
-              ))}
-            </div>
-
-            {/* Testimonial */}
-            <div className="mt-14 bg-white/10 backdrop-blur-sm rounded-2xl px-6 py-5">
-              <p className="text-sm text-white/80 italic leading-relaxed">
-                "ConvoiaAI replaced 4 separate AI subscriptions for our team. The token system is brilliant — we only pay for what we actually use."
-              </p>
-              <div className="flex items-center gap-3 mt-4">
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500" />
-                <div>
-                  <p className="text-sm font-semibold">Sarah Chen</p>
-                  <p className="text-xs text-white/50">CTO, TechForward Inc.</p>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </div>
-
-      {/* Right — Form Side */}
-      <div className="flex-1 flex flex-col justify-center px-6 sm:px-12 lg:px-16 xl:px-20 bg-background relative overflow-y-auto">
-        <div className="absolute top-5 right-5 z-10">
-          <ThemeToggle />
-        </div>
-
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6 }}
-          className="w-full max-w-[400px] mx-auto py-10"
-        >
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2.5 mb-8">
-            <img src="/logo.png?v=2" alt="ConvoiaAI" style={{ height: '48px', objectFit: 'contain' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
-          </Link>
-
-          <h1 className="text-3xl font-bold text-text-primary tracking-tight">Create your account</h1>
-          <p className="text-text-muted mt-2 mb-2">Start using AI in under 2 minutes</p>
-
-          {/* Step indicator */}
-          <div className="flex items-center gap-2 mb-8">
-            <div className={cn('h-1.5 flex-1 rounded-full transition-all duration-500', step >= 1 ? 'bg-primary' : 'bg-surface-2')} />
-            <div className={cn('h-1.5 flex-1 rounded-full transition-all duration-500', step >= 2 ? 'bg-primary' : 'bg-surface-2')} />
-            <span className="text-xs text-text-muted ml-2">Step {step}/2</span>
-          </div>
-
-          {/* Step 1: Account Type */}
-          {step === 1 && (
-            <motion.div
-              key="step1"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-5"
-            >
-              <p className="text-sm text-text-secondary font-medium">How will you use ConvoiaAI?</p>
-
-              <div className="grid grid-cols-2 gap-4">
-                <motion.button
-                  whileHover={{ y: -3, boxShadow: '0 12px 40px -12px rgba(124,58,237,0.3)' }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => { setAccountType('individual'); setStep(2) }}
-                  className={cn(
-                    'p-6 rounded-2xl border-2 text-left transition-all group',
-                    accountType === 'individual' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
-                  )}
-                >
-                  <div className="w-12 h-12 mb-4 rounded-xl bg-gradient-to-br from-primary/15 to-accent-end/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <User size={24} className="text-primary" />
-                  </div>
-                  <p className="font-bold text-text-primary text-sm">Individual</p>
-                  <p className="text-xs text-text-muted mt-1 leading-relaxed">Personal AI access with pay-as-you-go tokens</p>
-                </motion.button>
-
-                <motion.button
-                  whileHover={{ y: -3, boxShadow: '0 12px 40px -12px rgba(124,58,237,0.3)' }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => { setAccountType('business'); setStep(2) }}
-                  className={cn(
-                    'p-6 rounded-2xl border-2 text-left transition-all group',
-                    accountType === 'business' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
-                  )}
-                >
-                  <div className="w-12 h-12 mb-4 rounded-xl bg-gradient-to-br from-primary/15 to-accent-end/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Building2 size={24} className="text-primary" />
-                  </div>
-                  <p className="font-bold text-text-primary text-sm">Team / Business</p>
-                  <p className="text-xs text-text-muted mt-1 leading-relaxed">Manage AI access for your entire organization</p>
-                </motion.button>
-              </div>
-
-              <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-border" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-3 text-text-muted tracking-wider">or sign up instantly</span>
-                </div>
-              </div>
-
-              <div className="flex justify-center">
-                <GoogleLogin
-                  onSuccess={async (credentialResponse) => {
-                    if (!credentialResponse.credential) return
-                    try {
-                      await googleLogin(credentialResponse.credential)
-                      toast.success('Account created!')
-                    } catch (err: any) {
-                      toast.error(err?.response?.data?.message || 'Google sign-up failed')
-                    }
-                  }}
-                  onError={() => toast.error('Google sign-up failed')}
-                  theme="outline"
-                  shape="rectangular"
-                  size="large"
-                  width="360"
-                  text="signup_with"
-                />
-              </div>
-            </motion.div>
-          )}
-
-          {/* Step 2: Registration Form */}
-          {step === 2 && (
-            <motion.form
-              key="step2"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              onSubmit={handleSubmit}
-              className="space-y-4"
-            >
-              {!inviteToken && (
-                <button type="button" onClick={() => setStep(1)} className="flex items-center gap-1.5 text-sm text-text-muted hover:text-primary mb-1 transition-colors font-medium">
-                  <ArrowLeft size={14} /> Change account type
-                </button>
-              )}
-
-              {inviteToken && inviteOrg && (
-                <div className="bg-primary/8 border border-primary/20 rounded-xl px-4 py-3 mb-3 flex items-center gap-3">
-                  <span className="text-lg">🎉</span>
-                  <div>
-                    <p className="text-sm font-semibold text-text-primary">Joining {decodeURIComponent(inviteOrg)}</p>
-                    <p className="text-xs text-text-muted">You'll be added as {inviteRole}</p>
-                  </div>
-                </div>
-              )}
-
-              <Input label="Full name" placeholder="John Doe" value={form.name} onChange={(e) => updateField('name', e.target.value)} error={errors.name} icon={<User size={16} />} />
-              <Input label="Work email" type="email" placeholder="name@company.com" value={form.email} onChange={(e) => updateField('email', e.target.value)} error={errors.email} icon={<Mail size={16} />} />
-
-              <div>
-                <Input label="Password" type="password" placeholder="Min 8 characters" value={form.password} onChange={(e) => updateField('password', e.target.value)} error={errors.password} icon={<Lock size={16} />} />
-                {form.password && (
-                  <div className="mt-2">
-                    <div className="flex gap-1">
-                      {[1, 2, 3, 4, 5].map((i) => (
-                        <div key={i} className={cn('h-1.5 flex-1 rounded-full transition-all duration-300', i <= strength.score ? strength.color : 'bg-surface-2')} />
-                      ))}
-                    </div>
-                    <p className={cn('text-xs mt-1 font-medium', strength.score <= 2 ? 'text-danger' : strength.score <= 3 ? 'text-warning' : 'text-success')}>
-                      {strength.label}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <Input label="Confirm password" type="password" placeholder="Confirm your password" value={form.confirmPassword} onChange={(e) => updateField('confirmPassword', e.target.value)} error={errors.confirmPassword} icon={<Lock size={16} />} />
-
-              {accountType === 'business' && !inviteToken && (
-                <>
-                  <Input label="Organization name" placeholder="Acme Inc." value={form.organizationName} onChange={(e) => updateField('organizationName', e.target.value)} error={errors.organizationName} icon={<Building2 size={16} />} />
-                  <Select label="Industry" options={industries} value={form.industry} onChange={(e) => updateField('industry', e.target.value)} />
-                  <Select label="Your role" options={roleOptions} value={form.role} onChange={(e) => updateField('role', e.target.value)} />
-                </>
-              )}
-
-              <label className="flex items-start gap-2.5 cursor-pointer pt-1">
-                <input type="checkbox" checked={agreed} onChange={(e) => { setAgreed(e.target.checked); setErrors((p) => ({ ...p, terms: '' })) }} className="mt-0.5 rounded border-border bg-surface text-primary focus:ring-primary w-4 h-4" />
-                <span className="text-sm text-text-secondary leading-relaxed">
-                  I agree to the <Link to="/terms" target="_blank" className="text-primary hover:underline">Terms</Link> and <Link to="/privacy" target="_blank" className="text-primary hover:underline">Privacy Policy</Link>
-                </span>
-              </label>
-              {errors.terms && <p className="text-xs text-danger">{errors.terms}</p>}
-
-              <Button type="submit" isLoading={isLoading} className="w-full !py-3 !text-base !font-semibold">
-                Create Account
-                <ArrowRight size={16} />
-              </Button>
-            </motion.form>
-          )}
-
-          <p className="text-center text-sm text-text-muted mt-8">
+    <div data-theme="dark">
+      <AuthLayout
+        wide={step === 2 && accountType === 'business'}
+        title={step === 1 ? 'Create your account' : 'Your details'}
+        subtitle={step === 1 ? 'Start routing across 40+ AI models in 60 seconds' : 'Fill in your information to continue'}
+        footer={
+          <span>
             Already have an account?{' '}
-            <Link to="/login" className="text-primary hover:text-primary-hover font-semibold transition-colors">Sign in</Link>
-          </p>
-        </motion.div>
-      </div>
+            <Link to="/login" style={{ color: 'var(--accent)', fontWeight: 500, textDecoration: 'none' }}>
+              Sign in
+            </Link>
+          </span>
+        }
+      >
+        {/* Step indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <div style={{ height: 3, flex: 1, borderRadius: 2, background: 'var(--accent)', transition: 'all 0.4s' }} />
+          <div style={{ height: 3, flex: 1, borderRadius: 2, background: step >= 2 ? 'var(--accent)' : 'var(--surface-3)', transition: 'all 0.4s' }} />
+          <span className="mono-label" style={{ marginLeft: 4, fontSize: 10 }}>STEP {step}/2</span>
+        </div>
+
+        {/* Invite banner */}
+        {inviteToken && inviteOrg && (
+          <div style={{
+            background: 'var(--accent-soft)',
+            border: '0.5px solid var(--accent-border)',
+            borderRadius: 'var(--radius-md)',
+            padding: '10px 14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+          }}>
+            <span style={{ fontSize: 18 }}>🎉</span>
+            <div>
+              <div className="text-body-sm" style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                Joining {decodeURIComponent(inviteOrg)}
+              </div>
+              <div className="text-caption" style={{ color: 'var(--text-secondary)' }}>
+                You'll be added as {inviteRole}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {step === 1 && (
+          <>
+            <div className="text-body-sm" style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>
+              How will you use Intellect?
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <button
+                type="button"
+                onClick={() => { setAccountType('individual'); setStep(2) }}
+                style={{
+                  all: 'unset',
+                  cursor: 'pointer',
+                  padding: 20,
+                  borderRadius: 'var(--radius-lg)',
+                  border: '0.5px solid var(--border-default)',
+                  background: 'var(--surface-1)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--accent-border)'
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--border-default)'
+                  e.currentTarget.style.transform = 'translateY(0)'
+                }}
+              >
+                <div style={{
+                  width: 36, height: 36, borderRadius: 'var(--radius-md)',
+                  background: 'var(--accent-soft)', color: 'var(--accent)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                </div>
+                <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)' }}>Individual</div>
+                <div className="text-caption" style={{ color: 'var(--text-tertiary)', lineHeight: 1.4 }}>
+                  Personal AI access with pay-as-you-go tokens
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setAccountType('business'); setStep(2) }}
+                style={{
+                  all: 'unset',
+                  cursor: 'pointer',
+                  padding: 20,
+                  borderRadius: 'var(--radius-lg)',
+                  border: '0.5px solid var(--border-default)',
+                  background: 'var(--surface-1)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--accent-border)'
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--border-default)'
+                  e.currentTarget.style.transform = 'translateY(0)'
+                }}
+              >
+                <div style={{
+                  width: 36, height: 36, borderRadius: 'var(--radius-md)',
+                  background: 'var(--accent-soft)', color: 'var(--accent)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <path d="M9 3v18M15 3v18M3 9h18M3 15h18" />
+                  </svg>
+                </div>
+                <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)' }}>Team / Business</div>
+                <div className="text-caption" style={{ color: 'var(--text-tertiary)', lineHeight: 1.4 }}>
+                  Manage AI access for your entire organization
+                </div>
+              </button>
+            </div>
+
+            <div style={{ position: 'relative', margin: '8px 0', textAlign: 'center' }}>
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center' }}>
+                <div style={{ width: '100%', borderTop: '0.5px solid var(--border-subtle)' }} />
+              </div>
+              <span className="mono-label" style={{ position: 'relative', background: 'var(--surface-1)', padding: '0 12px', fontSize: 10 }}>
+                OR SIGN UP INSTANTLY
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <GoogleLogin
+                onSuccess={async (credentialResponse) => {
+                  if (!credentialResponse.credential) return
+                  try {
+                    await googleLogin(credentialResponse.credential)
+                    toast.success('Account created!')
+                  } catch (err: any) {
+                    toast.error(err?.response?.data?.message || 'Google sign-up failed')
+                  }
+                }}
+                onError={() => toast.error('Google sign-up failed')}
+                theme="outline"
+                shape="rectangular"
+                size="large"
+                width="360"
+                text="signup_with"
+              />
+            </div>
+          </>
+        )}
+
+        {step === 2 && (
+          <form className="auth-register-form" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {!inviteToken && (
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  color: 'var(--text-tertiary)', fontSize: 'var(--text-body-sm)',
+                  alignSelf: 'flex-start',
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M19 12H5M12 19l-7-7 7-7" />
+                </svg>
+                Change account type
+              </button>
+            )}
+
+            <Input
+              label="Full name"
+              placeholder="Anirudh Rai"
+              value={form.name}
+              onChange={(e) => updateField('name', e.target.value)}
+              error={errors.name}
+              required
+              autoFocus
+              autoComplete="name"
+            />
+            <Input
+              label="Work email"
+              type="email"
+              placeholder="name@company.com"
+              value={form.email}
+              onChange={(e) => updateField('email', e.target.value)}
+              error={errors.email}
+              required
+              autoComplete="email"
+            />
+
+            <div>
+              <Input
+                label="Password"
+                type="password"
+                placeholder="Min 8 characters"
+                value={form.password}
+                onChange={(e) => updateField('password', e.target.value)}
+                error={errors.password}
+                required
+                autoComplete="new-password"
+              />
+              {form.password && (
+                <div style={{ marginTop: 6 }}>
+                  <div style={{ display: 'flex', gap: 3 }}>
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <div key={i} style={{
+                        height: 3, flex: 1, borderRadius: 2,
+                        background: i <= strength.score ? STRENGTH_COLORS[strength.score] : 'var(--surface-3)',
+                        transition: 'background 0.3s',
+                      }} />
+                    ))}
+                  </div>
+                  <p className="text-caption" style={{
+                    marginTop: 4,
+                    color: STRENGTH_COLORS[strength.score],
+                    fontWeight: 500,
+                  }}>
+                    {strength.label}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <Input
+              label="Confirm password"
+              type="password"
+              placeholder="Confirm your password"
+              value={form.confirmPassword}
+              onChange={(e) => updateField('confirmPassword', e.target.value)}
+              error={errors.confirmPassword}
+              required
+              autoComplete="new-password"
+            />
+
+            {accountType === 'business' && !inviteToken && (
+              <>
+                <Input
+                  label="Organization name"
+                  placeholder="Acme Inc."
+                  value={form.organizationName}
+                  onChange={(e) => updateField('organizationName', e.target.value)}
+                  error={errors.organizationName}
+                />
+                <LabeledSelect label="Industry" value={form.industry} onChange={(v) => updateField('industry', v)} options={industries} />
+                <LabeledSelect label="Your role" value={form.role} onChange={(v) => updateField('role', v)} options={roleOptions} />
+              </>
+            )}
+
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={(e) => { setAgreed(e.target.checked); setErrors(p => ({ ...p, terms: '' })) }}
+                style={{ marginTop: 2, width: 16, height: 16, accentColor: 'var(--accent)' }}
+              />
+              <span className="text-body-sm" style={{ color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                I agree to the{' '}
+                <Link to="/terms" target="_blank" style={{ color: 'var(--accent)' }}>Terms</Link>
+                {' '}and{' '}
+                <Link to="/privacy" target="_blank" style={{ color: 'var(--accent)' }}>Privacy Policy</Link>
+              </span>
+            </label>
+            {errors.terms && <p className="input-field__error">{errors.terms}</p>}
+
+            <SignalLine />
+
+            <Button type="submit" variant="primary" size="lg" loading={isLoading} disabled={isLoading}>
+              {isLoading ? 'Creating account...' : 'Create account'}
+            </Button>
+
+            {isLoading && <ComputationLine label="PROVISIONING WORKSPACE" />}
+          </form>
+        )}
+      </AuthLayout>
     </div>
   )
 }
