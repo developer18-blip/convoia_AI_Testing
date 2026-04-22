@@ -163,7 +163,7 @@ export function MobileChatPage() {
             <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
               <button onClick={() => { setActiveConversation(null); setShowHistory(false) }}
                 style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px dashed var(--color-border)', background: 'transparent', color: 'var(--color-primary)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
-                <Plus size={16} /> New Chat
+                <Plus size={16} /> New chat
               </button>
               {conversations.filter(c => (c.messages?.length > 0) || (c.title && c.title !== 'New Chat')).map(conv => (
                 <button key={conv.id} onClick={() => { setActiveConversation(conv.id); setShowHistory(false) }}
@@ -272,7 +272,7 @@ export function MobileChatPage() {
               <Menu size={18} />
             </button>
             <h1 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '160px' }}>
-              {activeConversationId ? (conversations.find(c => c.id === activeConversationId)?.title || 'Chat') : 'New chat'}
+              {activeConversationId ? (conversations.find(c => c.id === activeConversationId)?.title || 'Intellect') : 'New chat'}
             </h1>
           </div>
           <div style={{ display: 'flex', gap: '6px' }}>

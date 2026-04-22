@@ -3,7 +3,7 @@ import { Home, MessageSquare, LayoutGrid, Wallet, User } from 'lucide-react'
 
 const TABS = [
   { path: '/dashboard', icon: Home, label: 'Home' },
-  { path: '/chat', icon: MessageSquare, label: 'Chat' },
+  { path: '/chat', icon: MessageSquare, label: 'Intellect' },
   { path: '/models', icon: LayoutGrid, label: 'Agents' },
   { path: '/tokens/buy', icon: Wallet, label: 'Wallet' },
   { path: '/settings', icon: User, label: 'Profile' },

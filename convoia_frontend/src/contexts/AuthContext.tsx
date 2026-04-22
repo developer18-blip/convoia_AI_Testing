@@ -101,7 +101,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(newToken)
       setUser(userData)
       setIsLoading(false)
-      navigate(userData.role === 'platform_admin' ? '/admin' : '/dashboard')
+      // Intellect is the primary surface — every role lands there on
+      // sign-in. Admins can reach /admin via the sidebar if they want.
+      navigate('/chat')
     }
 
     window.addEventListener('convoia:auth', handleDeepLinkAuth)
@@ -109,9 +111,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [navigate])
 
   const redirectByRole = useCallback(
-    (role: string) => {
-      if (role === 'platform_admin') navigate('/admin')
-      else navigate('/dashboard')
+    (_role: string) => {
+      // Post-login / post-register every role lands on Intellect.
+      // Prior behaviour sent platform_admins to /admin and everyone
+      // else to /dashboard — the dashboard is no longer the home
+      // surface now that Intellect AI is the product.
+      navigate('/chat')
     },
     [navigate]
   )

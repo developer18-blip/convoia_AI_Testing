@@ -26,7 +26,7 @@ interface NavItem {
 function getNavItems(role: string, hasOrg: boolean): NavItem[] {
   const base: NavItem[] = [
     { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/dashboard' },
-    { icon: <MessageSquare size={20} />, label: 'Chat', path: '/chat' },
+    { icon: <MessageSquare size={20} />, label: 'Intellect', path: '/chat' },
     { icon: <Bot size={20} />, label: 'Models', path: '/models' },
   ]
 

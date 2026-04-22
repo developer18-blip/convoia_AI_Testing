@@ -212,7 +212,7 @@ export function PersonalView({ stats, wallet: _wallet, recentUsage, insights, us
             <div className="space-y-2">
               <button onClick={() => navigate('/chat')} className="w-full flex items-center gap-3 p-3 rounded-lg transition-colors" style={{ background: 'var(--color-surface-2)' }}>
                 <MessageSquare size={16} style={{ color: 'var(--color-primary)' }} />
-                <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>Start New Chat</span>
+                <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>Open Intellect</span>
               </button>
               <button onClick={() => navigate('/models')} className="w-full flex items-center gap-3 p-3 rounded-lg transition-colors" style={{ background: 'var(--color-surface-2)' }}>
                 <Bot size={16} style={{ color: 'var(--color-primary)' }} />
