@@ -632,6 +632,7 @@ function callGoogleStream(
       let buffer = '';
       let gotAnyChunk = false;
       let inThoughtBlock = false; // Track thinking-vs-answer transition for formatting
+      let finishReason: string | undefined;
 
       response.data.on('data', (chunk: Buffer) => {
         buffer += chunk.toString();
@@ -668,6 +669,8 @@ function callGoogleStream(
               inputTokens = json.usageMetadata.promptTokenCount || inputTokens;
               outputTokens = json.usageMetadata.candidatesTokenCount || outputTokens;
             }
+            const fr = json?.candidates?.[0]?.finishReason;
+            if (fr) finishReason = fr;
           } catch { /* skip malformed SSE frame */ }
         }
       });
@@ -678,7 +681,7 @@ function callGoogleStream(
           streamingFailed = true;
           return;
         }
-        callbacks.onDone(inputTokens, outputTokens);
+        callbacks.onDone(inputTokens, outputTokens, { finishReason });
         resolve();
       });
 
@@ -1086,6 +1089,10 @@ async function findFallbackModel(excludeProvider: string) {
 export interface StreamUsageMeta {
   reasoningTokens?: number;
   searchQueries?: number;
+  // Raw terminal signal from the provider: 'stop' | 'length' | 'max_tokens' | 'MAX_TOKENS' | 'end_turn' | etc.
+  // When it's a length/max_tokens variant, the response was truncated and the caller
+  // should surface a hint to the user + log for diagnostics.
+  finishReason?: string;
 }
 
 interface StreamCallbacks {
@@ -1182,6 +1189,7 @@ ${systemPrompt}`;
       let buffer = '';
       let isThinking = false;
       let contentBuffer = ''; // Buffer to detect <think> tags
+      let finishReason: string | undefined;
 
       response.data.on('data', (chunk: Buffer) => {
         buffer += chunk.toString();
@@ -1195,6 +1203,8 @@ ${systemPrompt}`;
           try {
             const json = JSON.parse(trimmed.slice(6));
             const delta = json.choices?.[0]?.delta;
+            const choiceFinish = json.choices?.[0]?.finish_reason;
+            if (choiceFinish) finishReason = choiceFinish;
 
             if (delta?.content) {
               let text = delta.content;
@@ -1273,7 +1283,7 @@ ${systemPrompt}`;
             if (cleaned) callbacks.onChunk(cleaned);
           }
         }
-        callbacks.onDone(inputTokens, outputTokens);
+        callbacks.onDone(inputTokens, outputTokens, { finishReason });
         resolve();
       });
       response.data.on('error', (err: Error) => {
@@ -1368,6 +1378,7 @@ function callAnthropicStream(
       let buffer = '';
       let currentBlockType = 'text'; // Track whether current block is 'thinking' or 'text'
       let isThinking = false;
+      let finishReason: string | undefined;
 
       response.data.on('data', (chunk: Buffer) => {
         buffer += chunk.toString();
@@ -1407,15 +1418,16 @@ function callAnthropicStream(
             if (json.type === 'message_start' && json.message?.usage) {
               inputTokens = json.message.usage.input_tokens || 0;
             }
-            if (json.type === 'message_delta' && json.usage) {
-              outputTokens = json.usage.output_tokens || 0;
+            if (json.type === 'message_delta') {
+              if (json.usage) outputTokens = json.usage.output_tokens || 0;
+              if (json.delta?.stop_reason) finishReason = json.delta.stop_reason;
             }
           } catch { /* skip */ }
         }
       });
 
       response.data.on('end', () => {
-        callbacks.onDone(inputTokens, outputTokens);
+        callbacks.onDone(inputTokens, outputTokens, { finishReason });
         resolve();
       });
       response.data.on('error', (err: Error) => {
@@ -1479,6 +1491,7 @@ function callOpenAICompatibleStream(
       let inputTokens = 0, outputTokens = 0;
       let buffer = '';
       let isThinking = false;
+      let finishReason: string | undefined;
 
       response.data.on('data', (chunk: Buffer) => {
         buffer += chunk.toString();
@@ -1492,6 +1505,8 @@ function callOpenAICompatibleStream(
           try {
             const json = JSON.parse(trimmed.slice(6));
             const delta = json.choices?.[0]?.delta;
+            const choiceFinish = json.choices?.[0]?.finish_reason;
+            if (choiceFinish) finishReason = choiceFinish;
 
             // DeepSeek Reasoner: stream reasoning_content as thinking blocks
             if (delta?.reasoning_content) {
@@ -1521,7 +1536,7 @@ function callOpenAICompatibleStream(
       });
 
       response.data.on('end', () => {
-        callbacks.onDone(inputTokens, outputTokens);
+        callbacks.onDone(inputTokens, outputTokens, { finishReason });
         resolve();
       });
       response.data.on('error', (err: Error) => {

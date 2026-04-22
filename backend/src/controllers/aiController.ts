@@ -1026,6 +1026,27 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
     // completeness check.
     const intent: ClassifiedIntent = classifyIntent(userQuery || lastUserText || '', hasDocContext);
 
+    // ── CONTEXT-AWARE maxTokens BUMP ─────────────────────────────
+    // Baseline from the classifier is 4096 for extraction/question — fine for
+    // short answers but cuts document analysis mid-bullet. When we know the
+    // turn needs a longer reply (attachments uploaded or the user explicitly
+    // asked for a detailed breakdown), raise the cap to 8192. For long-form
+    // writing with a concrete artifact target (article/essay/report/letter/
+    // email), also lift to 8192. streamMaxOutput still clamps to the user's
+    // token balance downstream, so this never exceeds what they can afford.
+    {
+      const bumpText = userQuery || lastUserText || '';
+      const hasAttachments = attachmentsLoaded.length > 0;
+      const isLongAnalysisRequest = /\b(analyz|summariz|breakdown|audit|report|review|explain in detail|comprehensive)\b/i.test(bumpText);
+      if (hasAttachments || isLongAnalysisRequest) {
+        intent.maxTokens = Math.max(intent.maxTokens, 8192);
+        logger.info(`[orchestration] maxTokens bumped to ${intent.maxTokens} (hasAttachments=${hasAttachments}, longAnalysis=${isLongAnalysisRequest})`);
+      }
+      if (intent.intent === 'long_form_writing' && /\b(article|essay|report|letter|email)\b/i.test(bumpText)) {
+        intent.maxTokens = Math.max(intent.maxTokens, 8192);
+      }
+    }
+
     // ── COUNCIL MODE — Multi-Model Consensus ───────────────────────────────
     // Fires when the frontend requests the LLM Council. Runs the 3-phase
     // pipeline (parallel queries → cross-examination → verdict) and streams
@@ -1829,7 +1850,7 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
           fullResponse += text;
           res.write(`data: ${JSON.stringify({ type: 'chunk', content: text })}\n\n`);
         },
-        onDone: (rawInputTokens: number, rawOutputTokens: number, meta?: { reasoningTokens?: number; searchQueries?: number }) => {
+        onDone: (rawInputTokens: number, rawOutputTokens: number, meta?: { reasoningTokens?: number; searchQueries?: number; finishReason?: string }) => {
           // Quality gate: strip any leading thinking preamble or meta-
           // commentary from the ASSEMBLED response before persisting.
           // This runs post-stream, so the user has already seen the
@@ -1842,6 +1863,20 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
           }
           if (isResponseIncomplete(fullResponse, intent.intent)) {
             logger.warn(`[stream] Response looks incomplete (intent=${intent.intent}, len=${fullResponse.length})`);
+          }
+
+          // Provider signaled the response was cut off at the token cap.
+          // Log it so we can tune maxTokens per-intent, and append a short
+          // note to the live stream so the user knows to ask for more.
+          const fr = (meta?.finishReason || '').toLowerCase();
+          const truncated = fr === 'length' || fr === 'max_tokens';
+          if (truncated) {
+            logger.warn(`[stream] Response truncated at max_tokens — user=${user.id} model=${finalModelId} intent=${intent.intent} maxTokens=${agentConfig?.maxTokens} outputTokens=${rawOutputTokens}`);
+            if (!streamEnded && !res.writableEnded) {
+              const note = '\n\n_[Response was cut short. Ask me to continue for more detail.]_';
+              fullResponse += note;
+              res.write(`data: ${JSON.stringify({ type: 'chunk', content: note })}\n\n`);
+            }
           }
 
           // Fire-and-forget the async post-processing
