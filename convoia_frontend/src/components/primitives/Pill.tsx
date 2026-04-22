@@ -1,4 +1,4 @@
-import { HTMLAttributes, ReactNode } from 'react'
+import type { HTMLAttributes, ReactNode } from 'react'
 
 interface PillProps extends HTMLAttributes<HTMLSpanElement> {
   variant?: 'default' | 'accent' | 'success' | 'warning' | 'error'

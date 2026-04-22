@@ -1,4 +1,4 @@
-import { CSSProperties } from 'react'
+import type { CSSProperties } from 'react'
 import { useAccent } from '../../contexts/AccentContext'
 import { PROVIDER_THEMES, getProviderFromModelId } from '../../config/providers'
 
