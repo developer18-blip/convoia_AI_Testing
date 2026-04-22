@@ -1,4 +1,6 @@
 import fs from 'fs'
+import path from 'path'
+import crypto from 'crypto'
 import axios from 'axios'
 import { Request, Response } from 'express'
 import { asyncHandler, AppError } from '../middleware/errorHandler.js'
@@ -11,6 +13,26 @@ import { config } from '../config/env.js'
 import logger from '../config/logger.js'
 import prisma from '../config/db.js'
 import { TOKEN_BASE_RATE, costAdjustedTokens } from '../config/tokenPackages.js'
+
+// Where persisted attachment previews live (served via express.static at /api/uploads/attachments)
+const ATTACHMENTS_DIR = path.join(process.cwd(), 'uploads', 'attachments')
+if (!fs.existsSync(ATTACHMENTS_DIR)) {
+  fs.mkdirSync(ATTACHMENTS_DIR, { recursive: true })
+}
+
+function classifyAttachmentType(mimetype: string, filename: string): string {
+  if (mimetype.startsWith('image/')) return 'image'
+  if (mimetype.startsWith('audio/')) return 'audio'
+  if (mimetype.startsWith('video/')) return 'video'
+  if (mimetype === 'application/pdf') return 'pdf'
+  if (mimetype.includes('wordprocessingml') || mimetype === 'application/msword') return 'docx'
+  if (mimetype.includes('spreadsheetml') || mimetype === 'application/vnd.ms-excel') return 'xlsx'
+  if (mimetype === 'text/csv' || filename.toLowerCase().endsWith('.csv')) return 'csv'
+  if (mimetype === 'text/plain') return 'text'
+  const ext = path.extname(filename).toLowerCase()
+  if (/^\.(js|ts|tsx|jsx|py|java|c|cpp|h|rs|go|rb|php|sh|sql|yml|yaml|json|md|css|html|xml)$/.test(ext)) return 'code'
+  return 'text'
+}
 
 // OCR scanned/image-based PDFs using AI vision models
 async function ocrPdfWithVision(filePath: string): Promise<string | null> {
@@ -480,4 +502,150 @@ export const generateImage = asyncHandler(async (req: Request, res: Response): P
     },
     timestamp: new Date().toISOString(),
   })
+})
+
+/**
+ * POST /api/files/attach
+ *
+ * New Phase-1 attachment endpoint: extracts file content, persists a
+ * ConversationAttachment row so the AI can reference the file across
+ * turns, and returns the attachmentId for the frontend to include in
+ * subsequent chat requests.
+ *
+ * Body (multipart/form-data):
+ *   file            — the uploaded file (required)
+ *   conversationId  — the target conversation id (required)
+ *
+ * Returns:
+ *   { attachmentId, fileName, fileType, fileSize, mimeType,
+ *     extractedCharCount, thumbnail? }
+ */
+export const attachFile = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw new AppError('Unauthorized', 401)
+  if (!req.file) throw new AppError('No file uploaded', 400)
+  const conversationId = typeof req.body.conversationId === 'string' ? req.body.conversationId : ''
+  if (!conversationId) {
+    FileProcessingService.cleanupFile(req.file.path)
+    throw new AppError('conversationId is required', 400)
+  }
+
+  const file = req.file
+  const fileType = classifyAttachmentType(file.mimetype, file.originalname)
+
+  // Ensure conversation exists + belongs to this user. Auto-create on
+  // first attach (draft conversations live in localStorage until the
+  // first message — but a file attached BEFORE typing still needs a
+  // conversation row to hang off).
+  try {
+    await prisma.conversation.upsert({
+      where: { id: conversationId },
+      create: { id: conversationId, userId: req.user.userId, title: 'New Chat' },
+      update: {},
+    })
+  } catch (err: any) {
+    FileProcessingService.cleanupFile(file.path)
+    logger.error(`attachFile conversation upsert failed: ${err.message}`)
+    throw new AppError('Could not prepare conversation for attachment', 500)
+  }
+
+  let extractedText = ''
+  let thumbnail: string | null = null
+
+  try {
+    // ── Extract text by type ─────────────────────────────────────────
+    if (fileType === 'pdf') {
+      try {
+        const { PDFParse } = await import('pdf-parse')
+        const dataBuffer = fs.readFileSync(file.path)
+        const parser = new PDFParse({ data: new Uint8Array(dataBuffer) })
+        const result = await parser.getText({ pageJoiner: '' })
+        await parser.destroy()
+        extractedText = result.text || ''
+      } catch (pdfErr: any) {
+        logger.warn(`PDF parse failed for ${file.originalname}: ${pdfErr.message}`)
+      }
+      // Garbled-output guard (mirrors legacy processFile logic)
+      if (extractedText.length > 0) {
+        const readableWords = (extractedText.match(/\b[a-zA-Z]{3,}\b/g) || []).length
+        const ratio = readableWords / Math.max(extractedText.length / 5, 1)
+        if (ratio < 0.1) extractedText = ''
+      }
+      // OCR fallback when text layer is empty
+      if (extractedText.trim().length < 50 && file.size > 1000) {
+        const ocr = await ocrPdfWithVision(file.path)
+        if (ocr) extractedText = ocr
+      }
+    } else if (fileType === 'docx') {
+      const mammoth = await import('mammoth')
+      const result = await mammoth.extractRawText({ path: file.path })
+      extractedText = result.value || ''
+    } else if (fileType === 'text' || fileType === 'code' || fileType === 'csv') {
+      extractedText = fs.readFileSync(file.path, 'utf-8')
+    } else if (fileType === 'audio') {
+      // Whisper transcription — same path as legacy endpoint
+      const OpenAIMod = (await import('openai')).default
+      const apiKey = process.env.OPENAI_API_KEY
+      if (!apiKey) {
+        throw new AppError('Audio transcription requires an OpenAI API key (Whisper).', 500)
+      }
+      const openai = new OpenAIMod({ apiKey })
+      const transcription = await openai.audio.transcriptions.create({
+        file: fs.createReadStream(file.path),
+        model: 'whisper-1',
+        response_format: 'text',
+      })
+      extractedText = (transcription as unknown as string) || ''
+    } else if (fileType === 'image') {
+      // Images: persist the original as a thumbnail the chip can render,
+      // leave extractedText null so the AI gateway knows to use vision
+      // on it via referenceImage when the user sends the turn.
+      const ext = path.extname(file.originalname).toLowerCase() || '.png'
+      const safeName = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${ext}`
+      const destPath = path.join(ATTACHMENTS_DIR, safeName)
+      fs.copyFileSync(file.path, destPath)
+      thumbnail = `/api/uploads/attachments/${safeName}`
+      extractedText = '' // vision pipeline consumes the image directly, not extracted text
+    }
+
+    // Cap stored text at 200K chars — prevents runaway DB rows on
+    // pathological uploads. Truncation is explicit so the prompt
+    // builder can warn the user if it matters.
+    const capped = (extractedText || '').slice(0, 200_000)
+
+    const attachment = await prisma.conversationAttachment.create({
+      data: {
+        conversationId,
+        userId: req.user.userId,
+        fileName: file.originalname,
+        fileType,
+        fileSize: file.size,
+        mimeType: file.mimetype,
+        extractedText: capped || null,
+        thumbnail,
+      },
+    })
+
+    logger.info(`Attachment saved: ${file.originalname} (${fileType}, ${capped.length} chars) conv=${conversationId}`)
+
+    res.json({
+      success: true,
+      data: {
+        attachmentId: attachment.id,
+        fileName: attachment.fileName,
+        fileType: attachment.fileType,
+        fileSize: attachment.fileSize,
+        mimeType: attachment.mimeType,
+        extractedCharCount: capped.length,
+        thumbnail: attachment.thumbnail,
+      },
+    })
+  } catch (err: any) {
+    if (err instanceof AppError) throw err
+    logger.error(`attachFile error for ${file.originalname}: ${err.message}`)
+    throw new AppError(err.message || 'Failed to process attachment', 500)
+  } finally {
+    // Temp upload always cleaned; persisted copy (for images) lives in
+    // uploads/attachments/ and survives independently.
+    FileProcessingService.cleanupFile(file.path)
+  }
 })

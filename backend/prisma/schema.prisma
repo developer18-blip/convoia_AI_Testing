@@ -78,22 +78,23 @@ model User {
   wallet             Wallet?
 
   // Enterprise features
-  tokenAllocationsGiven    TokenAllocation[]  @relation("AssignedBy")
-  tokenAllocationsReceived TokenAllocation[]  @relation("AssignedTo")
-  tasksCreated             Task[]             @relation("TaskCreator")
-  tasksAssigned            Task[]             @relation("TaskAssignee")
+  tokenAllocationsGiven    TokenAllocation[]        @relation("AssignedBy")
+  tokenAllocationsReceived TokenAllocation[]        @relation("AssignedTo")
+  tasksCreated             Task[]                   @relation("TaskCreator")
+  tasksAssigned            Task[]                   @relation("TaskAssignee")
   taskComments             TaskComment[]
   notifications            Notification[]
   agents                   Agent[]
-  invitesCreated           OrgInvite[]        @relation("InviteCreator")
-  invitesAccepted          OrgInvite[]        @relation("InviteAcceptor")
-  activityLogsAsActor      ActivityLog[]      @relation("ActivityActor")
-  activityLogsAsTarget     ActivityLog[]      @relation("ActivityTarget")
+  invitesCreated           OrgInvite[]              @relation("InviteCreator")
+  invitesAccepted          OrgInvite[]              @relation("InviteAcceptor")
+  activityLogsAsActor      ActivityLog[]            @relation("ActivityActor")
+  activityLogsAsTarget     ActivityLog[]            @relation("ActivityTarget")
   tokenPurchases           TokenPurchase[]
   tokenWallet              TokenWallet?
   tokenTransactions        TokenTransaction[]
   reviews                  Review[]
   conversations            Conversation[]
+  conversationAttachments  ConversationAttachment[]
   memories                 UserMemory[]
 
   // Autonomous agent relations
@@ -143,14 +144,14 @@ model AIModel {
   reasoningTokenPrice Float           @default(0)
   perQueryFee         Float           @default(0)
   markupPercentage    Float           @default(25)
-  capabilities     String[]
-  contextWindow    Int
-  isActive         Boolean         @default(true)
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  hourlySessions   HourlySession[]
-  usageLogs        UsageLog[]
-  agents           Agent[]
+  capabilities        String[]
+  contextWindow       Int
+  isActive            Boolean         @default(true)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  hourlySessions      HourlySession[]
+  usageLogs           UsageLog[]
+  agents              Agent[]
 
   @@index([provider])
   @@index([name])
@@ -576,25 +577,46 @@ model Review {
 }
 
 model Conversation {
-  id          String        @id @default(uuid())
+  id          String                   @id @default(uuid())
   userId      String
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title       String        @default("New Chat")
+  user        User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String                   @default("New Chat")
   modelId     String?
   modelName   String?
   agentId     String?
   industry    String?
-  isPinned    Boolean       @default(false)
+  isPinned    Boolean                  @default(false)
   folderId    String?
-  totalCost   Float         @default(0)
-  totalTokens Int           @default(0)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  totalCost   Float                    @default(0)
+  totalTokens Int                      @default(0)
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
   messages    ChatMessage[]
+  attachments ConversationAttachment[]
 
   @@index([userId])
   @@index([userId, updatedAt])
   @@index([createdAt])
+}
+
+model ConversationAttachment {
+  id             String   @id @default(cuid())
+  conversationId String
+  userId         String
+  fileName       String
+  fileType       String // 'pdf' | 'docx' | 'image' | 'audio' | 'xlsx' | 'csv' | 'code' | 'text'
+  fileSize       Int
+  mimeType       String
+  extractedText  String?  @db.Text // Full extracted content (null for images where analysis hasn't run)
+  s3Key          String? // Optional: original file kept in S3 for re-processing (Phase 2+)
+  thumbnail      String?  @db.Text // Base64 data URL for image previews in chips
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([userId, createdAt])
 }
 
 model ChatMessage {

@@ -505,6 +505,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         },
         body: JSON.stringify({
           modelId, messages: allMsgs, industry, agentId, thinkingEnabled,
+          // Scope attachment lookups to this conversation so prior files
+          // remain visible to the model across turns.
+          ...(activeId ? { conversationId: activeId } : {}),
           ...(lastImage ? { referenceImage: lastImage } : {}),
           ...(councilOpts ? { councilMode: true, councilModelIds: councilOpts.modelIds } : {}),
         }),
@@ -710,6 +713,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       timestamp: new Date().toISOString(),
       ...messageExtras,
     }
+    // Structured attachment ids (set by MessageInput once files are
+    // persisted server-side). Forwarded to /ai/query/stream so the
+    // backend can hydrate full file content for this turn AND future
+    // turns in the same conversation.
+    const attachmentIdsForRequest = messageExtras?.attachmentIds || userMsg.attachmentIds
     const assistantId = uuidv4()
     const streamingMsg: Message = {
       id: assistantId, role: 'assistant', content: '', timestamp: new Date().toISOString(), isLoading: true,
@@ -762,6 +770,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         },
         body: JSON.stringify({
           modelId, messages: messagesForAPI, industry, agentId, thinkingEnabled,
+          // Conversation scope for attachments — lets the backend load
+          // prior attachments for this conversation even if the user
+          // hasn't re-attached them in the current turn.
+          ...(activeId ? { conversationId: activeId } : {}),
+          ...(attachmentIdsForRequest && attachmentIdsForRequest.length > 0 ? { attachmentIds: attachmentIdsForRequest } : {}),
           ...(referenceImages.length === 1 ? { referenceImage: referenceImages[0] } : {}),
           ...(referenceImages.length > 1 ? { referenceImages } : {}),
           ...(councilOpts ? { councilMode: true, councilModelIds: councilOpts.modelIds } : {}),

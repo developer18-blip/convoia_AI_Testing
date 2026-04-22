@@ -174,6 +174,10 @@ export interface Message {
     type: 'image' | 'document' | 'audio' | 'video'
     size: number
   }
+  /** Structured attachment ids persisted server-side via /api/files/attach.
+   *  The backend resolves these to ConversationAttachment rows when the
+   *  message is sent, so the AI can read the file contents across turns. */
+  attachmentIds?: string[]
   statusText?: string
   webSearch?: {
     query: string

@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { ConversationList } from '../components/chat/ConversationList'
 import { MessageArea } from '../components/chat/MessageArea'
-import { MessageInput } from '../components/chat/MessageInput'
+import { MessageInput, type MessageInputHandle } from '../components/chat/MessageInput'
+import { DragDropOverlay } from '../components/chat/DragDropOverlay'
 import { CodeInterpreter } from '../components/chat/CodeInterpreter'
 import { CanvasPanel } from '../components/chat/CanvasPanel'
 // CostEstimator moved to more menu on desktop
@@ -54,6 +55,12 @@ export function ChatPage() {
   const navigate = useNavigate()
   const [codeInterpreter, setCodeInterpreter] = useState<{ code: string; language: string } | null>(null)
   const [voiceModeOpen, setVoiceModeOpen] = useState(false)
+
+  // Handle to the composer — lets DragDropOverlay push files into the staging area.
+  const messageInputRef = useRef<MessageInputHandle>(null)
+  const handleDroppedFiles = useCallback((files: File[]) => {
+    messageInputRef.current?.addFiles(files)
+  }, [])
 
   // Canvas state
   const [canvasItems, setCanvasItems] = useState<CanvasItem[]>([])
@@ -311,6 +318,7 @@ export function ChatPage() {
   const totalCost = messages.reduce((s, m) => s + (m.cost || 0), 0)
 
   return (
+    <DragDropOverlay onFilesDropped={handleDroppedFiles}>
     <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden', backgroundColor: 'var(--chat-bg)', color: 'var(--chat-text)', fontFamily: "'Inter', sans-serif" }}>
 
       {/* LEFT PANEL — Desktop sidebar */}
@@ -549,6 +557,8 @@ export function ChatPage() {
 
         {/* Input */}
         <MessageInput
+          ref={messageInputRef}
+          conversationId={activeConversationId || undefined}
           onSend={handleSend}
           isLoading={isStreaming}
           disabled={!hasTokens}
@@ -610,6 +620,7 @@ export function ChatPage() {
       )}
 
     </div>
+    </DragDropOverlay>
   )
 }
 

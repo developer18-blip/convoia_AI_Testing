@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express'
 import * as fs from 'fs'
-import { processFile, generateImage } from '../controllers/fileController.js'
+import { processFile, generateImage, attachFile } from '../controllers/fileController.js'
 import { jwtOrApiKey } from '../middleware/apiKeyAuth.js'
 import { uploadSingle } from '../middleware/uploadMiddleware.js'
 import {
@@ -57,8 +57,12 @@ router.get('/download/:fileId', (req: Request, res: Response) => {
 
 router.use(jwtOrApiKey)
 
-// Upload and process file
+// Upload and process file (legacy: one-shot image analysis, document extract)
 router.post('/upload', uploadSingle, processFile)
+
+// Attach file to a conversation — extracts + persists so the AI can
+// reference it across turns. Used by the new chip-strip UI.
+router.post('/attach', uploadSingle, attachFile)
 
 // Generate image
 router.post('/generate-image', generateImage)

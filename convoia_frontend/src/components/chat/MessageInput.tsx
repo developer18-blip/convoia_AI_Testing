@@ -1,17 +1,32 @@
-import { useState, useRef, useEffect, useMemo, type KeyboardEvent } from 'react'
-import { ArrowUp, Plus, Square, X, FileText, Music, Film, Link2 } from 'lucide-react'
+import { forwardRef, useImperativeHandle, useState, useRef, useEffect, useMemo, type KeyboardEvent } from 'react'
+import { ArrowUp, Plus, Square, X, Link2 } from 'lucide-react'
 import { VoiceInputButton } from './VoiceInputButton'
 import { ImageGenerationModal } from './ImageGenerationModal'
+import { AttachmentChip } from './AttachmentChip'
 
 interface AttachedFile {
   file: File
   type: 'image' | 'document' | 'audio' | 'video'
   preview?: string
+  /** Legacy path (images): base64 preview piped through as referenceImage. */
   extractedText?: string
   transcript?: string
   uploading: boolean
   uploaded: boolean
   error?: string
+  /** Set once the file is persisted as a ConversationAttachment in the backend. */
+  attachmentId?: string
+  /** 0-100 while uploading, undefined or 100 once complete. */
+  uploadProgress?: number
+  /** Classified file type returned by backend — used by AttachmentChip icon picker. */
+  attachmentKind?: string
+  /** Server-provided thumbnail URL for persisted images. */
+  serverThumbnail?: string
+}
+
+export interface MessageInputHandle {
+  /** Adds files to the staged list (used by DragDropOverlay). */
+  addFiles: (files: File[]) => void
 }
 
 export interface ImageGeneratedData {
@@ -41,14 +56,19 @@ interface MessageInputProps {
   onStop?: () => void
   onFileProcessed?: (data: FileProcessedData) => void
   onImageGenerated?: (data: ImageGeneratedData) => void
-  onSendWithContext?: (text: string, systemContext: string | null, extras?: { fileAttachment?: { name: string; type: 'image' | 'document' | 'audio' | 'video'; size: number }; imagePreview?: string; imagePreviews?: string[] }) => void
+  onSendWithContext?: (text: string, systemContext: string | null, extras?: { fileAttachment?: { name: string; type: 'image' | 'document' | 'audio' | 'video'; size: number }; imagePreview?: string; imagePreviews?: string[]; attachmentIds?: string[] }) => void
   onError?: (message: string) => void
   latestAIResponse?: string
+  /** Conversation id the uploaded files should be bound to. Required for
+   *  doc/audio/code attachments to persist via the new /files/attach
+   *  endpoint; when absent, non-image uploads fall back to the legacy
+   *  /files/upload path so this component stays usable elsewhere. */
+  conversationId?: string
 }
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
-export function MessageInput({
+export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(function MessageInput({
   onSend,
   isLoading,
   disabled,
@@ -61,7 +81,8 @@ export function MessageInput({
   onSendWithContext,
   onError: _onError,
   latestAIResponse,
-}: MessageInputProps) {
+  conversationId,
+}, ref) {
   void _selectedModelId; void _onFileProcessed; void _onError;
   const [value, setValue] = useState('')
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
@@ -78,6 +99,14 @@ export function MessageInput({
   }, [value])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Expose an imperative API so the surrounding DragDropOverlay can
+  // push files into the staging area without prop-drilling state.
+  useImperativeHandle(ref, () => ({
+    addFiles: (files: File[]) => {
+      files.forEach((f) => handleFileSelect(f))
+    },
+  }))
 
   const handleFileSelect = async (file: File) => {
     // Limit to 5 files max
@@ -107,11 +136,77 @@ export function MessageInput({
     setAttachedFiles(prev => [...prev, attached])
     setFileError(null)
 
-    if (type === 'document') preUploadDocumentAtIndex(file, attachedFiles.length)
-    if (type === 'audio') preUploadAudioAtIndex(file, attachedFiles.length)
+    // Images still flow through the existing base64 referenceImage path
+    // (one-shot vision analysis). Everything else persists as a
+    // structured ConversationAttachment via /files/attach.
+    if (type === 'document' || type === 'audio') {
+      uploadToAttach(file, attachedFiles.length)
+    }
   }
 
-  const preUploadDocumentAtIndex = async (file: File, idx: number) => {
+  /**
+   * Upload a file to the new /files/attach endpoint, which persists it
+   * as a ConversationAttachment the AI can reference across turns.
+   * Uses XHR (not fetch) so we can surface real upload progress in the
+   * chip. Routes document, audio, AND image files through here now —
+   * the server extracts/transcribes as appropriate and returns a
+   * stable attachmentId.
+   *
+   * Falls back to the legacy /files/upload flow (in-memory extractedText)
+   * only if conversationId is not provided.
+   */
+  const uploadToAttach = (file: File, idx: number) => {
+    if (!conversationId) {
+      // No conversation yet — legacy path still works via extractedText
+      // injection. Uncommon for the chat page, used by other mounts.
+      return legacyUpload(file, idx)
+    }
+    setAttachedFiles(prev => prev.map((f, i) => i === idx ? { ...f, uploading: true, uploadProgress: 0 } : f))
+
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('conversationId', conversationId)
+    const token = localStorage.getItem('convoia_token')
+
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `${API_URL}/files/attach`)
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+
+    xhr.upload.onprogress = (e) => {
+      if (!e.lengthComputable) return
+      const pct = Math.round((e.loaded / e.total) * 100)
+      setAttachedFiles(prev => prev.map((f, i) => i === idx ? { ...f, uploadProgress: pct } : f))
+    }
+    xhr.onerror = () => {
+      setAttachedFiles(prev => prev.map((f, i) => i === idx ? { ...f, uploading: false, error: 'Upload failed' } : f))
+    }
+    xhr.onload = () => {
+      try {
+        const data = JSON.parse(xhr.responseText || '{}')
+        if (xhr.status >= 200 && xhr.status < 300 && data.success && data.data?.attachmentId) {
+          setAttachedFiles(prev => prev.map((f, i) => i === idx ? {
+            ...f,
+            uploading: false,
+            uploaded: true,
+            uploadProgress: 100,
+            attachmentId: data.data.attachmentId,
+            attachmentKind: data.data.fileType,
+            serverThumbnail: data.data.thumbnail || undefined,
+          } : f))
+        } else {
+          const msg = data?.message || data?.data?.warning || `Upload failed (${xhr.status})`
+          setAttachedFiles(prev => prev.map((f, i) => i === idx ? { ...f, uploading: false, error: msg } : f))
+        }
+      } catch {
+        setAttachedFiles(prev => prev.map((f, i) => i === idx ? { ...f, uploading: false, error: 'Bad server response' } : f))
+      }
+    }
+    xhr.send(formData)
+  }
+
+  /** Legacy /files/upload path — returns extractedText/transcript in-memory.
+   *  Still used when conversationId isn't available. */
+  const legacyUpload = async (file: File, idx: number) => {
     setAttachedFiles(prev => prev.map((f, i) => i === idx ? { ...f, uploading: true } : f))
     try {
       const formData = new FormData()
@@ -123,36 +218,15 @@ export function MessageInput({
         body: formData,
       })
       const data = await res.json()
-      console.log('[PDF Upload] Response:', { success: data.success, textLength: data.data?.extractedText?.length, warning: data.data?.warning })
       if (data.success && data.data?.extractedText) {
         setAttachedFiles(prev => prev.map((f, i) => i === idx ? { ...f, uploading: false, uploaded: true, extractedText: data.data.extractedText } : f))
+      } else if (data.success && data.data?.transcript) {
+        setAttachedFiles(prev => prev.map((f, i) => i === idx ? { ...f, uploading: false, uploaded: true, transcript: data.data.transcript } : f))
       } else {
         setAttachedFiles(prev => prev.map((f, i) => i === idx ? { ...f, uploading: false, error: data.data?.warning || data.message || 'Failed to process' } : f))
       }
     } catch {
       setAttachedFiles(prev => prev.map((f, i) => i === idx ? { ...f, uploading: false, error: 'Failed to process' } : f))
-    }
-  }
-
-  const preUploadAudioAtIndex = async (file: File, idx: number) => {
-    setAttachedFiles(prev => prev.map((f, i) => i === idx ? { ...f, uploading: true } : f))
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const token = localStorage.getItem('convoia_token')
-      const res = await fetch(`${API_URL}/files/upload`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      })
-      const data = await res.json()
-      if (data.success && data.data.transcript) {
-        setAttachedFiles(prev => prev.map((f, i) => i === idx ? { ...f, uploading: false, uploaded: true, transcript: data.data.transcript } : f))
-      } else {
-        setAttachedFiles(prev => prev.map((f, i) => i === idx ? { ...f, uploading: false, error: 'Transcription failed' } : f))
-      }
-    } catch {
-      setAttachedFiles(prev => prev.map((f, i) => i === idx ? { ...f, uploading: false, error: 'Transcription failed' } : f))
     }
   }
 
@@ -170,38 +244,37 @@ export function MessageInput({
       const docs = attachedFiles.filter(f => f.type === 'document')
       const audios = attachedFiles.filter(f => f.type === 'audio')
 
-      // ── UNIFIED MULTI-FILE PATH ──
-      // ALL file combinations go through one path: images as base64, docs/audio as text context
-      // CRITICAL: Each document gets a NUMBERED boundary — never merged into one blob
-      const contextParts: string[] = []
+      // Structured attachment ids — the backend loads their content
+      // from ConversationAttachment and prepends it to the last user
+      // message before calling the model. The frontend no longer
+      // inlines the extracted text into the visible user bubble.
+      const attachmentIds = attachedFiles
+        .map(f => f.attachmentId)
+        .filter((id): id is string => !!id)
+
+      // Legacy fallback: if a file uploaded via the old extractedText
+      // path (no conversationId at the time), we still need to inline
+      // its content so the AI gets something useful this turn.
+      const legacyContextParts: string[] = []
+      let legacyIdx = 0
+      for (const f of [...docs, ...audios]) {
+        if (f.attachmentId) continue // already persisted server-side
+        const content = f.extractedText || f.transcript
+        if (content) {
+          legacyIdx++
+          legacyContextParts.push(`═══ DOCUMENT ${legacyIdx}: ${f.file.name} ═══\n${content}\n═══ END DOCUMENT ${legacyIdx} ═══`)
+        }
+      }
+      const legacyContext = legacyContextParts.length > 0 ? legacyContextParts.join('\n\n') : null
+
+      // Image previews (base64) continue on the referenceImage path —
+      // Phase 1 doesn't migrate image processing to structured attachments.
       const allImagePreviews: string[] = []
-      let docIndex = 0
-
-      // Collect document text — each as a clearly separated, numbered block
-      for (const doc of docs) {
-        if (doc.extractedText) {
-          docIndex++
-          const docName = doc.file.name.replace(/\.[^.]+$/, '') // strip extension
-          contextParts.push(`═══ DOCUMENT ${docIndex}: ${docName} ═══\n${doc.extractedText}\n═══ END DOCUMENT ${docIndex} ═══`)
-        }
-      }
-
-      // Collect audio transcripts
-      for (const audio of audios) {
-        if (audio.transcript) {
-          docIndex++
-          contextParts.push(`═══ DOCUMENT ${docIndex}: ${audio.file.name} (Audio Transcript) ═══\n${audio.transcript}\n═══ END DOCUMENT ${docIndex} ═══`)
-        }
-      }
-
-      // Collect image previews (base64)
       for (const img of images) {
         if (img.preview) allImagePreviews.push(img.preview)
       }
 
-      // Build the message with clear document boundaries
-      const combinedContext = contextParts.length > 0 ? contextParts.join('\n\n') : null
-      const totalFiles = images.length + docs.length + audios.length
+      const totalFiles = attachedFiles.length
       const defaultQuestion = totalFiles > 1
         ? `Analyze these ${totalFiles} files`
         : images.length === 1 ? 'Analyze this image'
@@ -209,33 +282,26 @@ export function MessageInput({
         : 'Analyze this file'
       const question = value.trim() || defaultQuestion
 
-      // Build file attachment info
       const allFileNames = attachedFiles.map(f => f.file.name).join(', ')
       const totalSize = attachedFiles.reduce((s, f) => s + f.file.size, 0)
       const primaryType = images.length > 0 ? 'image' as const : 'document' as const
 
       if (onSendWithContext) {
-        // Multi-file instruction — tells the model how many documents and what to do
-        const multiFileInstruction = totalFiles > 1
-          ? `\n\n[${totalFiles} files attached: ${images.length > 0 ? `${images.length} image(s)` : ''}${docs.length > 0 ? `${images.length > 0 ? ', ' : ''}${docs.length} document(s)` : ''}${audios.length > 0 ? `${(images.length + docs.length) > 0 ? ', ' : ''}${audios.length} audio file(s)` : ''}]`
-          : ''
-
-        // Add multi-document system instruction when 2+ documents present
-        const multiDocInstruction = docIndex >= 2
-          ? `\n\nYou have received ${docIndex} separate documents. Treat each document independently — they are NOT one combined document. Always refer to them by their document number and name. When comparing, analyze each document first, then identify differences and similarities.`
-          : ''
-
+        // Only include legacy context as systemContext; attachmentIds
+        // drive server-side context for the new path.
+        const visibleText = legacyContext ? `${question}\n\n${legacyContext}` : question
         onSendWithContext(
-          combinedContext ? `${question}${multiFileInstruction}${multiDocInstruction}\n\n${combinedContext}` : `${question}${multiFileInstruction}`,
+          visibleText,
           null,
           {
             fileAttachment: { name: allFileNames, type: primaryType, size: totalSize },
             imagePreview: allImagePreviews[0],
             imagePreviews: allImagePreviews.length > 1 ? allImagePreviews : undefined,
+            attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
           },
         )
-      } else if (combinedContext) {
-        onSend(`${question}\n\n${combinedContext}`)
+      } else if (legacyContext) {
+        onSend(`${question}\n\n${legacyContext}`)
       } else if (value.trim()) {
         onSend(value.trim())
       }
@@ -329,48 +395,35 @@ export function MessageInput({
         }}
         >
 
-          {/* File previews — multiple files */}
+          {/* File chip strip — uses AttachmentChip for consistent UX
+              (thumbnails for images, type icons for docs/audio, upload
+              progress bar along the chip's bottom edge, error state). */}
           {attachedFiles.length > 0 && (
             <div style={{ padding: '12px 16px 0', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {attachedFiles.map((af, idx) => (
-                <div key={idx} className="file-chip">
-                  {af.type === 'image' && af.preview && (
-                    <div className="relative inline-block">
-                      <img src={af.preview} alt={`Attached file ${idx + 1}`} style={{ height: '70px', width: 'auto', borderRadius: '10px', border: '1px solid var(--chat-border)', objectFit: 'cover' }} />
-                      <button onClick={() => removeFile(idx)} className="absolute flex items-center justify-center"
-                        style={{ top: '-6px', right: '-6px', width: '20px', height: '20px', borderRadius: '50%', background: 'var(--chat-border)', border: '1px solid var(--color-border-hover)', color: 'var(--chat-text-secondary)', cursor: 'pointer' }}>
-                        <X size={10} />
-                      </button>
-                    </div>
-                  )}
-                  {af.type === 'document' && (
-                    <div className="inline-flex items-center gap-2" style={{ background: 'var(--chat-border)', border: '1px solid var(--color-border-hover)', borderRadius: '10px', padding: '5px 10px', fontSize: '12px' }}>
-                      <FileText size={13} style={{ color: '#3B82F6' }} />
-                      <span className="truncate" style={{ maxWidth: '120px', color: 'var(--chat-text)' }}>{af.file.name}</span>
-                      {af.uploading && <div style={{ width: '12px', height: '12px', border: '1.5px solid var(--color-primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin-slow 1s linear infinite' }} />}
-                      {af.uploaded && <span style={{ color: '#10B981', fontSize: '10px' }}>Ready</span>}
-                      {af.error && <span style={{ color: '#EF4444', fontSize: '10px' }}>Error</span>}
-                      {!af.uploading && <button onClick={() => removeFile(idx)} style={{ color: 'var(--chat-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}><X size={11} /></button>}
-                    </div>
-                  )}
-                  {af.type === 'audio' && (
-                    <div className="inline-flex items-center gap-2" style={{ background: 'var(--chat-border)', border: '1px solid var(--color-border-hover)', borderRadius: '10px', padding: '5px 10px', fontSize: '12px' }}>
-                      <Music size={13} style={{ color: '#10B981' }} />
-                      <span className="truncate" style={{ maxWidth: '120px', color: 'var(--chat-text)' }}>{af.file.name}</span>
-                      {af.uploading && <div style={{ width: '12px', height: '12px', border: '1.5px solid var(--color-primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin-slow 1s linear infinite' }} />}
-                      {af.uploaded && <span style={{ color: '#10B981', fontSize: '10px' }}>Ready</span>}
-                      {!af.uploading && <button onClick={() => removeFile(idx)} style={{ color: 'var(--chat-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}><X size={11} /></button>}
-                    </div>
-                  )}
-                  {af.type === 'video' && (
-                    <div className="inline-flex items-center gap-2" style={{ background: 'var(--chat-border)', border: '1px solid var(--color-border-hover)', borderRadius: '10px', padding: '5px 10px', fontSize: '12px' }}>
-                      <Film size={13} style={{ color: 'var(--color-primary)' }} />
-                      <span className="truncate" style={{ maxWidth: '120px', color: 'var(--chat-text)' }}>{af.file.name}</span>
-                      <button onClick={() => removeFile(idx)} style={{ color: 'var(--chat-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}><X size={11} /></button>
-                    </div>
-                  )}
-                </div>
-              ))}
+              {attachedFiles.map((af, idx) => {
+                const chipKind =
+                  af.attachmentKind ||
+                  (af.type === 'image' ? 'image'
+                    : af.type === 'audio' ? 'audio'
+                    : af.type === 'video' ? 'video'
+                    : af.file.type === 'application/pdf' ? 'pdf'
+                    : af.file.type.includes('wordprocessingml') || af.file.type === 'application/msword' ? 'docx'
+                    : 'document')
+                return (
+                  <AttachmentChip
+                    key={idx}
+                    attachment={{
+                      fileName: af.file.name,
+                      fileType: chipKind,
+                      fileSize: af.file.size,
+                      uploadProgress: af.uploading ? (af.uploadProgress ?? 0) : (af.uploaded ? 100 : undefined),
+                      thumbnail: af.preview || af.serverThumbnail,
+                      error: af.error,
+                    }}
+                    onRemove={() => removeFile(idx)}
+                  />
+                )
+              })}
             </div>
           )}
 
@@ -383,13 +436,18 @@ export function MessageInput({
             onPaste={(e) => {
               const items = e.clipboardData?.items
               if (!items) return
+              // Accept ANY pasted file (image, PDF, doc, audio) — not
+              // just images. Matches Claude/ChatGPT clipboard UX.
+              const filesPasted: File[] = []
               for (const item of Array.from(items)) {
-                if (item.type.startsWith('image/')) {
-                  e.preventDefault()
-                  const file = item.getAsFile()
-                  if (file) handleFileSelect(file)
-                  return
+                if (item.kind === 'file') {
+                  const f = item.getAsFile()
+                  if (f) filesPasted.push(f)
                 }
+              }
+              if (filesPasted.length > 0) {
+                e.preventDefault()
+                filesPasted.forEach(f => handleFileSelect(f))
               }
             }}
             onFocus={() => setInputFocused(true)}
@@ -514,4 +572,4 @@ export function MessageInput({
       />
     </div>
   )
-}
+})

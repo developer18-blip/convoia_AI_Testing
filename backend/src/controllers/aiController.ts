@@ -262,6 +262,8 @@ export const queryAIStream = async (req: Request, res: Response) => {
       return;
     }
     const { modelId, messages, industry, agentId, thinkingEnabled, referenceImage, referenceImages } = req.body;
+    const conversationId: string | undefined = typeof req.body.conversationId === 'string' ? req.body.conversationId : undefined;
+    const attachmentIds: string[] = Array.isArray(req.body.attachmentIds) ? req.body.attachmentIds.filter((x: any) => typeof x === 'string') : [];
     const isAutoMode = modelId === 'auto';
     // Debug: log multi-file info
     if (referenceImages?.length > 0 || referenceImage) {
@@ -383,6 +385,68 @@ export const queryAIStream = async (req: Request, res: Response) => {
     // short message, not the URL-enriched version (which can be 15K+ chars).
     const latestUserMsg = [...messages].reverse().find((m: any) => m.role === 'user');
     const latestUserText = typeof latestUserMsg?.content === 'string' ? latestUserMsg.content : '';
+
+    // ── STRUCTURED ATTACHMENTS (Phase 1 replacement for marker hack) ──
+    // Load ConversationAttachment rows so the AI can reference files
+    // across turns. Attachment content is prepended to the last user
+    // message so it flows through every model's context window
+    // uniformly — identical to how the old "Here is the attached
+    // document content:" string was built, but now sourced from DB
+    // instead of being embedded by the frontend.
+    let attachmentsLoaded: Array<{ id: string; fileName: string; fileType: string; fileSize: number; extractedText: string | null; createdAt: Date }> = [];
+    let attachmentContextBlock = '';
+    if (conversationId) {
+      try {
+        const allAttachments = await prisma.conversationAttachment.findMany({
+          where: { conversationId, userId: req.user!.userId },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true, fileName: true, fileType: true, fileSize: true, extractedText: true, createdAt: true },
+        });
+        attachmentsLoaded = allAttachments;
+        if (allAttachments.length > 0) {
+          const currentSet = new Set(attachmentIds);
+          const current = allAttachments.filter(a => currentSet.has(a.id));
+          const prior = allAttachments.filter(a => !currentSet.has(a.id));
+
+          const parts: string[] = [];
+          if (current.length > 0) {
+            parts.push('=== FILES ATTACHED TO THIS MESSAGE ===');
+            for (const att of current) {
+              parts.push(`\n--- ${att.fileName} (${att.fileType}, ${(att.fileSize / 1024).toFixed(1)}KB) ---`);
+              parts.push(att.extractedText || '[binary file — no extractable text; reference by name]');
+            }
+          }
+          if (prior.length > 0) {
+            parts.push((current.length > 0 ? '\n\n' : '') + '=== PREVIOUSLY ATTACHED FILES (earlier in conversation) ===');
+            for (const att of prior) {
+              parts.push(`\n--- ${att.fileName} (${att.fileType}) ---`);
+              // Older files capped to 2000 chars to save tokens; current message gets the full text.
+              const preview = (att.extractedText || '').slice(0, 2000);
+              const didTruncate = (att.extractedText || '').length > 2000;
+              parts.push(preview + (didTruncate ? '\n[...truncated — ask to re-read for full text]' : ''));
+            }
+          }
+          if (parts.length > 0) {
+            attachmentContextBlock = parts.join('\n') + '\n\n---\n\n';
+            logger.info(`Attachments loaded: ${current.length} current + ${prior.length} prior = ${attachmentContextBlock.length} chars in context`);
+          }
+        }
+      } catch (err: any) {
+        logger.warn(`Attachment load failed (conv=${conversationId}): ${err.message}`);
+      }
+    }
+
+    // Inject the attachment context into the last user message. The AI
+    // model sees attachments as part of the user turn (same pattern as
+    // the legacy marker), but the content is server-controlled and
+    // type-safe now.
+    if (attachmentContextBlock && latestUserMsg) {
+      const msgIndex = messages.lastIndexOf(latestUserMsg);
+      if (msgIndex >= 0) {
+        const originalText = typeof messages[msgIndex].content === 'string' ? messages[msgIndex].content : '';
+        messages[msgIndex] = { ...messages[msgIndex], content: attachmentContextBlock + originalText };
+      }
+    }
 
     // ── URL FETCH — enrich messages with fetched page content ──
     const lastMsgForUrl = latestUserMsg;
@@ -545,7 +609,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
     const route = await smartRoute({
       message: lastUserText,
       hasImageAttachment: !!referenceImage || (referenceImages && referenceImages.length > 0),
-      hasDocumentContext: lastUserText.includes('Here is the attached document content:'),
+      hasDocumentContext: attachmentsLoaded.length > 0,
       agentId,
       conversationMessages: cappedMessages,
       prisma,
@@ -888,11 +952,13 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
     // Web search: check if the latest user message needs real-time data
     const lastUserMsg = [...cappedMessages].reverse().find((m: any) => m.role === 'user');
     const rawUserContent = typeof lastUserMsg?.content === 'string' ? lastUserMsg.content : '';
-    // Extract actual user question if document context is embedded
-    const docSeparator = '---\n\nUser question: ';
-    const hasDocContext = rawUserContent.includes('Here is the attached document content:');
-    const userQuery = hasDocContext && rawUserContent.includes(docSeparator)
-      ? rawUserContent.split(docSeparator).pop()?.trim() || rawUserContent
+    // Phase 1: hasDocContext comes from the ConversationAttachment table,
+    // not a string marker. Strip the attachment context block off the
+    // raw content to recover the user's actual question for intent /
+    // routing / search-decision logic.
+    const hasDocContext = attachmentsLoaded.length > 0;
+    const userQuery = attachmentContextBlock && rawUserContent.startsWith(attachmentContextBlock)
+      ? rawUserContent.slice(attachmentContextBlock.length).trim()
       : rawUserContent;
     let enrichedMessages = cappedMessages;
 
