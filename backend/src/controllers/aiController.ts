@@ -1080,7 +1080,9 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
     // The AI model produces structured JSON; a Python script turns that into
     // a real file; the file ships to S3 with a pre-signed download URL.
     // Billed at 30% markup (vs the standard 25%) to cover file-gen compute.
-    const fileIntent: FileIntent | null = detectFileIntent(latestUserText);
+    const fileIntent: FileIntent | null = await detectFileIntent(latestUserText, {
+      hasUploadedFiles: hasDocContext,
+    });
     if (fileIntent) {
       logger.info(`File generation detected: ${fileIntent.format} — "${latestUserText.substring(0, 80)}"`);
 
