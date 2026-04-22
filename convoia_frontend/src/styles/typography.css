@@ -59,8 +59,20 @@
   font-size: var(--text-micro);
   text-transform: uppercase;
   letter-spacing: var(--ls-mono-upper);
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   font-weight: var(--weight-medium);
+}
+
+/* Section divider heading — mono + accent uppercase. Linear/Vercel pattern.
+   Use for top-level section breaks instead of heavy h2s. */
+.section-heading {
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: var(--weight-medium);
+  margin-bottom: var(--space-4);
 }
 
 .mono-value {
