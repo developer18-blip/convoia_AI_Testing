@@ -1,0 +1,70 @@
+/* Type utility classes */
+
+.text-display {
+  font-size: var(--text-display);
+  font-weight: var(--weight-semibold);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--ls-display);
+}
+
+.text-h1 {
+  font-size: var(--text-h1);
+  font-weight: var(--weight-semibold);
+  line-height: var(--lh-heading);
+  letter-spacing: var(--ls-heading);
+}
+
+.text-h2 {
+  font-size: var(--text-h2);
+  font-weight: var(--weight-semibold);
+  line-height: var(--lh-heading);
+  letter-spacing: var(--ls-heading);
+}
+
+.text-h3 {
+  font-size: var(--text-h3);
+  font-weight: var(--weight-semibold);
+  line-height: var(--lh-h3);
+}
+
+.text-body-lg {
+  font-size: var(--text-body-lg);
+  line-height: var(--lh-body);
+}
+
+.text-body {
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+}
+
+.text-body-sm {
+  font-size: var(--text-body-sm);
+  line-height: var(--lh-caption);
+}
+
+.text-caption {
+  font-size: var(--text-caption);
+  line-height: var(--lh-caption);
+  color: var(--text-tertiary);
+}
+
+.text-micro {
+  font-size: var(--text-micro);
+  line-height: var(--lh-micro);
+  color: var(--text-muted);
+}
+
+.mono-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  text-transform: uppercase;
+  letter-spacing: var(--ls-mono-upper);
+  color: var(--text-tertiary);
+  font-weight: var(--weight-medium);
+}
+
+.mono-value {
+  font-family: var(--font-mono);
+  font-feature-settings: 'tnum' 1, 'zero' 1;
+  font-weight: var(--weight-medium);
+}
