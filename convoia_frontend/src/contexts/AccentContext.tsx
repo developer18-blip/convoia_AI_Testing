@@ -1,5 +1,7 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import { getThemeForModel, ProviderTheme, PROVIDER_THEMES, getProviderFromModelId } from '../config/providers'
+import { createContext, useContext, useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
+import { getThemeForModel, PROVIDER_THEMES, getProviderFromModelId } from '../config/providers'
+import type { ProviderTheme } from '../config/providers'
 
 interface AccentContextValue {
   activeModelId: string

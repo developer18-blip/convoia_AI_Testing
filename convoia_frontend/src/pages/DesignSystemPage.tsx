@@ -8,7 +8,8 @@ import { SignalLine } from '../components/primitives/SignalLine'
 import { ComputationLine } from '../components/primitives/ComputationLine'
 import { Metric } from '../components/primitives/Metric'
 import { useAccent } from '../contexts/AccentContext'
-import { PROVIDER_THEMES, getProviderFromModelId, ProviderKey } from '../config/providers'
+import { PROVIDER_THEMES, getProviderFromModelId } from '../config/providers'
+import type { ProviderKey } from '../config/providers'
 
 const SAMPLE_MODEL_BY_PROVIDER: Record<ProviderKey, string> = {
   anthropic: 'claude-opus-4-6',
