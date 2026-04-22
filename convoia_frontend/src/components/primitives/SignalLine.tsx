@@ -1,3 +1,8 @@
-export function SignalLine({ className = '' }: { className?: string }) {
-  return <div className={`signal-line ${className}`} />
+interface SignalLineProps {
+  className?: string
+  council?: boolean
+}
+
+export function SignalLine({ className = '', council = false }: SignalLineProps) {
+  return <div className={`signal-line ${council ? 'signal-line--council' : ''} ${className}`} />
 }

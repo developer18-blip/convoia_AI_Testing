@@ -134,12 +134,14 @@
   --border-strong: rgba(0, 0, 0, 0.12);
   --border-focus: var(--accent-600);
 
-  --accent: var(--accent-600);
-  --accent-hover: var(--accent-700);
-  --accent-soft: rgba(8, 145, 178, 0.08);
-  --accent-border: rgba(8, 145, 178, 0.25);
-  --accent-glow: rgba(8, 145, 178, 0.15);
-  --accent-on: #FAFAFA;
+  /* Accent resolves via AccentContext-set provider vars, falling back to
+     the static Intellect turquoise when no provider is active. */
+  --accent: var(--provider-light, var(--accent-600));
+  --accent-hover: var(--provider-hover, var(--accent-700));
+  --accent-soft: var(--provider-soft, rgba(8, 145, 178, 0.08));
+  --accent-border: var(--provider-border, rgba(8, 145, 178, 0.25));
+  --accent-glow: var(--provider-glow, rgba(8, 145, 178, 0.15));
+  --accent-on: var(--provider-on, #FAFAFA);
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.04);
@@ -173,12 +175,13 @@
   --border-strong: rgba(255, 255, 255, 0.12);
   --border-focus: var(--accent-500);
 
-  --accent: var(--accent-500);
-  --accent-hover: var(--accent-400);
-  --accent-soft: rgba(20, 184, 205, 0.1);
-  --accent-border: rgba(20, 184, 205, 0.3);
-  --accent-glow: rgba(20, 184, 205, 0.2);
-  --accent-on: #0A0A0F;
+  /* Dark mode uses the provider's "primary" shade (brighter variant). */
+  --accent: var(--provider-primary, var(--accent-500));
+  --accent-hover: var(--provider-hover, var(--accent-400));
+  --accent-soft: var(--provider-soft, rgba(20, 184, 205, 0.1));
+  --accent-border: var(--provider-border, rgba(20, 184, 205, 0.3));
+  --accent-glow: var(--provider-glow, rgba(20, 184, 205, 0.2));
+  --accent-on: var(--provider-on, #0A0A0F);
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
@@ -209,4 +212,45 @@
 [data-theme] ::selection {
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+/* ─── Accent transition (smooth color swap on model change) ─── */
+:root {
+  --accent-transition:
+    color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    fill 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    stroke 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn--primary,
+.btn--outline,
+.pill--accent,
+.input-field__wrap:focus-within,
+.metric__value--accent,
+.intellect-mark__nodes circle,
+.intellect-mark__lines line,
+.signal-line,
+.comp-line__pulse,
+.card--accent,
+.section-heading {
+  transition: var(--accent-transition);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn--primary,
+  .btn--outline,
+  .pill--accent,
+  .input-field__wrap:focus-within,
+  .metric__value--accent,
+  .intellect-mark__nodes circle,
+  .intellect-mark__lines line,
+  .signal-line,
+  .comp-line__pulse,
+  .card--accent,
+  .section-heading {
+    transition: none;
+  }
 }

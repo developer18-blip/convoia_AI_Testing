@@ -12,6 +12,7 @@ import '@fontsource/geist-sans/600.css'
 import '@fontsource/geist-mono/400.css'
 import '@fontsource/geist-mono/500.css'
 import App from './App.tsx'
+import { AccentProvider } from './contexts/AccentContext'
 import { initNativeBridge } from './lib/capacitor'
 import { initStorageCache } from './lib/storage'
 
@@ -30,6 +31,8 @@ initNativeBridge()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <AccentProvider>
+      <App />
+    </AccentProvider>
   </StrictMode>,
 )

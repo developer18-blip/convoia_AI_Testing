@@ -7,9 +7,26 @@ import { Pill } from '../components/primitives/Pill'
 import { SignalLine } from '../components/primitives/SignalLine'
 import { ComputationLine } from '../components/primitives/ComputationLine'
 import { Metric } from '../components/primitives/Metric'
+import { useAccent } from '../contexts/AccentContext'
+import { PROVIDER_THEMES, getProviderFromModelId, ProviderKey } from '../config/providers'
+
+const SAMPLE_MODEL_BY_PROVIDER: Record<ProviderKey, string> = {
+  anthropic: 'claude-opus-4-6',
+  openai: 'gpt-5.4',
+  google: 'gemini-3.1-pro',
+  xai: 'grok-4',
+  deepseek: 'deepseek-chat',
+  mistral: 'mistral-large-latest',
+  meta: 'llama-4',
+  cohere: 'command-r-plus',
+  perplexity: 'sonar-large',
+  default: 'intellect-default',
+}
 
 export default function DesignSystemPage() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
+  const { setActiveModel, activeModelId, theme: providerTheme } = useAccent()
+  const activeProviderKey = getProviderFromModelId(activeModelId)
 
   return (
     <div data-theme={theme} style={{ minHeight: '100vh', padding: '40px', background: 'var(--surface-0)', color: 'var(--text-primary)' }}>
@@ -30,6 +47,51 @@ export default function DesignSystemPage() {
         </header>
 
         <SignalLine />
+
+        <section>
+          <div className="section-heading">Dynamic Provider Accents</div>
+          <p className="text-body-sm" style={{ marginBottom: 16, color: 'var(--text-secondary)' }}>
+            Click any provider — the entire UI adopts that brand color. Live preview:
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 16 }}>
+            {(Object.entries(PROVIDER_THEMES) as [ProviderKey, typeof PROVIDER_THEMES[ProviderKey]][]).map(([key, pt]) => {
+              const isActive = activeProviderKey === key
+              return (
+                <button
+                  key={key}
+                  onClick={() => setActiveModel(SAMPLE_MODEL_BY_PROVIDER[key])}
+                  style={{
+                    all: 'unset',
+                    cursor: 'pointer',
+                    padding: 12,
+                    borderRadius: 'var(--radius-md)',
+                    border: `0.5px solid ${isActive ? pt.border : 'var(--border-default)'}`,
+                    background: isActive ? pt.soft : 'var(--surface-1)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: pt.primary }} />
+                    <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)' }}>{pt.name}</div>
+                  </div>
+                  <div className="mono-label" style={{ fontSize: 9 }}>{pt.primary}</div>
+                </button>
+              )
+            })}
+          </div>
+          <div style={{ padding: 16, border: '0.5px solid var(--border-default)', borderRadius: 'var(--radius-md)', background: 'var(--surface-2)' }}>
+            <div className="mono-label" style={{ marginBottom: 8 }}>CURRENT ACCENT</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--accent)' }} />
+              <div>
+                <div className="text-body" style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{providerTheme.name}</div>
+                <div className="mono-label">{activeModelId}</div>
+              </div>
+            </div>
+          </div>
+        </section>
 
         <section>
           <div className="section-heading">Typography</div>
