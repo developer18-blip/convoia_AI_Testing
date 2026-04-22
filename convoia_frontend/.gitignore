@@ -32,3 +32,9 @@ ios/DerivedData
 *.njsproj
 *.sln
 *.sw?
+
+# Local environment overrides (per-host secrets — never commit)
+.env
+.env.local
+.env.production
+.env.development
