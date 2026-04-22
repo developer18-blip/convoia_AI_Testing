@@ -32,7 +32,7 @@ export default function DesignSystemPage() {
         <SignalLine />
 
         <section>
-          <h2 className="text-h3" style={{ marginBottom: 16 }}>Typography</h2>
+          <div className="section-heading">Typography</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div className="text-display">Display 48px</div>
             <div className="text-h1">Heading 1 — 32px</div>
@@ -48,7 +48,7 @@ export default function DesignSystemPage() {
         </section>
 
         <section>
-          <h2 className="text-h3" style={{ marginBottom: 16 }}>Accent — Turquoise</h2>
+          <div className="section-heading">Accent — Turquoise</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {[50, 100, 200, 300, 400, 500, 600, 700, 800, 900].map(stop => (
               <div key={stop} style={{ textAlign: 'center' }}>
@@ -60,7 +60,7 @@ export default function DesignSystemPage() {
         </section>
 
         <section>
-          <h2 className="text-h3" style={{ marginBottom: 16 }}>Intellect Mark — states</h2>
+          <div className="section-heading">Intellect Mark — states</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
             {(['idle', 'thinking', 'streaming', 'council'] as const).map(state => (
               <Card key={state} padding="md" style={{ textAlign: 'center' }}>
@@ -72,7 +72,7 @@ export default function DesignSystemPage() {
         </section>
 
         <section>
-          <h2 className="text-h3" style={{ marginBottom: 16 }}>Buttons</h2>
+          <div className="section-heading">Buttons</div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
             <Button variant="primary">Primary</Button>
             <Button variant="secondary">Secondary</Button>
@@ -88,7 +88,7 @@ export default function DesignSystemPage() {
         </section>
 
         <section>
-          <h2 className="text-h3" style={{ marginBottom: 16 }}>Inputs</h2>
+          <div className="section-heading">Inputs</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <Input label="Email" placeholder="you@example.com" />
             <Input label="API Key" placeholder="sk-..." mono />
@@ -98,7 +98,7 @@ export default function DesignSystemPage() {
         </section>
 
         <section>
-          <h2 className="text-h3" style={{ marginBottom: 16 }}>Pills</h2>
+          <div className="section-heading">Pills</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Pill>Default</Pill>
             <Pill variant="accent">⚡ Council</Pill>
@@ -111,7 +111,7 @@ export default function DesignSystemPage() {
         </section>
 
         <section>
-          <h2 className="text-h3" style={{ marginBottom: 16 }}>Metrics</h2>
+          <div className="section-heading">Metrics</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
             <Metric label="Tokens" value="24,300" />
             <Metric label="Cost" value="$0.06" sublabel="per query" accent />
@@ -121,14 +121,14 @@ export default function DesignSystemPage() {
         </section>
 
         <section>
-          <h2 className="text-h3" style={{ marginBottom: 16 }}>Computation Line</h2>
+          <div className="section-heading">Computation Line</div>
           <Card padding="md">
             <ComputationLine label="STREAMING · 847/MAX TOKENS" />
           </Card>
         </section>
 
         <section>
-          <h2 className="text-h3" style={{ marginBottom: 16 }}>Cards</h2>
+          <div className="section-heading">Cards</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
             <Card padding="md">
               <div className="text-body" style={{ fontWeight: 500 }}>Default card</div>
@@ -146,7 +146,7 @@ export default function DesignSystemPage() {
         </section>
 
         <section>
-          <h2 className="text-h3" style={{ marginBottom: 16 }}>Grain Surface</h2>
+          <div className="section-heading">Grain Surface</div>
           <div className="grain-surface" style={{
             padding: 40,
             background: 'var(--surface-1)',
