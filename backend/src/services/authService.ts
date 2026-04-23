@@ -396,8 +396,8 @@ export class AuthService {
     }
   }
 
-  static async login(data: LoginRequest): Promise<AuthResponse> {
-    const { email, password } = data;
+  static async login(data: LoginRequest & { rememberMe?: boolean }): Promise<AuthResponse> {
+    const { email, password, rememberMe } = data;
 
     try {
       const user = await prisma.user.findUnique({
@@ -428,16 +428,18 @@ export class AuthService {
         await prisma.user.update({ where: { id: user.id }, data: { isVerified: true } });
       }
 
-      logger.info(`User logged in: ${user.email}`);
+      logger.info(`User logged in: ${user.email}${rememberMe ? ' (rememberMe)' : ''}`);
 
       // Send login notification (fire and forget)
       NotificationService.onLogin(user.id, user.name).catch(() => {});
 
+      // Honor "Remember me": 30d access token when checked, 24h otherwise.
+      const accessExpiry = rememberMe ? '30d' : '24h';
       const token = generateToken({
         userId: user.id,
         organizationId: user.organizationId || undefined,
         role: user.role,
-      });
+      }, accessExpiry);
 
       const refreshToken = generateRefreshToken({
         userId: user.id,

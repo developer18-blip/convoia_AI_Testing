@@ -60,7 +60,7 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const login = asyncHandler(async (req: Request, res: Response) => {
-  const { email, password } = req.body as LoginRequest;
+  const { email, password, rememberMe } = req.body as LoginRequest & { rememberMe?: boolean };
 
   if (!email || !password) {
     throw new AppError('Email and password are required', 400);
@@ -74,6 +74,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   const result = await AuthService.login({
     email: sanitizedEmail,
     password,
+    rememberMe: Boolean(rememberMe),
   });
 
   res.json({

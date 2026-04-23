@@ -4,11 +4,12 @@ import { config } from '../config/env.js';
 import { JWTPayload } from '../middleware/authMiddleware.js';
 
 /**
- * Generate short-lived access token (15min default)
+ * Generate short-lived access token (config.jwtExpire by default).
+ * Pass `expiresIn` to override — used by login to honor "Remember me".
  */
-export const generateToken = (payload: JWTPayload): string => {
+export const generateToken = (payload: JWTPayload, expiresIn?: string): string => {
   return jwt.sign(payload, config.jwtSecret, {
-    expiresIn: config.jwtExpire,
+    expiresIn: (expiresIn || config.jwtExpire) as any,
   });
 };
 
