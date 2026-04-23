@@ -13,7 +13,7 @@ import api from '../../lib/api'
 const features = [
   { icon: Brain, label: '35+ AI Models', desc: 'GPT, Claude, Gemini & more' },
   { icon: Globe, label: 'Web Search', desc: 'Real-time data access' },
-  { icon: Shield, label: 'Enterprise Security', desc: 'SOC 2 compliant' },
+  { icon: Shield, label: 'SSL Encrypted', desc: 'HTTPS-only · data in transit' },
   { icon: Zap, label: 'Lightning Fast', desc: 'Sub-second responses' },
 ]
 
@@ -31,6 +31,7 @@ export function LoginPage() {
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(false)
   const [showForgot, setShowForgot] = useState(false)
@@ -52,7 +53,7 @@ export function LoginPage() {
     if (!validate()) return
     try {
       setIsLoading(true)
-      await login(email, password)
+      await login(email, password, rememberMe)
       if (inviteToken) {
         try {
           const res = await api.post('/team/accept-invite', { token: inviteToken })
@@ -144,8 +145,14 @@ export function LoginPage() {
             />
 
             <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
-                <input type="checkbox" className="rounded border-border bg-surface text-primary focus:ring-primary w-4 h-4" />
+              <label htmlFor="remember-me" className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
+                <input
+                  id="remember-me"
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="rounded border-border bg-surface text-primary focus:ring-primary w-4 h-4"
+                />
                 <span>Remember me</span>
               </label>
               <button type="button" onClick={() => { setShowForgot(true); setForgotEmail(email); setForgotSent(false) }} className="text-sm text-primary hover:text-primary-hover font-medium transition-colors">
@@ -236,22 +243,6 @@ export function LoginPage() {
               ))}
             </div>
 
-            {/* Social proof — colored avatar dots restored */}
-            <div className="mt-14 flex items-center gap-4">
-              <div className="flex -space-x-2">
-                {['#FF6B6B', '#4ECDC4', '#45B7D1', '#96E6A1', '#DDA0DD'].map((color, i) => (
-                  <div
-                    key={i}
-                    className="w-8 h-8 rounded-full"
-                    style={{ background: color, border: '2px solid rgba(255,255,255,0.35)' }}
-                  />
-                ))}
-              </div>
-              <div>
-                <p className="text-sm font-semibold" style={{ color: '#ffffff' }}>Trusted by 500+ teams</p>
-                <p className="text-xs" style={{ color: 'rgba(255,255,255,0.82)' }}>From startups to enterprises</p>
-              </div>
-            </div>
           </motion.div>
         </div>
       </div>
