@@ -8,6 +8,8 @@ import { AgentPanel } from './AgentPanel'
 import { InlineChart, extractCharts } from './InlineChart'
 import { DocumentDownloadBar } from './DocumentDownloadBar'
 import { FileDownloadCard } from './FileDownloadCard'
+import { CitationPills } from './CitationPills'
+import remarkCitationLinks from './remarkCitationLinks'
 import { copyText, stripHtmlAndEntities } from '../../lib/clipboard'
 import { isDocumentWorthy } from '../../lib/documentDetector'
 import { formatCurrency, formatTokens } from '../../lib/utils'
@@ -18,7 +20,23 @@ import { CouncilMessage } from '../council/CouncilMessage'
 // Stable module-level reference — ReactMarkdown does a shallow compare
 // and rebuilds the rendered DOM if this array is recreated on each
 // parent re-render, which would wipe any active text selection mid-drag.
-const REMARK_PLUGINS = [remarkGfm, remarkBreaks]
+const REMARK_PLUGINS = [remarkGfm, remarkBreaks, remarkCitationLinks]
+
+// When an inline citation link (#citation-N) is clicked, scroll to the
+// matching pill and flash its background. Used from the custom `a`
+// markdown renderer below.
+function handleCitationClick(e: React.MouseEvent<HTMLAnchorElement>, href: string) {
+  e.preventDefault()
+  const id = href.slice(1) // strip leading '#'
+  const el = typeof document !== 'undefined' ? document.getElementById(id) : null
+  if (!el) return
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
+  el.classList.remove('citation-pill--flash')
+  // Re-trigger the CSS keyframe animation on rapid repeat clicks.
+  void el.offsetWidth
+  el.classList.add('citation-pill--flash')
+  window.setTimeout(() => el.classList.remove('citation-pill--flash'), 1300)
+}
 
 interface MessageBubbleProps {
   message: Message
@@ -215,10 +233,18 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
     ),
     strong: ({ children }: { children?: React.ReactNode }) => <strong style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{children}</strong>,
     em: ({ children }: { children?: React.ReactNode }) => <em style={{ color: 'var(--chat-text-secondary)', fontStyle: 'italic' }}>{children}</em>,
-    a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
-      <a href={href} target="_blank" rel="noopener noreferrer"
-        style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>{children}</a>
-    ),
+    a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
+      // Internal citation anchors: scroll to the matching pill + flash.
+      if (href && href.startsWith('#citation-')) {
+        return (
+          <a href={href} onClick={(e) => handleCitationClick(e, href)}>{children}</a>
+        )
+      }
+      return (
+        <a href={href} target="_blank" rel="noopener noreferrer"
+          style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>{children}</a>
+      )
+    },
     hr: () => <hr style={{ border: 'none', borderTop: '1px solid var(--chat-border)', margin: '20px 0' }} />,
     pre: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
     table: ({ children }: { children?: React.ReactNode }) => (
@@ -594,177 +620,15 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
       {/* Text area — no background, no border */}
       <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
 
-        {/* Web Search Card — ChatGPT-style horizontal carousel */}
-        {message.webSearch && (() => {
-          const gradients = [
-            'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-            'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-            'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
-            'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-          ]
-          return (
-            <div style={{ marginBottom: '16px' }}>
-              {/* Header */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                <div style={{
-                  width: '28px', height: '28px', borderRadius: '50%',
-                  background: 'linear-gradient(135deg, var(--color-primary), var(--color-accent-end))',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '13px', color: 'white', flexShrink: 0,
-                }}>✦</div>
-                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--chat-text)' }}>
-                  Searched the web
-                </span>
-                <span style={{ fontSize: '12px', color: 'var(--chat-text-muted)', fontStyle: 'italic' }}>
-                  "{message.webSearch.query}"
-                </span>
-              </div>
-
-              {/* Horizontal scrollable card carousel */}
-              <div style={{
-                display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '8px',
-                scrollbarWidth: 'thin',
-                scrollSnapType: 'x mandatory',
-                WebkitOverflowScrolling: 'touch',
-              }}>
-                {message.webSearch.sources.map((source, idx) => {
-                  let domain = ''
-                  try { domain = new URL(source.url).hostname.replace('www.', '') } catch { domain = source.url }
-                  const displayName = source.siteName || domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1)
-                  // Detect if image is a real article thumbnail vs a logo fallback
-                  const isLogoFallback = source.image?.includes('logo.clearbit.com')
-                  const hasRealImage = source.image && !isLogoFallback
-                  return (
-                    <a
-                      key={idx}
-                      href={source.url}
-                      title={source.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        display: 'flex', flexDirection: 'column',
-                        minWidth: '220px', maxWidth: '260px', flex: '0 0 auto',
-                        borderRadius: '12px', overflow: 'hidden',
-                        background: 'var(--chat-surface)',
-                        border: '1px solid var(--chat-border)',
-                        textDecoration: 'none', transition: 'all 0.2s ease',
-                        scrollSnapAlign: 'start',
-                        cursor: 'pointer',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = 'var(--color-primary)'
-                        e.currentTarget.style.transform = 'translateY(-2px)'
-                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = 'var(--chat-border)'
-                        e.currentTarget.style.transform = 'translateY(0)'
-                        e.currentTarget.style.boxShadow = 'none'
-                      }}
-                    >
-                      {/* Thumbnail area */}
-                      <div style={{
-                        height: '130px', width: '100%', position: 'relative',
-                        background: gradients[idx % gradients.length],
-                        overflow: 'hidden',
-                      }}>
-                        {/* Real article image — full cover */}
-                        {hasRealImage && (
-                          <img
-                            src={source.image}
-                            alt=""
-                            style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }}
-                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                          />
-                        )}
-                        {/* Logo fallback — centered on gradient */}
-                        {isLogoFallback && (
-                          <div style={{
-                            position: 'absolute', inset: 0,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          }}>
-                            <img
-                              src={source.image}
-                              alt=""
-                              style={{
-                                width: '56px', height: '56px', borderRadius: '12px',
-                                background: 'rgba(255,255,255,0.95)', padding: '8px',
-                                objectFit: 'contain', boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-                              }}
-                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                            />
-                          </div>
-                        )}
-                        {/* Dark gradient overlay at bottom */}
-                        <div style={{
-                          position: 'absolute', inset: 0,
-                          background: 'linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.1) 50%, transparent 100%)',
-                        }} />
-                        {/* Source badge */}
-                        <div style={{
-                          position: 'absolute', bottom: '8px', left: '8px',
-                          display: 'flex', alignItems: 'center', gap: '6px',
-                          background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
-                          padding: '4px 10px', borderRadius: '8px',
-                        }}>
-                          <img
-                            src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
-                            width={16} height={16} alt=""
-                            style={{ borderRadius: '3px', flexShrink: 0 }}
-                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                          />
-                          <span style={{ fontSize: '11px', color: '#fff', fontWeight: 600, letterSpacing: '0.02em' }}>
-                            {displayName}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Card text content */}
-                      <div style={{ padding: '10px 12px', flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <div style={{
-                          fontSize: '13px', fontWeight: 600, color: 'var(--chat-text)',
-                          lineHeight: '1.35',
-                          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const,
-                          overflow: 'hidden',
-                        }}>
-                          {source.title}
-                        </div>
-                        {source.snippet && (
-                          <div style={{
-                            fontSize: '11.5px', color: 'var(--chat-text-muted)', lineHeight: '1.45',
-                            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const,
-                            overflow: 'hidden',
-                          }}>
-                            {source.snippet}
-                          </div>
-                        )}
-                        {/* URL — visible at bottom */}
-                        <div style={{
-                          fontSize: '10px', color: 'var(--color-primary)', marginTop: 'auto',
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                          opacity: 0.7,
-                        }}>
-                          {domain}
-                        </div>
-                      </div>
-                    </a>
-                  )
-                })}
-              </div>
-
-              {/* Expand/collapse arrow hint */}
-              {message.webSearch.sources.length > 3 && (
-                <div style={{
-                  display: 'flex', justifyContent: 'center', marginTop: '4px',
-                  color: 'var(--chat-text-dim)', fontSize: '18px', cursor: 'default',
-                }}>
-                  ›
-                </div>
-              )}
-            </div>
-          )
-        })()}
+        {/* Citation pills — compact source list for AI answers that used web search.
+            Replaces the previous horizontal card carousel. Inline [N] links in the
+            prose scroll-highlight the matching pill via handleCitationClick above. */}
+        {message.webSearch && (
+          <CitationPills
+            query={message.webSearch.query}
+            sources={message.webSearch.sources}
+          />
+        )}
 
         <div ref={contentRef} className="prose prose-sm max-w-none message-content" style={{ fontSize: '15px', lineHeight: '1.75', color: 'var(--chat-text)' }}>
           <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={aiMessageComponents}>

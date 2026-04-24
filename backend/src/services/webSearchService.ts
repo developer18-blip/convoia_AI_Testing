@@ -790,6 +790,7 @@ function buildContextText(query: string, results: SearchResult[], source: string
   });
 
   ctx += `[Use ALL sources above to write a comprehensive, well-structured answer. Cross-reference data between sources for accuracy.]\n`;
+  ctx += `[When referencing a source, cite it inline using [1], [2], etc. matching the "SOURCE N" numbering above — e.g. "the policy passed in 2026 [3]". Put the bracket right after the claim. Do NOT invent numbers; only cite sources that actually appear above.]\n`;
 
   return ctx;
 }
