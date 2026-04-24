@@ -143,8 +143,11 @@ model AIModel {
   outputTokenPrice    Float
   reasoningTokenPrice Float           @default(0)
   perQueryFee         Float           @default(0)
-  markupPercentage    Float           @default(25)
-  capabilities        String[]
+  markupPercentage       Float           @default(27.5)
+  markupMultiplier       Float?          @default(1.275)
+  providerBaseCostInput  Float?
+  providerBaseCostOutput Float?
+  capabilities           String[]
   contextWindow       Int
   isActive            Boolean         @default(true)
   createdAt           DateTime        @default(now())
