@@ -150,6 +150,33 @@ Rules:
 - The presentation should be ready to deliver`;
 }
 
+export function getCsvPrompt(userRequest: string): string {
+  return `The user wants a CSV file (comma-separated values, raw tabular data — no formulas, no styling).
+
+USER REQUEST: ${userRequest}
+
+Respond with ONLY valid JSON (no markdown, no backticks, no explanation). Use this exact structure:
+
+{
+  "title": "Brief descriptive title — will be used as the filename",
+  "headers": ["Column A", "Column B", "Column C"],
+  "rows": [
+    ["value 1", "value 2", "value 3"],
+    ["value 4", "value 5", "value 6"]
+  ]
+}
+
+Rules:
+- Every row must have the same number of columns as "headers"
+- Use real, realistic data based on the request — never placeholder text like "value 1"
+- Column headers should be clear and descriptive (e.g. "Transaction Date", "Customer Name", not "col1")
+- Include at least 5 rows of data unless the user specifies fewer
+- Dates should be ISO format (YYYY-MM-DD) unless the user asks otherwise
+- Numbers should be plain numbers (no currency symbols inside values — put "USD" or similar in a separate column if needed)
+- If a value contains commas or quotes, just emit the raw value — CSV escaping is handled downstream
+- Do NOT emit Excel formulas (=SUM, etc). CSV is flat data only`;
+}
+
 export function getXlsxPrompt(userRequest: string): string {
   return `The user wants an Excel spreadsheet. Generate the content as structured JSON.
 
@@ -182,11 +209,12 @@ Rules:
 - The spreadsheet should be immediately useful`;
 }
 
-export function getFilePrompt(format: 'pdf' | 'docx' | 'pptx' | 'xlsx', userRequest: string): string {
+export function getFilePrompt(format: 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'csv', userRequest: string): string {
   switch (format) {
     case 'pdf': return getPdfPrompt(userRequest);
     case 'docx': return getDocxPrompt(userRequest);
     case 'pptx': return getPptxPrompt(userRequest);
     case 'xlsx': return getXlsxPrompt(userRequest);
+    case 'csv': return getCsvPrompt(userRequest);
   }
 }

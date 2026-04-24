@@ -61,6 +61,7 @@ const MIME_TYPES: Record<string, string> = {
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  csv: 'text/csv',
 };
 
 export interface FileGenerationResult {
@@ -74,7 +75,7 @@ export interface FileGenerationResult {
 }
 
 export async function generateFile(
-  format: 'pdf' | 'docx' | 'pptx' | 'xlsx',
+  format: 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'csv',
   contentJson: object,
   userId: string,
 ): Promise<FileGenerationResult> {

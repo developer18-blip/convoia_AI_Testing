@@ -32,7 +32,7 @@ import { config } from '../config/env.js';
 import logger from '../config/logger.js';
 
 export interface FileIntent {
-  format: 'pdf' | 'docx' | 'pptx' | 'xlsx';
+  format: 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'csv';
   formatLabel: string;
   description: string;
 }
@@ -54,6 +54,7 @@ const FORMAT_LABELS: Record<FileIntent['format'], string> = {
   docx: 'Word Document',
   pptx: 'PowerPoint',
   xlsx: 'Excel Spreadsheet',
+  csv: 'CSV',
 };
 
 // ── Layer 1: upload-context short-circuit ──────────────────────────────
@@ -65,7 +66,7 @@ const FORMAT_LABELS: Record<FileIntent['format'], string> = {
  * word ("create a PDF", "export to Word", "turn this into a presentation").
  */
 function isExplicitGenerateWithUpload(message: string): boolean {
-  return /\b(create|make|generate|build|produce|export|save|convert|turn)\s+(this\s+)?(in\s*)?(to\s+)?(a\s+)?(new\s+)?(pdf|docx?|word|pptx?|powerpoint|xlsx?|excel|spreadsheet|presentation|slides?|slide\s*deck|pitch\s*deck)\b/i.test(
+  return /\b(create|make|generate|build|produce|export|save|convert|turn)\s+(this\s+)?(in\s*)?(to\s+)?(a\s+)?(new\s+)?(pdf|docx?|word|pptx?|powerpoint|xlsx?|excel|spreadsheet|csv|presentation|slides?|slide\s*deck|pitch\s*deck)\b/i.test(
     message,
   );
 }
@@ -80,9 +81,14 @@ interface RawAIDecision {
 
 const DECISION_PROMPT = (userMessage: string) => `You are a file-generation intent detector for an AI chat assistant.
 
-DECIDE whether the user is explicitly asking for a NEW document FILE to be generated and downloaded. Valid formats: pdf, docx, pptx, xlsx.
+DECIDE whether the user is explicitly asking for a NEW document FILE to be generated and downloaded. Valid formats: pdf, docx, pptx, xlsx, csv.
 
 Return wants_file=true ONLY when the user is clearly asking to CREATE / GENERATE / MAKE / BUILD / EXPORT / SAVE / CONVERT a downloadable file in a specific format.
+
+Format hints:
+- "csv", "comma-separated", "flat table", "raw data export" → csv
+- "excel", "xlsx", "spreadsheet with formulas", "workbook" → xlsx
+- CSV is for raw tabular data with no formulas or styling. If the user asks for formulas, multiple sheets, or spreadsheet-style formatting, prefer xlsx.
 
 Return wants_file=false for:
 - explaining, summarizing, or analyzing an uploaded/existing document
@@ -100,13 +106,17 @@ Examples:
 - "Convert this to PDF"                          → {"wants_file": true,  "format": "pdf",  "reason": "explicit conversion"}
 - "Turn this into a presentation"                → {"wants_file": true,  "format": "pptx", "reason": "explicit presentation request"}
 - "Create a presentation about AI trends"        → {"wants_file": true,  "format": "pptx", "reason": "explicit presentation request"}
+- "Export this as CSV"                           → {"wants_file": true,  "format": "csv",  "reason": "explicit CSV request"}
+- "Give me a CSV of these leads"                 → {"wants_file": true,  "format": "csv",  "reason": "explicit CSV request"}
+- "Download as comma-separated values"           → {"wants_file": true,  "format": "csv",  "reason": "explicit CSV phrasing"}
+- "Save as spreadsheet with totals formula"      → {"wants_file": true,  "format": "xlsx", "reason": "formulas — xlsx not csv"}
 - "can you explain me the updated pdf"           → {"wants_file": false, "format": null, "reason": "asking about existing PDF"}
 
 USER MESSAGE:
 ${userMessage}
 
 Respond with ONLY valid JSON, no prose, no code fence:
-{"wants_file": true|false, "format": "pdf"|"docx"|"pptx"|"xlsx"|null, "reason": "short sentence"}`;
+{"wants_file": true|false, "format": "pdf"|"docx"|"pptx"|"xlsx"|"csv"|null, "reason": "short sentence"}`;
 
 async function aiDecideFileIntent(userMessage: string): Promise<FileIntent | null> {
   const apiKey = config.apiKeys.openai;
