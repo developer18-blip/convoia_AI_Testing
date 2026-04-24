@@ -644,7 +644,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             tokensInput: metadata.tokens?.input || 0,
             tokensOutput: metadata.tokens?.output || 0,
             cost: Number(metadata.cost?.charged || 0) || 0,
-            model: metadata.model || 'ConvoiaAI Council',
+            model: metadata.model || 'ConvoiaAI Apex',
             provider: metadata.provider || 'council',
             council: {
               ...m.council,
@@ -908,7 +908,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             tokensInput: metadata.tokens?.input || 0,
             tokensOutput: metadata.tokens?.output || 0,
             cost: Number(metadata.cost?.charged || 0) || 0,
-            model: metadata.model || 'ConvoiaAI Council',
+            model: metadata.model || 'ConvoiaAI Apex',
             provider: metadata.provider || 'council',
             council: {
               ...m.council,

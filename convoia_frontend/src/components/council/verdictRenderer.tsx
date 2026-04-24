@@ -45,7 +45,7 @@ export function renderCouncilVerdict(text: string, isStreaming: boolean): ReactN
       const rest = verdictMatch[1] || ''
       out.push(
         <div key={i} className="council-verdict-text">
-          <span className="council-verdict-label">Council verdict — </span>
+          <span className="council-verdict-label">Verdict — </span>
           {parseInline(rest)}
         </div>,
       )

@@ -83,7 +83,7 @@ export function MobileChatPage() {
     if (!activeConversationId) {
       createConversation(
         councilMode ? councilModelIds[0] : selectedModelId,
-        councilMode ? 'ConvoiaAI Council' : (selectedModel?.name || 'AI'),
+        councilMode ? 'ConvoiaAI Apex' : (selectedModel?.name || 'AI'),
       )
     }
     const councilOpts = councilMode ? { modelIds: councilModelIds } : undefined
@@ -100,7 +100,7 @@ export function MobileChatPage() {
   const handleSendWithContext = (text: string, systemContext: string | null, extras?: any) => {
     if (!activeConversationId) createConversation(
       councilMode ? councilModelIds[0] : selectedModelId,
-      councilMode ? 'ConvoiaAI Council' : (selectedModel?.name || 'AI'),
+      councilMode ? 'ConvoiaAI Apex' : (selectedModel?.name || 'AI'),
     )
     const messageExtras: Partial<Message> = {}
     if (extras?.fileAttachment) messageExtras.fileAttachment = extras.fileAttachment

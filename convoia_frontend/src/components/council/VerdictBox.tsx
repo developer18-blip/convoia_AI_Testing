@@ -15,7 +15,7 @@ export function VerdictBox({ verdict, isStreaming, agreementLevel }: Props) {
     <div className="council-verdict-card">
       <div className="council-verdict-header">
         <div className="council-verdict-icon">C</div>
-        <div className="council-verdict-title">ConvoiaAI Council</div>
+        <div className="council-verdict-title">ConvoiaAI Apex</div>
         <div className={`council-verdict-badge ${badgeClass}`}>
           {agreementLevel.text}
         </div>

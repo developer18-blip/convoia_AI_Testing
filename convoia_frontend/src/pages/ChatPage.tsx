@@ -165,7 +165,7 @@ export function ChatPage() {
     }
 
     const primaryModelId = councilMode ? councilModelIds[0] : selectedModelId
-    const primaryModelName = councilMode ? 'ConvoiaAI Council' : (selectedModel?.name || 'AI')
+    const primaryModelName = councilMode ? 'ConvoiaAI Apex' : (selectedModel?.name || 'AI')
 
     let convId = activeConversationId
     if (!convId) {

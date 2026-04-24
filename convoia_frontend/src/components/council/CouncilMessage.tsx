@@ -25,7 +25,7 @@ function badgeForPhase(phase: CouncilPhase, modelCount: number): { label: string
     case 'error':
       return { label: 'Error', cls: 'council-badge--error' }
     default:
-      return { label: 'Council', cls: 'council-badge--selecting' }
+      return { label: 'Apex', cls: 'council-badge--selecting' }
   }
 }
 
@@ -38,7 +38,7 @@ export function CouncilMessage({ council }: Props) {
   const doneCount = completedCount + errorCount
   const progressPct = totalCount > 0 ? (doneCount / totalCount) * 100 : 0
   const progressLabel = totalCount === 0
-    ? 'Preparing council…'
+    ? 'Preparing Apex…'
     : errorCount > 0 && doneCount === totalCount
       ? `${completedCount} of ${totalCount} succeeded — proceeding with ${completedCount} models`
       : doneCount === totalCount
@@ -74,7 +74,7 @@ export function CouncilMessage({ council }: Props) {
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--council-text)' }}>
-            ConvoiaAI Council
+            ConvoiaAI Apex
           </div>
           <div style={{ fontSize: '11px', color: 'var(--council-text-dim)', marginTop: 1 }}>
             {totalCount > 0 ? `${totalCount} models consulted` : 'Starting…'}
@@ -92,7 +92,7 @@ export function CouncilMessage({ council }: Props) {
           color: 'var(--council-red)', fontSize: '13px',
         }}>
           <AlertCircle size={16} />
-          <span>{errorMessage || 'Council failed'}</span>
+          <span>{errorMessage || 'Apex failed'}</span>
         </div>
       )}
 
