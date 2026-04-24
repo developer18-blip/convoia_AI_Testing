@@ -303,6 +303,11 @@ async function runXMLFunctionCallingLoop(
 
   const xmlSystemPrompt = systemPrompt + `\n\n[TOOL USE FORMAT]\nTo use a tool, output EXACTLY this XML format:\n<tool_call>\n{"name": "tool_name", "arguments": {"param": "value"}}\n</tool_call>\n\nAvailable tools:\n${xmlToolSection}\n\nAfter receiving tool results, continue your response. Only use tools when necessary.`;
 
+  // Captures token usage from the single LLM call inside this XML loop.
+  // Previously discarded — see fix(billing): bill XML tool-call loop.
+  let capturedInputTokens = 0;
+  let capturedOutputTokens = 0;
+
   // For XML-based providers, use the standard sendMessage flow but parse for tool_call tags
   const fullResponse = await new Promise<string>(async (resolve) => {
     let accumulated = '';
@@ -320,11 +325,49 @@ async function runXMLFunctionCallingLoop(
       },
       {
         onChunk: (text) => { accumulated += text; },
-        onDone: () => { resolve(accumulated); },
+        onDone: (inTok: number, outTok: number) => {
+          capturedInputTokens = inTok || 0;
+          capturedOutputTokens = outTok || 0;
+          resolve(accumulated);
+        },
         onError: (err) => { callbacks.onError(err); resolve(''); },
       }
     );
   });
+
+  // Bills the LLM call once. Mirrors native-path billing (lines ~250-260).
+  const billLLMCall = async (toolCallCount: number) => {
+    if (capturedInputTokens + capturedOutputTokens === 0) return;
+    const providerCost = capturedInputTokens * aiModel.inputTokenPrice + capturedOutputTokens * aiModel.outputTokenPrice;
+    const customerPrice = providerCost * (1 + aiModel.markupPercentage / 100);
+    const walletTokens = costAdjustedTokens(customerPrice, capturedInputTokens + capturedOutputTokens);
+    await TokenWalletService.deductTokens({
+      userId,
+      tokens: walletTokens,
+      reference: agentId,
+      description: `[TOOL_CALL] ${aiModel.name} via XML loop (${toolCallCount} tool(s))`,
+      organizationId,
+    });
+    try {
+      await prisma.usageLog.create({
+        data: {
+          userId,
+          organizationId,
+          modelId: aiModel.id,
+          prompt: `[TOOL_CALL] ${toolCallCount} tool(s) requested via XML loop`,
+          response: fullResponse.substring(0, 500),
+          tokensInput: capturedInputTokens,
+          tokensOutput: capturedOutputTokens,
+          totalTokens: capturedInputTokens + capturedOutputTokens,
+          providerCost,
+          markupPercentage: aiModel.markupPercentage,
+          customerPrice,
+          status: 'completed',
+        },
+      });
+    } catch { /* non-fatal */ }
+    logger.info(`[TOOL_CALL] billed: user=${userId} model=${aiModel.name} tokens=${capturedInputTokens}/${capturedOutputTokens} cost=$${customerPrice.toFixed(6)}`);
+  };
 
   // Parse for <tool_call> tags
   const toolCallRegex = /<tool_call>\s*({[\s\S]*?})\s*<\/tool_call>/g;
@@ -341,7 +384,8 @@ async function runXMLFunctionCallingLoop(
   if (toolCalls.length === 0) {
     // No tool calls — just stream the response
     callbacks.onChunk(fullResponse);
-    callbacks.onDone(0, 0);
+    await billLLMCall(0);
+    callbacks.onDone(capturedInputTokens, capturedOutputTokens);
     return;
   }
 
@@ -369,7 +413,8 @@ async function runXMLFunctionCallingLoop(
   // Send text parts (removing tool_call tags)
   const cleanText = fullResponse.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '').trim();
   if (cleanText) callbacks.onChunk(cleanText);
-  callbacks.onDone(0, 0);
+  await billLLMCall(toolCalls.length);
+  callbacks.onDone(capturedInputTokens, capturedOutputTokens);
 }
 
 // ── Provider-specific helpers ────────────────────────────────────────
