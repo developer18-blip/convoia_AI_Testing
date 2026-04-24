@@ -431,9 +431,11 @@ async function callOpenAI(modelId: string, messages: any[], systemPrompt: string
       body.max_completion_tokens = overrides?.maxTokens ?? 16384;
       body.temperature = forceTemp1 ? 1 : (overrides?.temperature ?? 0.7);
       if (!forceTemp1 && overrides?.topP != null) body.top_p = overrides.topP;
-      // GPT-5 family: optional native reasoning via reasoning.effort
+      // GPT-5 family (chat completions): flat reasoning_effort param.
+      // The nested { reasoning: { effort } } shape is for the /v1/responses endpoint —
+      // sending it to /v1/chat/completions returns 400 'Unknown parameter: reasoning'.
       if (overrides?.thinkingEnabled || overrides?.reasoningEffort) {
-        body.reasoning = { effort: overrides?.reasoningEffort || 'high' };
+        body.reasoning_effort = overrides?.reasoningEffort || 'high';
         body.max_completion_tokens = Math.max(body.max_completion_tokens, 32768);
       }
     } else {
