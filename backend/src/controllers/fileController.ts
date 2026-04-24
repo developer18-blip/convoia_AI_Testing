@@ -79,8 +79,21 @@ function classifyAttachmentType(mimetype: string, filename: string): string {
   return 'text'
 }
 
-// OCR scanned/image-based PDFs using AI vision models
-async function ocrPdfWithVision(filePath: string): Promise<string | null> {
+// OCR scanned/image-based PDFs using AI vision models.
+// Bills userId for actual provider tokens used, with 27.5% markup
+// (markup pulled from each AIModel row, not hardcoded).
+async function ocrPdfWithVision(
+  filePath: string,
+  userId: string,
+  organizationId?: string,
+): Promise<string | null> {
+  // Pre-flight: gate on having any balance
+  const ocrBalance = await TokenWalletService.getBalance(userId)
+  if (ocrBalance.tokenBalance <= 0) {
+    logger.warn(`OCR blocked — user=${userId} has zero balance`)
+    throw new AppError('No tokens remaining for OCR.', 402)
+  }
+
   const pdfBase64 = fs.readFileSync(filePath).toString('base64')
 
   // Try Anthropic first (native PDF support)
@@ -114,6 +127,45 @@ async function ocrPdfWithVision(filePath: string): Promise<string | null> {
       const text = resp.data?.content?.[0]?.text || ''
       if (text.length > 20) {
         logger.info(`OCR: Anthropic extracted ${text.length} chars from scanned PDF`)
+
+        // Bill actual provider tokens — Anthropic Claude Haiku 4.5
+        const aInTok = resp.data?.usage?.input_tokens || 0
+        const aOutTok = resp.data?.usage?.output_tokens || 0
+        const haiku = await prisma.aIModel.findUnique({
+          where: { modelId: 'claude-haiku-4-5-20251001' },
+        })
+        if (haiku && (aInTok + aOutTok) > 0) {
+          const providerCost = aInTok * haiku.inputTokenPrice + aOutTok * haiku.outputTokenPrice
+          const customerPrice = providerCost * (1 + haiku.markupPercentage / 100)
+          const walletTokens = costAdjustedTokens(customerPrice, aInTok + aOutTok)
+          await TokenWalletService.deductTokens({
+            userId,
+            tokens: walletTokens,
+            reference: `ocr-anthropic-${Date.now()}`,
+            description: `[OCR] Scanned PDF via Claude Haiku (${aInTok}/${aOutTok} tokens)`,
+            organizationId,
+          })
+          try {
+            await prisma.usageLog.create({
+              data: {
+                userId,
+                organizationId,
+                modelId: haiku.id,
+                prompt: '[OCR] scanned PDF',
+                response: text.substring(0, 500),
+                tokensInput: aInTok,
+                tokensOutput: aOutTok,
+                totalTokens: aInTok + aOutTok,
+                providerCost,
+                markupPercentage: haiku.markupPercentage,
+                customerPrice,
+                status: 'completed',
+              },
+            })
+          } catch { /* non-fatal */ }
+          logger.info(`[OCR] Anthropic billed: user=${userId} tokens=${aInTok}/${aOutTok} cost=$${customerPrice.toFixed(6)}`)
+        }
+
         return text
       }
     } catch (err: any) {
@@ -140,6 +192,45 @@ async function ocrPdfWithVision(filePath: string): Promise<string | null> {
       const text = resp.data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
       if (text.length > 20) {
         logger.info(`OCR: Gemini extracted ${text.length} chars from scanned PDF`)
+
+        // Bill actual provider tokens — Gemini 2.0 Flash
+        const gInTok = resp.data?.usageMetadata?.promptTokenCount || 0
+        const gOutTok = resp.data?.usageMetadata?.candidatesTokenCount || 0
+        const gemini = await prisma.aIModel.findUnique({
+          where: { modelId: 'gemini-2.0-flash' },
+        })
+        if (gemini && (gInTok + gOutTok) > 0) {
+          const providerCost = gInTok * gemini.inputTokenPrice + gOutTok * gemini.outputTokenPrice
+          const customerPrice = providerCost * (1 + gemini.markupPercentage / 100)
+          const walletTokens = costAdjustedTokens(customerPrice, gInTok + gOutTok)
+          await TokenWalletService.deductTokens({
+            userId,
+            tokens: walletTokens,
+            reference: `ocr-gemini-${Date.now()}`,
+            description: `[OCR] Scanned PDF via Gemini 2.0 Flash (${gInTok}/${gOutTok} tokens)`,
+            organizationId,
+          })
+          try {
+            await prisma.usageLog.create({
+              data: {
+                userId,
+                organizationId,
+                modelId: gemini.id,
+                prompt: '[OCR] scanned PDF',
+                response: text.substring(0, 500),
+                tokensInput: gInTok,
+                tokensOutput: gOutTok,
+                totalTokens: gInTok + gOutTok,
+                providerCost,
+                markupPercentage: gemini.markupPercentage,
+                customerPrice,
+                status: 'completed',
+              },
+            })
+          } catch { /* non-fatal */ }
+          logger.info(`[OCR] Gemini billed: user=${userId} tokens=${gInTok}/${gOutTok} cost=$${customerPrice.toFixed(6)}`)
+        }
+
         return text
       }
     } catch (err: any) {
@@ -335,7 +426,7 @@ export const processFile = asyncHandler(async (req: Request, res: Response): Pro
             .trim()
           if (meaningfulText.length < 50 && file.size > 1000) {
             logger.info(`PDF text extraction produced ${meaningfulText.length} meaningful chars (file size: ${file.size} bytes). Attempting vision OCR...`)
-            const ocrText = await ocrPdfWithVision(file.path)
+            const ocrText = await ocrPdfWithVision(file.path, req.user!.userId, orgId)
             if (ocrText) {
               extractedText = ocrText
               pageCount = pageCount || 1
@@ -671,7 +762,8 @@ export const attachFile = asyncHandler(async (req: Request, res: Response): Prom
       }
       // OCR fallback when text layer is empty
       if (extractedText.trim().length < 50 && file.size > 1000) {
-        const ocr = await ocrPdfWithVision(file.path)
+        const ocrOrgId = await getOrCreatePersonalOrg(req.user!.userId)
+        const ocr = await ocrPdfWithVision(file.path, req.user!.userId, ocrOrgId)
         if (ocr) extractedText = ocr
       }
     } else if (fileType === 'docx') {
