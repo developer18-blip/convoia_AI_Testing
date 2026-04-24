@@ -104,7 +104,7 @@ export const transcribeAudioHandler = asyncHandler(
           tokensOutput: 0,
           totalTokens: billing.walletTokens,
           providerCost: billing.providerCost,
-          markupPercentage: 30,
+          markupPercentage: 27.5,  // synced with WHISPER_MARKUP/TTS_MARKUP in audioService.ts
           customerPrice: billing.customerPrice,
           status: 'completed',
         },
@@ -215,7 +215,7 @@ export const synthesizeSpeechHandler = asyncHandler(
           tokensOutput: billing.walletTokens,
           totalTokens: billing.walletTokens,
           providerCost: billing.providerCost,
-          markupPercentage: 30,
+          markupPercentage: 27.5,  // synced with WHISPER_MARKUP/TTS_MARKUP in audioService.ts
           customerPrice: billing.customerPrice,
           status: 'completed',
         },

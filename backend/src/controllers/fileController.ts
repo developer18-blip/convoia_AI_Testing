@@ -9,6 +9,7 @@ import { AIGatewayService } from '../services/aiGatewayService.js'
 import { afterQueryMiddleware } from '../middleware/tokenTracker.js'
 import { getOrCreatePersonalOrg } from '../utils/orgHelper.js'
 import { TokenWalletService } from '../services/tokenWalletService.js'
+import { calculateWhisperTokenCost } from '../services/audioService.js'
 import { config } from '../config/env.js'
 import logger from '../config/logger.js'
 import prisma from '../config/db.js'
@@ -390,12 +391,27 @@ export const processFile = asyncHandler(async (req: Request, res: Response): Pro
       }
 
       case 'audio': {
-        // Audio transcription still uses OpenAI Whisper (no multi-provider alternative yet)
+        // Audio transcription still uses OpenAI Whisper (no multi-provider alternative yet).
+        // Billed via calculateWhisperTokenCost — mirrors /api/audio/transcribe handler.
         const OpenAI = (await import('openai')).default
         const apiKey = process.env.OPENAI_API_KEY
         if (!apiKey) {
           throw new AppError('Audio transcription requires an OpenAI API key (Whisper). Add OPENAI_API_KEY to your .env file.', 500)
         }
+
+        // Pre-flight balance gate (worst-case 2-min cost)
+        const wBalance = await TokenWalletService.getBalance(req.user!.userId)
+        if (wBalance.tokenBalance <= 0) {
+          throw new AppError('No tokens remaining for transcription.', 402)
+        }
+        const wMaxEstimate = calculateWhisperTokenCost(120)
+        if (wBalance.tokenBalance < wMaxEstimate.walletTokens) {
+          throw new AppError(
+            `Insufficient tokens for voice transcription. You have ${wBalance.tokenBalance} tokens.`,
+            402
+          )
+        }
+
         const openai = new OpenAI({ apiKey })
         const audioStream = fs.createReadStream(file.path)
 
@@ -408,6 +424,43 @@ export const processFile = asyncHandler(async (req: Request, res: Response): Pro
         const transcript = (transcription as unknown as { text: string }).text || ''
         const duration = (transcription as unknown as { duration: number }).duration || 0
 
+        // Bill actual duration (1s minimum)
+        const wBilling = calculateWhisperTokenCost(Math.max(duration, 1))
+        await TokenWalletService.deductTokens({
+          userId: req.user!.userId,
+          tokens: wBilling.walletTokens,
+          reference: `whisper-files-${Date.now()}`,
+          description: `[WHISPER] Voice transcription via /files/process (${Math.round(duration)}s)`,
+          organizationId: orgId,
+        })
+
+        // UsageLog (non-fatal)
+        try {
+          const openaiModel = await prisma.aIModel.findFirst({
+            where: { isActive: true, provider: 'openai' },
+            select: { id: true },
+            orderBy: { inputTokenPrice: 'asc' },
+          })
+          await prisma.usageLog.create({
+            data: {
+              userId: req.user!.userId,
+              organizationId: orgId,
+              modelId: openaiModel?.id || '',
+              prompt: '[WHISPER] file upload',
+              response: transcript.substring(0, 500),
+              tokensInput: wBilling.walletTokens,
+              tokensOutput: 0,
+              totalTokens: wBilling.walletTokens,
+              providerCost: wBilling.providerCost,
+              markupPercentage: 27.5,
+              customerPrice: wBilling.customerPrice,
+              status: 'completed',
+            },
+          })
+        } catch { /* non-fatal — never block the response */ }
+
+        logger.info(`[WHISPER] /files/process: user=${req.user!.userId} duration=${duration.toFixed(1)}s tokens=${wBilling.walletTokens}`)
+
         res.json({
           success: true,
           data: {
@@ -416,6 +469,8 @@ export const processFile = asyncHandler(async (req: Request, res: Response): Pro
             duration: Math.round(duration),
             fileName: file.originalname,
             fileSize: file.size,
+            tokensUsed: wBilling.walletTokens,
+            cost: wBilling.customerPrice.toFixed(6),
           },
         })
         return
@@ -672,19 +727,73 @@ export const attachFile = asyncHandler(async (req: Request, res: Response): Prom
       // to the user / wasting upload time.
       extractedText = `[Video file: ${file.originalname} — not yet analyzed. Audio track extraction + frame sampling is on the roadmap.]`
     } else if (fileType === 'audio') {
-      // Whisper transcription — same path as legacy endpoint
+      // Whisper transcription — same path as legacy endpoint.
+      // Billed via calculateWhisperTokenCost — mirrors /api/audio/transcribe handler.
       const OpenAIMod = (await import('openai')).default
       const apiKey = process.env.OPENAI_API_KEY
       if (!apiKey) {
         throw new AppError('Audio transcription requires an OpenAI API key (Whisper).', 500)
       }
+
+      // Pre-flight balance gate (worst-case 2-min cost)
+      const aBalance = await TokenWalletService.getBalance(req.user!.userId)
+      if (aBalance.tokenBalance <= 0) {
+        throw new AppError('No tokens remaining for transcription.', 402)
+      }
+      const aMaxEstimate = calculateWhisperTokenCost(120)
+      if (aBalance.tokenBalance < aMaxEstimate.walletTokens) {
+        throw new AppError(
+          `Insufficient tokens for voice transcription. You have ${aBalance.tokenBalance} tokens.`,
+          402
+        )
+      }
+      const aOrgId = await getOrCreatePersonalOrg(req.user!.userId)
+
       const openai = new OpenAIMod({ apiKey })
       const transcription = await openai.audio.transcriptions.create({
         file: fs.createReadStream(file.path),
         model: 'whisper-1',
-        response_format: 'text',
+        response_format: 'verbose_json',
       })
-      extractedText = (transcription as unknown as string) || ''
+      extractedText = (transcription as unknown as { text: string }).text || ''
+      const aDuration = (transcription as unknown as { duration: number }).duration || 0
+
+      // Bill actual duration (1s minimum)
+      const aBilling = calculateWhisperTokenCost(Math.max(aDuration, 1))
+      await TokenWalletService.deductTokens({
+        userId: req.user!.userId,
+        tokens: aBilling.walletTokens,
+        reference: `whisper-attach-${Date.now()}`,
+        description: `[WHISPER] Voice attachment (${Math.round(aDuration)}s)`,
+        organizationId: aOrgId,
+      })
+
+      // UsageLog (non-fatal)
+      try {
+        const aOpenaiModel = await prisma.aIModel.findFirst({
+          where: { isActive: true, provider: 'openai' },
+          select: { id: true },
+          orderBy: { inputTokenPrice: 'asc' },
+        })
+        await prisma.usageLog.create({
+          data: {
+            userId: req.user!.userId,
+            organizationId: aOrgId,
+            modelId: aOpenaiModel?.id || '',
+            prompt: '[WHISPER] attachment upload',
+            response: extractedText.substring(0, 500),
+            tokensInput: aBilling.walletTokens,
+            tokensOutput: 0,
+            totalTokens: aBilling.walletTokens,
+            providerCost: aBilling.providerCost,
+            markupPercentage: 27.5,
+            customerPrice: aBilling.customerPrice,
+            status: 'completed',
+          },
+        })
+      } catch { /* non-fatal */ }
+
+      logger.info(`[WHISPER] attachment: user=${req.user!.userId} duration=${aDuration.toFixed(1)}s tokens=${aBilling.walletTokens}`)
     } else if (fileType === 'image') {
       // Images: persist the original as a thumbnail the chip can render,
       // leave extractedText null so the AI gateway knows to use vision

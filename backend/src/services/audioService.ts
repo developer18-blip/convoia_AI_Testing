@@ -6,12 +6,12 @@ import { TOKEN_BASE_RATE } from '../config/tokenPackages.js';
 // ── Whisper pricing ──
 // $0.006 per minute, minimum 1 second billed as 1/60th of a minute
 const WHISPER_COST_PER_MINUTE = 0.006;
-const WHISPER_MARKUP = 1.30; // 30% markup
+const WHISPER_MARKUP = 1.275; // 27.5% markup — aligns with unified Convoia pricing policy
 
 // ── TTS pricing ──
 // tts-1 (standard): $15 per 1M characters
 const TTS_COST_PER_MILLION_CHARS = 15.0;
-const TTS_MARKUP = 1.30; // 30% markup
+const TTS_MARKUP = 1.275; // 27.5% markup — aligns with unified Convoia pricing policy
 
 /**
  * Calculate wallet token cost for Whisper transcription.
