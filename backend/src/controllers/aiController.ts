@@ -89,13 +89,19 @@ export const queryAI = asyncHandler(async (req: Request, res: Response) => {
   if (!user) throw new AppError('User not found', 404);
   const organizationId = await getOrCreatePersonalOrg(user.id);
 
-  // Check token balance — estimate includes system prompt (~500 tokens) + all message history
+  // Check token balance — estimate includes input + worst-case output cost,
+  // priced from the model's actual rates with markup applied. See
+  // TokenWalletService.estimateQueryCost. Falls back to old loose check if
+  // model lookup fails (returns null).
   const tokenBalance = await TokenWalletService.getBalance(user.id);
   const inputText = messages.map((m: any) => m.content).join(' ');
-  // Realistic estimation: each char ≈ 0.25 tokens, plus ~500 for system prompt overhead
   const estimatedInputTokens = Math.ceil(inputText.length / 4) + 500;
-  // Minimum balance needed: input estimate + 200 buffer for at least a short response
-  const minimumRequired = estimatedInputTokens + 200;
+  const chatCostEstimate = await TokenWalletService.estimateQueryCost({
+    modelId,
+    estInputTokens: estimatedInputTokens,
+    maxOutputTokens: 8000,
+  });
+  const minimumRequired = chatCostEstimate?.estimatedTokens ?? estimatedInputTokens + 200;
 
   if (tokenBalance.tokenBalance <= 0) {
     const isOrgMember = !!user.organizationId;
@@ -566,11 +572,19 @@ export const queryAIStream = async (req: Request, res: Response) => {
       return m;
     });
 
-    // Check token balance — estimate includes system prompt (~500 tokens) + all message history
+    // Check token balance — estimate includes input + worst-case output cost,
+    // priced from the model's actual rates with markup applied. See
+    // TokenWalletService.estimateQueryCost. Falls back to old loose check if
+    // model lookup fails (returns null).
     const streamTokenBalance = await TokenWalletService.getBalance(user.id);
     const inputText = cappedMessages.map((m: any) => m.content).join(' ');
     const estimatedInputTokens = Math.ceil(inputText.length / 4) + 500;
-    const minimumRequired = estimatedInputTokens + 200;
+    const streamCostEstimate = await TokenWalletService.estimateQueryCost({
+      modelId,
+      estInputTokens: estimatedInputTokens,
+      maxOutputTokens: 8000,
+    });
+    const minimumRequired = streamCostEstimate?.estimatedTokens ?? estimatedInputTokens + 200;
 
     if (streamTokenBalance.tokenBalance <= 0) {
       const isOrgMember = !!user.organizationId;
