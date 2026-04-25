@@ -117,7 +117,7 @@ export async function runCouncil(
   const estimatedVerdict = 1500;
   const estimatedTotalOutput = (models.length * estimatedOutputPerModel) + estimatedCrossExam + estimatedVerdict;
   const maxOutputPrice = Math.max(...models.map(m => m.outputTokenPrice));
-  const estimatedCost = estimatedTotalOutput * maxOutputPrice * 1.25;
+  const estimatedCost = estimatedTotalOutput * maxOutputPrice * 1.275; // 27.5% markup — unified Convoia policy
   const estimatedWalletTokens = Math.ceil(estimatedCost / 0.00000249);
 
   const balance = await TokenWalletService.getBalance(config.userId);
