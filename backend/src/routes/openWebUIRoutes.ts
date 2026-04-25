@@ -77,11 +77,18 @@ router.post('/chat/completions', queryLimiter, asyncHandler(async (req: Request,
 
   const organizationId = await getOrCreatePersonalOrg(user.id);
 
-  // Check token balance with estimation
+  // Check token balance — uses TokenWalletService.estimateQueryCost which
+  // prices input + worst-case output from the model row with markup applied.
+  // Falls back to old loose check if model lookup fails.
   const owuiTokenBal = await TokenWalletService.getBalance(user.id);
   const owuiInputText = messages.map((m: any) => m.content || '').join(' ');
   const owuiEstimatedInput = Math.ceil(owuiInputText.length / 4) + 500;
-  const owuiMinRequired = owuiEstimatedInput + 200;
+  const owuiCostEstimate = await TokenWalletService.estimateQueryCost({
+    modelId,
+    estInputTokens: owuiEstimatedInput,
+    maxOutputTokens: 8000,
+  });
+  const owuiMinRequired = owuiCostEstimate?.estimatedTokens ?? owuiEstimatedInput + 200;
 
   if (owuiTokenBal.tokenBalance <= 0) {
     return res.status(402).json({

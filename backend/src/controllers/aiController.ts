@@ -360,7 +360,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
         const result = await FileProcessingService.generateImage(imagePrompt, '1024x1024', 'standard', imageProvider, referenceImage);
         // Image gen: cost-adjusted deduction. DALL-E ~$0.04/image, Gemini ~$0.003, GPT Image ~$0.08
         const imageProviderCost = result.provider === 'gpt-image-1' ? 0.08 : result.provider === 'dalle' ? 0.04 : 0.003;
-        const imageCustPrice = imageProviderCost * 1.25; // 25% markup
+        const imageCustPrice = imageProviderCost * 1.275; // 27.5% markup — unified Convoia policy
         const imageTokenCost = costAdjustedTokens(imageCustPrice, result.provider === 'gemini' ? 1300 : 1000);
         await TokenWalletService.deductTokens({ userId: req.user.userId, tokens: imageTokenCost, reference: `image-gen-${Date.now()}`, description: `Image generation (${streamModelCheck.name})`, organizationId: imgUser?.organizationId || undefined });
         // Send description only — the actual image renders via imageUrl in the done event
@@ -372,7 +372,7 @@ export const queryAIStream = async (req: Request, res: Response) => {
         res.end();
         // Log usage
         const orgId = imgUser?.organizationId || undefined;
-        await prisma.usageLog.create({ data: { userId: req.user.userId, organizationId: orgId, modelId: streamModelCheck.id, prompt: lastMsg.substring(0, 500), response: `[Image: ${result.revisedPrompt?.substring(0, 200)}]`, tokensInput: 0, tokensOutput: imageTokenCost, totalTokens: imageTokenCost, providerCost: imageProviderCost, markupPercentage: 25, customerPrice: imgCustomerPrice, status: 'completed' } });
+        await prisma.usageLog.create({ data: { userId: req.user.userId, organizationId: orgId, modelId: streamModelCheck.id, prompt: lastMsg.substring(0, 500), response: `[Image: ${result.revisedPrompt?.substring(0, 200)}]`, tokensInput: 0, tokensOutput: imageTokenCost, totalTokens: imageTokenCost, providerCost: imageProviderCost, markupPercentage: 27.5, customerPrice: imgCustomerPrice, status: 'completed' } });
       } catch (err: any) {
         res.write(`data: ${JSON.stringify({ type: 'chunk', content: `\n\nImage generation failed: ${err.message}` })}\n\n`);
         res.write(`data: ${JSON.stringify({ type: 'done', tokens: { input: 0, output: 0, total: 0 }, tokensUsed: 0, cost: { charged: '0' }, model: streamModelCheck.name, provider: 'openai' })}\n\n`);
@@ -861,7 +861,7 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
 
         // Deduct cost-adjusted tokens for image gen
         const imgProvCost = result.provider === 'gemini' ? 0.003 : 0.04;
-        const imgCustPrice = imgProvCost * 1.25;
+        const imgCustPrice = imgProvCost * 1.275; // 27.5% markup — unified Convoia policy
         const imageTokenCost = costAdjustedTokens(imgCustPrice, result.provider === 'gemini' ? 1300 : 1000);
         await TokenWalletService.deductTokens({
           userId: user.id,
@@ -905,7 +905,7 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
             prompt: lastUserText.substring(0, 500),
             response: `[Image generated: ${result.revisedPrompt?.substring(0, 200) || enhancedPrompt.substring(0, 200)}]`,
             tokensInput: 0, tokensOutput: imageTokenCost, totalTokens: imageTokenCost,
-            providerCost: imgProvCost, markupPercentage: 25, customerPrice: imgCustomerPrice,
+            providerCost: imgProvCost, markupPercentage: 27.5, customerPrice: imgCustomerPrice,
             status: 'completed',
           },
         });
@@ -2086,10 +2086,19 @@ export const compareModels = asyncHandler(async (req: Request, res: Response) =>
 
   const compareTokenBal = await TokenWalletService.getBalance(user.id);
   const inputText = messages.map((m: any) => m.content).join(' ');
-  // Estimate: (input + system prompt + response buffer) * number of models
   const estimatedInputPerModel = Math.ceil(inputText.length / 4) + 500;
-  const estimatedPerModel = estimatedInputPerModel + 2000; // allow ~2000 output per model
-  const estimatedTotal = estimatedPerModel * modelIds.length;
+  // Per-model cost estimate from each model's actual prices + markup. Sum across
+  // all selected models. Falls back to old +2000-output heuristic per model if
+  // any lookup fails.
+  let estimatedTotal = 0;
+  for (const mid of modelIds) {
+    const est = await TokenWalletService.estimateQueryCost({
+      modelId: mid,
+      estInputTokens: estimatedInputPerModel,
+      maxOutputTokens: 2000,
+    });
+    estimatedTotal += est?.estimatedTokens ?? estimatedInputPerModel + 2000;
+  }
 
   if (compareTokenBal.tokenBalance <= 0) {
     const isOrgMember = !!user.organizationId;

@@ -620,14 +620,19 @@ export const generateImage = asyncHandler(async (req: Request, res: Response): P
 
   if (!user) throw new AppError('User not found', 404)
 
-  // Check token balance
+  // Check token balance — DALL-E costs ~$0.04 = ~16k wallet tokens, Gemini ~$0.003
+  // = ~1.5k. Old check was 500 tokens flat — way too loose for DALL-E. Use the
+  // higher (DALL-E) bound since we don't know which provider will resolve until
+  // FileProcessingService picks one.
   const imgTokenBal = await TokenWalletService.getBalance(user.id)
-  if (imgTokenBal.tokenBalance < 500) {
+  const imgEstimatedTokens = Math.ceil(costAdjustedTokens(0.04 * 1.275, 1000) * 1.1)
+  if (imgTokenBal.tokenBalance < imgEstimatedTokens) {
     res.status(402).json({
       success: false,
-      code: 'INSUFFICIENT_TOKENS',
-      message: 'You need more tokens to generate images.',
+      code: imgTokenBal.tokenBalance <= 0 ? 'NO_TOKENS' : 'INSUFFICIENT_TOKENS',
+      message: `Insufficient tokens for image generation. Estimated: ${imgEstimatedTokens.toLocaleString()}, balance: ${imgTokenBal.tokenBalance.toLocaleString()}.`,
       currentBalance: imgTokenBal.tokenBalance,
+      estimatedRequired: imgEstimatedTokens,
       action: 'BUY_TOKENS',
     })
     return
@@ -636,9 +641,10 @@ export const generateImage = asyncHandler(async (req: Request, res: Response): P
   // Generate image (Gemini first, DALL-E fallback)
   const result = await FileProcessingService.generateImage(prompt, size, quality, provider)
 
-  // Cost-adjusted token billing for image generation
+  // Cost-adjusted token billing for image generation — 27.5% markup matches the
+  // unified Convoia pricing policy (was 1.25 = 25%).
   const imgProvCost = result.provider === 'gemini' ? 0.003 : 0.04
-  const imgCustPrice = imgProvCost * 1.25  // 25% markup
+  const imgCustPrice = imgProvCost * 1.275
   const imageTokenCost = costAdjustedTokens(imgCustPrice, result.provider === 'gemini' ? 1300 : 1000)
   const orgId = user.organizationId || await getOrCreatePersonalOrg(user.id)
   await TokenWalletService.deductTokens({
