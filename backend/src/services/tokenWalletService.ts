@@ -1,5 +1,6 @@
 import prisma from '../config/db.js';
 import logger from '../config/logger.js';
+import { costAdjustedTokens } from '../config/tokenPackages.js';
 
 // Alert threshold: log a CRITICAL warning when a single deduction exceeds this many tokens.
 // A Starter pack = 500k tokens. Losing >100k in one call is unusual and worth tracking.
@@ -271,6 +272,68 @@ export class TokenWalletService {
       prisma.tokenTransaction.count({ where: { userId } }),
     ]);
     return { transactions, pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
+  }
+
+  /**
+   * Estimate the wallet-token cost of a query before the provider runs.
+   * Uses worst-case maxOutputTokens. Caller can compare result against balance.
+   * Returns null if model lookup fails — caller falls back to existing behavior.
+   */
+  static async estimateQueryCost(params: {
+    modelId: string;
+    estInputTokens: number;
+    maxOutputTokens: number;
+  }): Promise<{ estimatedTokens: number; estimatedCost: number } | null> {
+    const aiModel = await prisma.aIModel.findUnique({
+      where: { id: params.modelId },
+    });
+    if (!aiModel) return null;
+    const providerCost =
+      params.estInputTokens * aiModel.inputTokenPrice +
+      params.maxOutputTokens * aiModel.outputTokenPrice;
+    const customerPrice = providerCost * (1 + aiModel.markupPercentage / 100);
+    const rawWalletTokens = costAdjustedTokens(
+      customerPrice,
+      params.estInputTokens + params.maxOutputTokens,
+    );
+    // 10% safety margin absorbs tokenizer variance + markup drift
+    const estimatedTokens = Math.ceil(rawWalletTokens * 1.1);
+    return { estimatedTokens, estimatedCost: customerPrice };
+  }
+
+  /**
+   * Pre-flight balance gate. Compares user balance against estimated query cost.
+   * Returns { ok: true } if user has enough; { ok: false, ... } with details to
+   * surface in the 402 response otherwise.
+   *
+   * If model lookup fails (estimateQueryCost returns null), falls back to a
+   * lenient gate (balance > 0). Caller can still apply its own stricter check.
+   */
+  static async checkBalanceForQuery(params: {
+    userId: string;
+    modelId: string;
+    estInputTokens: number;
+    maxOutputTokens: number;
+  }): Promise<
+    | { ok: true; estimated: number; balance: number }
+    | { ok: false; estimated: number; balance: number }
+  > {
+    const wallet = await this.getBalance(params.userId);
+    const cost = await this.estimateQueryCost({
+      modelId: params.modelId,
+      estInputTokens: params.estInputTokens,
+      maxOutputTokens: params.maxOutputTokens,
+    });
+    if (!cost) {
+      // Model lookup failed — fall back to "any balance" check
+      return wallet.tokenBalance > 0
+        ? { ok: true, estimated: 0, balance: wallet.tokenBalance }
+        : { ok: false, estimated: 0, balance: wallet.tokenBalance };
+    }
+    if (wallet.tokenBalance < cost.estimatedTokens) {
+      return { ok: false, estimated: cost.estimatedTokens, balance: wallet.tokenBalance };
+    }
+    return { ok: true, estimated: cost.estimatedTokens, balance: wallet.tokenBalance };
   }
 
   static estimateTokens(text: string): number {
