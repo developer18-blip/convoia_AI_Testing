@@ -125,12 +125,64 @@ function setCache(url: string, data: FetchedURL): void {
   }
 }
 
-// ── SPA Fallback (Perplexity) ─────────────────────────────────────────
-// When direct fetch yields too few chars (typical for React/Vue/Svelte
-// SPAs hydrated client-side), retry through Perplexity which renders
-// pages server-side. No per-user billing wired — Convoia pays the
-// Perplexity API cost (~$0.005/call). Result feeds back into the same
-// 5-min URL cache via the caller.
+// ── SPA Fallback Tier 2: Jina Reader ──────────────────────────────────
+// Jina Reader (r.jina.ai) is purpose-built for fetching JS-rendered pages.
+// It runs a real headless browser and returns clean markdown. Free tier
+// has generous rate limits and requires no API key. This is the primary
+// SPA fallback — handles React/Vue/Svelte/Next.js client-rendered sites
+// that direct cheerio fetch cannot. Perplexity stays as tier 3 (below)
+// for paywalled sites where Jina also fails.
+
+async function jinaReaderFallback(url: string): Promise<{ content: string; title: string; success: boolean }> {
+  try {
+    const response = await axios.get(`https://r.jina.ai/${url}`, {
+      timeout: 25000,
+      maxContentLength: MAX_RESPONSE_SIZE,
+      headers: {
+        'Accept': 'text/plain, text/markdown',
+        'User-Agent': 'ConvoiaAI/1.0 (URL Preview Bot)',
+        'X-Return-Format': 'markdown',
+      },
+      responseType: 'text',
+      validateStatus: (s) => s < 400,
+    });
+
+    const raw = String(response.data || '').trim();
+    if (raw.length < 200) return { content: '', title: '', success: false };
+
+    // Jina prefixes output with metadata lines: "Title: ...", "URL Source: ...",
+    // "Published Time: ...", then "Markdown Content:" and the body. Extract
+    // the title and strip the metadata header.
+    let title = '';
+    const titleMatch = raw.match(/^Title:\s*(.+)$/m);
+    if (titleMatch) title = titleMatch[1].trim().slice(0, 200);
+
+    let body = raw;
+    const markerIdx = raw.indexOf('Markdown Content:');
+    if (markerIdx >= 0) {
+      body = raw.slice(markerIdx + 'Markdown Content:'.length).trim();
+    }
+
+    if (body.length < 200) return { content: '', title: '', success: false };
+
+    const truncated = body.length > MAX_CONTENT_LENGTH
+      ? body.slice(0, MAX_CONTENT_LENGTH) + '\n[content truncated]'
+      : body;
+    return { content: truncated, title, success: true };
+  } catch (err: any) {
+    logger.warn(`URL fetch: Jina Reader failed for ${url}: ${err.message}`);
+    return { content: '', title: '', success: false };
+  }
+}
+
+// ── SPA Fallback Tier 3: Perplexity ───────────────────────────────────
+// Last-resort tier when both direct fetch and Jina Reader yield too little.
+// Useful for paywalled or geo-blocked sites where Perplexity's search
+// indexes may have cached or summarized content. Note: Perplexity is a
+// search engine, not a renderer — it may return content from related URLs
+// rather than the exact target. Accept any source that returns substantive
+// content; searchWeb augments Perplexity citations with DDG/Tavily so the
+// final source field can mutate, but the underlying content is still useful.
 
 async function perplexityFallback(url: string, title: string): Promise<{ content: string; success: boolean }> {
   try {
@@ -138,11 +190,7 @@ async function perplexityFallback(url: string, title: string): Promise<{ content
     const query = `Summarize the content at ${url}${titleHint}. Include the main topic, key points, and any specific information visible on the page.`;
     const result = await searchWeb(query, 1);
 
-    // Only trust Perplexity-sourced results — DDG/Tavily fallbacks won't
-    // have rendered the SPA, they'd just return search snippets.
-    if (result.source !== 'perplexity' || result.results.length === 0) {
-      return { content: '', success: false };
-    }
+    if (result.results.length === 0) return { content: '', success: false };
 
     const text = (result.results[0].content || '').trim();
     if (text.length < 200) return { content: '', success: false };
@@ -248,12 +296,31 @@ async function fetchURL(url: string): Promise<FetchedURL> {
     const extracted = extractReadableContent(html, url);
 
     // SPA fallback: pages rendered client-side return tiny extracted text
-    // (just the SSR shell). Retry via Perplexity, which renders server-side.
+    // (just the SSR shell). Try Jina Reader (real headless browser) first,
+    // then Perplexity (search-based) for paywalled cases.
     if (extracted.content.length < SPA_FALLBACK_THRESHOLD) {
-      logger.info(`URL fetch: ${url} returned only ${extracted.content.length} chars (threshold ${SPA_FALLBACK_THRESHOLD}), trying Perplexity fallback`);
+      logger.info(`URL fetch: ${url} returned only ${extracted.content.length} chars (threshold ${SPA_FALLBACK_THRESHOLD}), trying Jina Reader fallback`);
+
+      // Tier 2: Jina Reader (renders JS, returns markdown)
+      const jina = await jinaReaderFallback(url);
+      if (jina.success) {
+        logger.info(`URL fetch: Jina Reader succeeded for ${url} (${jina.content.length} chars)`);
+        const result: FetchedURL = {
+          ...base,
+          title: jina.title || extracted.title || url,
+          content: jina.content,
+          contentLength: jina.content.length,
+          success: true,
+        };
+        setCache(url, result);
+        return result;
+      }
+
+      // Tier 3: Perplexity (search-based summary, last resort)
+      logger.info(`URL fetch: Jina Reader insufficient for ${url}, trying Perplexity tier 3`);
       const fb = await perplexityFallback(url, extracted.title);
       if (fb.success) {
-        logger.info(`URL fetch: Perplexity fallback succeeded for ${url} (${fb.content.length} chars)`);
+        logger.info(`URL fetch: Perplexity tier 3 succeeded for ${url} (${fb.content.length} chars)`);
         const result: FetchedURL = {
           ...base,
           title: extracted.title || url,
@@ -264,7 +331,8 @@ async function fetchURL(url: string): Promise<FetchedURL> {
         setCache(url, result);
         return result;
       }
-      // Fallback failed — keep direct content with explicit warning if very sparse
+
+      // All tiers failed — keep direct content with explicit warning if very sparse
       const result: FetchedURL = {
         ...base,
         title: extracted.title,
