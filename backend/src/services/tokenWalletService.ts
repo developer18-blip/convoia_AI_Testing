@@ -6,12 +6,6 @@ import { costAdjustedTokens } from '../config/tokenPackages.js';
 // A Starter pack = 500k tokens. Losing >100k in one call is unusual and worth tracking.
 const LARGE_DEDUCTION_THRESHOLD = 100_000;
 
-// Hard safety cap: a single query can never drain more than this many wallet tokens,
-// regardless of model price + markup. Prevents a misconfigured markup or a runaway
-// long-context query from zeroing the wallet in one shot.
-// 300k = 60% of a Starter pack — still large, but leaves the user some balance.
-export const MAX_SINGLE_DEDUCTION = 300_000;
-
 export class TokenWalletService {
   static async getOrCreateWallet(userId: string) {
     return await prisma.tokenWallet.upsert({
@@ -110,16 +104,10 @@ export class TokenWalletService {
     description: string;
     organizationId?: string;
   }): Promise<number> {
-    const { userId, tokens: rawTokens, reference, description, organizationId } = params;
-
-    // Apply the hard per-query safety cap before anything touches the DB.
-    const tokens = Math.min(rawTokens, MAX_SINGLE_DEDUCTION);
-    if (tokens < rawTokens) {
-      logger.warn(
-        `DEDUCTION_CAP_APPLIED: userId=${userId} requested=${rawTokens} capped=${tokens} ` +
-        `(MAX_SINGLE_DEDUCTION=${MAX_SINGLE_DEDUCTION}) — possible misconfigured markup or huge context.`
-      );
-    }
+    // Pre-flight (TokenWalletService.estimateQueryCost at caller) gates affordability.
+    // No clamp here — users with sufficient balance pay actual cost x markup;
+    // users without sufficient balance are rejected upstream with a 402.
+    const { userId, tokens, reference, description, organizationId } = params;
 
     try {
       return await prisma.$transaction(async (tx) => {

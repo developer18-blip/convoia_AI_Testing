@@ -15,7 +15,6 @@ import { enhanceImagePrompt } from '../services/imageIntentService.js';
 import { FileProcessingService } from '../services/fileProcessingService.js';
 import { generateVideo as generateVideoFn, VIDEO_TOKEN_COST, type MediaRequest } from '../services/mediaGenerationService.js';
 import { TOKEN_BASE_RATE, costAdjustedTokens } from '../config/tokenPackages.js';
-import { MAX_SINGLE_DEDUCTION } from '../services/tokenWalletService.js';
 import { buildThinkModeParams } from '../ai/thinkModeParams.js';
 import { routeToOptimalModel, type RouterInput, type RouterResult } from '../services/llmRouter.js';
 import { runCouncil } from '../services/councilService.js';
@@ -613,18 +612,6 @@ export const queryAIStream = async (req: Request, res: Response) => {
         canBuyTokens: !isOrgMember || user.role === 'org_owner',
       });
       return;
-    }
-
-    // Drain-rate guard: if the estimated cost for this query already exceeds
-    // MAX_SINGLE_DEDUCTION, log a critical warning.  The deductTokens() cap will
-    // prevent actual over-billing, but the log helps diagnose runaway configs.
-    const estimatedWalletCost = Math.ceil(estimatedInputTokens / 4); // rough pre-model estimate
-    if (estimatedWalletCost > MAX_SINGLE_DEDUCTION) {
-      logger.warn(
-        `DRAIN_GUARD: userId=${user.id} estimatedInputTokens=${estimatedInputTokens} ` +
-        `estimatedWalletCost=${estimatedWalletCost} exceeds MAX_SINGLE_DEDUCTION=${MAX_SINGLE_DEDUCTION} — ` +
-        `cap will apply at deduction time.`
-      );
     }
 
     // Budget check
@@ -1879,18 +1866,24 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
             logger.warn(`[stream] Response looks incomplete (intent=${intent.intent}, len=${fullResponse.length})`);
           }
 
-          // Provider signaled the response was cut off at the token cap.
-          // Log it so we can tune maxTokens per-intent, and append a short
-          // note to the live stream so the user knows to ask for more.
+          // Provider signaled finish_reason=length. But some providers (notably Gemini
+          // streaming) emit partial usage mid-stream and can drop the final totals chunk,
+          // leaving rawOutputTokens stuck at an early partial value. Only treat this
+          // as a real cap hit when the reported output is within 90% of our cap.
           const fr = (meta?.finishReason || '').toLowerCase();
-          const truncated = fr === 'length' || fr === 'max_tokens';
-          if (truncated) {
-            logger.warn(`[stream] Response truncated at max_tokens — user=${user.id} model=${finalModelId} intent=${intent.intent} maxTokens=${agentConfig?.maxTokens} outputTokens=${rawOutputTokens}`);
+          const hitLengthSignal = fr === 'length' || fr === 'max_tokens';
+          const cap = agentConfig?.maxTokens || 4096;
+          const isTrulyTruncated = hitLengthSignal && rawOutputTokens >= cap * 0.9;
+
+          if (isTrulyTruncated) {
+            logger.warn(`[stream] Response truncated at max_tokens — user=${user.id} model=${finalModelId} intent=${intent.intent} cap=${cap} outputTokens=${rawOutputTokens}`);
             if (!streamEnded && !res.writableEnded) {
               const note = '\n\n_[Response was cut short. Ask me to continue for more detail.]_';
               fullResponse += note;
               res.write(`data: ${JSON.stringify({ type: 'chunk', content: note })}\n\n`);
             }
+          } else if (hitLengthSignal) {
+            logger.warn(`[stream] Provider-side early finish (not at cap) — user=${user.id} model=${finalModelId} intent=${intent.intent} cap=${cap} outputTokens=${rawOutputTokens} finishReason=${fr}`);
           }
 
           // Fire-and-forget the async post-processing
