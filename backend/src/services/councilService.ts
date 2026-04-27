@@ -21,6 +21,11 @@ export interface CouncilConfig {
   organizationId: string;
   modelIds: string[];
   query: string;
+  // Rich multimodal messages forwarded to Phase 1 experts. Includes
+  // text content from prior turns, document text from uploaded PDFs,
+  // and (when present) image_url blocks for vision analysis.
+  // Phase 2 + 3 reason over text outputs and don't need this.
+  messages: Array<{ role: string; content: any }>;
   intent: string;
   thinkingEnabled?: boolean;
   memoryContext?: string;
@@ -67,7 +72,21 @@ type CouncilModel = {
   outputTokenPrice: number;
   markupPercentage: number;
   contextWindow: number;
+  capabilities: string[];
 };
+
+// Strip image_url / image / inlineData parts from a multimodal content
+// array, keeping only text. Used when dispatching to a non-vision model.
+function stripImageParts(messages: Array<{ role: string; content: any }>): Array<{ role: string; content: any }> {
+  return messages.map(m => {
+    if (!Array.isArray(m.content)) return m;
+    const textOnly = m.content
+      .filter((c: any) => c?.type === 'text' || typeof c === 'string')
+      .map((c: any) => (typeof c === 'string' ? c : c.text))
+      .join('\n');
+    return { ...m, content: textOnly || '[image attached, but this model cannot view images]' };
+  });
+}
 
 export async function runCouncil(
   config: CouncilConfig,
@@ -86,7 +105,7 @@ export async function runCouncil(
     select: {
       id: true, modelId: true, name: true, provider: true,
       inputTokenPrice: true, outputTokenPrice: true, markupPercentage: true,
-      contextWindow: true,
+      contextWindow: true, capabilities: true,
     },
   });
 
@@ -161,11 +180,26 @@ export async function runCouncil(
     try {
       const phase1SystemPrompt = getPhase1Prompt(config.query, model.name);
 
+      // Vision filtering: if the conversation has image content but this
+      // expert isn't vision-capable, send text-only (image stripped). The
+      // expert sees the user's text description but can't analyze the
+      // pixels — better than rejecting the whole Apex run.
+      const hasImageContent = config.messages.some(
+        m => Array.isArray(m.content) && m.content.some((c: any) => c?.type === 'image_url' || c?.type === 'image')
+      );
+      const isVisionCapable = (model.capabilities || []).some(c => c === 'vision' || c === 'multimodal');
+      const messagesForExpert = (hasImageContent && !isVisionCapable)
+        ? stripImageParts(config.messages)
+        : config.messages;
+      if (hasImageContent && !isVisionCapable) {
+        logger.info(`Council: ${model.name} is not vision-capable — sending text-only`);
+      }
+
       const result = await AIGatewayService.sendMessage({
         userId: config.userId,
         organizationId: config.organizationId,
         modelId: model.id,
-        messages: [{ role: 'user', content: config.query }],
+        messages: messagesForExpert,
         agentConfig: {
           systemPrompt: phase1SystemPrompt,
           temperature: 0.4,

@@ -1063,12 +1063,50 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
       }
 
       try {
+        // Build council messages with image data injected. Mirrors the
+        // multimodal injection at the streaming-chat path (line ~1525)
+        // but runs here because the council branch returns early.
+        // Document/PDF text is already in cappedMessages from upstream
+        // extraction — no extra work needed for those.
+        let councilMessages: Array<{ role: string; content: any }> = enrichedMessages;
+        const councilImages: string[] = referenceImages?.length > 0
+          ? referenceImages
+          : referenceImage ? [referenceImage] : [];
+        if (councilImages.length > 0) {
+          const lastIdx = councilMessages.length - 1;
+          if (councilMessages[lastIdx]?.role === 'user') {
+            const textContent = councilMessages[lastIdx].content;
+            const contentParts: any[] = [{ type: 'text', text: textContent }];
+            for (const imgBase64 of councilImages) {
+              let mimeType = 'image/jpeg';
+              let rawBase64 = imgBase64;
+              if (imgBase64.startsWith('data:')) {
+                const m = imgBase64.match(/^data:(image\/\w+);base64,/);
+                if (m) {
+                  mimeType = m[1];
+                  rawBase64 = imgBase64.replace(/^data:image\/\w+;base64,/, '');
+                }
+              }
+              contentParts.push({
+                type: 'image_url',
+                image_url: { url: imgBase64.startsWith('data:') ? imgBase64 : `data:${mimeType};base64,${rawBase64}` },
+                _base64: rawBase64,
+                _mimeType: mimeType,
+              });
+            }
+            councilMessages = [...councilMessages];
+            councilMessages[lastIdx] = { ...councilMessages[lastIdx], content: contentParts };
+            logger.info(`Council: injected ${councilImages.length} image(s) into expert dispatch`);
+          }
+        }
+
         await runCouncil(
           {
             userId: user.id,
             organizationId,
             modelIds: councilModelIds,
             query: latestUserText,
+            messages: councilMessages,
             intent: intent?.intent || 'question',
             thinkingEnabled: !!thinkingEnabled,
             memoryContext: memoryPrompt || undefined,
