@@ -276,25 +276,39 @@ export class TokenWalletService {
 
   /**
    * Estimate the wallet-token cost of a query before the provider runs.
-   * Uses worst-case maxOutputTokens. Caller can compare result against balance.
+   * Uses worst-case maxOutputTokens, plus optional reasoning + search budgets
+   * for models that bill those components (Perplexity Sonar family). Caller
+   * can compare result against balance.
    * Returns null if model lookup fails — caller falls back to existing behavior.
    */
   static async estimateQueryCost(params: {
     modelId: string;
     estInputTokens: number;
     maxOutputTokens: number;
+    maxReasoningTokens?: number;
+    maxSearchQueries?: number;
   }): Promise<{ estimatedTokens: number; estimatedCost: number } | null> {
     const aiModel = await prisma.aIModel.findUnique({
       where: { id: params.modelId },
     });
     if (!aiModel) return null;
+    // Perplexity-style extras: 0 for models that don't bill these. Cast mirrors
+    // the existing pattern at aiController.ts:1944-1946.
+    const reasoningPrice = (aiModel as any).reasoningTokenPrice ?? 0;
+    const queryFee = (aiModel as any).perQueryFee ?? 0;
+    // Auto-default to worst-case for models that bill these components.
+    // Caller can override with a tighter bound if known.
+    const maxReason = params.maxReasoningTokens ?? (reasoningPrice > 0 ? 250_000 : 0);
+    const maxQueries = params.maxSearchQueries ?? (queryFee > 0 ? 50 : 0);
     const providerCost =
       params.estInputTokens * aiModel.inputTokenPrice +
-      params.maxOutputTokens * aiModel.outputTokenPrice;
+      params.maxOutputTokens * aiModel.outputTokenPrice +
+      maxReason * reasoningPrice +
+      maxQueries * queryFee;
     const customerPrice = providerCost * (1 + aiModel.markupPercentage / 100);
     const rawWalletTokens = costAdjustedTokens(
       customerPrice,
-      params.estInputTokens + params.maxOutputTokens,
+      params.estInputTokens + params.maxOutputTokens + maxReason,
     );
     // 10% safety margin absorbs tokenizer variance + markup drift
     const estimatedTokens = Math.ceil(rawWalletTokens * 1.1);
