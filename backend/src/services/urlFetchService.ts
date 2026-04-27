@@ -7,6 +7,7 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { URL } from 'url';
 import logger from '../config/logger.js';
+import { searchWeb } from './webSearchService.js';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -32,6 +33,7 @@ const FETCH_TIMEOUT_MS = 10000;
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024;   // 5MB
 const MAX_CONTENT_LENGTH = 15000;              // chars per URL
 const MAX_TOTAL_CONTENT = 30000;               // chars across all URLs
+const SPA_FALLBACK_THRESHOLD = 800;            // below this, try Perplexity for SPA-rendered pages
 
 // ── SSRF Protection ───────────────────────────────────────────────────
 
@@ -120,6 +122,38 @@ function setCache(url: string, data: FetchedURL): void {
   if (urlCache.size > 100) {
     const oldest = urlCache.keys().next().value;
     if (oldest) urlCache.delete(oldest);
+  }
+}
+
+// ── SPA Fallback (Perplexity) ─────────────────────────────────────────
+// When direct fetch yields too few chars (typical for React/Vue/Svelte
+// SPAs hydrated client-side), retry through Perplexity which renders
+// pages server-side. No per-user billing wired — Convoia pays the
+// Perplexity API cost (~$0.005/call). Result feeds back into the same
+// 5-min URL cache via the caller.
+
+async function perplexityFallback(url: string, title: string): Promise<{ content: string; success: boolean }> {
+  try {
+    const titleHint = title ? ` (page title: "${title.slice(0, 120)}")` : '';
+    const query = `Summarize the content at ${url}${titleHint}. Include the main topic, key points, and any specific information visible on the page.`;
+    const result = await searchWeb(query, 1);
+
+    // Only trust Perplexity-sourced results — DDG/Tavily fallbacks won't
+    // have rendered the SPA, they'd just return search snippets.
+    if (result.source !== 'perplexity' || result.results.length === 0) {
+      return { content: '', success: false };
+    }
+
+    const text = (result.results[0].content || '').trim();
+    if (text.length < 200) return { content: '', success: false };
+
+    const truncated = text.length > MAX_CONTENT_LENGTH
+      ? text.slice(0, MAX_CONTENT_LENGTH) + '\n[content truncated]'
+      : text;
+    return { content: truncated, success: true };
+  } catch (err: any) {
+    logger.warn(`URL fetch: Perplexity fallback failed for ${url}: ${err.message}`);
+    return { content: '', success: false };
   }
 }
 
@@ -213,8 +247,32 @@ async function fetchURL(url: string): Promise<FetchedURL> {
     // HTML — extract readable content
     const extracted = extractReadableContent(html, url);
 
-    if (extracted.content.length < 100) {
-      const result: FetchedURL = { ...base, title: extracted.title, content: extracted.content, contentLength: extracted.content.length, success: true, error: extracted.content.length < 50 ? '[Minimal content extracted — page may be paywalled or require JavaScript]' : undefined };
+    // SPA fallback: pages rendered client-side return tiny extracted text
+    // (just the SSR shell). Retry via Perplexity, which renders server-side.
+    if (extracted.content.length < SPA_FALLBACK_THRESHOLD) {
+      logger.info(`URL fetch: ${url} returned only ${extracted.content.length} chars (threshold ${SPA_FALLBACK_THRESHOLD}), trying Perplexity fallback`);
+      const fb = await perplexityFallback(url, extracted.title);
+      if (fb.success) {
+        logger.info(`URL fetch: Perplexity fallback succeeded for ${url} (${fb.content.length} chars)`);
+        const result: FetchedURL = {
+          ...base,
+          title: extracted.title || url,
+          content: fb.content,
+          contentLength: fb.content.length,
+          success: true,
+        };
+        setCache(url, result);
+        return result;
+      }
+      // Fallback failed — keep direct content with explicit warning if very sparse
+      const result: FetchedURL = {
+        ...base,
+        title: extracted.title,
+        content: extracted.content,
+        contentLength: extracted.content.length,
+        success: true,
+        error: extracted.content.length < 50 ? '[Minimal content extracted — page may be paywalled or require JavaScript]' : undefined,
+      };
       setCache(url, result);
       return result;
     }
