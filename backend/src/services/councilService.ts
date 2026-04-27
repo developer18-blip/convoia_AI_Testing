@@ -117,18 +117,34 @@ export async function runCouncil(
   // Strongest = highest output price (proxy for capability)
   const strongestModel = [...models].sort((a, b) => b.outputTokenPrice - a.outputTokenPrice)[0];
 
-  const moderatorModel = await prisma.aIModel.findFirst({
-    where: { modelId: { contains: 'claude-haiku' }, isActive: true },
+  // Moderator: prefer Sonnet 4.6 for stronger synthesis; fall back to Haiku
+  // if Sonnet isn't seeded/active (keeps Apex runnable on minimal model sets).
+  let moderatorCandidate = await prisma.aIModel.findFirst({
+    where: { modelId: { contains: 'claude-sonnet-4-6' }, isActive: true },
     select: {
       id: true, modelId: true, name: true, provider: true,
       inputTokenPrice: true, outputTokenPrice: true, markupPercentage: true,
     },
   });
 
-  if (!moderatorModel) {
-    callbacks.onError(new Error('Moderator model (Claude Haiku) not available'));
+  if (!moderatorCandidate) {
+    logger.warn('Apex: claude-sonnet-4-6 moderator not found, falling back to Haiku');
+    moderatorCandidate = await prisma.aIModel.findFirst({
+      where: { modelId: { contains: 'claude-haiku' }, isActive: true },
+      select: {
+        id: true, modelId: true, name: true, provider: true,
+        inputTokenPrice: true, outputTokenPrice: true, markupPercentage: true,
+      },
+    });
+  }
+
+  if (!moderatorCandidate) {
+    callbacks.onError(new Error('Apex: no moderator model available (neither Sonnet 4.6 nor Haiku)'));
     return;
   }
+  // Rebind to `const` so TypeScript preserves non-null narrowing across
+  // the rest of this function (Phase 2 + Phase 3 references below).
+  const moderatorModel = moderatorCandidate;
 
   // Pre-flight balance estimate — conservative
   const estimatedOutputPerModel = 2000;
