@@ -1392,17 +1392,35 @@ function callAnthropicStream(
     stream: true,
   };
 
-  // Extended thinking mode (Claude only)
+  // Extended thinking mode (Claude only) — hedged by modelId.
+  // Mirrors B1 in callAnthropic: modern Claude (4.6+) uses adaptive
+  // shape, 4.5 family uses thinking.enabled + budget_tokens.
+  // See ADAPTIVE_THINKING_MODELS comment for empirical context.
   if (overrides?.thinkingEnabled) {
-    const thinkBudget = overrides?.thinkingBudget || 10000;
-    body.thinking = { type: 'enabled', budget_tokens: thinkBudget };
-    // Extended thinking requires max_tokens > budget_tokens — add 8000 headroom
-    body.max_tokens = Math.max(body.max_tokens, thinkBudget + 8000);
-    // Legacy thinking requires temperature=1, but Opus 4.7+ rejects any
-    // temperature value. Omit for those models. (Hotfix-S will rework
-    // this branch to use the adaptive shape entirely.)
-    if (!OMIT_TEMPERATURE_MODELS.has(modelId)) body.temperature = 1;
-    delete body.top_p;    // Anthropic rejects both temperature AND top_p together
+    if (ADAPTIVE_THINKING_MODELS.has(modelId)) {
+      // Defense in depth: clamp xhigh to high for models not in
+      // XHIGH_CAPABLE_MODELS (future-safety against unverified models).
+      const requestedEffort = overrides?.reasoningEffort || 'high';
+      const effort = (requestedEffort === 'xhigh' && !XHIGH_CAPABLE_MODELS.has(modelId))
+        ? 'high'
+        : requestedEffort;
+      if (requestedEffort === 'xhigh' && effort !== 'xhigh') {
+        logger.info(`Anthropic stream: clamped xhigh→high for ${modelId} (not in XHIGH_CAPABLE_MODELS)`);
+      }
+      body.thinking = { type: 'adaptive' };
+      body.output_config = { effort };
+      // No temperature=1 requirement on adaptive shape; no beta header needed.
+    } else {
+      // Legacy form for 4.5 family (Opus 4.5, Haiku 4.5, Sonnet 4.5).
+      const thinkBudget = overrides?.thinkingBudget || 10000;
+      body.thinking = { type: 'enabled', budget_tokens: thinkBudget };
+      // Extended thinking requires max_tokens > budget_tokens — add 8000 headroom
+      body.max_tokens = Math.max(body.max_tokens, thinkBudget + 8000);
+      // Belt-and-suspenders: Opus 4.7 wouldn't reach this branch (routes
+      // via ADAPTIVE_THINKING_MODELS), but gate for any future OMIT model.
+      if (!OMIT_TEMPERATURE_MODELS.has(modelId)) body.temperature = 1;
+      delete body.top_p;    // Anthropic rejects both temperature AND top_p together
+    }
   } else {
     if (OMIT_TEMPERATURE_MODELS.has(modelId)) {
       // Sampling params disallowed on this model — omit both temperature and top_p.
@@ -1431,8 +1449,9 @@ function callAnthropicStream(
         'anthropic-version': '2023-06-01',
         'Content-Type': 'application/json',
       };
-      // Extended thinking requires beta header
-      if (overrides?.thinkingEnabled) {
+      // Extended thinking beta header — only for legacy form (4.5 family).
+      // Adaptive shape (4.6+) doesn't use this header.
+      if (overrides?.thinkingEnabled && !ADAPTIVE_THINKING_MODELS.has(modelId)) {
         headers['anthropic-beta'] = 'interleaved-thinking-2025-05-14';
       }
 
