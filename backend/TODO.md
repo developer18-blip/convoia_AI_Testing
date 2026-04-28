@@ -44,3 +44,12 @@ Tunable per-model without code changes. Refs: Fix 6 Phase A.5 (commit will be ad
 **Effort:** ~25 lines across 2 files
 **Priority:** Activate only if agent tool-call traffic begins firing
 **Identified:** 2026-04-27 audit. Investigation 2026-04-27 confirmed zero traffic.
+
+## BUG-013 — Circular JSON error at aiController.ts:1114
+Status: Latent bug, separate from Hotfix-L scope
+Symptom: onError callback's JSON.stringify(err) fails when err contains TLSSocket
+Impact: Error logs occasionally show 'Converting circular structure to JSON' instead of useful info
+Fix approach: Use a JSON.stringify replacer that strips TLSSocket / circular refs before serialization
+Effort: ~10 lines in onError handler
+Priority: Low (cosmetic — error still surfaces, just with this extra noise line)
+Identified: 2026-04-29 during Hotfix-L investigation
