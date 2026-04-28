@@ -275,6 +275,7 @@ export class TokenWalletService {
     maxOutputTokens: number;
     maxReasoningTokens?: number;
     maxSearchQueries?: number;
+    numImages?: number;  // counted only if model supports vision
   }): Promise<{ estimatedTokens: number; estimatedCost: number } | null> {
     const aiModel = await prisma.aIModel.findUnique({
       where: { id: params.modelId },
@@ -288,15 +289,24 @@ export class TokenWalletService {
     // Caller can override with a tighter bound if known.
     const maxReason = params.maxReasoningTokens ?? (reasoningPrice > 0 ? 250_000 : 0);
     const maxQueries = params.maxSearchQueries ?? (queryFee > 0 ? 50 : 0);
+    // Image input budget - only counted for vision-capable models. Anthropic
+    // ~1500 tok/image, OpenAI ~1100, Gemini ~1300; use 1500 as conservative
+    // upper bound (slight over-budget is safer than under-budget). Non-vision
+    // models drop images server-side and contribute zero image cost.
+    const numImages = params.numImages ?? 0;
+    const supportsVision = (aiModel.capabilities ?? []).includes('vision');
+    const imageInputTokens = (numImages > 0 && supportsVision) ? numImages * 1500 : 0;
+    const imageInputCost = imageInputTokens * aiModel.inputTokenPrice;
     const providerCost =
       params.estInputTokens * aiModel.inputTokenPrice +
       params.maxOutputTokens * aiModel.outputTokenPrice +
       maxReason * reasoningPrice +
-      maxQueries * queryFee;
+      maxQueries * queryFee +
+      imageInputCost;
     const customerPrice = providerCost * (1 + aiModel.markupPercentage / 100);
     const rawWalletTokens = costAdjustedTokens(
       customerPrice,
-      params.estInputTokens + params.maxOutputTokens + maxReason,
+      params.estInputTokens + params.maxOutputTokens + maxReason + imageInputTokens,
     );
     // 10% safety margin absorbs tokenizer variance + markup drift
     const estimatedTokens = Math.ceil(rawWalletTokens * 1.1);

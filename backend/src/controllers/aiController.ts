@@ -69,7 +69,7 @@ const IMAGE_ONLY_MODELS = new Set([
 
 export const queryAI = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) throw new AppError('Unauthorized', 401);
-  const { modelId, messages, industry, agentId } = req.body;
+  const { modelId, messages, industry, agentId, referenceImage, referenceImages } = req.body;
   if (!modelId || !messages || messages.length === 0) {
     throw new AppError('modelId and messages are required', 400);
   }
@@ -95,10 +95,12 @@ export const queryAI = asyncHandler(async (req: Request, res: Response) => {
   const tokenBalance = await TokenWalletService.getBalance(user.id);
   const inputText = messages.map((m: any) => m.content).join(' ');
   const estimatedInputTokens = Math.ceil(inputText.length / 4) + 500;
+  const numImages = (Array.isArray(referenceImages) ? referenceImages.length : 0) + (referenceImage ? 1 : 0);
   const chatCostEstimate = await TokenWalletService.estimateQueryCost({
     modelId,
     estInputTokens: estimatedInputTokens,
     maxOutputTokens: 8000,
+    numImages,
   });
   const minimumRequired = chatCostEstimate?.estimatedTokens ?? estimatedInputTokens + 200;
 
@@ -578,10 +580,12 @@ export const queryAIStream = async (req: Request, res: Response) => {
     const streamTokenBalance = await TokenWalletService.getBalance(user.id);
     const inputText = cappedMessages.map((m: any) => m.content).join(' ');
     const estimatedInputTokens = Math.ceil(inputText.length / 4) + 500;
+    const streamNumImages = (Array.isArray(referenceImages) ? referenceImages.length : 0) + (referenceImage ? 1 : 0);
     const streamCostEstimate = await TokenWalletService.estimateQueryCost({
       modelId,
       estInputTokens: estimatedInputTokens,
       maxOutputTokens: 8000,
+      numImages: streamNumImages,
     });
     const minimumRequired = streamCostEstimate?.estimatedTokens ?? estimatedInputTokens + 200;
 
@@ -2114,7 +2118,7 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
 
 export const compareModels = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) throw new AppError('Unauthorized', 401);
-  const { modelIds, messages, industry } = req.body;
+  const { modelIds, messages, industry, referenceImage, referenceImages } = req.body;
   if (!modelIds || modelIds.length === 0 || !messages) {
     throw new AppError('modelIds array and messages are required', 400);
   }
@@ -2131,6 +2135,7 @@ export const compareModels = asyncHandler(async (req: Request, res: Response) =>
   const compareTokenBal = await TokenWalletService.getBalance(user.id);
   const inputText = messages.map((m: any) => m.content).join(' ');
   const estimatedInputPerModel = Math.ceil(inputText.length / 4) + 500;
+  const compareNumImages = (Array.isArray(referenceImages) ? referenceImages.length : 0) + (referenceImage ? 1 : 0);
   // Per-model cost estimate from each model's actual prices + markup. Sum across
   // all selected models. Falls back to old +2000-output heuristic per model if
   // any lookup fails.
@@ -2140,6 +2145,7 @@ export const compareModels = asyncHandler(async (req: Request, res: Response) =>
       modelId: mid,
       estInputTokens: estimatedInputPerModel,
       maxOutputTokens: 2000,
+      numImages: compareNumImages,
     });
     estimatedTotal += est?.estimatedTokens ?? estimatedInputPerModel + 2000;
   }
