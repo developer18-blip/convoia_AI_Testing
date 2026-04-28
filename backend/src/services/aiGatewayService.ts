@@ -176,7 +176,7 @@ interface SendMessageParams {
   webSearchActive?: boolean; // Augment system prompt with web search formatting rules
   complexity?: 'simple' | 'standard' | 'complex'; // Query complexity for prompt sizing
   thinkingBudget?: number; // Claude budget_tokens + Gemini thinkingConfig.thinkingBudget
-  reasoningEffort?: 'low' | 'medium' | 'high'; // OpenAI reasoning_effort + GPT-5 reasoning.effort
+  reasoningEffort?: 'low' | 'medium' | 'high' | 'xhigh'; // 'xhigh' is Anthropic-only — runtime clamps to 'high' for OpenAI
 }
 
 interface SendVisionParams {
@@ -350,7 +350,7 @@ interface ProviderOverrides {
   topP?: number;
   thinkingEnabled?: boolean;
   thinkingBudget?: number; // Claude budget_tokens + Gemini thinkingBudget
-  reasoningEffort?: 'low' | 'medium' | 'high'; // OpenAI o-series + GPT-5 family
+  reasoningEffort?: 'low' | 'medium' | 'high' | 'xhigh'; // 'xhigh' is Anthropic-only — runtime clamps to 'high' for OpenAI
 }
 
 // PURE reasoning models (o1/o3/o4-mini) — reject temperature, top_p; require 'developer' role
@@ -424,7 +424,7 @@ async function callOpenAI(modelId: string, messages: any[], systemPrompt: string
       // Native reasoning effort — when think mode is active OR caller
       // explicitly set a level. 'high' is the default for think mode.
       if (overrides?.thinkingEnabled || overrides?.reasoningEffort) {
-        body.reasoning_effort = overrides?.reasoningEffort || 'high';
+        body.reasoning_effort = clampOpenAIEffort(overrides?.reasoningEffort) || 'high';
         body.max_completion_tokens = Math.max(body.max_completion_tokens, 32768);
       }
     } else if (gpt5) {
@@ -435,7 +435,7 @@ async function callOpenAI(modelId: string, messages: any[], systemPrompt: string
       // The nested { reasoning: { effort } } shape is for the /v1/responses endpoint —
       // sending it to /v1/chat/completions returns 400 'Unknown parameter: reasoning'.
       if (overrides?.thinkingEnabled || overrides?.reasoningEffort) {
-        body.reasoning_effort = overrides?.reasoningEffort || 'high';
+        body.reasoning_effort = clampOpenAIEffort(overrides?.reasoningEffort) || 'high';
         body.max_completion_tokens = Math.max(body.max_completion_tokens, 32768);
       }
     } else {
@@ -478,6 +478,25 @@ const ADAPTIVE_THINKING_MODELS = new Set<string>([
   'claude-sonnet-4-6',
 ]);
 
+// Models that accept output_config.effort='xhigh' on the native Anthropic
+// API. Verified via probe 2026-04-28: claude-opus-4-7 accepts. Opus 4.6
+// and Sonnet 4.6 not yet probed for xhigh — clamped to 'high' until
+// verified to avoid 400s. Update as new models verify.
+const XHIGH_CAPABLE_MODELS = new Set<string>(['claude-opus-4-7']);
+
+// Defense in depth: OpenAI accepts only low|medium|high — never xhigh.
+// If a caller routes xhigh to an OpenAI model (intentional or otherwise),
+// downgrade to 'high' to avoid 400. Logs per-clamp for visibility.
+function clampOpenAIEffort(
+  effort?: 'low' | 'medium' | 'high' | 'xhigh'
+): 'low' | 'medium' | 'high' | undefined {
+  if (effort === 'xhigh') {
+    logger.info('OpenAI: clamped reasoning_effort xhigh→high (OpenAI does not support xhigh)');
+    return 'high';
+  }
+  return effort;
+}
+
 async function callAnthropic(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
   const buildBody = (forceTemp1: boolean = false): { body: Record<string, any>; headers: Record<string, string> } => {
     const body: Record<string, any> = {
@@ -499,8 +518,17 @@ async function callAnthropic(modelId: string, messages: any[], systemPrompt: str
       // Opus 4.7 rejects the legacy form; the 4.5 family rejects the new
       // shape. Verified empirically across 6 models / 9 probes (2026-04-28).
       if (ADAPTIVE_THINKING_MODELS.has(modelId)) {
+        // Defense in depth: clamp xhigh to high for models not in
+        // XHIGH_CAPABLE_MODELS (future-safety against unverified models).
+        const requestedEffort = overrides?.reasoningEffort || 'high';
+        const effort = (requestedEffort === 'xhigh' && !XHIGH_CAPABLE_MODELS.has(modelId))
+          ? 'high'
+          : requestedEffort;
+        if (requestedEffort === 'xhigh' && effort !== 'xhigh') {
+          logger.info(`Anthropic: clamped xhigh→high for ${modelId} (not in XHIGH_CAPABLE_MODELS)`);
+        }
         body.thinking = { type: 'adaptive' };
-        body.output_config = { effort: overrides?.reasoningEffort || 'high' };
+        body.output_config = { effort };
         // No temperature=1 requirement on new shape; no beta header needed.
       } else {
         // Legacy form for 4.5 family (Opus 4.5, Haiku 4.5, Sonnet 4.5).
@@ -1147,7 +1175,7 @@ function callOpenAIStream(
     // o-series: only max_completion_tokens, no temperature/top_p
     body.max_completion_tokens = overrides?.maxTokens ?? 16384;
     if (thinkingEnabled || overrides?.reasoningEffort) {
-      body.reasoning_effort = overrides?.reasoningEffort || 'high';
+      body.reasoning_effort = clampOpenAIEffort(overrides?.reasoningEffort) || 'high';
       body.max_completion_tokens = Math.max(body.max_completion_tokens, 32768);
     }
   } else if (gpt5) {
@@ -1156,7 +1184,7 @@ function callOpenAIStream(
     body.temperature = overrides?.temperature ?? 0.7;
     if (overrides?.topP != null) body.top_p = overrides.topP;
     if (thinkingEnabled || overrides?.reasoningEffort) {
-      body.reasoning = { effort: overrides?.reasoningEffort || 'high' };
+      body.reasoning = { effort: clampOpenAIEffort(overrides?.reasoningEffort) || 'high' };
       body.max_completion_tokens = Math.max(body.max_completion_tokens, 32768);
     }
   } else {
