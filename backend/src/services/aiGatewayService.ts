@@ -2123,14 +2123,22 @@ export class AIGatewayService {
     // Without this cap, GPT-5 and reasoning models burn 10K+ tokens on simple
     // queries because they interpret high max_tokens as "go long / think hard".
     // Simple "hey?" should never produce a 10K-token response.
+    //
+    // Anthropic exception: Claude models stop naturally at end_turn — they
+    // don't interpret high max_tokens as a "go long" signal. Applying this
+    // cap to Anthropic silently truncated legitimate long-form responses
+    // (research analysis, detailed code, document generation) at 2048 tokens
+    // for weeks. Skipped here so Anthropic gets the value the caller intended.
     const complexityCaps: Record<string, number> = {
       simple: 512,     // Greetings, acknowledgments
       standard: 2048,  // Normal questions
       complex: 8192,   // Long code, deep analysis, multi-question
     };
-    const complexityCap = complexityCaps[params.complexity || 'standard'] || 2048;
-    if (effectiveMaxTokens && effectiveMaxTokens > complexityCap) {
-      effectiveMaxTokens = complexityCap;
+    if (effectiveModel.provider !== 'anthropic') {
+      const complexityCap = complexityCaps[params.complexity || 'standard'] || 2048;
+      if (effectiveMaxTokens && effectiveMaxTokens > complexityCap) {
+        effectiveMaxTokens = complexityCap;
+      }
     }
 
     const overrides: ProviderOverrides = {
