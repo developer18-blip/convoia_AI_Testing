@@ -1610,7 +1610,7 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
     // sendMessageStream call can pass depth-scaled thinking params even
     // though `analysis` itself is scoped inside the if-block.
     let depthThinkingBudget: number | undefined;
-    let depthReasoningEffort: 'low' | 'medium' | 'high' | undefined;
+    let depthReasoningEffort: 'low' | 'medium' | 'high' | 'xhigh' | undefined;
 
     if (thinkingEnabled) {
       const analysis = await analyzeQuery(
@@ -1623,7 +1623,10 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
       depthThinkingBudget = analysis.depthLevel === 'research' ? 20000
         : analysis.depthLevel === 'deep' ? 10000
         : 5000;
-      depthReasoningEffort = analysis.depthLevel === 'research' ? 'high'
+      // Premium effort on premium model + premium depth (matches Pass 1 routing).
+      const isOpus47ForRefine = selectedModel?.modelId === 'claude-opus-4-7';
+      depthReasoningEffort = analysis.depthLevel === 'research'
+        ? (isOpus47ForRefine ? 'xhigh' : 'high')
         : analysis.depthLevel === 'deep' ? 'medium'
         : 'low';
       const thinkIntel = getModelIntelligence(selectedModel?.modelId || '');
@@ -1708,7 +1711,17 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
             // still gets the lion's share but we leave headroom for the
             // refinement pass that follows.
             thinkingBudget: analysis.depthLevel === 'research' ? 16000 : 8000,
-            reasoningEffort: analysis.depthLevel === 'research' ? 'high' : 'medium',
+            reasoningEffort: (() => {
+              // Premium effort on premium model + premium depth.
+              // Limits xhigh exposure to deeply complex research queries on
+              // claude-opus-4-7 only. Other models continue to use 'high'
+              // for research depth and 'medium' otherwise.
+              const isOpus47 = selectedModel?.modelId === 'claude-opus-4-7';
+              if (analysis.depthLevel === 'research') {
+                return isOpus47 ? 'xhigh' : 'high';
+              }
+              return 'medium';
+            })(),
           });
 
           pass1ExtraInputTokens = pass1Result.inputTokens;
