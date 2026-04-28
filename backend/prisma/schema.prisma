@@ -41,6 +41,18 @@ model Organization {
   activityLogs     ActivityLog[]
   tokenPurchases   TokenPurchase[]
 
+  // ── Token Alerts & Auto-Refill (Phase 1) ──────────────────────────
+  // Per-org rollout switch. FEATURE_TOKEN_ALERTS env is the global
+  // kill switch; this column gates per-org enrollment.
+  tokenAlertsEnabled Boolean @default(false)
+  // USD cents per wallet token. Snapshotted into TokenEvent.metadata
+  // at refill time so admin rate changes don't reprice past refills.
+  tokenToCentsRate   Decimal @default(0.00025) @db.Decimal(10, 6)
+
+  tokenAlertSetting TokenAlertSetting?
+  tokenRefillRules  TokenRefillRule[]
+  tokenEvents       TokenEvent[]
+
   @@index([ownerId])
   @@index([status])
   @@index([tier])
@@ -102,6 +114,11 @@ model User {
   agentProjects  AgentProject[]
   toolExecutions ToolExecution[]
 
+  // Token Alerts & Auto-Refill (Phase 1) — inverse relations
+  refillRulesAsSubject TokenRefillRule[] @relation("RefillRuleSubject")
+  refillRulesCreated   TokenRefillRule[] @relation("RefillRuleCreator")
+  tokenEvents          TokenEvent[]
+
   @@index([organizationId])
   @@index([managerId])
   @@index([email])
@@ -134,27 +151,27 @@ model APIKey {
 }
 
 model AIModel {
-  id                  String          @id @default(uuid())
-  name                String          @unique
-  provider            String
-  modelId             String          @unique
-  description         String?
-  inputTokenPrice     Float
-  outputTokenPrice    Float
-  reasoningTokenPrice Float           @default(0)
-  perQueryFee         Float           @default(0)
+  id                     String          @id @default(uuid())
+  name                   String          @unique
+  provider               String
+  modelId                String          @unique
+  description            String?
+  inputTokenPrice        Float
+  outputTokenPrice       Float
+  reasoningTokenPrice    Float           @default(0)
+  perQueryFee            Float           @default(0)
   markupPercentage       Float           @default(27.5)
   markupMultiplier       Float?          @default(1.275)
   providerBaseCostInput  Float?
   providerBaseCostOutput Float?
   capabilities           String[]
-  contextWindow       Int
-  isActive            Boolean         @default(true)
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
-  hourlySessions      HourlySession[]
-  usageLogs           UsageLog[]
-  agents              Agent[]
+  contextWindow          Int
+  isActive               Boolean         @default(true)
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+  hourlySessions         HourlySession[]
+  usageLogs              UsageLog[]
+  agents                 Agent[]
 
   @@index([provider])
   @@index([name])
@@ -511,16 +528,21 @@ model ActivityLog {
 // ============== TOKEN WALLET SYSTEM ==============
 
 model TokenWallet {
-  id                   String   @id @default(uuid())
-  userId               String   @unique
-  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenBalance         Int      @default(0)
-  totalTokensPurchased Int      @default(0)
-  totalTokensUsed      Int      @default(0)
-  allocatedTokens      Int      @default(0)
+  id                   String    @id @default(uuid())
+  userId               String    @unique
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenBalance         Int       @default(0)
+  totalTokensPurchased Int       @default(0)
+  totalTokensUsed      Int       @default(0)
+  allocatedTokens      Int       @default(0)
   allocatedBy          String?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  // Token Alerts (Phase 1) — last alert tier sent + when. Cleared by
+  // worker when balance recovers above warning threshold so future
+  // drops re-trigger.
+  lastAlertTier        String?
+  lastAlertSentAt      DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 }
 
 model TokenPurchase {
@@ -712,4 +734,107 @@ model ToolExecution {
 
   @@index([userId, agentId])
   @@index([createdAt])
+}
+
+// ============================================================
+// Token Alerts & Auto-Refill (Phase 1) — added 2026-04-27
+// See docs/features/token-alerts-phase1-design.md
+// ============================================================
+
+enum TokenEventType {
+  alert_warning
+  alert_critical
+  alert_depleted
+  refill_attempted
+  refill_succeeded
+  refill_failed
+  refill_cap_reached
+  refill_payment_failed
+  refill_manual
+  payment_method_missing
+}
+
+model TokenAlertSetting {
+  id             String       @id @default(uuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  enabled         Boolean  @default(true)
+  warningPct      Int      @default(20)
+  criticalPct     Int      @default(5)
+  notifyDepleted  Boolean  @default(true)
+  recipientRoles  String[] @default(["org_owner", "manager"])
+  extraEmails     String[] @default([])
+  cooldownMinutes Int      @default(60)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TokenRefillRule {
+  id             String @id @default(uuid())
+  organizationId String
+  userId         String
+  createdById    String
+
+  enabled               Boolean @default(false)
+  triggerPct            Int     @default(10)
+  refillTokenAmount     BigInt
+  maxRefillsPerMonth    Int?
+  maxSpendPerMonthCents Int?
+  stripePaymentMethodId String
+
+  monthlyRefillCount      Int      @default(0)
+  monthlyRefillSpendCents Int      @default(0)
+  monthlyResetAt          DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation("RefillRuleSubject", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation("RefillRuleCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, userId])
+  @@index([enabled])
+}
+
+model TokenEvent {
+  id             String         @id @default(uuid())
+  organizationId String
+  userId         String?
+  eventType      TokenEventType
+  metadata       Json
+  idempotencyKey String?        @unique
+  createdAt      DateTime       @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([userId, createdAt])
+  @@index([eventType, createdAt])
+}
+
+model PendingJob {
+  id             String    @id @default(uuid())
+  jobType        String
+  payload        Json
+  idempotencyKey String?   @unique
+  status         String    @default("pending")
+  priority       Int       @default(0)
+  attemptCount   Int       @default(0)
+  maxAttempts    Int       @default(3)
+  lastError      String?
+  scheduledFor   DateTime  @default(now())
+  startedAt      DateTime?
+  completedAt    DateTime?
+  lockedBy       String?
+  lockedAt       DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status, scheduledFor])
+  @@index([jobType, status])
+  @@index([completedAt])
 }
