@@ -1527,9 +1527,43 @@ function callAnthropicStream(
       });
     } catch (err: any) {
       const status = err?.response?.status;
+      let extractedMessage: string | undefined;
+      let extractedCode: string | undefined;
+
+      // For streaming errors, response.data is a Node Readable — the legacy
+      // `responseData?.error?.message` access returns undefined on a stream,
+      // masking the real Anthropic error (e.g. parameter deprecation) as
+      // generic "Request failed with status code 400". Drain it to parse.
+      const responseData = err?.response?.data;
+      if (responseData) {
+        if (typeof responseData.on === 'function' && typeof responseData[Symbol.asyncIterator] === 'function') {
+          try {
+            const chunks: Buffer[] = [];
+            for await (const chunk of responseData) {
+              chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+            }
+            const body = Buffer.concat(chunks).toString('utf8');
+            try {
+              const parsed = JSON.parse(body);
+              extractedMessage = parsed?.error?.message;
+              extractedCode = parsed?.error?.type;
+            } catch {
+              if (body && body.length < 500) extractedMessage = body;
+            }
+          } catch (drainErr: any) {
+            logger.debug('Failed to drain Anthropic stream error body', { drainErr: drainErr?.message });
+          }
+        } else if (responseData?.error?.message) {
+          // Already-buffered (non-stream) error response — preserves prior behavior
+          extractedMessage = responseData.error.message;
+          extractedCode = responseData.error.type;
+        }
+      }
+
       logger.error('Anthropic stream error', {
         provider: 'anthropic', modelId, status,
-        message: err?.response?.data?.error?.message || err?.message,
+        errorCode: extractedCode,
+        message: extractedMessage || err?.message,
         ...(status === 403 ? { hint: 'Check ANTHROPIC_API_KEY in .env' } : {}),
       });
       callbacks.onError(err);
