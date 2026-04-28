@@ -484,6 +484,15 @@ const ADAPTIVE_THINKING_MODELS = new Set<string>([
 // verified to avoid 400s. Update as new models verify.
 const XHIGH_CAPABLE_MODELS = new Set<string>(['claude-opus-4-7']);
 
+// Models that DISALLOW temperature/top_p sampling parameters entirely.
+// Distinct from TEMP_LOCKED_MODELS (which forces temperature=1): these
+// models reject the parameter outright with HTTP 400. Verified via
+// probes (2026-04-28) for claude-opus-4-7:
+//   "temperature is deprecated for this model"
+//   "top_p is deprecated for this model"
+// Update as new models adopt this lockdown.
+const OMIT_TEMPERATURE_MODELS = new Set<string>(['claude-opus-4-7']);
+
 // Defense in depth: OpenAI accepts only low|medium|high — never xhigh.
 // If a caller routes xhigh to an OpenAI model (intentional or otherwise),
 // downgrade to 'high' to avoid 400. Logs per-clamp for visibility.
@@ -544,10 +553,13 @@ async function callAnthropic(modelId: string, messages: any[], systemPrompt: str
         headers['anthropic-beta'] = 'interleaved-thinking-2025-05-14';
       }
     } else if (forceTemp1) {
-      body.temperature = 1;
+      // Skip force-temp=1 if model rejects the param entirely (Opus 4.7+).
+      if (!OMIT_TEMPERATURE_MODELS.has(modelId)) body.temperature = 1;
     } else {
-      // Anthropic rejects both temperature AND top_p together — use only one
-      if (overrides?.temperature != null) {
+      if (OMIT_TEMPERATURE_MODELS.has(modelId)) {
+        // Sampling params disallowed on this model — omit both temperature and top_p.
+      } else if (overrides?.temperature != null) {
+        // Anthropic rejects both temperature AND top_p together — use only one
         body.temperature = overrides.temperature;
       } else if (overrides?.topP != null) {
         body.top_p = overrides.topP;
@@ -1386,11 +1398,16 @@ function callAnthropicStream(
     body.thinking = { type: 'enabled', budget_tokens: thinkBudget };
     // Extended thinking requires max_tokens > budget_tokens — add 8000 headroom
     body.max_tokens = Math.max(body.max_tokens, thinkBudget + 8000);
-    body.temperature = 1; // REQUIRED by Anthropic when thinking is enabled
+    // Legacy thinking requires temperature=1, but Opus 4.7+ rejects any
+    // temperature value. Omit for those models. (Hotfix-S will rework
+    // this branch to use the adaptive shape entirely.)
+    if (!OMIT_TEMPERATURE_MODELS.has(modelId)) body.temperature = 1;
     delete body.top_p;    // Anthropic rejects both temperature AND top_p together
   } else {
-    // Anthropic rejects requests with BOTH temperature AND top_p — use only one
-    if (overrides?.temperature != null) {
+    if (OMIT_TEMPERATURE_MODELS.has(modelId)) {
+      // Sampling params disallowed on this model — omit both temperature and top_p.
+    } else if (overrides?.temperature != null) {
+      // Anthropic rejects both temperature AND top_p together — use only one
       body.temperature = overrides.temperature;
     } else if (overrides?.topP != null) {
       body.top_p = overrides.topP;
@@ -1400,7 +1417,9 @@ function callAnthropicStream(
   }
 
   // If this model is known to reject custom temperature, force temperature=1
-  if (TEMP_LOCKED_MODELS.has(modelId) && !overrides?.thinkingEnabled) {
+  // OMIT models override TEMP_LOCKED behavior — they reject ANY temperature
+  // value (including =1), so the lock-to-1 fallback would still 400.
+  if (TEMP_LOCKED_MODELS.has(modelId) && !overrides?.thinkingEnabled && !OMIT_TEMPERATURE_MODELS.has(modelId)) {
     body.temperature = 1;
     delete body.top_p;
   }
