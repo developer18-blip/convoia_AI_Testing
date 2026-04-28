@@ -1133,7 +1133,7 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
             },
             onModelError: (name, index, error) => {
               if (!streamEnded && !res.writableEnded) {
-                res.write(`data: ${JSON.stringify({ type: 'council_model_error', modelName: name, modelIndex: index, error })}\n\n`);
+                res.write(`data: ${JSON.stringify({ type: 'council_model_error', modelName: name, modelIndex: index, error: safeErrorDetails(error) })}\n\n`);
               }
             },
             onCrossExamStart: () => {
