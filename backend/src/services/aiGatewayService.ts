@@ -466,6 +466,18 @@ async function callOpenAI(modelId: string, messages: any[], systemPrompt: string
   );
 }
 
+// Modern Claude models that accept the canonical adaptive thinking
+// shape (thinking.type='adaptive' + output_config.effort). The 4.5
+// family rejects this form with HTTP 400 "adaptive thinking is not
+// supported on this model". Opus 4.7 conversely rejects the legacy
+// thinking.enabled + budget_tokens form. Update this set as new
+// modern Claude models are released.
+const ADAPTIVE_THINKING_MODELS = new Set<string>([
+  'claude-opus-4-7',
+  'claude-opus-4-6',
+  'claude-sonnet-4-6',
+]);
+
 async function callAnthropic(modelId: string, messages: any[], systemPrompt: string, apiKey: string, overrides?: ProviderOverrides) {
   const buildBody = (forceTemp1: boolean = false): { body: Record<string, any>; headers: Record<string, string> } => {
     const body: Record<string, any> = {
@@ -482,16 +494,27 @@ async function callAnthropic(modelId: string, messages: any[], systemPrompt: str
     };
 
     if (overrides?.thinkingEnabled) {
-      // Scale thinking budget with the caller's hint. budget_tokens
-      // costs real money (Anthropic charges for thinking tokens), so
-      // simple queries should use less. Default 10000 keeps parity
-      // with pre-scaling behavior.
-      const thinkBudget = overrides?.thinkingBudget || 10000;
-      body.thinking = { type: 'enabled', budget_tokens: thinkBudget };
-      // max_tokens must exceed budget_tokens — add 8000 headroom for the answer
-      body.max_tokens = Math.max(body.max_tokens, thinkBudget + 8000);
-      body.temperature = 1; // REQUIRED by Anthropic when thinking is enabled
-      headers['anthropic-beta'] = 'interleaved-thinking-2025-05-14';
+      // Hedged by modelId: modern Claude (4.6+) uses canonical adaptive
+      // shape; legacy 4.5 family stays on thinking.enabled + budget_tokens.
+      // Opus 4.7 rejects the legacy form; the 4.5 family rejects the new
+      // shape. Verified empirically across 6 models / 9 probes (2026-04-28).
+      if (ADAPTIVE_THINKING_MODELS.has(modelId)) {
+        body.thinking = { type: 'adaptive' };
+        body.output_config = { effort: overrides?.reasoningEffort || 'high' };
+        // No temperature=1 requirement on new shape; no beta header needed.
+      } else {
+        // Legacy form for 4.5 family (Opus 4.5, Haiku 4.5, Sonnet 4.5).
+        // Scale thinking budget with the caller's hint. budget_tokens
+        // costs real money (Anthropic charges for thinking tokens), so
+        // simple queries should use less. Default 10000 keeps parity
+        // with pre-scaling behavior.
+        const thinkBudget = overrides?.thinkingBudget || 10000;
+        body.thinking = { type: 'enabled', budget_tokens: thinkBudget };
+        // max_tokens must exceed budget_tokens — add 8000 headroom for the answer
+        body.max_tokens = Math.max(body.max_tokens, thinkBudget + 8000);
+        body.temperature = 1; // REQUIRED by Anthropic for legacy thinking form
+        headers['anthropic-beta'] = 'interleaved-thinking-2025-05-14';
+      }
     } else if (forceTemp1) {
       body.temperature = 1;
     } else {
