@@ -5,6 +5,7 @@ export const COUNCIL_MODEL_CATEGORIES: Record<string, { label: string; modelIds:
     label: 'Recommended',
     modelIds: [
       'claude-opus-4-7',
+      'gpt-5.5',
       'claude-sonnet-4-6',
       'gpt-5.4',
       'gemini-3.1-pro-preview',
