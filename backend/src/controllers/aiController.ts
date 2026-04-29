@@ -56,6 +56,7 @@ import { smartRoute } from '../services/smartRouter.js';
 import { getCachedResponse, setCachedResponse } from '../services/modelRecommendationService.js';
 import { getUserMemoryPrompt } from '../services/userMemoryService.js';
 import { processMemoryForQuery } from '../services/vectorMemoryService.js';
+import { retrieveFactsForQuery } from '../services/userFactRetrievalService.js';
 import { analyzeQuery, getClarificationSystemPrompt, getDeepResearchPrompt, buildRefinementPrompt } from '../services/thinkingService.js';
 import { getModelIntelligence } from '../ai/modelRegistry.js';
 import { fetchAndExtractURLs } from '../services/urlFetchService.js';
@@ -803,13 +804,37 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
     // Smart memory injection — matches how Claude.ai handles memory.
     // Simple queries get no memory. Standard queries get ~50 tokens.
     // Complex queries get ~150 tokens. Single compact line format.
+    //
+    // Phase 6: per-user useUserFacts flag routes to UserFact retrieval.
+    // New path falls back to vector path on empty result or error, so
+    // users with the flag off see no behavior change.
     let memoryPrompt = '';
     if (queryComplexity !== 'simple') {
       const memMaxChars = queryComplexity === 'complex' ? 600 : 200;
-      try {
-        memoryPrompt = await processMemoryForQuery(user.id, lastUserText, memMaxChars);
-      } catch {
-        try { memoryPrompt = await getUserMemoryPrompt(user.id); } catch { /* silent */ }
+
+      if (user.useUserFacts) {
+        try {
+          const intentForMemory = classifyIntent(lastUserText || '', false).intent;
+          const factResult = await retrieveFactsForQuery(user.id, intentForMemory);
+          if (factResult.formattedPrompt) {
+            memoryPrompt = factResult.formattedPrompt;
+            logger.info(`Memory (UserFact path): ${factResult.facts.length} facts injected for user ${user.id} (intent=${intentForMemory})`);
+          } else {
+            logger.info(`Memory (UserFact path): empty for user ${user.id}, falling back to vector path`);
+          }
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          logger.error(`UserFact retrieval failed for user ${user.id}: ${message}, falling back to vector path`);
+        }
+      }
+
+      // Vector path — runs if user is on old path OR new path returned empty/threw
+      if (!memoryPrompt) {
+        try {
+          memoryPrompt = await processMemoryForQuery(user.id, lastUserText, memMaxChars);
+        } catch {
+          try { memoryPrompt = await getUserMemoryPrompt(user.id); } catch { /* silent */ }
+        }
       }
     }
 
