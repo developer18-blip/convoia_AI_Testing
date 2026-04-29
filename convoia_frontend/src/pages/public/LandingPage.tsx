@@ -395,7 +395,7 @@ export function LandingPage() {
               <div className="lp-testimonial__avatar">AR</div>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>Anirudh Rai</div>
-                <div className="mono-label" style={{ fontSize: 10, marginTop: 2 }}>FOUNDER · INTELLECT AI</div>
+                <div className="mono-label" style={{ fontSize: 10, marginTop: 2 }}>DESIGNER AND AI ENGINEER · CONVOIA AI</div>
               </div>
             </div>
           </div>
