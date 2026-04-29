@@ -374,6 +374,7 @@ const TEMP_LOCKED_MODELS = new Set<string>();
   'claude-sonnet-4-5-20250929',
   'gpt-5',
   'gpt-5-mini',
+  'gpt-5.5',  // probe 2026-04-29: rejects temp other than default (1)
 ].forEach(m => TEMP_LOCKED_MODELS.add(m));
 
 logger.info(`Temperature-locked models (seed): ${[...TEMP_LOCKED_MODELS].join(', ')}`);
