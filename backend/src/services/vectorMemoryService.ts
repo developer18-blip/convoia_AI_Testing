@@ -373,6 +373,90 @@ export function buildMemoryContext(memories: RetrievedMemory[], maxChars = 600):
   return `\n[User context: ${memStr}]`;
 }
 
+// ── Quality Filter ───────────────────────────────────────────────────
+
+/**
+ * Quality filter applied at injection time. Drops:
+ *   1. Too-short content (<20 chars after trim)
+ *   2. Fragments without terminal punctuation (unless labeled prefix
+ *      like "Goal:", "Avoid:", "User's", etc — see Step 2 comment)
+ *   3. Code/shell-like patterns (defense in depth)
+ *   4. Exact + fuzzy duplicates (edit distance <= 2 on normalized form)
+ *   5. ALL name claims when 3+ different names found (contradiction rule)
+ *
+ * NOT a redesign — vector retrieval, storage, and ranking are unchanged.
+ * This is a pure function applied between retrieval and context-building.
+ * Reversible: remove the call in processMemoryForQuery to disable.
+ *
+ * Reason for existence: extractMemoriesFromMessage writes new rows with
+ * random key suffixes per call, so identity claims accumulate without
+ * overwriting. Vector retrieval ranks by importance score; nothing
+ * dedupes or sanity-checks contradictions before injection. This filter
+ * stops the bleed at the prompt boundary while a proper memory-layer
+ * redesign is tracked as separate work.
+ */
+export function filterMemoryQuality(memories: RetrievedMemory[]): RetrievedMemory[] {
+  const namePattern = /(?:user'?s?\s+name\s+is|my\s+name\s+is)\s+([\p{L}][\p{L}0-9_-]{0,40})/iu;
+
+  // 0. Contradicting name claims — checked FIRST on raw input so that
+  // 'my name is X' variants (which would otherwise be dropped by the
+  // fragment filter at Step 2 since 'my' is not in the labeled-prefix
+  // bypass) still count toward the contradiction threshold. If 3+ name
+  // memories disagree, drop ALL name claims as untrustworthy.
+  let kept = memories;
+  const rawNameClaims = memories
+    .map(m => (m.content || '').match(namePattern))
+    .filter((m): m is RegExpMatchArray => m !== null)
+    .map(m => m[1].toLowerCase());
+  const distinctNames = new Set(rawNameClaims);
+  if (rawNameClaims.length >= 3 && distinctNames.size >= 2) {
+    kept = kept.filter(m => !namePattern.test(m.content || ''));
+  }
+
+  // 1. Drop too-short
+  kept = kept.filter(m => (m.content || '').trim().length >= 20);
+
+  // 2. Drop fragments — no terminal punctuation AND not a labeled prefix
+  kept = kept.filter(m => {
+    const v = m.content.trim();
+    // Reject if ends with article/conjunction (mid-thought)
+    if (/\b(the|and|or|of|to|in|for|with|that|which|from|by|on|a|an|is|are|was|were)$/i.test(v)) return false;
+    // Allow labeled facts (Goal:, Avoid:, etc) without terminal punctuation —
+    // user preferences are often phrased as labeled bullets in storage.
+    // Note: this is intentional leniency; downstream Steps 4 (dedup) catches
+    // most cases of fragmented labeled content. Step 0 (run before this)
+    // handles contradicting name claims, including the 'my name is X' form
+    // that would otherwise fall through here.
+    if (/^(Goal|Avoid|Note|Preference|Style|User'?s)/i.test(v)) return true;
+    // Otherwise require terminal punctuation
+    return /[.!?]$/.test(v);
+  });
+
+  // 3. Drop code/shell-like patterns
+  const codeRegex = /^(root@|sudo |journalctl|pm2 |\$ |\/[a-z]|cd \/|ls -|systemctl|grep |find |\.sh\b|\.log\b|[a-z_]+\.sh)/i;
+  kept = kept.filter(m => !codeRegex.test(m.content.trim()));
+
+  // 4. Dedup — exact + fuzzy (edit distance <= 2 on normalized form)
+  const seen: string[] = [];
+  kept = kept.filter(m => {
+    const norm = m.content.toLowerCase().trim().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ');
+    for (const prev of seen) {
+      if (norm === prev) return false;
+      if (Math.abs(norm.length - prev.length) <= 2) {
+        // Cheap edit-distance approximation: count differing chars + length delta
+        let diffs = Math.abs(norm.length - prev.length);
+        const min = Math.min(norm.length, prev.length);
+        for (let i = 0; i < min && diffs <= 2; i++) if (norm[i] !== prev[i]) diffs++;
+        if (diffs <= 2) return false;
+      }
+    }
+    seen.push(norm);
+    return true;
+  });
+
+  return kept;
+}
+
 // ── Full Pipeline ────────────────────────────────────────────────────
 
 /**
@@ -387,7 +471,17 @@ export async function processMemoryForQuery(
   maxChars = 600
 ): Promise<string> {
   // Step 1: Retrieve relevant memories
-  const memories = await retrieveRelevantMemories(userId, userMessage, 5);
+  const rawMemories = await retrieveRelevantMemories(userId, userMessage, 5);
+
+  // Step 1.5: Quality filter — drop fragments, dedupe, drop conflicting claims.
+  // See filterMemoryQuality docstring. Stops poisoned memories from reaching
+  // the LLM while leaving storage/retrieval mechanics unchanged.
+  const memories = filterMemoryQuality(rawMemories);
+  if (rawMemories.length > 0 && memories.length === 0) {
+    logger.info(`Memory filter dropped all ${rawMemories.length} memories for user ${userId} \u2014 quality gate`);
+  } else if (memories.length < rawMemories.length) {
+    logger.info(`Memory filter: ${rawMemories.length} \u2192 ${memories.length} after quality gate (user ${userId})`);
+  }
 
   // Step 2: Build context
   const context = buildMemoryContext(memories, maxChars);
