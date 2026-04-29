@@ -1628,9 +1628,10 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
         : analysis.depthLevel === 'deep' ? 10000
         : 5000;
       // Premium effort on premium model + premium depth (matches Pass 1 routing).
-      const isOpus47ForRefine = selectedModel?.modelId === 'claude-opus-4-7';
+      const isXhighCapableForRefine = selectedModel?.modelId === 'claude-opus-4-7'
+        || selectedModel?.modelId === 'gpt-5.5';
       depthReasoningEffort = analysis.depthLevel === 'research'
-        ? (isOpus47ForRefine ? 'xhigh' : 'high')
+        ? (isXhighCapableForRefine ? 'xhigh' : 'high')
         : analysis.depthLevel === 'deep' ? 'medium'
         : 'low';
       const thinkIntel = getModelIntelligence(selectedModel?.modelId || '');
@@ -1718,11 +1719,13 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
             reasoningEffort: (() => {
               // Premium effort on premium model + premium depth.
               // Limits xhigh exposure to deeply complex research queries on
-              // claude-opus-4-7 only. Other models continue to use 'high'
-              // for research depth and 'medium' otherwise.
-              const isOpus47 = selectedModel?.modelId === 'claude-opus-4-7';
+              // xhigh-capable models (claude-opus-4-7, gpt-5.5). Other
+              // models continue to use 'high' for research depth and
+              // 'medium' otherwise.
+              const isXhighCapable = selectedModel?.modelId === 'claude-opus-4-7'
+                || selectedModel?.modelId === 'gpt-5.5';
               if (analysis.depthLevel === 'research') {
-                return isOpus47 ? 'xhigh' : 'high';
+                return isXhighCapable ? 'xhigh' : 'high';
               }
               return 'medium';
             })(),

@@ -424,7 +424,7 @@ async function callOpenAI(modelId: string, messages: any[], systemPrompt: string
       // Native reasoning effort — when think mode is active OR caller
       // explicitly set a level. 'high' is the default for think mode.
       if (overrides?.thinkingEnabled || overrides?.reasoningEffort) {
-        body.reasoning_effort = clampOpenAIEffort(overrides?.reasoningEffort) || 'high';
+        body.reasoning_effort = clampOpenAIEffort(overrides?.reasoningEffort, modelId) || 'high';
         body.max_completion_tokens = Math.max(body.max_completion_tokens, 32768);
       }
     } else if (gpt5) {
@@ -435,7 +435,7 @@ async function callOpenAI(modelId: string, messages: any[], systemPrompt: string
       // The nested { reasoning: { effort } } shape is for the /v1/responses endpoint —
       // sending it to /v1/chat/completions returns 400 'Unknown parameter: reasoning'.
       if (overrides?.thinkingEnabled || overrides?.reasoningEffort) {
-        body.reasoning_effort = clampOpenAIEffort(overrides?.reasoningEffort) || 'high';
+        body.reasoning_effort = clampOpenAIEffort(overrides?.reasoningEffort, modelId) || 'high';
         body.max_completion_tokens = Math.max(body.max_completion_tokens, 32768);
       }
     } else {
@@ -479,10 +479,15 @@ const ADAPTIVE_THINKING_MODELS = new Set<string>([
 ]);
 
 // Models that accept output_config.effort='xhigh' on the native Anthropic
-// API. Verified via probe 2026-04-28: claude-opus-4-7 accepts. Opus 4.6
-// and Sonnet 4.6 not yet probed for xhigh — clamped to 'high' until
-// verified to avoid 400s. Update as new models verify.
-const XHIGH_CAPABLE_MODELS = new Set<string>(['claude-opus-4-7']);
+// API and reasoning_effort='xhigh' on OpenAI /chat/completions.
+// Verified empirically:
+//   claude-opus-4-7 (probe 2026-04-28)
+//   gpt-5.5 (probe 2026-04-29: reasoning_tokens=16 vs 5 for high — real tier)
+// Other models clamped to 'high' until verified to avoid 400s.
+const XHIGH_CAPABLE_MODELS = new Set<string>([
+  'claude-opus-4-7',
+  'gpt-5.5',
+]);
 
 // Models that DISALLOW temperature/top_p sampling parameters entirely.
 // Distinct from TEMP_LOCKED_MODELS (which forces temperature=1): these
@@ -493,14 +498,17 @@ const XHIGH_CAPABLE_MODELS = new Set<string>(['claude-opus-4-7']);
 // Update as new models adopt this lockdown.
 const OMIT_TEMPERATURE_MODELS = new Set<string>(['claude-opus-4-7']);
 
-// Defense in depth: OpenAI accepts only low|medium|high — never xhigh.
-// If a caller routes xhigh to an OpenAI model (intentional or otherwise),
-// downgrade to 'high' to avoid 400. Logs per-clamp for visibility.
+// Defense in depth: clamp xhigh→high for OpenAI models NOT in
+// XHIGH_CAPABLE_MODELS. gpt-5.5 (probe 2026-04-29) is the first OpenAI
+// model verified to accept xhigh on /chat/completions; future OpenAI
+// models must be probed and added to the allowlist before xhigh passes
+// through. Logs per-clamp for visibility.
 function clampOpenAIEffort(
-  effort?: 'low' | 'medium' | 'high' | 'xhigh'
-): 'low' | 'medium' | 'high' | undefined {
-  if (effort === 'xhigh') {
-    logger.info('OpenAI: clamped reasoning_effort xhigh→high (OpenAI does not support xhigh)');
+  effort?: 'low' | 'medium' | 'high' | 'xhigh',
+  modelId?: string
+): 'low' | 'medium' | 'high' | 'xhigh' | undefined {
+  if (effort === 'xhigh' && (!modelId || !XHIGH_CAPABLE_MODELS.has(modelId))) {
+    logger.info(`OpenAI: clamped reasoning_effort xhigh→high for ${modelId || 'unknown model'} (not in XHIGH_CAPABLE_MODELS)`);
     return 'high';
   }
   return effort;
@@ -1187,7 +1195,7 @@ function callOpenAIStream(
     // o-series: only max_completion_tokens, no temperature/top_p
     body.max_completion_tokens = overrides?.maxTokens ?? 16384;
     if (thinkingEnabled || overrides?.reasoningEffort) {
-      body.reasoning_effort = clampOpenAIEffort(overrides?.reasoningEffort) || 'high';
+      body.reasoning_effort = clampOpenAIEffort(overrides?.reasoningEffort, modelId) || 'high';
       body.max_completion_tokens = Math.max(body.max_completion_tokens, 32768);
     }
   } else if (gpt5) {
@@ -1196,7 +1204,7 @@ function callOpenAIStream(
     body.temperature = overrides?.temperature ?? 0.7;
     if (overrides?.topP != null) body.top_p = overrides.topP;
     if (thinkingEnabled || overrides?.reasoningEffort) {
-      body.reasoning = { effort: clampOpenAIEffort(overrides?.reasoningEffort) || 'high' };
+      body.reasoning = { effort: clampOpenAIEffort(overrides?.reasoningEffort, modelId) || 'high' };
       body.max_completion_tokens = Math.max(body.max_completion_tokens, 32768);
     }
   } else {
