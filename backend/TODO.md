@@ -53,3 +53,14 @@ Fix approach: Use a JSON.stringify replacer that strips TLSSocket / circular ref
 Effort: ~10 lines in onError handler
 Priority: Low (cosmetic — error still surfaces, just with this extra noise line)
 Identified: 2026-04-29 during Hotfix-L investigation
+
+## BUG-014 — Streaming dispatch lacks TEMP_LOCKED_MODELS self-populate
+Status: Latent gap — only fires for new OpenAI models that hit streaming
+first AND have temperature lockdown AND aren't pre-seeded
+Symptom: 400 with no recovery (vs non-streaming which auto-retries via
+safeProviderCall and adds model to cache)
+Fix approach: Extract safeProviderCall's catch-and-retry pattern into a
+shared utility, apply to both callOpenAI and callOpenAIStream
+Effort: ~30 lines, careful refactor
+Priority: Low — workaround is pre-seeding probed models
+Identified: 2026-04-29 during HOTFIX-GPT55-T investigation
