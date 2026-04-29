@@ -2182,21 +2182,31 @@ export class AIGatewayService {
     effectiveMaxTokens = clampMaxTokens(effectiveModel.provider, effectiveMaxTokens);
 
     // ── COMPLEXITY-AWARE OUTPUT CAPS ──────────────────────────────
-    // Without this cap, GPT-5 and reasoning models burn 10K+ tokens on simple
-    // queries because they interpret high max_tokens as "go long / think hard".
-    // Simple "hey?" should never produce a 10K-token response.
+    // The cap exists for non-reasoning OpenAI models (GPT-4o, GPT-4.1) that
+    // interpret high max_tokens as "be more verbose." Without it, those models
+    // burn 10K+ tokens on simple "hey?" queries.
     //
-    // Anthropic exception: Claude models stop naturally at end_turn — they
-    // don't interpret high max_tokens as a "go long" signal. Applying this
-    // cap to Anthropic silently truncated legitimate long-form responses
-    // (research analysis, detailed code, document generation) at 2048 tokens
-    // for weeks. Skipped here so Anthropic gets the value the caller intended.
+    // Skipped for models that stop naturally at end_turn / stop:
+    //   - Anthropic (added 2026-04-28 Hotfix-O after weeks of silent
+    //     truncation on long-form Claude responses)
+    //   - OpenAI reasoning models — GPT-5 family (/^gpt-5/) and o-series
+    //     (/^o\d/). Same bug class confirmed 2026-04-29 on gpt-5.5
+    //     (microservices research query cut at exactly 2048 tokens with
+    //     finish_reason=length). Reasoning models stop naturally; the
+    //     "go long" worry only applies to non-reasoning OpenAI models.
+    //   - Reuses existing isPureReasoningModel + isGPT5Family helpers
+    //     defined at line 357/361 (same regexes used by dispatch routing
+    //     for max_completion_tokens).
     const complexityCaps: Record<string, number> = {
       simple: 512,     // Greetings, acknowledgments
       standard: 2048,  // Normal questions
       complex: 8192,   // Long code, deep analysis, multi-question
     };
-    if (effectiveModel.provider !== 'anthropic') {
+    const isAnthropic = effectiveModel.provider === 'anthropic';
+    const isOpenAIReasoning = effectiveModel.provider === 'openai' &&
+      (isPureReasoningModel(effectiveModel.modelId) || isGPT5Family(effectiveModel.modelId));
+    const skipComplexityCap = isAnthropic || isOpenAIReasoning;
+    if (!skipComplexityCap) {
       const complexityCap = complexityCaps[params.complexity || 'standard'] || 2048;
       if (effectiveMaxTokens && effectiveMaxTokens > complexityCap) {
         effectiveMaxTokens = complexityCap;
