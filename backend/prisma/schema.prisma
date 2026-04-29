@@ -78,23 +78,26 @@ model User {
   wallet             Wallet?
 
   // Enterprise features
-  tokenAllocationsGiven    TokenAllocation[]  @relation("AssignedBy")
-  tokenAllocationsReceived TokenAllocation[]  @relation("AssignedTo")
-  tasksCreated             Task[]             @relation("TaskCreator")
-  tasksAssigned            Task[]             @relation("TaskAssignee")
+  tokenAllocationsGiven    TokenAllocation[]         @relation("AssignedBy")
+  tokenAllocationsReceived TokenAllocation[]         @relation("AssignedTo")
+  tasksCreated             Task[]                    @relation("TaskCreator")
+  tasksAssigned            Task[]                    @relation("TaskAssignee")
   taskComments             TaskComment[]
   notifications            Notification[]
   agents                   Agent[]
-  invitesCreated           OrgInvite[]        @relation("InviteCreator")
-  invitesAccepted          OrgInvite[]        @relation("InviteAcceptor")
-  activityLogsAsActor      ActivityLog[]      @relation("ActivityActor")
-  activityLogsAsTarget     ActivityLog[]      @relation("ActivityTarget")
+  invitesCreated           OrgInvite[]               @relation("InviteCreator")
+  invitesAccepted          OrgInvite[]               @relation("InviteAcceptor")
+  activityLogsAsActor      ActivityLog[]             @relation("ActivityActor")
+  activityLogsAsTarget     ActivityLog[]             @relation("ActivityTarget")
   tokenPurchases           TokenPurchase[]
   tokenWallet              TokenWallet?
   tokenTransactions        TokenTransaction[]
   reviews                  Review[]
   conversations            Conversation[]
+  conversationAttachments  ConversationAttachment[]
   memories                 UserMemory[]
+  facts                    UserFact[]
+  conversationSummaries    UserConversationSummary[]
 
   // Autonomous agent relations
   agentMemories  AgentMemory[]
@@ -143,14 +146,14 @@ model AIModel {
   reasoningTokenPrice Float           @default(0)
   perQueryFee         Float           @default(0)
   markupPercentage    Float           @default(25)
-  capabilities     String[]
-  contextWindow    Int
-  isActive         Boolean         @default(true)
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  hourlySessions   HourlySession[]
-  usageLogs        UsageLog[]
-  agents           Agent[]
+  capabilities        String[]
+  contextWindow       Int
+  isActive            Boolean         @default(true)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  hourlySessions      HourlySession[]
+  usageLogs           UsageLog[]
+  agents              Agent[]
 
   @@index([provider])
   @@index([name])
@@ -576,25 +579,46 @@ model Review {
 }
 
 model Conversation {
-  id          String        @id @default(uuid())
+  id          String                   @id @default(uuid())
   userId      String
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title       String        @default("New Chat")
+  user        User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String                   @default("New Chat")
   modelId     String?
   modelName   String?
   agentId     String?
   industry    String?
-  isPinned    Boolean       @default(false)
+  isPinned    Boolean                  @default(false)
   folderId    String?
-  totalCost   Float         @default(0)
-  totalTokens Int           @default(0)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  totalCost   Float                    @default(0)
+  totalTokens Int                      @default(0)
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
   messages    ChatMessage[]
+  attachments ConversationAttachment[]
 
   @@index([userId])
   @@index([userId, updatedAt])
   @@index([createdAt])
+}
+
+model ConversationAttachment {
+  id             String   @id @default(uuid())
+  conversationId String
+  userId         String
+  fileName       String
+  fileType       String
+  fileSize       Int
+  mimeType       String
+  extractedText  String?
+  s3Key          String?
+  thumbnail      String?
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([userId, createdAt])
 }
 
 model ChatMessage {
@@ -687,4 +711,63 @@ model ToolExecution {
 
   @@index([userId, agentId])
   @@index([createdAt])
+}
+
+// ============== MEMORY LAYER V2 (UserFact) ==============
+// Replaces UserMemory regex-extraction approach with LLM-extracted facts
+// categorized into WORK / PERSONAL / TOP_OF_MIND / HISTORY (Claude.ai-style).
+// See docs/features/memory-layer-redesign.md for full architecture.
+
+enum FactCategory {
+  WORK
+  PERSONAL
+  TOP_OF_MIND
+  HISTORY
+}
+
+enum FactSource {
+  EXTRACTED
+  USER_ADDED
+  MIGRATED
+}
+
+model UserFact {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  category FactCategory
+  content  String // natural-language fact
+
+  source     FactSource
+  confidence Float // 0.0-1.0; user-added defaults to 1.0
+
+  sourceConvoId   String? // conversation that produced this fact
+  sourceMessageId String?
+
+  active       Boolean   @default(true)
+  supersededBy String? // points to UserFact.id replacing this
+  expiresAt    DateTime? // TOP_OF_MIND default 14 days
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  lastUsedAt DateTime? // updated when injected into a prompt
+
+  @@index([userId, category, active])
+  @@index([userId, supersededBy])
+  @@index([userId, lastUsedAt])
+}
+
+model UserConversationSummary {
+  id             String @id @default(uuid())
+  userId         String
+  user           User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversationId String @unique
+
+  summary      String
+  factIds      String[]
+  messageCount Int
+  processedAt  DateTime @default(now())
+
+  @@index([userId, processedAt])
 }
