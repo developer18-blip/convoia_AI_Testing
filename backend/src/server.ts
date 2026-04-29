@@ -39,6 +39,7 @@ import audioRoutes from './routes/audioRoutes.js';
 import walletRoutes from './routes/walletRoutes.js';
 import agentToolRoutes from './routes/agentToolRoutes.js';
 import { startLocalCleanup as startFileGenCleanup } from './services/fileGenerationService.js';
+import { startFactExtractionJob } from './jobs/factExtractionJob.js';
 
 const app: Express = express();
 
@@ -414,6 +415,7 @@ const startServer = async (): Promise<void> => {
     await migrateApiKeysToHashed();
     await hydrateModelProfiles(prisma); // maps LLM Router profiles to active DB model IDs
     startFileGenCleanup(); // no-op unless USE_LOCAL_FILE_STORAGE=true
+    startFactExtractionJob(); // hourly cron, gated by MEMORY_EXTRACTION_ENABLED env flag
 
     const server = app.listen(config.port, () => {
       logger.info(`🚀 Server is running on port ${config.port}`);
