@@ -34,6 +34,7 @@ import tokenWalletRoutes from './routes/tokenWalletRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
 import conversationRoutes from './routes/conversationRoutes.js';
 import memoryRoutes from './routes/memoryRoutes.js';
+import userFactRoutes from './routes/userFactRoutes.js';
 import audioRoutes from './routes/audioRoutes.js';
 import walletRoutes from './routes/walletRoutes.js';
 import agentToolRoutes from './routes/agentToolRoutes.js';
@@ -79,6 +80,11 @@ const isDev = process.env.NODE_ENV !== 'production';
 const allowedOrigins = [
   process.env.CORS_ORIGIN,
   process.env.FRONTEND_URL,
+  // New primary domain
+  'https://convoia.ai',
+  'https://www.convoia.ai',
+  // Legacy domain — keep during 30-day migration window, remove once
+  // everyone's bookmarks / cached sessions have drained.
   'https://intellect.convoia.com',
   // Capacitor native app origins — Android uses https://localhost, iOS uses capacitor://localhost
   'https://localhost',
@@ -105,6 +111,7 @@ app.use(
       const allowed =
         !origin ||
         allowedOrigins.includes(origin) ||
+        origin.endsWith('.convoia.ai') ||
         origin.endsWith('.convoia.com') ||
         origin.startsWith('capacitor://') ||
         origin.startsWith('ionic://') ||
@@ -264,6 +271,7 @@ app.use('/api/stripe', stripeRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/memory', memoryRoutes);
+app.use('/api/user/facts', userFactRoutes);
 app.use('/api/audio', audioRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/agent-tools', agentToolRoutes);
