@@ -191,7 +191,7 @@ const INTENT_PATTERNS: IntentRule[] = [
     ],
     temperature: 0.5,
     formatHint: 'prose',
-    maxTokens: 4096,
+    maxTokens: 6144,
   },
 ];
 
@@ -199,7 +199,7 @@ const CONVERSATION_DEFAULT: ClassifiedIntent = {
   intent: 'conversation',
   confidence: 0.95,
   temperature: 0.7,
-  maxTokens: 1024,
+  maxTokens: 6144,
   shouldStream: true,
   needsWebSearch: false,
   formatHint: 'minimal',
@@ -320,7 +320,7 @@ export function classifyIntent(message: string, hasDocumentContext = false): Cla
       intent: 'question',
       confidence: 0.4,
       temperature: 0.5,
-      maxTokens: 4096,
+      maxTokens: 6144,
       shouldStream: true,
       needsWebSearch: false,
       formatHint: 'prose',
