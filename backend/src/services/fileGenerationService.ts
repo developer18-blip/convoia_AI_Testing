@@ -39,7 +39,7 @@ const BUCKET = process.env.AWS_S3_BUCKET_FILES || 'convoia-generated-files';
 const REGION = process.env.AWS_S3_REGION || process.env.AWS_SES_REGION || 'us-east-1';
 
 const USE_LOCAL_STORAGE = (process.env.USE_LOCAL_FILE_STORAGE || '').toLowerCase() === 'true';
-const BACKEND_URL = process.env.BACKEND_URL || 'https://intellect.convoia.com';
+const BACKEND_URL = process.env.BACKEND_URL || 'https://convoia.ai';
 const DOWNLOAD_TTL_SECONDS = 3600;
 
 const s3 = buildS3Client();

@@ -195,7 +195,7 @@ const response = await client.chat.completions.create({
 console.log(response.choices[0].message.content)`} />
                 )}
                 {sdkTab === 'curl' && (
-                  <CodeSnippet language="bash" code={`curl https://intellect.convoia.com/api/v1/chat/completions \\
+                  <CodeSnippet language="bash" code={`curl https://convoia.ai/api/v1/chat/completions \\
   -H "Authorization: Bearer cvai_xxx" \\
   -H "Content-Type: application/json" \\
   -d '{
