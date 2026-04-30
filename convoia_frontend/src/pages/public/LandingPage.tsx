@@ -172,6 +172,17 @@ export function LandingPage() {
   const { setActiveModel } = useAccent()
   useEffect(() => { setActiveModel('') }, [setActiveModel])
 
+  // Deep-link: honor /#features, /#reviews, etc. when arriving from an
+  // external link. Small delay lets lazy-loaded sections finish mounting.
+  useEffect(() => {
+    const hash = window.location.hash.slice(1)
+    if (!hash) return
+    const t = setTimeout(() => {
+      document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 200)
+    return () => clearTimeout(t)
+  }, [])
+
   return (
     <div className="landing-page">
       <MarketingNav />
@@ -346,16 +357,21 @@ export function LandingPage() {
       </section>
 
       {/* 5. PROOF */}
-      <section className="lp-proof">
+      <section id="reviews" className="lp-proof">
         <div className="lp-proof__inner">
           <div style={{ textAlign: 'center', marginBottom: 32 }}>
-            <Pill variant="accent" mono>⚡ EARLY ACCESS</Pill>
+            <div className="lp-proof__rating-badge">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+              </svg>
+              <span className="mono-label">5.0 AVERAGE FROM EARLY USERS</span>
+            </div>
             <h2 className="text-h1" style={{ marginTop: 16, marginBottom: 12, color: 'var(--text-primary)' }}>
-              Be one of our first 100 teams.
+              Trusted by AI-native teams.
             </h2>
             <p className="text-body-lg" style={{ color: 'var(--text-secondary)', maxWidth: 560, margin: '0 auto' }}>
-              We're in early access. Direct line to the team building it. Founder pricing locked for your first year.
-              No sales calls — sign up, start saving.
+              We're in early access with founding teams. Direct line to the team building it.
+              Founder pricing locked for your first year.
             </p>
           </div>
 
@@ -387,6 +403,13 @@ export function LandingPage() {
             <svg width="28" height="28" viewBox="0 0 24 24" fill="var(--accent)" opacity="0.3" style={{ marginBottom: 12 }}>
               <path d="M7 7h3l-2 5h3v6H6V10l1-3zm8 0h3l-2 5h3v6h-5V10l1-3z" />
             </svg>
+            <div className="lp-testimonial__rating">
+              {[1, 2, 3, 4, 5].map(i => (
+                <svg key={i} width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                </svg>
+              ))}
+            </div>
             <p className="lp-testimonial__body">
               "I built this because my team was bleeding money across six AI subscriptions. Now we run everything through one dashboard.
               The cost-per-query breakdown alone saved us from a $2K surprise bill last month."
@@ -398,6 +421,21 @@ export function LandingPage() {
                 <div className="mono-label" style={{ fontSize: 10, marginTop: 2 }}>DESIGNER AND AI ENGINEER · CONVOIA AI</div>
               </div>
             </div>
+          </div>
+
+          <div className="lp-proof__cta">
+            <p className="text-body" style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>
+              Using Intellect AI? We'd love your feedback.
+            </p>
+            <Link to="/review">
+              <Button variant="outline" size="md" leftIcon={
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+                </svg>
+              }>
+                Write a Review
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
