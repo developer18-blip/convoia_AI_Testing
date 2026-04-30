@@ -28,8 +28,8 @@ function getTimeGreeting(firstName: string): string {
   if (hour < 5) return `Still up, ${firstName}?`
   if (hour < 12) return `Good morning, ${firstName}`
   if (hour < 17) return `Good afternoon, ${firstName}`
-  if (hour < 22) return `Good evening, ${firstName}`
-  return `Working late, ${firstName}?`
+  if (hour < 23) return `Good evening, ${firstName}`
+  return `Still up, ${firstName}?`
 }
 
 export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, onEditMessage, onDeleteMessage, onRunCode, onOpenInCanvas }: MessageAreaProps) {
@@ -96,72 +96,75 @@ export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, o
 
   if (messages.length === 0) {
     return (
-      <div className="chat-welcome" style={{ height: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 20px 120px', backgroundColor: 'var(--chat-bg)' }}>
-        {/* Hybrid icon — purple gradient frame with Convoia Mark inside */}
-        <div className="chat-welcome__icon" style={{
-          width: '72px', height: '72px', borderRadius: '20px', marginBottom: '20px',
-          background: 'linear-gradient(135deg, #7c3aed, #5b21b6)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 12px 40px rgba(124, 58, 237, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
-          animation: 'float 6s ease-in-out infinite',
-        }}>
-          <ConvoiaMark size={38} state="idle" color="#ffffff" />
-        </div>
+      <div className="chat-welcome" style={{ height: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', backgroundColor: 'var(--chat-bg)' }}>
+        {/* Inner wrapper: margin auto centers when space allows but stays scroll-reachable when content overflows */}
+        <div style={{ margin: 'auto 0', padding: '32px 20px 120px', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', maxWidth: '720px' }}>
+          {/* Hybrid icon — purple gradient frame with Convoia Mark inside */}
+          <div className="chat-welcome__icon" style={{
+            width: '72px', height: '72px', borderRadius: '20px', marginBottom: '20px',
+            background: 'linear-gradient(135deg, #7c3aed, #5b21b6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 12px 40px rgba(124, 58, 237, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+            animation: 'float 6s ease-in-out infinite',
+          }}>
+            <ConvoiaMark size={38} state="idle" color="#ffffff" />
+          </div>
 
-        {/* Eyebrow label */}
-        <div className="mono-label" style={{ color: '#a78bfa', marginBottom: '12px', letterSpacing: '0.8px', fontSize: 11 }}>
-          CHAT WITH CONVOIA AI
-        </div>
+          {/* Eyebrow label */}
+          <div className="mono-label" style={{ color: '#a78bfa', marginBottom: '12px', letterSpacing: '0.8px', fontSize: 11 }}>
+            CHAT WITH CONVOIA AI
+          </div>
 
-        {/* Time-aware greeting */}
-        <h1 style={{
-          fontSize: '32px', fontWeight: 600, letterSpacing: '-0.025em',
-          margin: '0 0 8px', textAlign: 'center', color: 'var(--color-text-primary)',
-          animation: 'fade-in 0.4s ease-out',
-        }}>
-          {greeting}
-        </h1>
-        <p style={{ fontSize: 'var(--text-body, 14px)', color: 'var(--color-text-secondary)', margin: '0 0 40px', textAlign: 'center' }}>
-          What would you like to explore today?
-        </p>
+          {/* Time-aware greeting */}
+          <h1 style={{
+            fontSize: '32px', fontWeight: 600, letterSpacing: '-0.025em',
+            margin: '0 0 8px', textAlign: 'center', color: 'var(--color-text-primary)',
+            animation: 'fade-in 0.4s ease-out',
+          }}>
+            {greeting}
+          </h1>
+          <p style={{ fontSize: 'var(--text-body, 14px)', color: 'var(--color-text-secondary)', margin: '0 0 40px', textAlign: 'center' }}>
+            What would you like to explore today?
+          </p>
 
-        {/* 4 suggestion cards with original pink/blue/green/orange colors */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px', width: '100%', maxWidth: '680px' }}>
-          {SUGGESTIONS.map((s, i) => (
-            <button key={s.key} onClick={() => onSuggestedPrompt?.(s.prompt)}
-              className={`suggestion-card suggestion-card--${s.color}`}
-              style={{
-                padding: '18px 20px', backgroundColor: 'var(--chat-surface)', border: '1px solid var(--chat-border)',
-                borderRadius: '16px', cursor: 'pointer', textAlign: 'left',
-                display: 'flex', flexDirection: 'column', gap: '10px', minHeight: '120px',
-                transition: 'transform 200ms ease, box-shadow 200ms ease, background-color 150ms',
-                animation: `fadeSlideIn 0.3s ease-out ${i * 60}ms backwards`,
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--chat-hover)'; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.08)' }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--chat-surface)'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}
-            >
-              <div style={{
-                width: '36px', height: '36px', borderRadius: '10px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                backgroundColor: `rgba(${s.rgb}, 0.12)`,
-                border: `0.5px solid rgba(${s.rgb}, 0.2)`,
-                color: `rgb(${s.rgb})`,
-              }}>
-                <s.Icon size={16} />
-              </div>
-              <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{s.title}</div>
-              <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: 0, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden' }}>
-                {s.description}
-              </p>
-            </button>
-          ))}
-        </div>
+          {/* 4 suggestion cards with original pink/blue/green/orange colors */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px', width: '100%', maxWidth: '680px' }}>
+            {SUGGESTIONS.map((s, i) => (
+              <button key={s.key} onClick={() => onSuggestedPrompt?.(s.prompt)}
+                className={`suggestion-card suggestion-card--${s.color}`}
+                style={{
+                  padding: '18px 20px', backgroundColor: 'var(--chat-surface)', border: '1px solid var(--chat-border)',
+                  borderRadius: '16px', cursor: 'pointer', textAlign: 'left',
+                  display: 'flex', flexDirection: 'column', gap: '10px', minHeight: '120px',
+                  transition: 'transform 200ms ease, box-shadow 200ms ease, background-color 150ms',
+                  animation: `fadeSlideIn 0.3s ease-out ${i * 60}ms backwards`,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--chat-hover)'; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.08)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--chat-surface)'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}
+              >
+                <div style={{
+                  width: '36px', height: '36px', borderRadius: '10px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  backgroundColor: `rgba(${s.rgb}, 0.12)`,
+                  border: `0.5px solid rgba(${s.rgb}, 0.2)`,
+                  color: `rgb(${s.rgb})`,
+                }}>
+                  <s.Icon size={16} />
+                </div>
+                <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{s.title}</div>
+                <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: 0, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden' }}>
+                  {s.description}
+                </p>
+              </button>
+            ))}
+          </div>
 
-        {/* Footer hint */}
-        <div className="mono" style={{ marginTop: '32px', fontSize: '11px', color: 'var(--color-text-tertiary, var(--color-text-muted))', display: 'flex', gap: '8px', letterSpacing: '0.3px' }}>
-          <span>Drop a file anywhere</span>
-          <span style={{ opacity: 0.4 }}>·</span>
-          <span>or start typing below</span>
+          {/* Footer hint */}
+          <div className="mono" style={{ marginTop: '32px', fontSize: '11px', color: 'var(--color-text-tertiary, var(--color-text-muted))', display: 'flex', gap: '8px', letterSpacing: '0.3px' }}>
+            <span>Drop a file anywhere</span>
+            <span style={{ opacity: 0.4 }}>·</span>
+            <span>or start typing below</span>
+          </div>
         </div>
       </div>
     )
