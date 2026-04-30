@@ -1,0 +1,208 @@
+/* ═══════════════════════════════════════════════════════════
+   LOGIN PAGE — premium hero variant of AuthLayout
+   ═══════════════════════════════════════════════════════════ */
+
+/* Hero mark — scale AuthLayout-rendered ConvoiaMark to 64px */
+.login-page .auth-layout__header svg.convoia-mark {
+  width: 64px;
+  height: 64px;
+}
+
+.login-page .auth-layout__header h1 {
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-top: 24px;
+  margin-bottom: 8px;
+}
+
+.login-page .auth-layout__header p {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+/* Mark hover boost — speeds breathing ~1.5x when hovering the hero region.
+   `> *` durably targets every direct child of .convoia-mark__nodes whether
+   it's <circle>, <path>, or future SVG elements. */
+.login-page .auth-layout__header:hover
+  .convoia-mark--idle
+  .convoia-mark__nodes > * {
+  animation-duration: 2.1s;
+}
+
+/* Google sign-in container */
+.login-page__google {
+  display: flex;
+  justify-content: center;
+}
+
+/* Email divider with mono label */
+.login-page__divider {
+  position: relative;
+  margin: 4px 0;
+  text-align: center;
+}
+.login-page__divider::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  border-top: var(--border-thin) solid var(--border-subtle);
+  pointer-events: none;
+}
+.login-page__divider-label {
+  position: relative;
+  background: var(--surface-1);
+  padding: 0 12px;
+  font-size: 10px;
+}
+
+/* Form */
+.login-page__form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.login-page__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+
+.login-page__remember {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--text-tertiary);
+}
+
+.login-page__checkbox {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* Links and link-style buttons */
+.login-page__link,
+.login-page__link-btn {
+  color: var(--accent);
+  font-weight: 500;
+  text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: color 150ms var(--ease-default);
+}
+.login-page__link-btn {
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+.login-page__link:hover,
+.login-page__link-btn:hover {
+  color: var(--accent-hover);
+}
+
+/* Primary submit — premium hover with turquoise glow */
+.login-page__submit {
+  transition:
+    transform 200ms var(--ease-default),
+    box-shadow 200ms var(--ease-default),
+    background-color 200ms var(--ease-default);
+}
+.login-page__submit:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px var(--accent-glow);
+}
+.login-page__submit:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* ⌘ + ↵ keyboard shortcut hint */
+.login-page__shortcut {
+  text-align: center;
+  margin-top: 4px;
+  font-size: 10px;
+}
+.login-page__kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  border: var(--border-thin) solid currentColor;
+  border-radius: 3px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FORGOT PASSWORD MODAL
+   ═══════════════════════════════════════════════════════════ */
+.login-page__modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.login-page__modal {
+  background: var(--surface-overlay);
+  border: var(--border-thin) solid var(--border-default);
+  border-radius: var(--radius-xl);
+  padding: 28px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: var(--shadow-xl);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+}
+
+.login-page__modal-title {
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.login-page__modal-body {
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+}
+
+.login-page__modal-success {
+  text-align: center;
+}
+
+.login-page__modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.login-page__modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MOBILE (≤480px)
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 480px) {
+  .login-page .auth-layout__header svg.convoia-mark {
+    width: 56px;
+    height: 56px;
+  }
+  .login-page .auth-layout__header h1 {
+    font-size: 26px;
+  }
+  .login-page .auth-layout__card {
+    padding: 28px 24px;
+    margin: 0 12px;
+  }
+}

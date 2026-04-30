@@ -10,11 +10,13 @@ interface AuthLayoutProps {
   footer?: ReactNode
   /** Use wider card for multi-step / business registration flow */
   wide?: boolean
+  /** Optional class added to the root for page-specific styling */
+  className?: string
 }
 
-export function AuthLayout({ children, title, subtitle, footer, wide = false }: AuthLayoutProps) {
+export function AuthLayout({ children, title, subtitle, footer, wide = false, className = '' }: AuthLayoutProps) {
   return (
-    <div className="auth-layout">
+    <div className={`auth-layout ${className}`.trim()}>
       <div className="auth-layout__ambient" />
 
       <Link to="/" className="auth-layout__back mono-label">

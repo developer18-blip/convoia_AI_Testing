@@ -10,6 +10,7 @@ import { ComputationLine } from '../../components/primitives/ComputationLine'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
 import api from '../../lib/api'
+import '../../styles/login-page.css'
 
 export function LoginPage() {
   const { login, googleLogin } = useAuth()
@@ -23,7 +24,6 @@ export function LoginPage() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(false)
 
-  // Forgot-password modal state — preserved from the legacy page
   const [showForgot, setShowForgot] = useState(false)
   const [forgotEmail, setForgotEmail] = useState('')
   const [forgotLoading, setForgotLoading] = useState(false)
@@ -62,7 +62,6 @@ export function LoginPage() {
     }
   }
 
-  // Cmd/Ctrl+Enter submits the form
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -76,19 +75,17 @@ export function LoginPage() {
   return (
     <>
       <AuthLayout
+        className="login-page"
         title="Welcome back"
         subtitle="Sign in to continue to Convoia AI"
         footer={
           <span>
             Don't have an account?{' '}
-            <Link to="/register" style={{ color: 'var(--accent)', fontWeight: 500, textDecoration: 'none' }}>
-              Create one
-            </Link>
+            <Link to="/register" className="login-page__link">Create one</Link>
           </span>
         }
       >
-        {/* Google OAuth — identical behaviour to the legacy page */}
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <div className="login-page__google">
           <GoogleLogin
             onSuccess={async (credentialResponse) => {
               if (!credentialResponse.credential) return
@@ -108,16 +105,11 @@ export function LoginPage() {
           />
         </div>
 
-        <div style={{ position: 'relative', margin: '4px 0', textAlign: 'center' }}>
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center' }}>
-            <div style={{ width: '100%', borderTop: '0.5px solid var(--border-subtle)' }} />
-          </div>
-          <span className="mono-label" style={{ position: 'relative', background: 'var(--surface-1)', padding: '0 12px', fontSize: 10 }}>
-            OR WITH EMAIL
-          </span>
+        <div className="login-page__divider">
+          <span className="mono-label login-page__divider-label">OR WITH EMAIL</span>
         </div>
 
-        <form className="auth-login-form" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <form className="auth-login-form login-page__form" onSubmit={handleSubmit}>
           <Input
             label="Email"
             type="email"
@@ -140,22 +132,21 @@ export function LoginPage() {
               required
               autoComplete="current-password"
             />
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
-              <label htmlFor="remember-me" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: 'var(--text-tertiary)' }} className="text-body-sm">
+            <div className="login-page__row">
+              <label htmlFor="remember-me" className="login-page__remember text-body-sm">
                 <input
                   id="remember-me"
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  style={{ width: 14, height: 14, accentColor: 'var(--accent)', cursor: 'pointer' }}
+                  className="login-page__checkbox"
                 />
                 <span>Remember me</span>
               </label>
               <button
                 type="button"
                 onClick={() => { setShowForgot(true); setForgotEmail(email); setForgotSent(false) }}
-                className="text-body-sm"
-                style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0 }}
+                className="login-page__link-btn text-body-sm"
               >
                 Forgot password?
               </button>
@@ -164,70 +155,68 @@ export function LoginPage() {
 
           <SignalLine />
 
-          <Button type="submit" variant="primary" size="lg" loading={isLoading} disabled={isLoading}>
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            loading={isLoading}
+            disabled={isLoading}
+            className="login-page__submit"
+          >
             {isLoading ? 'Signing in...' : 'Sign in'}
           </Button>
 
           {isLoading && <ComputationLine label="AUTHENTICATING" />}
 
-          <div className="mono-label" style={{ textAlign: 'center', marginTop: 4, fontSize: 10 }}>
-            <span className="mono" style={{ padding: '2px 6px', border: '0.5px solid currentColor', borderRadius: 3 }}>⌘</span>{' '}
-            +{' '}
-            <span className="mono" style={{ padding: '2px 6px', border: '0.5px solid currentColor', borderRadius: 3 }}>↵</span>{' '}
-            TO SUBMIT
+          <div className="login-page__shortcut mono-label">
+            <kbd className="mono login-page__kbd">⌘</kbd>
+            {' + '}
+            <kbd className="mono login-page__kbd">↵</kbd>
+            {' TO SUBMIT'}
           </div>
         </form>
       </AuthLayout>
 
-      {/* Forgot password modal — preserved logic, re-styled to match design system */}
       {showForgot && (
         <div
-          style={{
-            position: 'fixed', inset: 0, zIndex: 100, display: 'flex',
-            alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
-          }}
+          className="login-page__modal-overlay"
           onClick={() => setShowForgot(false)}
         >
           <div
-            className="grain-surface"
-            style={{
-              background: 'var(--surface-1)',
-              border: '0.5px solid var(--border-default)',
-              borderRadius: 'var(--radius-xl)',
-              padding: 28, maxWidth: 400, width: '90%',
-              boxShadow: 'var(--shadow-xl)',
-            }}
+            className="login-page__modal grain-surface"
             onClick={(e) => e.stopPropagation()}
           >
             {forgotSent ? (
-              <div style={{ textAlign: 'center' }}>
-                <h3 className="text-h3" style={{ marginBottom: 8, color: 'var(--text-primary)' }}>Check your email</h3>
-                <p className="text-body-sm" style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
+              <div className="login-page__modal-success">
+                <h3 className="text-h3 login-page__modal-title">Check your email</h3>
+                <p className="text-body-sm login-page__modal-body">
                   If an account exists for <strong>{forgotEmail}</strong>, we've sent a password reset link.
                 </p>
                 <Button variant="primary" size="md" onClick={() => setShowForgot(false)}>Got it</Button>
               </div>
             ) : (
               <>
-                <h3 className="text-h3" style={{ marginBottom: 8, color: 'var(--text-primary)' }}>Forgot your password?</h3>
-                <p className="text-body-sm" style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
+                <h3 className="text-h3 login-page__modal-title">Forgot your password?</h3>
+                <p className="text-body-sm login-page__modal-body">
                   Enter your email and we'll send you a reset link.
                 </p>
-                <form onSubmit={async (e) => {
-                  e.preventDefault()
-                  if (!forgotEmail) return
-                  setForgotLoading(true)
-                  try {
-                    await api.post('/auth/forgot-password', { email: forgotEmail })
-                    setForgotSent(true)
-                  } catch {
-                    // Still show success to prevent email enumeration
-                    setForgotSent(true)
-                  } finally {
-                    setForgotLoading(false)
-                  }
-                }} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <form
+                  className="login-page__modal-form"
+                  onSubmit={async (e) => {
+                    e.preventDefault()
+                    if (!forgotEmail) return
+                    setForgotLoading(true)
+                    try {
+                      await api.post('/auth/forgot-password', { email: forgotEmail })
+                      setForgotSent(true)
+                    } catch {
+                      // Show success regardless to prevent email enumeration
+                      setForgotSent(true)
+                    } finally {
+                      setForgotLoading(false)
+                    }
+                  }}
+                >
                   <Input
                     type="email"
                     value={forgotEmail}
@@ -236,7 +225,7 @@ export function LoginPage() {
                     autoFocus
                     required
                   />
-                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <div className="login-page__modal-actions">
                     <Button type="button" variant="ghost" size="md" onClick={() => setShowForgot(false)}>Cancel</Button>
                     <Button type="submit" variant="primary" size="md" loading={forgotLoading} disabled={forgotLoading}>
                       {forgotLoading ? 'Sending...' : 'Send reset link'}
