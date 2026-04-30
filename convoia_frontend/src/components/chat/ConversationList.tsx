@@ -304,32 +304,33 @@ export function ConversationList({
 
       {/* Navigation + User at bottom */}
       <div style={{ flexShrink: 0, borderTop: '1px solid var(--color-border-subtle)' }}>
-        {/* Quick nav links */}
-        <div style={{ display: 'flex', gap: '4px', padding: '10px 10px 6px' }}>
-          <button onClick={() => navigate('/dashboard')} title="Dashboard"
-            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '6px', borderRadius: '8px', background: 'none', border: 'none', color: 'var(--color-text-dim)', cursor: 'pointer', fontSize: '11px', transition: 'all 0.15s' }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-surface-2)'; e.currentTarget.style.color = 'var(--color-text-primary)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--color-text-dim)' }}>
-            <LayoutDashboard size={14} />
-          </button>
-          <button onClick={() => navigate('/settings')} title="Settings"
-            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '6px', borderRadius: '8px', background: 'none', border: 'none', color: 'var(--color-text-dim)', cursor: 'pointer', fontSize: '11px', transition: 'all 0.15s' }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-surface-2)'; e.currentTarget.style.color = 'var(--color-text-primary)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--color-text-dim)' }}>
-            <Settings size={14} />
-          </button>
-          <button onClick={toggleTheme} title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
-            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '6px', borderRadius: '8px', background: 'none', border: 'none', color: 'var(--color-text-dim)', cursor: 'pointer', fontSize: '11px', transition: 'all 0.15s' }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-surface-2)'; e.currentTarget.style.color = 'var(--color-text-primary)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--color-text-dim)' }}>
-            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-          </button>
-          <button onClick={logout} title="Logout"
-            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '6px', borderRadius: '8px', background: 'none', border: 'none', color: 'var(--color-text-dim)', cursor: 'pointer', fontSize: '11px', transition: 'all 0.15s' }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; e.currentTarget.style.color = '#EF4444' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--color-text-dim)' }}>
-            <LogOut size={14} />
-          </button>
+        {/* Quick nav links — chips with distinct colors so each icon reads at a glance */}
+        <div style={{ display: 'flex', gap: '6px', padding: '10px 10px 6px' }}>
+          {[
+            { title: 'Dashboard', Icon: LayoutDashboard, onClick: () => navigate('/dashboard'), color: 'var(--color-primary)', rgb: '20, 184, 205' /* accent turquoise — muted hover */ },
+            { title: 'Settings', Icon: Settings, onClick: () => navigate('/settings'), color: 'var(--color-text-secondary)', rgb: '148, 163, 184' },
+            { title: theme === 'dark' ? 'Light mode' : 'Dark mode', Icon: theme === 'dark' ? Sun : Moon, onClick: toggleTheme, color: theme === 'dark' ? '#F59E0B' : '#6366F1', rgb: theme === 'dark' ? '245, 158, 11' : '99, 102, 241' },
+            { title: 'Logout', Icon: LogOut, onClick: logout, color: '#EF4444', rgb: '239, 68, 68' },
+          ].map(({ title, Icon, onClick, color, rgb }) => (
+            <button
+              key={title}
+              onClick={onClick}
+              title={title}
+              aria-label={title}
+              style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: '8px', borderRadius: '8px', cursor: 'pointer',
+                background: `rgba(${rgb}, 0.08)`,
+                border: `0.5px solid rgba(${rgb}, 0.25)`,
+                color,
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = `rgba(${rgb}, 0.18)`; e.currentTarget.style.borderColor = `rgba(${rgb}, 0.5)` }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = `rgba(${rgb}, 0.08)`; e.currentTarget.style.borderColor = `rgba(${rgb}, 0.25)` }}
+            >
+              <Icon size={14} />
+            </button>
+          ))}
         </div>
 
         {/* User profile — click to go to settings */}

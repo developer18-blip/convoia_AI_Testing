@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Menu, Search, Bell, Zap, User, Key, LogOut, Sun, Moon, CheckCheck, X, MessageSquare, Bot, Settings, BarChart3 } from 'lucide-react'
+import { Search, Bell, Zap, User, Key, LogOut, Sun, Moon, CheckCheck, X, MessageSquare, Bot, Settings, BarChart3 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useTheme } from '../../hooks/useTheme'
 import { useTokens } from '../../contexts/TokenContext'
@@ -49,11 +49,9 @@ const searchItems = [
   { label: 'Team', path: '/team', icon: <User size={14} /> },
 ]
 
-interface HeaderProps {
-  onMenuClick: () => void
-}
+interface HeaderProps {}
 
-export function Header({ onMenuClick }: HeaderProps) {
+export function Header(_props: HeaderProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, logout } = useAuth()
@@ -141,13 +139,6 @@ export function Header({ onMenuClick }: HeaderProps) {
       borderBottom: '1px solid var(--chat-border)', zIndex: 20,
     }}>
       <div className="flex items-center gap-3">
-        <button
-          onClick={onMenuClick}
-          className="lg:hidden"
-          style={{ padding: '12px', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        >
-          <Menu size={20} />
-        </button>
         <h1 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>{title}</h1>
       </div>
 
