@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import type { MouseEvent } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { IntellectMark } from '../brand/IntellectMark'
 import { Button } from '../primitives/Button'
 import { ThemeToggle } from '../primitives/ThemeToggle'
@@ -7,6 +8,8 @@ import { ThemeToggle } from '../primitives/ThemeToggle'
 export function MarketingNav() {
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const location = useLocation()
+  const navigate = useNavigate()
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10)
@@ -14,22 +17,38 @@ export function MarketingNav() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
+  const handleScrollLink = (e: MouseEvent, sectionId: string) => {
+    e.preventDefault()
+    setMobileOpen(false)
+
+    if (location.pathname !== '/') {
+      navigate('/')
+      setTimeout(() => {
+        document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 100)
+      return
+    }
+
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    window.history.pushState(null, '', `/#${sectionId}`)
+  }
+
   return (
     <nav className={`m-nav ${scrolled ? 'm-nav--scrolled' : ''}`}>
       <div className="m-nav__inner">
         <Link to="/" className="m-nav__brand">
           <IntellectMark size={28} state="idle" />
           <div className="m-nav__brand-text">
-            <div className="m-nav__brand-name">Intellect</div>
-            <div className="m-nav__brand-sub mono-label">AI GATEWAY</div>
+            <div className="m-nav__brand-name">Intellect AI</div>
+            <div className="m-nav__brand-sub mono-label">BY CONVOIA AI</div>
           </div>
         </Link>
 
         <div className="m-nav__links">
-          <Link to="/#features" className="m-nav__link">Features</Link>
+          <a href="/#features" className="m-nav__link" onClick={(e) => handleScrollLink(e, 'features')}>Features</a>
           <Link to="/pricing" className="m-nav__link">Pricing</Link>
-          <Link to="/#how-it-works" className="m-nav__link">How it works</Link>
-          <Link to="/#reviews" className="m-nav__link">Reviews</Link>
+          <a href="/#how-it-works" className="m-nav__link" onClick={(e) => handleScrollLink(e, 'how-it-works')}>How it works</a>
+          <a href="/#reviews" className="m-nav__link" onClick={(e) => handleScrollLink(e, 'reviews')}>Reviews</a>
         </div>
 
         <div className="m-nav__actions">
@@ -60,10 +79,10 @@ export function MarketingNav() {
 
       {mobileOpen && (
         <div className="m-nav__mobile-menu">
-          <Link to="/#features" onClick={() => setMobileOpen(false)}>Features</Link>
+          <a href="/#features" onClick={(e) => handleScrollLink(e, 'features')}>Features</a>
           <Link to="/pricing" onClick={() => setMobileOpen(false)}>Pricing</Link>
-          <Link to="/#how-it-works" onClick={() => setMobileOpen(false)}>How it works</Link>
-          <Link to="/#reviews" onClick={() => setMobileOpen(false)}>Reviews</Link>
+          <a href="/#how-it-works" onClick={(e) => handleScrollLink(e, 'how-it-works')}>How it works</a>
+          <a href="/#reviews" onClick={(e) => handleScrollLink(e, 'reviews')}>Reviews</a>
           <div style={{ height: 1, background: 'var(--border-default)', margin: '8px 0' }} />
           <Link to="/login" onClick={() => setMobileOpen(false)}>Sign in</Link>
           <Link to="/register" onClick={() => setMobileOpen(false)} style={{ color: 'var(--accent)' }}>

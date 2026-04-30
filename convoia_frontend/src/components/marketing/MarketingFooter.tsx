@@ -8,14 +8,14 @@ export function MarketingFooter() {
         <div className="m-footer__brand-col">
           <div className="m-footer__brand">
             <IntellectMark size={24} state="idle" />
-            <div className="m-footer__brand-name">Intellect</div>
+            <div>
+              <div className="m-footer__brand-name">Intellect AI</div>
+              <div className="mono-label" style={{ fontSize: 10, marginTop: 2 }}>BY CONVOIA AI</div>
+            </div>
           </div>
           <p className="text-body-sm" style={{ color: 'var(--text-tertiary)', marginTop: 12, maxWidth: 280 }}>
             The AI gateway that routes across every provider from a single interface.
           </p>
-          <div className="mono-label" style={{ marginTop: 20, opacity: 0.6 }}>
-            A PRODUCT OF CONVOIA AI
-          </div>
         </div>
 
         <div className="m-footer__links-col">
@@ -42,7 +42,7 @@ export function MarketingFooter() {
       </div>
 
       <div className="m-footer__bottom">
-        <div className="mono-label">© 2026 CONVOIA AI · ALL RIGHTS RESERVED</div>
+        <div className="mono-label">© 2026 CONVOIA AI · INTELLECT IS A PRODUCT OF CONVOIA AI</div>
         <div className="mono-label">
           <span style={{ color: 'var(--color-success)' }}>●</span> ALL SYSTEMS OPERATIONAL
         </div>
