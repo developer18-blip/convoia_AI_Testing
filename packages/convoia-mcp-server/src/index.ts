@@ -26,7 +26,7 @@ function parseArgs(): { transport: 'stdio' | 'sse' | 'api'; port: number; apiKey
   let transport: 'stdio' | 'sse' | 'api' = 'stdio';
   let port = 3500;
   let apiKey = process.env.CONVOIA_API_KEY || '';
-  let baseUrl = process.env.CONVOIA_API_URL || 'https://intellect.convoia.com/api';
+  let baseUrl = process.env.CONVOIA_API_URL || 'https://convoia.ai/api';
   let workspaceRoot = process.env.CONVOIA_WORKSPACE || process.cwd();
 
   for (let i = 0; i < args.length; i++) {
@@ -54,7 +54,7 @@ async function main(): Promise<void> {
   if (!config.apiKey) {
     console.error('[ConvoiaAI MCP] ERROR: No API key provided.');
     console.error('  Set CONVOIA_API_KEY env var or pass --api-key <key>');
-    console.error('  Get your key at: https://intellect.convoia.com/api-keys');
+    console.error('  Get your key at: https://convoia.ai/api-keys');
     process.exit(1);
   }
 
