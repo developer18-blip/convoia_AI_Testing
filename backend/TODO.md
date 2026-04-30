@@ -64,3 +64,14 @@ shared utility, apply to both callOpenAI and callOpenAIStream
 Effort: ~30 lines, careful refactor
 Priority: Low — workaround is pre-seeding probed models
 Identified: 2026-04-29 during HOTFIX-GPT55-T investigation
+
+## Tier 1 LoginPage hybrid redesign — DONE 2026-04-30
+
+Resolved via prod commit c7a1b64 (cherry-pick of local 75a5327).
+Final state: AuthLayout single-column visual shell + rememberMe checkbox
+inline with Forgot password link + 3-arg login(email, password, rememberMe)
+call + AuthContext extended with optional rememberMe param.
+data-theme wrapper already absent in the deployed LoginPage.
+
+Files touched: LoginPage.tsx, AuthContext.tsx (rememberMe was already
+present on prod via cbba0a9; LoginPage replaced from prod-old layout).
