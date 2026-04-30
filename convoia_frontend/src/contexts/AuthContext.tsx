@@ -2,6 +2,7 @@ import { createContext, useCallback, useEffect, useState, type ReactNode } from 
 import { useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 import { setToken as setStorageToken, setRefreshToken as setStorageRefresh, setUserProfile, clearAuth } from '../lib/storage'
+import { useAccent } from './AccentContext'
 import type { User } from '../types'
 
 interface AuthContextType {
@@ -33,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const navigate = useNavigate()
+  const { setActiveModel } = useAccent()
 
   // ── Restore auth from localStorage on mount ──
   useEffect(() => {
@@ -190,10 +192,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('convoia_refresh_token')
     localStorage.removeItem('convoia_user')
     clearAuth() // Clear @capacitor/preferences on native
+    // Reset accent to brand turquoise BEFORE redirect so /login renders
+    // neutral at the state level (auth-surface CSS isolation is the
+    // defense-in-depth layer; this is the proper fix).
+    setActiveModel('')
     setToken(null)
     setUser(null)
     navigate('/login')
-  }, [navigate])
+  }, [navigate, setActiveModel])
 
   const updateUser = useCallback((updates: Partial<User>) => {
     setUser((prev) => {

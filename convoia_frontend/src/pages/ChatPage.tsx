@@ -95,7 +95,12 @@ export function ChatPage() {
 
   const handleModelChange = (id: string) => {
     setSelectedModelId(id)
-    setActiveModel(resolveModelSlug(id))
+    // Picker change updates accent ONLY when chat is already committed.
+    // For uncommitted (empty) chats, accent stays neutral — first send
+    // will commit the picker selection.
+    if (messages.length > 0) {
+      setActiveModel(resolveModelSlug(id))
+    }
     if (id === 'auto') { toast.info('Auto — router will pick the best model per query'); return }
     const model = models.find((m) => m.id === id)
     if (model) toast.info(`${model.name} is running`)
@@ -103,13 +108,14 @@ export function ChatPage() {
 
   useEffect(() => {
     if (models.length > 0 && !selectedModelId) {
+      // Set local picker state only. Accent stays at brand turquoise until
+      // the chat commits (first send) — picker is exploratory until then.
       setSelectedModelId(models[0].id)
-      setActiveModel(resolveModelSlug(models[0].id))
     }
     // resolveModelSlug closes over `models` — safe to omit from deps since
     // it's only invoked when models change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [models, selectedModelId, setActiveModel])
+  }, [models, selectedModelId])
 
   // Keep AccentContext in sync with Council mode so signal/compute lines
   // blend the active council provider colors. Join the IDs to a string so the
@@ -136,8 +142,18 @@ export function ChatPage() {
   useEffect(() => {
     if (activeConversation) {
       setSelectedModelId(activeConversation.modelId)
-      setActiveModel(resolveModelSlug(activeConversation.modelId))
+      // Loaded conversation is committed iff it has messages. Empty drafts
+      // stay neutral; existing chats with history shift accent to that
+      // conv's model immediately.
+      if (activeConversation.messages.length > 0) {
+        setActiveModel(resolveModelSlug(activeConversation.modelId))
+      } else {
+        setActiveModel('')
+      }
       if (activeConversation.industry) setIndustry(activeConversation.industry)
+    } else {
+      // No active conversation (handleNew clicked, fresh /chat load) — neutral.
+      setActiveModel('')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeConversationId])
@@ -195,6 +211,13 @@ export function ChatPage() {
 
     const primaryModelId = councilMode ? councilModelIds[0] : selectedModelId
     const primaryModelName = councilMode ? 'ConvoiaAI Apex' : (selectedModel?.name || 'AI')
+
+    // First-send commit: shift accent to picked model the moment the chat
+    // commits. Subsequent sends won't touch accent (picker changes update
+    // it directly via handleModelChange post-commit).
+    if (messages.length === 0) {
+      setActiveModel(resolveModelSlug(primaryModelId))
+    }
 
     let convId = activeConversationId
     if (!convId) {
@@ -319,6 +342,13 @@ export function ChatPage() {
     if (extras?.imagePreview) messageExtras.imagePreview = extras.imagePreview
     if (extras?.imagePreviews) messageExtras.imagePreviews = extras.imagePreviews
     const primaryModelId = councilMode ? councilModelIds[0] : selectedModelId
+
+    // First-send commit (matches handleSend) — shift accent to picked model
+    // when chat commits via the file/document path.
+    if (messages.length === 0) {
+      setActiveModel(resolveModelSlug(primaryModelId))
+    }
+
     const councilOpts = councilMode ? { modelIds: councilModelIds } : undefined
     sendWithContext(text, primaryModelId, systemContext, messageExtras, industry || undefined, selectedAgent?.id, thinkingEnabled, councilOpts)
   }

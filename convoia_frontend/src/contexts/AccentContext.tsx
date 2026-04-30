@@ -16,7 +16,10 @@ interface AccentContextValue {
 const AccentContext = createContext<AccentContextValue | null>(null)
 
 export function AccentProvider({ children }: { children: ReactNode }) {
-  const [activeModelId, setActiveModelIdState] = useState<string>('claude-opus-4-6')
+  // Empty string resolves to the 'default' (Convoia turquoise) provider via
+  // getProviderFromModelId. Chat commits a real model on first send; logout
+  // resets back here.
+  const [activeModelId, setActiveModelIdState] = useState<string>('')
   const [councilModels, setCouncilModelsState] = useState<string[]>([])
 
   // Track the site-wide theme (light/dark). ThemeContext toggles the `.light`
