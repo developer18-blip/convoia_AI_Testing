@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
-import { IntellectMark } from '../brand/IntellectMark'
+import { ConvoiaMark } from '../brand/ConvoiaMark'
 import { PROVIDER_THEMES } from '../../config/providers'
 
 interface AuthLayoutProps {
@@ -26,7 +26,7 @@ export function AuthLayout({ children, title, subtitle, footer, wide = false }: 
 
       <div className={`auth-layout__card grain-surface ${wide ? 'auth-layout__card--wide' : ''}`}>
         <div className="auth-layout__header">
-          <IntellectMark size={40} state="idle" />
+          <ConvoiaMark size={40} state="idle" />
           <h1 className="text-h2" style={{ marginTop: 16, marginBottom: 6, color: 'var(--text-primary)' }}>{title}</h1>
           {subtitle && <p className="text-body-sm" style={{ color: 'var(--text-secondary)', margin: 0 }}>{subtitle}</p>}
         </div>

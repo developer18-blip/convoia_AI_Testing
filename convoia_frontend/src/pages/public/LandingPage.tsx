@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { MarketingNav } from '../../components/marketing/MarketingNav'
 import { MarketingFooter } from '../../components/marketing/MarketingFooter'
-import { IntellectMark } from '../../components/brand/IntellectMark'
+import { ConvoiaMark } from '../../components/brand/ConvoiaMark'
 import { Button } from '../../components/primitives/Button'
 import { Pill } from '../../components/primitives/Pill'
 import { PROVIDER_THEMES } from '../../config/providers'
@@ -168,7 +168,7 @@ export function LandingPage() {
   // Reset the dynamic accent to default (turquoise) on mount. Marketing pages
   // stay on-brand regardless of whatever provider accent the user had active
   // elsewhere in the app. setActiveModel('') resolves via getProviderFromModelId
-  // to the 'default' theme, which is Intellect turquoise.
+  // to the 'default' theme, which is the static Convoia turquoise.
   const { setActiveModel } = useAccent()
   useEffect(() => { setActiveModel('') }, [setActiveModel])
 
@@ -279,14 +279,14 @@ export function LandingPage() {
         <div className="lp-solution__ambient" />
         <div className="lp-solution__inner">
           <div style={{ textAlign: 'center', marginBottom: 48 }}>
-            <IntellectMark size={48} state="council" />
+            <ConvoiaMark size={48} state="council" />
             <div className="section-heading" style={{ marginTop: 16, marginBottom: 8 }}>THE FIX</div>
             <h2 className="text-h1" style={{ marginBottom: 12, color: 'var(--text-primary)' }}>
               One gateway.<br />
               <span style={{ color: 'var(--accent)' }}>One invoice.</span> Real visibility.
             </h2>
             <p className="text-body-lg" style={{ color: 'var(--text-secondary)', maxWidth: 640, margin: '0 auto' }}>
-              Intellect sits between your team and every AI provider. Your people use the best model for the job.
+              Convoia sits between your team and every AI provider. Your people use the best model for the job.
               You see every token spent, every cent charged, by user and by model.
             </p>
           </div>
@@ -298,7 +298,7 @@ export function LandingPage() {
                 <span style={{ background: '#FFBD2E' }} />
                 <span style={{ background: '#27C93F' }} />
               </div>
-              <div className="mono-label" style={{ fontSize: 10 }}>intellect.convoia.ai/analytics</div>
+              <div className="mono-label" style={{ fontSize: 10 }}>app.convoia.ai/analytics</div>
             </div>
             <div className="lp-dashboard-mock__body">
               <div className="lp-dashboard-mock__header">
@@ -425,7 +425,7 @@ export function LandingPage() {
 
           <div className="lp-proof__cta">
             <p className="text-body" style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>
-              Using Intellect AI? We'd love your feedback.
+              Using Convoia AI? We'd love your feedback.
             </p>
             <Link to="/review">
               <Button variant="outline" size="md" leftIcon={
@@ -570,7 +570,7 @@ export function LandingPage() {
       <section className="lp-final">
         <div className="lp-final__ambient" />
         <div className="lp-final__inner">
-          <IntellectMark size={56} state="council" />
+          <ConvoiaMark size={56} state="council" />
           <h2 className="text-h1" style={{ marginTop: 24, marginBottom: 12, color: 'var(--text-primary)' }}>
             Stop bleeding money on AI.
           </h2>

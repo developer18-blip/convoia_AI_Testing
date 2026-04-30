@@ -3,7 +3,7 @@
 **Last Updated:** April 10, 2026
 **Developer:** Anirudh Rai (Applied AI Engineer)
 **Repository:** github.com/developer18-blip/convoia_AI_Testing
-**Live URL:** https://intellect.convoia.com
+**Live URL:** https://convoia.ai
 **Server:** AWS EC2 (Ubuntu), PM2 process manager, Nginx reverse proxy
 
 ---
@@ -52,7 +52,7 @@ ConvoiaAI is a **B2B SaaS AI Gateway Platform** — a unified interface that rou
 ### Deployment
 - **Server:** AWS EC2 Ubuntu instance
 - **Database:** PostgreSQL (managed or self-hosted)
-- **Domain:** intellect.convoia.com
+- **Domain:** convoia.ai
 - **SSL:** Let's Encrypt via Nginx
 
 ---
@@ -535,8 +535,8 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 RESEND_API_KEY=re_...
 
 # Frontend
-FRONTEND_URL=https://intellect.convoia.com
-CORS_ORIGIN=https://intellect.convoia.com
+FRONTEND_URL=https://convoia.ai
+CORS_ORIGIN=https://convoia.ai
 ```
 
 ---

@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { MarketingNav } from '../../components/marketing/MarketingNav'
 import { MarketingFooter } from '../../components/marketing/MarketingFooter'
 import { Button } from '../../components/primitives/Button'
-import { IntellectMark } from '../../components/brand/IntellectMark'
+import { ConvoiaMark } from '../../components/brand/ConvoiaMark'
 
 type TierVariant = 'primary' | 'secondary' | 'outline'
 
@@ -68,7 +68,7 @@ export function PricingPage() {
       <section className="pp-hero">
         <div className="pp-hero__ambient" />
         <div className="pp-hero__inner">
-          <IntellectMark size={40} state="idle" />
+          <ConvoiaMark size={40} state="idle" />
           <div className="section-heading" style={{ marginTop: 20, marginBottom: 8 }}>Pricing</div>
           <h1 className="text-h1" style={{ marginBottom: 16, textAlign: 'center', color: 'var(--text-primary)' }}>
             Pay only for what you use.<br />No subscriptions.
@@ -151,7 +151,7 @@ export function PricingPage() {
       <section className="lp-final-cta">
         <div className="lp-final-cta__inner">
           <div className="lp-final-cta__ambient" />
-          <IntellectMark size={48} state="council" />
+          <ConvoiaMark size={48} state="council" />
           <h2 className="text-h1" style={{ marginTop: 24, marginBottom: 12, color: 'var(--text-primary)' }}>
             Start with 500K free tokens
           </h2>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { MouseEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { IntellectMark } from '../brand/IntellectMark'
+import { ConvoiaMark } from '../brand/ConvoiaMark'
 import { Button } from '../primitives/Button'
 import { ThemeToggle } from '../primitives/ThemeToggle'
 
@@ -37,10 +37,9 @@ export function MarketingNav() {
     <nav className={`m-nav ${scrolled ? 'm-nav--scrolled' : ''}`}>
       <div className="m-nav__inner">
         <Link to="/" className="m-nav__brand">
-          <IntellectMark size={28} state="idle" />
+          <ConvoiaMark size={28} state="idle" />
           <div className="m-nav__brand-text">
-            <div className="m-nav__brand-name">Intellect AI</div>
-            <div className="m-nav__brand-sub mono-label">BY CONVOIA AI</div>
+            <div className="m-nav__brand-name">Convoia AI</div>
           </div>
         </Link>
 

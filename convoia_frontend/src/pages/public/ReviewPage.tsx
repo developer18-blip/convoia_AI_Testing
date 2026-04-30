@@ -3,7 +3,7 @@ import type { CSSProperties, FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { MarketingNav } from '../../components/marketing/MarketingNav'
 import { MarketingFooter } from '../../components/marketing/MarketingFooter'
-import { IntellectMark } from '../../components/brand/IntellectMark'
+import { ConvoiaMark } from '../../components/brand/ConvoiaMark'
 import { Button } from '../../components/primitives/Button'
 import { Input } from '../../components/primitives/Input'
 import { useAccent } from '../../contexts/AccentContext'
@@ -66,7 +66,7 @@ export function ReviewPage() {
           minHeight: '60vh', display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center', padding: '40px 20px', textAlign: 'center',
         }}>
-          <IntellectMark size={48} state="idle" />
+          <ConvoiaMark size={48} state="idle" />
           <h1 className="text-h1" style={{ marginTop: 24, marginBottom: 12, color: 'var(--text-primary)' }}>
             Sign in to leave a review.
           </h1>
@@ -91,7 +91,7 @@ export function ReviewPage() {
           minHeight: '60vh', display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center', padding: '40px 20px', textAlign: 'center',
         }}>
-          <IntellectMark size={48} state="council" />
+          <ConvoiaMark size={48} state="council" />
           <h1 className="text-h1" style={{ marginTop: 24, marginBottom: 12, color: 'var(--text-primary)' }}>Thank you.</h1>
           <p className="text-body-lg" style={{ color: 'var(--text-secondary)', marginBottom: 32, maxWidth: 480 }}>
             Your review has been submitted. We read every one. If we feature yours, we'll send you a free month of Scale.

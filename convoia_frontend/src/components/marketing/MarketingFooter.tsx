@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { IntellectMark } from '../brand/IntellectMark'
+import { ConvoiaMark } from '../brand/ConvoiaMark'
 
 export function MarketingFooter() {
   return (
@@ -7,10 +7,9 @@ export function MarketingFooter() {
       <div className="m-footer__inner">
         <div className="m-footer__brand-col">
           <div className="m-footer__brand">
-            <IntellectMark size={24} state="idle" />
+            <ConvoiaMark size={24} state="idle" />
             <div>
-              <div className="m-footer__brand-name">Intellect AI</div>
-              <div className="mono-label" style={{ fontSize: 10, marginTop: 2 }}>BY CONVOIA AI</div>
+              <div className="m-footer__brand-name">Convoia AI</div>
             </div>
           </div>
           <p className="text-body-sm" style={{ color: 'var(--text-tertiary)', marginTop: 12, maxWidth: 280 }}>
@@ -42,7 +41,7 @@ export function MarketingFooter() {
       </div>
 
       <div className="m-footer__bottom">
-        <div className="mono-label">© 2026 CONVOIA AI · INTELLECT IS A PRODUCT OF CONVOIA AI</div>
+        <div className="mono-label">© 2026 CONVOIA AI</div>
         <div className="mono-label">
           <span style={{ color: 'var(--color-success)' }}>●</span> ALL SYSTEMS OPERATIONAL
         </div>
