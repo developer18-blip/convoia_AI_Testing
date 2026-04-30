@@ -130,6 +130,10 @@ html {
   --surface-2: rgba(0, 0, 0, 0.02);
   --surface-3: rgba(0, 0, 0, 0.04);
   --surface-overlay: rgba(255, 255, 255, 0.9);
+  /* Atmospheric card surfaces over animated mesh backgrounds.
+     Lower alpha than --surface-overlay so background bleeds through
+     visibly. Currently consumed by .auth-layout__card. */
+  --surface-glass: rgba(255, 255, 255, 0.85);
 
   --text-primary: #18181B;
   --text-secondary: #3F3F46;
@@ -171,6 +175,7 @@ html {
   --surface-2: rgba(255, 255, 255, 0.02);
   --surface-3: rgba(255, 255, 255, 0.04);
   --surface-overlay: rgba(10, 10, 15, 0.85);
+  --surface-glass: rgba(15, 15, 20, 0.65);
 
   --text-primary: #F4F4F5;
   --text-secondary: #D4D4D8;
