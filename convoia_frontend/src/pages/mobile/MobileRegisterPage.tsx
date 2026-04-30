@@ -226,7 +226,7 @@ export function MobileRegisterPage() {
                   } catch (err: any) {
                     console.warn('Native Google sign-in failed, falling back to browser:', err?.message)
                   }
-                  const baseUrl = import.meta.env.VITE_API_URL || 'https://intellect.convoia.com/api'
+                  const baseUrl = import.meta.env.VITE_API_URL || 'https://convoia.ai/api'
                   window.open(`${baseUrl}/auth/google/mobile`, '_system')
                 }}
                 style={{
