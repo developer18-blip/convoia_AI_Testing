@@ -9,7 +9,7 @@ interface AuthContextType {
   token: string | null
   isAuthenticated: boolean
   isLoading: boolean
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>
   googleLogin: (idToken: string) => Promise<void>
   register: (data: Record<string, string>) => Promise<void>
   logout: () => void
@@ -117,9 +117,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const login = useCallback(
-    async (email: string, password: string) => {
+    async (email: string, password: string, rememberMe: boolean = false) => {
       try {
-        const res = await api.post('/auth/login', { email, password })
+        const res = await api.post('/auth/login', { email, password, rememberMe })
         const { token: newToken, refreshToken, user: userData } = res.data.data
         localStorage.setItem('convoia_token', newToken)
         localStorage.setItem('convoia_refresh_token', refreshToken)

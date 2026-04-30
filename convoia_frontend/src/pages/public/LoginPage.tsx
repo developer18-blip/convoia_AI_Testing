@@ -19,6 +19,7 @@ export function LoginPage() {
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(false)
 
@@ -42,7 +43,7 @@ export function LoginPage() {
     if (!validate()) return
     try {
       setIsLoading(true)
-      await login(email, password)
+      await login(email, password, rememberMe)
       if (inviteToken) {
         try {
           const res = await api.post('/team/accept-invite', { token: inviteToken })
@@ -139,7 +140,17 @@ export function LoginPage() {
               required
               autoComplete="current-password"
             />
-            <div style={{ textAlign: 'right', marginTop: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+              <label htmlFor="remember-me" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: 'var(--text-tertiary)' }} className="text-body-sm">
+                <input
+                  id="remember-me"
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  style={{ width: 14, height: 14, accentColor: 'var(--accent)', cursor: 'pointer' }}
+                />
+                <span>Remember me</span>
+              </label>
               <button
                 type="button"
                 onClick={() => { setShowForgot(true); setForgotEmail(email); setForgotSent(false) }}
