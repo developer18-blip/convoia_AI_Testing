@@ -62,6 +62,7 @@ const PrivacyPolicyPage = lazy(() => import('./pages/public/PrivacyPolicyPage'))
 const TermsOfServicePage = lazy(() => import('./pages/public/TermsOfServicePage'))
 const PricingPage = lazy(() => import('./pages/public/PricingPage'))
 const ResetPasswordPage = lazy(() => import('./pages/public/ResetPasswordPage'))
+const ReviewPage = lazy(() => import('./pages/public/ReviewPage'))
 const DesignSystemPage = lazy(() => import('./pages/DesignSystemPage'))
 
 function ProtectedRoute() {
@@ -162,6 +163,7 @@ function AppRoutes() {
         <Route path="/terms" element={<TermsOfServicePage />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/review" element={<ReviewPage />} />
 
         {/* Protected */}
         <Route element={<ProtectedRoute />}>

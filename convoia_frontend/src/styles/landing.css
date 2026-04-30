@@ -379,6 +379,16 @@
   text-align: center;
 }
 
+.lp-proof__rating-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(245, 158, 11, 0.1);
+  border: var(--border-thin) solid rgba(245, 158, 11, 0.25);
+  border-radius: var(--radius-full);
+}
+
 .lp-testimonial {
   max-width: 680px;
   margin: 0 auto;
@@ -387,6 +397,19 @@
   border: var(--border-thin) solid var(--accent-border);
   border-radius: var(--radius-xl);
   position: relative;
+}
+
+.lp-testimonial__rating {
+  display: flex;
+  gap: 2px;
+  margin-bottom: var(--space-3);
+}
+
+.lp-proof__cta {
+  text-align: center;
+  margin-top: var(--space-10);
+  padding-top: var(--space-8);
+  border-top: var(--border-thin) solid var(--border-subtle);
 }
 
 .lp-testimonial__body {
