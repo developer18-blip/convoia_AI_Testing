@@ -133,14 +133,14 @@ export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, o
               <button key={s.key} onClick={() => onSuggestedPrompt?.(s.prompt)}
                 className={`suggestion-card suggestion-card--${s.color}`}
                 style={{
-                  padding: '18px 20px', backgroundColor: 'var(--chat-surface)', border: '1px solid var(--chat-border)',
+                  padding: '18px 20px', backgroundColor: `rgba(${s.rgb}, 0.07)`, border: `1px solid rgba(${s.rgb}, 0.18)`,
                   borderRadius: '16px', cursor: 'pointer', textAlign: 'left',
                   display: 'flex', flexDirection: 'column', gap: '10px', minHeight: '120px',
-                  transition: 'transform 200ms ease, box-shadow 200ms ease, background-color 150ms',
+                  transition: 'transform 200ms ease, box-shadow 200ms ease, background-color 150ms, border-color 150ms',
                   animation: `fadeSlideIn 0.3s ease-out ${i * 60}ms backwards`,
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--chat-hover)'; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.08)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--chat-surface)'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = `rgba(${s.rgb}, 0.12)`; e.currentTarget.style.borderColor = `rgba(${s.rgb}, 0.30)`; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 6px 20px rgba(${s.rgb}, 0.15)` }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = `rgba(${s.rgb}, 0.07)`; e.currentTarget.style.borderColor = `rgba(${s.rgb}, 0.18)`; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}
               >
                 <div style={{
                   width: '36px', height: '36px', borderRadius: '10px',
