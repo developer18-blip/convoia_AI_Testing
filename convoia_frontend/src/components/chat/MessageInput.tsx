@@ -467,7 +467,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
             }}
             onFocus={() => setInputFocused(true)}
             onBlur={() => setInputFocused(false)}
-            placeholder={disabled ? "No tokens available — contact your admin or purchase tokens" : "Ask Intellect AI anything..."}
+            placeholder={disabled ? "No tokens available — contact your admin or purchase tokens" : "Ask Convoia AI anything..."}
             rows={1}
             disabled={disabled || fileLoading}
             aria-label="Message input"
