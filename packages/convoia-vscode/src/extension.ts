@@ -20,7 +20,7 @@ let chatPanel: vscode.WebviewPanel | null = null;
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const config = vscode.workspace.getConfiguration('convoia');
   const apiKey = config.get<string>('apiKey') || '';
-  const baseUrl = config.get<string>('apiBaseUrl') || 'https://intellect.convoia.com/api';
+  const baseUrl = config.get<string>('apiBaseUrl') || 'https://convoia.ai/api';
   const defaultModel = config.get<string>('defaultModel') || 'claude-sonnet-4-6';
   const workspaceRoot = getWorkspaceRoot() || '';
 

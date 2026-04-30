@@ -110,12 +110,12 @@
       "properties": {
         "convoia.apiKey": {
           "type": "string",
-          "description": "Your ConvoiaAI API key from intellect.convoia.com/api-keys",
+          "description": "Your ConvoiaAI API key from convoia.ai/api-keys",
           "order": 1
         },
         "convoia.apiBaseUrl": {
           "type": "string",
-          "default": "https://intellect.convoia.com/api",
+          "default": "https://convoia.ai/api",
           "description": "ConvoiaAI API base URL",
           "order": 2
         },
