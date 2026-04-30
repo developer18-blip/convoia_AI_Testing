@@ -58,6 +58,7 @@ export function PersonalView({ stats, wallet: _wallet, recentUsage, insights, us
           subtitle={tokenBalance > 0 ? 'Available to use' : 'Buy tokens to get started'}
           icon={<Zap size={20} />}
           className={tokenBalance < 1000 ? 'border-red-500/30' : 'border-emerald-500/20'}
+          to="/tokens/buy"
         />
         <StatCard
           title="Queries This Month"
@@ -65,18 +66,21 @@ export function PersonalView({ stats, wallet: _wallet, recentUsage, insights, us
           subtitle={`${todayQueries} today`}
           icon={<MessageSquare size={20} />}
           trend={queryTrend}
+          to="/usage"
         />
         <StatCard
           title="Tokens Used"
           value={formatTokens(monthTokens)}
           subtitle="this month"
           icon={<Coins size={20} />}
+          to="/usage"
         />
         <StatCard
           title="Total Purchased"
           value={formatTokens(totalPurchased)}
           subtitle={`${formatTokens(totalUsed)} used overall`}
           icon={<Coins size={20} />}
+          to="/tokens/buy"
         />
       </div>
 

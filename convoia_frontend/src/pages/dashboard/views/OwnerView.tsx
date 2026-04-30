@@ -117,24 +117,28 @@ export function OwnerView({ stats, userName, orgName }: OwnerViewProps) {
           subtitle="this month"
           icon={<DollarSign size={20} />}
           trend={costTrend}
+          to="/org/analytics"
         />
         <StatCard
           title="Team Members"
           value={`${activeMembers}`}
           subtitle={`${activeMembers} active`}
           icon={<Users size={20} />}
+          to="/team"
         />
         <StatCard
           title="My Tokens"
           value={formattedBalance}
           subtitle={totalPurchased > 0 ? `${fmtTokens(totalUsed)} used` : 'Buy tokens to start'}
           icon={<Zap size={20} />}
+          to="/tokens/buy"
         />
         <StatCard
           title="Total Purchased"
           value={fmtTokens(totalPurchased)}
           subtitle={totalUsed > 0 ? `${fmtTokens(totalUsed)} used` : 'lifetime'}
           icon={<Coins size={20} />}
+          to="/tokens"
         />
       </div>
 

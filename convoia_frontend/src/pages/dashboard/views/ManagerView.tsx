@@ -95,12 +95,14 @@ export function ManagerView({ stats, userName, orgName }: ManagerViewProps) {
           value={`${activeMembers} / ${totalMembers}`}
           subtitle={`${activeMembers} active`}
           icon={<Users size={20} />}
+          to="/team"
         />
         <StatCard
           title="Team Queries"
           value={formatNumber(totalQueries)}
           subtitle="this month"
           icon={<MessageSquare size={20} />}
+          to="/usage"
         />
         <StatCard
           title="Budget Health"
@@ -108,12 +110,14 @@ export function ManagerView({ stats, userName, orgName }: ManagerViewProps) {
           subtitle={budgetSubtitle}
           icon={<Shield size={20} />}
           className={membersNearLimit > 0 ? 'border-amber-500/30' : 'border-emerald-500/20'}
+          to="/budgets"
         />
         <StatCard
           title="Pending Tasks"
           value={String(pendingTasks)}
           subtitle={overdueTasks > 0 ? `${overdueTasks} overdue` : 'None overdue'}
           icon={<CheckSquare size={20} />}
+          to="/tasks"
         />
       </div>
 

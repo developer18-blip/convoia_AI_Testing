@@ -76,18 +76,21 @@ export function EmployeeView({ stats, recentUsage, userName, orgName, budget }: 
           subtitle={daysUntilReset !== null ? `Resets in ${daysUntilReset} days` : undefined}
           icon={<Target size={20} />}
           className={hasBudget ? (percentage > 80 ? 'border-amber-500/30' : 'border-emerald-500/20') : ''}
+          to="/budget"
         />
         <StatCard
           title="Queries This Month"
           value={formatNumber(monthQueries)}
           subtitle={`${todayQueries} today`}
           icon={<MessageSquare size={20} />}
+          to="/usage"
         />
         <StatCard
           title="Tokens Used"
           value={formatTokens(monthTokens)}
           subtitle={hasBudget ? `of ${formatTokens(monthlyCap)} allocated` : 'this month'}
           icon={<Zap size={20} />}
+          to="/usage"
         />
         <StatCard
           title="Budget Health"
@@ -95,6 +98,7 @@ export function EmployeeView({ stats, recentUsage, userName, orgName, budget }: 
           subtitle={budgetHealthLabel}
           icon={<Shield size={20} />}
           className={budgetHealthColor}
+          to="/budget"
         />
       </div>
 

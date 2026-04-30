@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { cn } from '../../lib/utils'
 import { TrendBadge } from './TrendBadge'
@@ -11,15 +12,25 @@ interface StatCardProps {
   trend?: number
   trendLabel?: string
   className?: string
+  /** When provided, the whole card becomes a React Router link to this path. */
+  to?: string
+  /** Optional click handler for non-nav actions (e.g. opening a modal). */
+  onClick?: () => void
 }
 
-export function StatCard({ title, value, subtitle, icon, trend, trendLabel, className }: StatCardProps) {
-  return (
+export function StatCard({ title, value, subtitle, icon, trend, trendLabel, className, to, onClick }: StatCardProps) {
+  const interactive = Boolean(to || onClick)
+
+  const inner = (
     <motion.div
-      whileHover={{ y: -2 }}
+      whileHover={interactive ? { y: -2 } : undefined}
       transition={{ duration: 0.2 }}
+      onClick={onClick}
+      role={onClick && !to ? 'button' : undefined}
+      tabIndex={onClick && !to ? 0 : undefined}
       className={cn(
         'bg-surface border border-border rounded-2xl p-5 transition-all duration-300 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5',
+        interactive && 'cursor-pointer hover:border-primary/40',
         className
       )}
     >
@@ -40,4 +51,14 @@ export function StatCard({ title, value, subtitle, icon, trend, trendLabel, clas
       </div>
     </motion.div>
   )
+
+  if (to) {
+    return (
+      <Link to={to} style={{ display: 'block', textDecoration: 'none', color: 'inherit' }} aria-label={title}>
+        {inner}
+      </Link>
+    )
+  }
+
+  return inner
 }

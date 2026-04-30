@@ -165,12 +165,12 @@ export function AdminView() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatCard title="Revenue" value={formatCurrency(stats.revenue)} subtitle="This month" icon={<DollarSign size={20} />} />
-        <StatCard title="Provider Cost" value={formatCurrency(stats.providerCost)} subtitle="This month" icon={<TrendingUp size={20} />} />
-        <StatCard title="Profit Margin" value={`${(Number(stats.profitMargin) || 0).toFixed(1)}%`} icon={<BarChart3 size={20} />} />
-        <StatCard title="Queries Today" value={formatNumber(stats.queriesToday)} icon={<Activity size={20} />} />
-        <StatCard title="Active Orgs" value={String(stats.activeOrgs)} icon={<Building2 size={20} />} />
-        <StatCard title="New Users" value={String(stats.newUsers)} subtitle="This month" icon={<Users size={20} />} />
+        <StatCard title="Revenue" value={formatCurrency(stats.revenue)} subtitle="This month" icon={<DollarSign size={20} />} to="/admin/revenue" />
+        <StatCard title="Provider Cost" value={formatCurrency(stats.providerCost)} subtitle="This month" icon={<TrendingUp size={20} />} to="/admin/analytics" />
+        <StatCard title="Profit Margin" value={`${(Number(stats.profitMargin) || 0).toFixed(1)}%`} icon={<BarChart3 size={20} />} to="/admin/analytics" />
+        <StatCard title="Queries Today" value={formatNumber(stats.queriesToday)} icon={<Activity size={20} />} to="/admin/analytics" />
+        <StatCard title="Active Orgs" value={String(stats.activeOrgs)} icon={<Building2 size={20} />} to="/admin/orgs" />
+        <StatCard title="New Users" value={String(stats.newUsers)} subtitle="This month" icon={<Users size={20} />} to="/admin/users" />
       </div>
 
       <Card padding="lg">
