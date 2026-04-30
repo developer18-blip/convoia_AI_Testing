@@ -14,7 +14,7 @@ import { formatCurrency, formatTokens } from '../../lib/utils'
 import type { Message } from '../../types'
 import type { ComponentPropsWithoutRef } from 'react'
 import { CouncilMessage } from '../council/CouncilMessage'
-import { IntellectMark } from '../brand/IntellectMark'
+import { ConvoiaMark } from '../brand/ConvoiaMark'
 import { ComputationLine } from '../primitives/ComputationLine'
 import { useAccent } from '../../contexts/AccentContext'
 import { PROVIDER_THEMES, getProviderFromModelId } from '../../config/providers'
@@ -52,9 +52,9 @@ function resolveMediaUrl(url: string): string {
   // Relative URL — prepend the API base
   const apiBase = import.meta.env.VITE_API_URL || ''
   if (apiBase.startsWith('http')) {
-    // apiBase is like https://intellect.convoia.com/api
+    // apiBase is like https://convoia.ai/api
     // URL is like /api/uploads/images/x.png
-    // We need https://intellect.convoia.com/api/uploads/images/x.png
+    // We need https://convoia.ai/api/uploads/images/x.png
     const origin = new URL(apiBase).origin
     return `${origin}${url}`
   }
@@ -107,7 +107,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
           border: '0.5px solid var(--border-default, var(--chat-border))',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <IntellectMark size={20} state="council" />
+          <ConvoiaMark size={20} state="council" />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <CouncilMessage council={message.council} />
@@ -323,7 +323,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
           border: `1px solid ${providerTheme.border}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <IntellectMark size={20} state="streaming" color={providerTheme.primary} />
+          <ConvoiaMark size={20} state="streaming" color={providerTheme.primary} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, minWidth: 0 }}>
           {/* Show accumulated content (e.g. thinking result) while still loading */}
@@ -589,14 +589,14 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
     }}
     onMouseEnter={() => setShowActions(true)} onMouseLeave={() => setShowActions(false)}>
 
-      {/* AI Avatar — Intellect Mark colored per the originating provider */}
+      {/* AI Avatar — Convoia Mark colored per the originating provider */}
       <div className="ai-avatar assistant-icon" style={{
         width: '32px', height: '32px', borderRadius: '10px', flexShrink: 0,
         background: providerTheme.soft,
         border: `1px solid ${providerTheme.border}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        <IntellectMark size={20} state="idle" color={providerTheme.primary} />
+        <ConvoiaMark size={20} state="idle" color={providerTheme.primary} />
       </div>
 
       {/* Text area — no background, no border */}

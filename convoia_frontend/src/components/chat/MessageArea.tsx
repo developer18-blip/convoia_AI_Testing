@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react'
 import { Pencil, Code2, Search, BarChart3, ArrowDown } from 'lucide-react'
 import { MessageBubble } from './MessageBubble'
-import { IntellectMark } from '../brand/IntellectMark'
+import { ConvoiaMark } from '../brand/ConvoiaMark'
 import { useAuth } from '../../hooks/useAuth'
 import type { Message } from '../../types'
 
@@ -97,7 +97,7 @@ export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, o
   if (messages.length === 0) {
     return (
       <div className="chat-welcome" style={{ height: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 20px 120px', backgroundColor: 'var(--chat-bg)' }}>
-        {/* Hybrid icon — purple gradient frame with Intellect Mark inside */}
+        {/* Hybrid icon — purple gradient frame with Convoia Mark inside */}
         <div className="chat-welcome__icon" style={{
           width: '72px', height: '72px', borderRadius: '20px', marginBottom: '20px',
           background: 'linear-gradient(135deg, #7c3aed, #5b21b6)',
@@ -105,12 +105,12 @@ export function MessageArea({ messages, isLoading, onRetry, onSuggestedPrompt, o
           boxShadow: '0 12px 40px rgba(124, 58, 237, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
           animation: 'float 6s ease-in-out infinite',
         }}>
-          <IntellectMark size={38} state="idle" color="#ffffff" />
+          <ConvoiaMark size={38} state="idle" color="#ffffff" />
         </div>
 
         {/* Eyebrow label */}
         <div className="mono-label" style={{ color: '#a78bfa', marginBottom: '12px', letterSpacing: '0.8px', fontSize: 11 }}>
-          CHAT WITH INTELLECT AI
+          CHAT WITH CONVOIA AI
         </div>
 
         {/* Time-aware greeting */}

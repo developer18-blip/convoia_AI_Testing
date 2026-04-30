@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   INTELLECT DESIGN SYSTEM — TOKEN FOUNDATION
+   CONVOIA DESIGN SYSTEM — TOKEN FOUNDATION
    All visual decisions start here. Never hardcode values.
    ═══════════════════════════════════════════════════════════ */
 
@@ -144,7 +144,7 @@ html {
   --border-focus: var(--accent-600);
 
   /* Accent resolves via AccentContext-set provider vars, falling back to
-     the static Intellect turquoise when no provider is active. */
+     the static Convoia turquoise when no provider is active. */
   --accent: var(--provider-light, var(--accent-600));
   --accent-hover: var(--provider-hover, var(--accent-700));
   --accent-soft: var(--provider-soft, rgba(8, 145, 178, 0.08));
@@ -239,8 +239,8 @@ html {
 .pill--accent,
 .input-field__wrap:focus-within,
 .metric__value--accent,
-.intellect-mark__nodes circle,
-.intellect-mark__lines line,
+.convoia-mark__nodes circle,
+.convoia-mark__lines line,
 .signal-line,
 .comp-line__pulse,
 .card--accent,
@@ -254,8 +254,8 @@ html {
   .pill--accent,
   .input-field__wrap:focus-within,
   .metric__value--accent,
-  .intellect-mark__nodes circle,
-  .intellect-mark__lines line,
+  .convoia-mark__nodes circle,
+  .convoia-mark__lines line,
   .signal-line,
   .comp-line__pulse,
   .card--accent,

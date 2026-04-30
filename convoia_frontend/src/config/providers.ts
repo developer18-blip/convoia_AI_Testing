@@ -109,7 +109,7 @@ export const PROVIDER_THEMES: Record<ProviderKey, ProviderTheme> = {
     onAccent: '#0A0A0F',
   },
   default: {
-    name: 'Intellect',
+    name: 'Convoia',
     primary: '#14B8CD',
     primaryLight: '#0891B2',
     soft: 'rgba(20, 184, 205, 0.1)',

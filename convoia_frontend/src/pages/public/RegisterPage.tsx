@@ -202,7 +202,7 @@ export function RegisterPage() {
         {step === 1 && (
           <>
             <div className="text-body-sm" style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>
-              How will you use Intellect?
+              How will you use Convoia?
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

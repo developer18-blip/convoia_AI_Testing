@@ -77,7 +77,7 @@ export function LoginPage() {
     <>
       <AuthLayout
         title="Welcome back"
-        subtitle="Sign in to continue to Intellect AI"
+        subtitle="Sign in to continue to Convoia AI"
         footer={
           <span>
             Don't have an account?{' '}

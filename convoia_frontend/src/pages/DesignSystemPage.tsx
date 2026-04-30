@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { IntellectMark } from '../components/brand/IntellectMark'
+import { ConvoiaMark } from '../components/brand/ConvoiaMark'
 import { Button } from '../components/primitives/Button'
 import { Input } from '../components/primitives/Input'
 import { Card } from '../components/primitives/Card'
@@ -21,7 +21,7 @@ const SAMPLE_MODEL_BY_PROVIDER: Record<ProviderKey, string> = {
   meta: 'llama-4',
   cohere: 'command-r-plus',
   perplexity: 'sonar-large',
-  default: 'intellect-default',
+  default: 'convoia-default',
 }
 
 export default function DesignSystemPage() {
@@ -35,9 +35,9 @@ export default function DesignSystemPage() {
 
         <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <IntellectMark size={32} state="idle" />
+            <ConvoiaMark size={32} state="idle" />
             <div>
-              <h1 className="text-h2" style={{ margin: 0 }}>Intellect Design System</h1>
+              <h1 className="text-h2" style={{ margin: 0 }}>Convoia Design System</h1>
               <p className="mono-label" style={{ margin: 0 }}>v0.1 · Tier 0</p>
             </div>
           </div>
@@ -123,11 +123,11 @@ export default function DesignSystemPage() {
         </section>
 
         <section>
-          <div className="section-heading">Intellect Mark — states</div>
+          <div className="section-heading">Convoia Mark — states</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
             {(['idle', 'thinking', 'streaming', 'council'] as const).map(state => (
               <Card key={state} padding="md" style={{ textAlign: 'center' }}>
-                <IntellectMark size={48} state={state} />
+                <ConvoiaMark size={48} state={state} />
                 <div className="mono-label" style={{ marginTop: 8 }}>{state}</div>
               </Card>
             ))}

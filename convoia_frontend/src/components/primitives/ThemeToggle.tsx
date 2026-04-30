@@ -2,9 +2,17 @@ import { useEffect, useState } from 'react'
 
 type Theme = 'light' | 'dark'
 
+// One-time migration: the localStorage key was 'intellect-theme' before the
+// Convoia rebrand. Read 'convoia-theme' first; if absent, fall back to the
+// legacy key so existing users keep their saved preference. We always WRITE
+// to 'convoia-theme' (see effect below), so the legacy key naturally retires
+// on the user's next toggle.
+const THEME_KEY = 'convoia-theme'
+const LEGACY_THEME_KEY = 'intellect-theme'
+
 function readInitialTheme(): Theme {
   if (typeof window === 'undefined') return 'dark'
-  const stored = localStorage.getItem('intellect-theme') as Theme | null
+  const stored = (localStorage.getItem(THEME_KEY) || localStorage.getItem(LEGACY_THEME_KEY)) as Theme | null
   if (stored === 'light' || stored === 'dark') return stored
   // Fall back to the existing app's ThemeContext convention (html.dark class)
   // so the marketing pages and the legacy app land on the same theme.
@@ -24,7 +32,7 @@ export function ThemeToggle() {
     root.setAttribute('data-theme', theme)
     root.classList.toggle('dark', theme === 'dark')
     root.classList.toggle('light', theme === 'light')
-    localStorage.setItem('intellect-theme', theme)
+    localStorage.setItem(THEME_KEY, theme)
   }, [theme])
 
   const toggle = () => setTheme(t => (t === 'dark' ? 'light' : 'dark'))
