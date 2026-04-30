@@ -9,6 +9,7 @@ import { CanvasPanel } from '../components/chat/CanvasPanel'
 // import { CostEstimator } from '../components/chat/CostEstimator'
 import { ModelSelector } from '../components/shared/ModelSelector'
 import { AgentSelector } from '../components/shared/AgentSelector'
+import { useAccent } from '../contexts/AccentContext'
 import { useChat } from '../hooks/useChat'
 import type { Agent, Message, CanvasItem } from '../types'
 import { useModels } from '../hooks/useModels'
@@ -18,7 +19,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useTokens } from '../contexts/TokenContext'
 import { formatTokens } from '../lib/utils'
 import { useNavigate } from 'react-router-dom'
-import { Zap, PanelLeftClose, PanelLeft, MoreHorizontal, Trash2, Download, Menu, Headphones } from 'lucide-react'
+import { Zap, PanelLeftClose, PanelLeft, MoreHorizontal, Trash2, Download, Headphones } from 'lucide-react'
 import { VoiceConversationMode } from '../components/VoiceConversationMode'
 import { CouncilChip } from '../components/council/CouncilChip'
 import { CouncilPicker } from '../components/council/CouncilPicker'
@@ -39,6 +40,7 @@ export function ChatPage() {
   } = useChat()
 
   const [selectedModelId, setSelectedModelId] = useState('')
+  const { setActiveModel, setCouncilModels } = useAccent()
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
   const [councilMode, setCouncilMode] = useState(false)
   const [councilModelIds, setCouncilModelIds] = useState<string[]>([])
@@ -49,7 +51,6 @@ export function ChatPage() {
   const [industry, setIndustry] = useState('')
   const [thinkingEnabled, setThinkingEnabled] = useState(false)
   const [leftOpen, setLeftOpen] = useState(true)
-  const [mobileLeftOpen, setMobileLeftOpen] = useState(false)
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const navigate = useNavigate()
   const [codeInterpreter, setCodeInterpreter] = useState<{ code: string; language: string } | null>(null)
@@ -75,16 +76,42 @@ export function ChatPage() {
 
 
 
+  // `models[].id` is a UUID; `models[].modelId` is the provider slug
+  // (e.g. "claude-haiku-4-5"). getProviderFromModelId pattern-matches on the
+  // slug, so passing the UUID makes every model resolve to the 'default'
+  // (turquoise) theme. Always hand the slug to setActiveModel.
+  const resolveModelSlug = (idOrSlug: string): string => {
+    if (!idOrSlug || idOrSlug === 'auto') return ''
+    const m = models.find((mm) => mm.id === idOrSlug || mm.modelId === idOrSlug)
+    return m?.modelId || m?.name || idOrSlug
+  }
+
   const handleModelChange = (id: string) => {
     setSelectedModelId(id)
+    setActiveModel(resolveModelSlug(id))
     if (id === 'auto') { toast.info('Auto — router will pick the best model per query'); return }
     const model = models.find((m) => m.id === id)
     if (model) toast.info(`${model.name} is running`)
   }
 
   useEffect(() => {
-    if (models.length > 0 && !selectedModelId) setSelectedModelId(models[0].id)
-  }, [models, selectedModelId])
+    if (models.length > 0 && !selectedModelId) {
+      setSelectedModelId(models[0].id)
+      setActiveModel(resolveModelSlug(models[0].id))
+    }
+    // resolveModelSlug closes over `models` — safe to omit from deps since
+    // it's only invoked when models change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [models, selectedModelId, setActiveModel])
+
+  // Keep AccentContext in sync with Council mode so signal/compute lines
+  // blend the active council provider colors. Join the IDs to a string so the
+  // dep is a primitive — passing the array literal directly re-fires the
+  // effect even when contents are unchanged.
+  const councilKey = councilMode ? councilModelIds.join(',') : ''
+  useEffect(() => {
+    setCouncilModels(councilKey ? councilKey.split(',') : [])
+  }, [councilKey, setCouncilModels])
 
   // Router picked a model — flip the selector to the resolved modelId
   useEffect(() => {
@@ -102,8 +129,10 @@ export function ChatPage() {
   useEffect(() => {
     if (activeConversation) {
       setSelectedModelId(activeConversation.modelId)
+      setActiveModel(resolveModelSlug(activeConversation.modelId))
       if (activeConversation.industry) setIndustry(activeConversation.industry)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeConversationId])
 
   const handleAgentChange = (agent: Agent | null) => {
@@ -326,38 +355,12 @@ export function ChatPage() {
         />
       </div>
 
-      {/* LEFT PANEL — Mobile overlay */}
-      <div
-        className={`fixed inset-0 z-30 transition-opacity duration-300 md:hidden ${
-          mobileLeftOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
-        style={{ background: 'rgba(0,0,0,0.6)' }}
-        onClick={() => setMobileLeftOpen(false)}
-      />
-      <div
-        className="fixed left-0 z-40 flex flex-col transition-transform duration-300 ease-in-out md:hidden"
-        style={{ top: 0, height: '100%', width: 'min(300px, calc(100vw - 56px))', background: 'var(--color-surface)', transform: mobileLeftOpen ? 'translateX(0)' : 'translateX(-100%)', paddingTop: 'env(safe-area-inset-top, 0px)' }}
-      >
-        <ConversationList
-          conversations={conversations} folders={folders} activeId={activeConversationId}
-          onSelect={(id) => { setActiveConversation(id); setMobileLeftOpen(false) }}
-          onNew={() => { handleNew(); setMobileLeftOpen(false) }}
-          onDelete={handleDelete} onRename={renameConversation} onTogglePin={togglePin}
-          onMoveToFolder={moveToFolder} onCreateFolder={createFolder} onDeleteFolder={deleteFolder}
-        />
-      </div>
-
       {/* CENTER PANEL — main chat */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: 'var(--chat-bg)', minWidth: 0 }}>
         {/* Top bar — single row on desktop (original), two rows on mobile */}
         <div style={{ flexShrink: 0, backgroundColor: 'var(--chat-bg)' }}>
           {/* Main row: all controls in one line on desktop */}
           <div className="flex items-center gap-2" style={{ height: '48px', padding: '0 16px', }}>
-            {/* Mobile hamburger */}
-            <button onClick={() => setMobileLeftOpen(true)} className="md:hidden"
-              style={{ padding: '8px', borderRadius: '8px', backgroundColor: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Menu size={20} />
-            </button>
             {/* Desktop sidebar toggle */}
             <button onClick={() => setLeftOpen(!leftOpen)} className="hidden md:flex" title={leftOpen ? 'Hide conversations' : 'Show conversations'}
               style={{ padding: '6px', borderRadius: '8px', backgroundColor: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', transition: 'all 150ms' }}

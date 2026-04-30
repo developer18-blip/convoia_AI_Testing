@@ -224,6 +224,7 @@ export function Sidebar({ collapsed, onToggle, onClose }: SidebarProps) {
             <NavLink
               key={item.path}
               to={item.path}
+              end
               onClick={onClose}
               className={cn(
                 'group relative flex items-center gap-3 transition-all duration-200',

@@ -14,6 +14,10 @@ import { formatCurrency, formatTokens } from '../../lib/utils'
 import type { Message } from '../../types'
 import type { ComponentPropsWithoutRef } from 'react'
 import { CouncilMessage } from '../council/CouncilMessage'
+import { IntellectMark } from '../brand/IntellectMark'
+import { ComputationLine } from '../primitives/ComputationLine'
+import { useAccent } from '../../contexts/AccentContext'
+import { PROVIDER_THEMES, getProviderFromModelId } from '../../config/providers'
 
 // Stable module-level reference — ReactMarkdown does a shallow compare
 // and rebuilds the rendered DOM if this array is recreated on each
@@ -84,6 +88,14 @@ function getDisplayContent(content: string, hasFileAttachment: boolean): string 
 }
 
 export const MessageBubble = memo(function MessageBubble({ message, onRetry, onEdit, onDelete, onCopy, onRunCode, onOpenInCanvas }: MessageBubbleProps) {
+  // Provider theme — prefer the specific model this message came from so old
+  // replies keep their original accent even if the user has since switched
+  // the active model. Fall back to the currently-active accent.
+  const { theme: activeTheme } = useAccent()
+  const providerTheme = message.model
+    ? PROVIDER_THEMES[getProviderFromModelId(message.model)]
+    : activeTheme
+
   // Council messages render via a dedicated component — bypasses the normal
   // assistant-message pipeline. User messages still render normally.
   if (message.role === 'assistant' && message.council) {
@@ -91,10 +103,12 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '28px' }}>
         <div style={{
           width: 32, height: 32, borderRadius: '10px', flexShrink: 0,
-          background: 'linear-gradient(135deg, #F59E0B, #D97706)',
+          background: 'var(--surface-1, var(--chat-surface))',
+          border: '0.5px solid var(--border-default, var(--chat-border))',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'white', fontSize: '14px',
-        }}>⚡</div>
+        }}>
+          <IntellectMark size={20} state="council" />
+        </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <CouncilMessage council={message.council} />
         </div>
@@ -305,11 +319,12 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
       <div className="ai-message-row" style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '28px', animation: 'fadeSlideIn 200ms ease-out' }}>
         <div className="ai-avatar" style={{
           width: '32px', height: '32px', borderRadius: '10px', flexShrink: 0,
-          background: 'linear-gradient(135deg, var(--color-primary-light), rgba(16,163,127,0.08))',
-          border: '1px solid rgba(16,163,127,0.25)',
+          background: providerTheme.soft,
+          border: `1px solid ${providerTheme.border}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '16px', color: 'var(--color-primary)',
-        }}>✦</div>
+        }}>
+          <IntellectMark size={20} state="streaming" color={providerTheme.primary} />
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, minWidth: 0 }}>
           {/* Show accumulated content (e.g. thinking result) while still loading */}
           {hasContent && (
@@ -328,21 +343,13 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
             }}>
               <div style={{
                 width: '16px', height: '16px', borderRadius: '50%', flexShrink: 0,
-                border: '2px solid var(--color-primary)', borderTopColor: 'transparent',
+                border: `2px solid ${providerTheme.primary}`, borderTopColor: 'transparent',
                 animation: 'spin 0.7s linear infinite',
               }} />
               <span style={{ fontWeight: 500 }}>{message.statusText}</span>
             </div>
           ) : (
-            <div style={{ display: 'flex', gap: '5px', padding: '4px 0' }}>
-              {[0, 1, 2].map((i) => (
-                <div key={i} style={{
-                  width: '7px', height: '7px', borderRadius: '50%',
-                  backgroundColor: 'var(--color-primary)',
-                  animation: `bounce 1.4s ease-in-out ${i * 0.16}s infinite`,
-                }} />
-              ))}
-            </div>
+            <ComputationLine label={`STREAMING${message.model ? ` · ${message.model.toUpperCase()}` : ''}`} maxWidth={200} />
           )}
         </div>
       </div>
@@ -582,14 +589,15 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
     }}
     onMouseEnter={() => setShowActions(true)} onMouseLeave={() => setShowActions(false)}>
 
-      {/* AI Avatar */}
+      {/* AI Avatar — Intellect Mark colored per the originating provider */}
       <div className="ai-avatar assistant-icon" style={{
         width: '32px', height: '32px', borderRadius: '10px', flexShrink: 0,
-        background: 'linear-gradient(135deg, var(--color-primary-light), rgba(16,163,127,0.08))',
-        border: '1px solid rgba(16,163,127,0.25)',
+        background: providerTheme.soft,
+        border: `1px solid ${providerTheme.border}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '16px', color: 'var(--color-primary)',
-      }}>✦</div>
+      }}>
+        <IntellectMark size={20} state="idle" color={providerTheme.primary} />
+      </div>
 
       {/* Text area — no background, no border */}
       <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
