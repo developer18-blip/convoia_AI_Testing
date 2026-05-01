@@ -27,21 +27,61 @@ export function formatTokens(tokens: number | string | null | undefined): string
   return t.toString()
 }
 
+// Reads the user's saved timezone from Settings → Profile → Timezone.
+// Empty string = "auto-detect from browser" (omit the timeZone option, which
+// makes Intl fall back to the browser's local zone). All date helpers below
+// route through this so a single Settings change reformats every timestamp
+// in the app — chat list, message bubbles, usage, dashboard, etc.
+function getUserTimeZone(): string | undefined {
+  try {
+    const tz = localStorage.getItem('convoia_settings_timezone')
+    return tz && tz.length > 0 ? tz : undefined
+  } catch { return undefined }
+}
+
 export function formatDate(dateStr: string): string {
+  const timeZone = getUserTimeZone()
   return new Date(dateStr).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
+    ...(timeZone ? { timeZone } : {}),
   })
 }
 
 export function formatDateTime(dateStr: string): string {
+  const timeZone = getUserTimeZone()
   return new Date(dateStr).toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
+    ...(timeZone ? { timeZone } : {}),
+  })
+}
+
+// Time-only — used by chat message timestamps. Honors timezone too so a user
+// in Tokyo viewing a message sent at 14:00 UTC sees 23:00 (their local time
+// in their chosen zone), not 14:00.
+export function formatTime(dateStr: string): string {
+  const timeZone = getUserTimeZone()
+  return new Date(dateStr).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    ...(timeZone ? { timeZone } : {}),
+  })
+}
+
+// Short date — "Apr 5" with no year. For tight UIs (task cards, mobile
+// conversation rows) where year would be redundant.
+export function formatDateShort(dateStr: string): string {
+  const timeZone = getUserTimeZone()
+  return new Date(dateStr).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    ...(timeZone ? { timeZone } : {}),
   })
 }
 

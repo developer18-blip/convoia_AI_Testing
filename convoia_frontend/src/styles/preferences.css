@@ -1,0 +1,21 @@
+/*
+ * User-preference scoped CSS — applied via attributes on <html>.
+ * Keys live in localStorage under convoia_settings_*. Read by SettingsPage
+ * Appearance tab; written via inline style / data-attr in the same effect.
+ */
+
+/* Reduced motion — cuts animation/transition durations to ~0ms.
+   Honors the user's explicit choice from Settings. */
+:root[data-reduced-motion="true"] *,
+:root[data-reduced-motion="true"] *::before,
+:root[data-reduced-motion="true"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Font size — applied via inline style on <html> (font-size: Npx).
+   :root[data-font-size="small" | "medium" | "large"] is set as a marker
+   for any future per-size overrides; the effective px value lives on
+   document.documentElement.style.fontSize. */

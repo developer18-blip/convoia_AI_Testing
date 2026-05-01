@@ -9,6 +9,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../hooks/useToast'
 import { Avatar } from '../components/ui/Avatar'
 import api from '../lib/api'
+import { formatDate as fmtDate, formatDateShort, formatDateTime } from '../lib/utils'
 
 // ─── Types ───
 interface SubTask { id: string; title: string; isCompleted: boolean; sortOrder: number }
@@ -47,7 +48,7 @@ const formatDate = (d?: string) => {
   if (diff === 0) return 'Today'
   if (diff === 1) return 'Tomorrow'
   if (diff < 7) return `${diff}d left`
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return formatDateShort(d)
 }
 const isOverdue = (d?: string) => d ? new Date(d) < new Date() : false
 const dueDateColor = (d?: string) => {
@@ -461,7 +462,7 @@ function TaskDetailPanel({ task, onClose, onStatusChange, onDelete, onRefresh, i
             <MetaItem label="Assigned to" value={task.assignedTo?.name} avatar={task.assignedTo} />
             <MetaItem label="Created by" value={task.createdBy?.name} avatar={task.createdBy} />
             <MetaItem label="Due date" value={formatDate(task.dueDate) || 'No due date'} color={dueDateColor(task.dueDate)} />
-            <MetaItem label="Created" value={new Date(task.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} />
+            <MetaItem label="Created" value={fmtDate(task.createdAt)} />
           </div>
 
           {/* Status Actions */}
@@ -528,7 +529,7 @@ function TaskDetailPanel({ task, onClose, onStatusChange, onDelete, onRefresh, i
                   <div className="flex items-center gap-2">
                     <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{c.user.name}</span>
                     <span style={{ fontSize: '10px', color: 'var(--color-text-dim)' }}>
-                      {new Date(c.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      {formatDateTime(c.createdAt)}
                     </span>
                   </div>
                   <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: '2px 0 0', lineHeight: '1.5' }}>{c.content}</p>

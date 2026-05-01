@@ -110,7 +110,16 @@ export function ChatPage() {
     if (models.length > 0 && !selectedModelId) {
       // Set local picker state only. Accent stays at brand turquoise until
       // the chat commits (first send) — picker is exploratory until then.
-      setSelectedModelId(models[0].id)
+      // TODO(settings): replace localStorage read with User.defaultModelId when backend supports it
+      let initial = models[0].id
+      try {
+        const saved = localStorage.getItem('convoia_settings_default_model')
+        if (saved) {
+          const match = models.find((m) => m.id === saved || m.modelId === saved)
+          if (match) initial = match.id
+        }
+      } catch { /* ignore */ }
+      setSelectedModelId(initial)
     }
     // resolveModelSlug closes over `models` — safe to omit from deps since
     // it's only invoked when models change.

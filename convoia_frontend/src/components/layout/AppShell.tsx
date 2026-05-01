@@ -1,10 +1,10 @@
-import { useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
+import { useSidebar } from '../../contexts/SidebarContext'
 
 export function AppShell() {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const { collapsed, toggle } = useSidebar()
   const location = useLocation()
   const isChat = location.pathname === '/chat'
 
@@ -14,8 +14,8 @@ export function AppShell() {
       {!isChat && (
         <div className="hidden lg:flex">
           <Sidebar
-            collapsed={sidebarCollapsed}
-            onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+            collapsed={collapsed}
+            onToggle={toggle}
           />
         </div>
       )}
