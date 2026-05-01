@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { CSSProperties } from 'react'
 import { ConvoiaMark } from '../components/brand/ConvoiaMark'
 import { Button } from '../components/primitives/Button'
 import { Input } from '../components/primitives/Input'
@@ -7,8 +8,7 @@ import { Pill } from '../components/primitives/Pill'
 import { SignalLine } from '../components/primitives/SignalLine'
 import { ComputationLine } from '../components/primitives/ComputationLine'
 import { Metric } from '../components/primitives/Metric'
-import { useAccent } from '../contexts/AccentContext'
-import { PROVIDER_THEMES, getProviderFromModelId } from '../config/providers'
+import { PROVIDER_THEMES, getThemeForModel, getProviderFromModelId } from '../config/providers'
 import type { ProviderKey } from '../config/providers'
 
 const SAMPLE_MODEL_BY_PROVIDER: Record<ProviderKey, string> = {
@@ -26,11 +26,33 @@ const SAMPLE_MODEL_BY_PROVIDER: Record<ProviderKey, string> = {
 
 export default function DesignSystemPage() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
-  const { setActiveModel, activeModelId, theme: providerTheme } = useAccent()
-  const activeProviderKey = getProviderFromModelId(activeModelId)
+  // Local preview state — never touches global AccentContext, so visiting
+  // /design and clicking provider tiles cannot leak accent colors to other
+  // pages after navigation.
+  const [previewModelId, setPreviewModelId] = useState<string>('')
+  const previewTheme = getThemeForModel(previewModelId)
+  const activeProviderKey = getProviderFromModelId(previewModelId)
+
+  // Inline scoped --provider-* vars on the page root. Children inherit these
+  // via the var() fallback chain in tokens.css (--accent → --provider-light →
+  // --accent-600), so accent surfaces preview the chosen provider without
+  // writing to <html>.
+  const rootStyle: CSSProperties = {
+    minHeight: '100vh',
+    padding: '40px',
+    background: 'var(--surface-0)',
+    color: 'var(--text-primary)',
+    ['--provider-primary' as string]: previewTheme.primary,
+    ['--provider-light' as string]: previewTheme.primaryLight,
+    ['--provider-hover' as string]: previewTheme.primaryLight,
+    ['--provider-soft' as string]: previewTheme.soft,
+    ['--provider-border' as string]: previewTheme.border,
+    ['--provider-glow' as string]: previewTheme.glow,
+    ['--provider-on' as string]: previewTheme.onAccent,
+  }
 
   return (
-    <div data-theme={theme} style={{ minHeight: '100vh', padding: '40px', background: 'var(--surface-0)', color: 'var(--text-primary)' }}>
+    <div data-theme={theme} style={rootStyle}>
       <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 40 }}>
 
         <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -60,7 +82,7 @@ export default function DesignSystemPage() {
               return (
                 <button
                   key={key}
-                  onClick={() => setActiveModel(SAMPLE_MODEL_BY_PROVIDER[key])}
+                  onClick={() => setPreviewModelId(SAMPLE_MODEL_BY_PROVIDER[key])}
                   style={{
                     all: 'unset',
                     cursor: 'pointer',
@@ -87,8 +109,8 @@ export default function DesignSystemPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--accent)' }} />
               <div>
-                <div className="text-body" style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{providerTheme.name}</div>
-                <div className="mono-label">{activeModelId}</div>
+                <div className="text-body" style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{previewTheme.name}</div>
+                <div className="mono-label">{previewModelId || 'convoia-default'}</div>
               </div>
             </div>
           </div>

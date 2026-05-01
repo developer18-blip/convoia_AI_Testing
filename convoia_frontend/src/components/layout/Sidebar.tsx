@@ -9,6 +9,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useTokens } from '../../contexts/TokenContext'
 import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
+import { ConvoiaMark } from '../brand/ConvoiaMark'
 import { cn } from '../../lib/utils'
 
 interface SidebarProps {
@@ -201,10 +202,15 @@ export function Sidebar({ collapsed, onToggle, onClose }: SidebarProps) {
       <div className="flex items-center justify-between shrink-0" style={{ padding: '0 14px', height: '52px', borderBottom: '1px solid var(--chat-border)' }}>
         <button
           onClick={() => { navigate('/dashboard'); onClose?.() }}
-          className="flex items-center gap-2.5"
+          className="flex items-center gap-2"
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-primary)' }}
         >
-          <img src="/logo.png?v=2" alt="ConvoiaAI" style={{ height: collapsed ? '32px' : '40px', objectFit: 'contain', borderRadius: '8px' }} />
+          <ConvoiaMark size={collapsed ? 28 : 28} state="idle" />
+          {!collapsed && (
+            <span style={{ fontSize: '15px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--color-text-primary)' }}>
+              Convoia
+            </span>
+          )}
         </button>
         <motion.button
           whileHover={{ scale: 1.1 }}
@@ -234,8 +240,8 @@ export function Sidebar({ collapsed, onToggle, onClose }: SidebarProps) {
                 padding: collapsed ? '8px' : '8px 12px',
                 borderRadius: '10px', fontSize: '13px', fontWeight: 500,
                 textDecoration: 'none',
-                background: isActive ? 'var(--color-primary-light)' : 'transparent',
-                color: isActive ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                background: isActive ? 'var(--accent-soft)' : 'transparent',
+                color: isActive ? 'var(--accent)' : 'var(--color-text-muted)',
               })}
             >
               {({ isActive }) => (
@@ -244,11 +250,11 @@ export function Sidebar({ collapsed, onToggle, onClose }: SidebarProps) {
                     <motion.div
                       layoutId="sidebar-active"
                       className="absolute"
-                      style={{ left: 0, top: '50%', transform: 'translateY(-50%)', width: '3px', height: '20px', background: 'linear-gradient(to bottom, var(--color-primary), var(--color-primary-hover))', borderRadius: '2px' }}
+                      style={{ left: 0, top: '50%', transform: 'translateY(-50%)', width: '3px', height: '20px', background: 'linear-gradient(to bottom, var(--accent), var(--accent-hover))', borderRadius: '2px' }}
                       transition={{ type: 'spring', stiffness: 350, damping: 30 }}
                     />
                   )}
-                  <span style={{ color: isActive ? 'var(--color-primary)' : 'var(--color-text-dim)', transition: 'color 150ms' }}>
+                  <span style={{ color: isActive ? 'var(--accent)' : 'var(--color-text-dim)', transition: 'color 150ms' }}>
                     {item.icon}
                   </span>
                   {!collapsed && <span>{item.label}</span>}
