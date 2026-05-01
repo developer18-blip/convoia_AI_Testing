@@ -4,6 +4,7 @@ import {
   LayoutDashboard, MessageSquare, Bot, BarChart3, Zap, Key,
   Settings, Users, Target, ChevronLeft, ChevronRight,
   LogOut, Plus, Building2, TrendingUp, CheckSquare, Coins, Shield,
+  Receipt,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useTokens } from '../../contexts/TokenContext'
@@ -40,6 +41,7 @@ function getNavItems(role: string, hasOrg: boolean): NavItem[] {
       { icon: <Coins size={20} />, label: 'Buy Tokens', path: '/tokens/buy' },
       { icon: <BarChart3 size={20} />, label: 'Usage', path: '/usage' },
       { icon: <Key size={20} />, label: 'API Keys', path: '/api-keys' },
+      { icon: <Receipt size={20} />, label: 'Transactions', path: '/transactions' },
       settingsItem,
     ]
   }
@@ -51,6 +53,7 @@ function getNavItems(role: string, hasOrg: boolean): NavItem[] {
       { icon: <Target size={20} />, label: 'My Budget', path: '/budget' },
       { icon: <BarChart3 size={20} />, label: 'My Usage', path: '/usage' },
       { icon: <CheckSquare size={20} />, label: 'My Tasks', path: '/tasks' },
+      { icon: <Receipt size={20} />, label: 'Transactions', path: '/transactions' },
       settingsItem,
     ]
   }
@@ -63,6 +66,7 @@ function getNavItems(role: string, hasOrg: boolean): NavItem[] {
       { icon: <Target size={20} />, label: 'Budgets', path: '/budgets' },
       { icon: <BarChart3 size={20} />, label: 'Team Usage', path: '/usage' },
       { icon: <CheckSquare size={20} />, label: 'Tasks', path: '/tasks' },
+      { icon: <Receipt size={20} />, label: 'Transactions', path: '/transactions' },
       settingsItem,
     ]
   }
@@ -75,6 +79,7 @@ function getNavItems(role: string, hasOrg: boolean): NavItem[] {
       { icon: <Coins size={20} />, label: 'Token Pools', path: '/tokens' },
       { icon: <BarChart3 size={20} />, label: 'Analytics', path: '/org/analytics' },
       { icon: <Coins size={20} />, label: 'Buy Tokens', path: '/tokens/buy' },
+      { icon: <Receipt size={20} />, label: 'Transactions', path: '/transactions' },
       { icon: <CheckSquare size={20} />, label: 'Tasks', path: '/tasks' },
       settingsItem,
     ]
