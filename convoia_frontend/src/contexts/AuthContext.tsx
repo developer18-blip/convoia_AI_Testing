@@ -117,7 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Post-login / post-register every role lands on Intellect.
       // Prior behaviour sent platform_admins to /admin and everyone
       // else to /dashboard — the dashboard is no longer the home
-      // surface now that Intellect AI is the product.
+      // surface now that Convoia AI is the product.
       navigate('/chat')
     },
     [navigate]
