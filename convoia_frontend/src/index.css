@@ -1,15 +1,19 @@
 @import "tailwindcss";
 
 @theme {
-  /* ─── Dark Mode: Neon Green Palette ─── */
-  --color-primary: #10A37F;
-  --color-primary-hover: #0D8A6A;
-  --color-primary-light: rgba(16, 163, 127, 0.15);
-  --color-primary-glow: rgba(16, 163, 127, 0.08);
+  /* ─── Dynamic accent — follows AccentContext (--provider-* vars on
+     <html>), falls back to Convoia brand turquoise when no provider is
+     active. Every Tailwind primary/accent utility (bg-primary,
+     text-primary, from-accent-start, to-accent-end, etc.) inherits this
+     so per-model accent works app-wide without per-component changes. ─── */
+  --color-primary: var(--provider-light, #14B8CD);
+  --color-primary-hover: var(--provider-primary, #0891B2);
+  --color-primary-light: var(--provider-soft, rgba(20, 184, 205, 0.15));
+  --color-primary-glow: var(--provider-glow, rgba(20, 184, 205, 0.08));
 
-  --color-accent-start: #10A37F;
-  --color-accent-mid: #34D399;
-  --color-accent-end: #6EE7B7;
+  --color-accent-start: var(--provider-primary, #14B8CD);
+  --color-accent-mid: var(--provider-light, #22D3EE);
+  --color-accent-end: var(--provider-light, #67E8F9);
 
   --color-background: #0D0D0D;
   --color-surface: #171717;
@@ -37,16 +41,16 @@
   --font-sans: 'Inter', -apple-system, system-ui, sans-serif;
 }
 
-/* ─── Light theme overrides: White + Vibrant Blue ─── */
+/* ─── Light theme overrides — dynamic accent with brand-turquoise fallback ─── */
 html.light {
-  --color-primary: #2563EB !important;
-  --color-primary-hover: #1D4ED8 !important;
-  --color-primary-light: rgba(37, 99, 235, 0.08) !important;
-  --color-primary-glow: rgba(37, 99, 235, 0.06) !important;
+  --color-primary: var(--provider-light, #0891B2) !important;
+  --color-primary-hover: var(--provider-primary, #0E7490) !important;
+  --color-primary-light: var(--provider-soft, rgba(8, 145, 178, 0.08)) !important;
+  --color-primary-glow: var(--provider-glow, rgba(8, 145, 178, 0.06)) !important;
 
-  --color-accent-start: #2563EB !important;
-  --color-accent-mid: #3B82F6 !important;
-  --color-accent-end: #60A5FA !important;
+  --color-accent-start: var(--provider-primary, #0891B2) !important;
+  --color-accent-mid: var(--provider-light, #14B8CD) !important;
+  --color-accent-end: var(--provider-light, #22D3EE) !important;
 
   --color-background: #F8FAFC !important;
   --color-surface: #FFFFFF !important;
@@ -824,9 +828,10 @@ html.light .text-text-muted { color: #64748B !important; }
 html.light .text-text-meta { color: #64748B !important; }
 html.light .text-text-dim { color: #94A3B8 !important; }
 
-/* Primary/accent text */
-html.light .text-primary { color: #1D4ED8 !important; }
-html.light .text-primary-hover { color: #1D4ED8 !important; }
+/* Primary/accent text — read dynamic --color-primary so per-model
+   accent flows through Tailwind text-primary utility in light mode. */
+html.light .text-primary { color: var(--color-primary) !important; }
+html.light .text-primary-hover { color: var(--color-primary-hover) !important; }
 
 /* Backgrounds */
 html.light .bg-background { background-color: #FAFBFF !important; }
@@ -844,15 +849,16 @@ html.light .border-primary\/20 { border-color: rgba(109,40,217,0.2) !important; 
 html.light .border-primary\/30 { border-color: rgba(109,40,217,0.3) !important; }
 html.light .border-primary\/40 { border-color: rgba(109,40,217,0.4) !important; }
 
-/* Gradient text — ensure contrast */
-html.light .from-accent-start { --tw-gradient-from: #2563EB !important; }
-html.light .via-accent-mid { --tw-gradient-via: #8B5CF6 !important; }
-html.light .to-accent-end { --tw-gradient-to: #60A5FA !important; }
-html.light .to-accent-mid { --tw-gradient-to: #8B5CF6 !important; }
-html.light .from-accent-start.to-accent-mid { --tw-gradient-from: #2563EB !important; --tw-gradient-to: #8B5CF6 !important; }
+/* Gradient text + backgrounds — read dynamic --color-accent-* so
+   per-model accent flows through every Tailwind gradient utility. */
+html.light .from-accent-start { --tw-gradient-from: var(--color-accent-start) !important; }
+html.light .via-accent-mid { --tw-gradient-via: var(--color-accent-mid) !important; }
+html.light .to-accent-end { --tw-gradient-to: var(--color-accent-end) !important; }
+html.light .to-accent-mid { --tw-gradient-to: var(--color-accent-mid) !important; }
+html.light .from-accent-start.to-accent-mid { --tw-gradient-from: var(--color-accent-start) !important; --tw-gradient-to: var(--color-accent-mid) !important; }
 
 /* Primary backgrounds */
-html.light .bg-primary { background-color: #1D4ED8 !important; }
+html.light .bg-primary { background-color: var(--color-primary) !important; }
 html.light .bg-primary\/10 { background-color: rgba(109,40,217,0.1) !important; }
 html.light .bg-primary\/12 { background-color: rgba(109,40,217,0.12) !important; }
 html.light .bg-primary\/20 { background-color: rgba(109,40,217,0.2) !important; }

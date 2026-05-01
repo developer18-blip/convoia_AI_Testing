@@ -158,8 +158,8 @@ export function SettingsPage() {
                 <p className="text-sm text-text-muted">{user?.email}</p>
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="mt-2 flex items-center gap-1.5 text-xs text-primary hover:text-primary-hover transition-colors"
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                  className="mt-2 flex items-center gap-1.5 text-xs transition-colors"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--accent)' }}
                 >
                   <Upload size={12} /> Upload photo
                 </button>
