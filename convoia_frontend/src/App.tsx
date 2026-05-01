@@ -33,6 +33,7 @@ const MobileLoginPage = lazy(() => import('./pages/mobile/MobileLoginPage'))
 const MobileRegisterPage = lazy(() => import('./pages/mobile/MobileRegisterPage'))
 const MobileSettingsPage = lazy(() => import('./pages/mobile/MobileSettingsPage'))
 const UsagePage = lazy(() => import('./pages/UsagePage'))
+const TransactionsPage = lazy(() => import('./pages/TransactionsPage'))
 const SessionsPage = lazy(() => import('./pages/SessionsPage'))
 const TeamPage = lazy(() => import('./pages/TeamPage'))
 const MemberPage = lazy(() => import('./pages/MemberPage'))
@@ -171,6 +172,7 @@ function AppRoutes() {
           <Route path="/chat" element={isNative ? <MobileChatPage /> : <ChatPage />} />
           <Route path="/models" element={isNative ? <MobileAgentsPage /> : <ModelsPage />} />
           <Route path="/usage" element={<UsagePage />} />
+          <Route path="/transactions" element={<TransactionsPage />} />
           <Route path="/settings" element={isNative ? <MobileSettingsPage /> : <SettingsPage />} />
           <Route path="/api-docs" element={<ApiDocsPage />} />
           {/* Token purchase — only freelancers + org_owner + platform_admin */}

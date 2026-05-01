@@ -259,16 +259,30 @@ export class TokenWalletService {
     });
   }
 
-  static async getTransactionHistory(userId: string, limit = 20, page = 1) {
+  static async getTransactionHistory(
+    userId: string,
+    limit = 20,
+    page = 1,
+    type?: string,
+  ) {
     const skip = (page - 1) * limit;
+    // 'allocation' is a UI bucket that maps to both ledger types.
+    // Other type values pass through verbatim ('purchase', 'usage', 'adjustment').
+    const typeFilter =
+      type === 'allocation'
+        ? { in: ['allocation_received', 'allocation_given'] }
+        : type
+          ? type
+          : undefined;
+    const where = typeFilter ? { userId, type: typeFilter } : { userId };
     const [transactions, total] = await Promise.all([
       prisma.tokenTransaction.findMany({
-        where: { userId },
+        where,
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
       }),
-      prisma.tokenTransaction.count({ where: { userId } }),
+      prisma.tokenTransaction.count({ where }),
     ]);
     return { transactions, pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
   }

@@ -42,8 +42,13 @@ export const getTokenHistory = asyncHandler(
 
     const page = parseInt(req.query.page as string) || 1;
     const limit = Math.min(50, parseInt(req.query.limit as string) || 20);
+    // Whitelist supported type filter values; unknown values are ignored
+    // (returns all rows) so a typo can't expose unexpected data or 500.
+    const rawType = (req.query.type as string) || undefined;
+    const ALLOWED_TYPES = ['purchase', 'usage', 'allocation', 'adjustment'];
+    const type = rawType && ALLOWED_TYPES.includes(rawType) ? rawType : undefined;
 
-    const result = await TokenWalletService.getTransactionHistory(req.user.userId, limit, page);
+    const result = await TokenWalletService.getTransactionHistory(req.user.userId, limit, page, type);
 
     res.json({ success: true, data: result });
   }
