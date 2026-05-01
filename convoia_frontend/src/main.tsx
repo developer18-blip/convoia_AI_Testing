@@ -4,6 +4,7 @@ import './index.css'
 import './styles/mobile-theme.css'
 import './styles/council.css'
 import './styles/index.css'
+import './styles/preferences.css'
 // Geist Sans — weights needed by the design system (400/500/600)
 import '@fontsource/geist-sans/400.css'
 import '@fontsource/geist-sans/500.css'
@@ -13,6 +14,7 @@ import '@fontsource/geist-mono/400.css'
 import '@fontsource/geist-mono/500.css'
 import App from './App.tsx'
 import { AccentProvider } from './contexts/AccentContext'
+import { SidebarProvider } from './contexts/SidebarContext'
 import { initNativeBridge } from './lib/capacitor'
 import { initStorageCache } from './lib/storage'
 
@@ -32,7 +34,9 @@ initNativeBridge()
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AccentProvider>
-      <App />
+      <SidebarProvider>
+        <App />
+      </SidebarProvider>
     </AccentProvider>
   </StrictMode>,
 )

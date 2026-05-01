@@ -6,6 +6,7 @@ import { Button } from '../components/ui/Button'
 import { ProgressBar } from '../components/ui/ProgressBar'
 import { useToast } from '../hooks/useToast'
 import api from '../lib/api'
+import { formatDate } from '../lib/utils'
 
 interface TokenPackage {
   id: string
@@ -249,7 +250,7 @@ export function OrgBillingPage() {
                     +{fmtTokens(p.tokensReceived)} tokens
                   </p>
                   <p className="text-xs text-text-muted">
-                    {new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    {formatDate(p.createdAt)}
                   </p>
                 </div>
                 <div className="text-right">

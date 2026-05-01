@@ -18,7 +18,7 @@ import { ErrorState } from '../components/shared/ErrorState'
 import { EmptyState } from '../components/shared/EmptyState'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../hooks/useToast'
-import { formatCurrency, formatNumber, formatTokens } from '../lib/utils'
+import { formatCurrency, formatNumber, formatTokens, formatDate } from '../lib/utils'
 import api from '../lib/api'
 
 interface TeamMember {
@@ -292,7 +292,7 @@ export function TeamPage() {
                     <Badge size="sm" variant="primary">{inv.role}</Badge>
                     <span className="ml-2">Invited by {inv.invitedBy}</span>
                     <span className="ml-2 text-text-dim">
-                      Expires {new Date(inv.expiresAt).toLocaleDateString()}
+                      Expires {formatDate(inv.expiresAt)}
                     </span>
                   </p>
                 </div>
@@ -509,7 +509,7 @@ export function TeamPage() {
           </Button>
 
           <p className="text-xs text-text-dim text-center">
-            Link expires in 7 days ({new Date(inviteResult?.expiresAt ?? '').toLocaleDateString()})
+            Link expires in 7 days ({inviteResult?.expiresAt ? formatDate(inviteResult.expiresAt) : ''})
           </p>
 
           <Button

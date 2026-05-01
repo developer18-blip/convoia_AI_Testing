@@ -96,8 +96,17 @@ export function ChatPage() {
 
   useEffect(() => {
     if (models.length > 0 && !selectedModelId) {
-      setSelectedModelId(models[0].id)
-      setActiveModel(resolveModelSlug(models[0].id))
+      // TODO(settings): replace localStorage read with User.defaultModelId when backend supports it
+      let initial = models[0].id
+      try {
+        const saved = localStorage.getItem('convoia_settings_default_model')
+        if (saved) {
+          const match = models.find((m) => m.id === saved || m.modelId === saved)
+          if (match) initial = match.id
+        }
+      } catch { /* ignore */ }
+      setSelectedModelId(initial)
+      setActiveModel(resolveModelSlug(initial))
     }
     // resolveModelSlug closes over `models` — safe to omit from deps since
     // it's only invoked when models change.

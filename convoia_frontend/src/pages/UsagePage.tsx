@@ -565,7 +565,7 @@ export function UsagePage() {
             )}
 
             <div className="text-xs text-text-muted">
-              {selectedLog.createdAt && `Timestamp: ${new Date(selectedLog.createdAt).toLocaleString()}`}
+              {selectedLog.createdAt && `Timestamp: ${formatDateTime(selectedLog.createdAt)}`}
             </div>
           </div>
         )}
