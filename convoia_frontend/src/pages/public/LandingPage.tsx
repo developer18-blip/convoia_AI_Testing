@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { MarketingNav } from '../../components/marketing/MarketingNav'
 import { MarketingFooter } from '../../components/marketing/MarketingFooter'
+import { HeroPlexus } from '../../components/marketing/HeroPlexus'
 import { ConvoiaMark } from '../../components/brand/ConvoiaMark'
 import { Button } from '../../components/primitives/Button'
 import { Pill } from '../../components/primitives/Pill'
@@ -190,6 +191,7 @@ export function LandingPage() {
       {/* 1. HERO */}
       <section className="lp-hero">
         <div className="lp-hero__ambient" />
+        <HeroPlexus />
         <div className="lp-hero__inner">
           <div className="lp-hero__eyebrow">
             <span className="lp-hero__eyebrow-dot" />

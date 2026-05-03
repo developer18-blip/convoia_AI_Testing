@@ -5,6 +5,7 @@ import './styles/mobile-theme.css'
 import './styles/council.css'
 import './styles/index.css'
 import './styles/preferences.css'
+import './styles/hero-plexus.css'
 // Geist Sans — weights needed by the design system (400/500/600)
 import '@fontsource/geist-sans/400.css'
 import '@fontsource/geist-sans/500.css'
