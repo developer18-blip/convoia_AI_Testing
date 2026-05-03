@@ -1,0 +1,110 @@
+/* HeroPlexus — atmospheric layers behind the landing hero content.
+   DOM order on .lp-hero is:
+     1. .lp-hero__ambient   (z:0, blurred radial bloom)
+     2. .hero-spotlight     (z:0, cursor-following radial glow)
+     3. .hero-plexus        (z:0, particle canvas)
+     4. .hero-ripple(s)     (z:0, click-emitted shock circles)
+     5. .lp-hero__inner     (z:1, content — always on top)
+   pointer-events: none on every layer here — purely decorative. tsparticles
+   tracks mouse via window-level events; spotlight + ripples are CSS only. */
+
+.hero-plexus {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.hero-plexus canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Static fallback for prefers-reduced-motion users — full-bleed SVG dot grid. */
+.hero-plexus--static {
+  width: 100%;
+  height: 100%;
+}
+
+/* ─── Cursor spotlight ─────────────────────────────────────────────────
+   Linear/Vercel-signature soft radial halo following the cursor.
+   Position is driven by --cursor-x / --cursor-y CSS custom properties
+   set on the .lp-hero parent by HeroPlexus's mousemove effect.
+   Fades in when cursor enters hero, fades out when it leaves. */
+.hero-spotlight {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    480px circle at var(--cursor-x, 50%) var(--cursor-y, 50%),
+    color-mix(in srgb, var(--accent) 22%, transparent),
+    transparent 55%
+  );
+  opacity: 0;
+  transition: opacity 350ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.lp-hero--cursor-active .hero-spotlight {
+  opacity: 1;
+}
+
+[data-theme="light"] .hero-spotlight {
+  background: radial-gradient(
+    480px circle at var(--cursor-x, 50%) var(--cursor-y, 50%),
+    color-mix(in srgb, var(--accent) 14%, transparent),
+    transparent 55%
+  );
+}
+
+/* Hide spotlight on touch devices — there's no cursor to follow. */
+@media (max-width: 768px) {
+  .hero-spotlight {
+    display: none;
+  }
+}
+
+/* ─── Click ripple ─────────────────────────────────────────────────────
+   Expanding ring that fades out, emitted on hero clicks (NOT on CTAs).
+   Each ripple is short-lived (~850ms) and auto-cleaned by React.
+   Positioned via inline left/top from the click coordinates. */
+.hero-ripple {
+  position: absolute;
+  z-index: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 18px var(--accent);
+  animation: hero-ripple 850ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes hero-ripple {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.9;
+    border-width: 2px;
+  }
+  60% {
+    opacity: 0.45;
+    border-width: 1.5px;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(55);
+    opacity: 0;
+    border-width: 0.5px;
+  }
+}
+
+/* prefers-reduced-motion handled at React level for ripples (we skip
+   emitting them entirely). Spotlight fade transition is cosmetic and
+   not motion-disorienting, but disable for safety. */
+@media (prefers-reduced-motion: reduce) {
+  .hero-spotlight {
+    transition: none;
+  }
+}
