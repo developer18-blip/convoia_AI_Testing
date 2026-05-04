@@ -792,7 +792,15 @@ async function callPerplexity(modelId: string, messages: any[], systemPrompt: st
       buildBody(forceTemp1),
       axiosConfig({ Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' })
     );
-    let text = response.data.choices[0].message.content;
+    // Strip <think>...</think> reasoning blocks before returning to client.
+    // sonar-reasoning-pro emits these and they verbatim-include the platform
+    // system prompt — a real IP/prompt-leak risk in chat UIs that don't
+    // strip them client-side. Applied to ALL Perplexity responses so future
+    // reasoning models (sonar-reasoning, sonar-deep-research) are covered
+    // automatically; the regex is a no-op on non-reasoning replies.
+    let text: string = (response.data.choices[0].message.content || '')
+      .replace(/<think>[\s\S]*?<\/think>\s*/gi, '')
+      .trim();
     const citations = response.data.citations;
     if (citations && Array.isArray(citations) && citations.length > 0) {
       text += '\n\n---\n**Sources:**\n' + citations.map((url: string, i: number) => `${i + 1}. ${url}`).join('\n');
