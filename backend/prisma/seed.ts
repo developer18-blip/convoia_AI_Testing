@@ -92,6 +92,10 @@ const aiModels = [
     contextWindow: 1048576,
   },
   {
+    // Disabled 2026-05 — same alignment-resistant identity-disclosure
+    // pattern as o3-mini: leaks "I am ChatGPT by OpenAI" despite the
+    // ConvoiaAI white-label system prompt. Sibling gpt-4.1 / gpt-4.1-mini
+    // are unaffected. Re-enable post-launch after deeper investigation.
     name: 'GPT-4.1 Nano',
     provider: 'openai',
     modelId: 'gpt-4.1-nano',
@@ -100,6 +104,7 @@ const aiModels = [
     outputTokenPrice: 0.0000004,   // $0.40 / 1M output
     capabilities: ['chat', 'function_calling', 'json_mode'],
     contextWindow: 1048576,
+    isActive: false,
   },
 
   // GPT-4o Family (still widely used)
@@ -426,6 +431,12 @@ const aiModels = [
 
   // ── Perplexity ──────────────────────────────────────────────────
   {
+    // Disabled 2026-05 — leaks "I am Perplexity by PervoiaAI" (note brand-
+    // name corruption "Pervoia" instead of "Convoia"). Both sonar-family
+    // base models exhibit the same pattern; possibly a Perplexity-side
+    // issue with system-prompt handling. Re-enable after investigation.
+    // sonar-reasoning-pro stays active — its <think>-block leak is fixed
+    // by response post-processing, a different mitigation pattern.
     name: 'Sonar Pro',
     provider: 'perplexity',
     modelId: 'sonar-pro',
@@ -434,8 +445,10 @@ const aiModels = [
     outputTokenPrice: 0.000015,    // $15 / 1M output
     capabilities: ['chat', 'search'],
     contextWindow: 200000,
+    isActive: false,
   },
   {
+    // Disabled 2026-05 — see sonar-pro note above (same leak pattern).
     name: 'Sonar',
     provider: 'perplexity',
     modelId: 'sonar',
@@ -444,6 +457,7 @@ const aiModels = [
     outputTokenPrice: 0.000001,    // $1 / 1M output
     capabilities: ['chat', 'search'],
     contextWindow: 128000,
+    isActive: false,
   },
   {
     name: 'Sonar Reasoning Pro',
