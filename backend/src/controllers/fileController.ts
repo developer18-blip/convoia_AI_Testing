@@ -57,9 +57,11 @@ async function ocrPdfWithVision(filePath: string): Promise<string | null> {
   // Fallback: Google Gemini (also supports PDF)
   if (config.apiKeys.google) {
     try {
-      logger.info('OCR: Using Google Gemini for scanned PDF')
+      logger.info('OCR: Using Google Gemini 2.5 Flash for scanned PDF')
       const resp = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${config.apiKeys.google}`,
+        // gemini-2.0-flash deprecated by Google 2026-05; 2.5-flash is the
+        // direct successor with identical multimodal inlineData PDF support.
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${config.apiKeys.google}`,
         {
           contents: [{
             parts: [
