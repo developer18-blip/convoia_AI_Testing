@@ -85,6 +85,7 @@ export function LoginPage() {
           <span>
             Don't have an account?{' '}
             <Link to="/register" className="login-page__link">Create one</Link>
+            {' '}— get <strong style={{ color: 'var(--accent)', fontWeight: 600 }}>100K free tokens</strong> to start.
           </span>
         }
       >
