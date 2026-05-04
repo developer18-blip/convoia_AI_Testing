@@ -2,6 +2,7 @@
  * Client-side document export — PDF via html2pdf.js, DOCX via docx library.
  * Both use dynamic imports so they're only loaded when the user clicks download.
  */
+import { applyExportStylesToElement } from './contentExport'
 
 // ── PDF Export ──
 export async function exportToPdf(contentElement: HTMLElement, title: string): Promise<void> {
@@ -24,52 +25,24 @@ export async function exportToPdf(contentElement: HTMLElement, title: string): P
   `
   wrapper.appendChild(header)
 
-  // Style overrides for print
-  clone.querySelectorAll('*').forEach((el) => {
-    const e = el as HTMLElement
-    e.style.color = e.style.color || '#1a1a1a'
-    e.style.background = 'transparent'
-  })
-  // Headings
+  // Sanitize via the shared content-export adapter — replaces every
+  // theme-dependent var(--chat-text) etc. with portable hex !important.
+  // Without this, html2canvas resolves CSS vars in the live document
+  // (dark theme) and bakes washed-out gray text into the PDF.
+  applyExportStylesToElement(clone)
+
+  // PDF-specific extras on top of the adapter baseline (page-break hints
+  // and the H1 underline only matter for paginated print output).
   clone.querySelectorAll('h1, h2, h3').forEach((el) => {
     const e = el as HTMLElement
-    e.style.color = '#1a1a1a'
-    e.style.borderBottom = el.tagName === 'H1' ? '1px solid #ddd' : 'none'
-    e.style.paddingBottom = el.tagName === 'H1' ? '8px' : '0'
-    e.style.pageBreakAfter = 'avoid'
+    e.style.setProperty('page-break-after', 'avoid')
+    if (el.tagName === 'H1') {
+      e.style.setProperty('border-bottom', '1px solid #ddd')
+      e.style.setProperty('padding-bottom', '8px')
+    }
   })
-  // Code blocks
-  clone.querySelectorAll('pre, code').forEach((el) => {
-    const e = el as HTMLElement
-    e.style.background = '#f5f5f5'
-    e.style.color = '#333'
-    e.style.border = '1px solid #e0e0e0'
-    e.style.borderRadius = '6px'
-    e.style.fontFamily = "'Fira Code', 'Consolas', monospace"
-    e.style.fontSize = '12px'
-    e.style.pageBreakInside = 'avoid'
-  })
-  // Tables
-  clone.querySelectorAll('table').forEach((el) => {
-    const e = el as HTMLElement
-    e.style.borderCollapse = 'collapse'
-    e.style.width = '100%'
-    e.style.pageBreakInside = 'avoid'
-  })
-  clone.querySelectorAll('th, td').forEach((el) => {
-    const e = el as HTMLElement
-    e.style.border = '1px solid #ddd'
-    e.style.padding = '8px 12px'
-    e.style.color = '#1a1a1a'
-    e.style.background = el.tagName === 'TH' ? '#f0f0f0' : 'transparent'
-  })
-  // Blockquotes
-  clone.querySelectorAll('blockquote').forEach((el) => {
-    const e = el as HTMLElement
-    e.style.borderLeft = '3px solid #7C3AED'
-    e.style.paddingLeft = '16px'
-    e.style.color = '#555'
-    e.style.fontStyle = 'italic'
+  clone.querySelectorAll('pre, table').forEach((el) => {
+    (el as HTMLElement).style.setProperty('page-break-inside', 'avoid')
   })
 
   wrapper.appendChild(clone)
