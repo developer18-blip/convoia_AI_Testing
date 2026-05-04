@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { GoogleLogin } from '@react-oauth/google'
 import { AuthLayout } from '../../components/auth/AuthLayout'
+import { RegisterDashboard } from '../../components/auth/RegisterDashboard'
 import { Input } from '../../components/primitives/Input'
 import { Button } from '../../components/primitives/Button'
 import { SignalLine } from '../../components/primitives/SignalLine'
@@ -10,6 +11,7 @@ import { ComputationLine } from '../../components/primitives/ComputationLine'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
 import { passwordStrength } from '../../lib/utils'
+import '../../styles/auth-split-layout.css'
 
 const industries = [
   { value: '', label: 'Select industry' },
@@ -160,6 +162,7 @@ export function RegisterPage() {
         wide={step === 2 && accountType === 'business'}
         title={step === 1 ? 'Create your account' : 'Your details'}
         subtitle={step === 1 ? 'Start routing across 40+ AI models in 60 seconds' : 'Fill in your information to continue'}
+        rightPane={step === 1 ? <RegisterDashboard /> : undefined}
         footer={
           <span>
             Already have an account?{' '}

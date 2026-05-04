@@ -12,20 +12,36 @@ interface AuthLayoutProps {
   wide?: boolean
   /** Optional class added to the root for page-specific styling */
   className?: string
+  /**
+   * Optional decorative right-pane content (carousel, dashboard preview,
+   * etc.). Hidden below 1024px via CSS — the form column re-centers.
+   * Marked aria-hidden because it's purely visual; screen readers skip it.
+   * When omitted, AuthLayout renders the legacy single-column form.
+   */
+  rightPane?: ReactNode
 }
 
-export function AuthLayout({ children, title, subtitle, footer, wide = false, className = '' }: AuthLayoutProps) {
-  return (
-    <div className={`auth-layout ${className}`.trim()}>
-      <div className="auth-layout__ambient" />
+export function AuthLayout({
+  children,
+  title,
+  subtitle,
+  footer,
+  wide = false,
+  className = '',
+  rightPane,
+}: AuthLayoutProps) {
+  const rootClass = [
+    'auth-layout',
+    rightPane ? 'auth-layout--split' : '',
+    className,
+  ].filter(Boolean).join(' ')
 
-      <Link to="/" className="auth-layout__back mono-label">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-          <path d="M19 12H5M12 19l-7-7 7-7" />
-        </svg>
-        BACK TO HOME
-      </Link>
-
+  // Form column — the existing card + provider strip, wrapped so the split
+  // layout can grid-place them as a unit alongside the right pane. In
+  // single-column mode (no rightPane) this still wraps cleanly because
+  // the parent grid never activates.
+  const formColumn = (
+    <div className="auth-layout__split-form">
       <div className={`auth-layout__card grain-surface ${wide ? 'auth-layout__card--wide' : ''}`}>
         <div className="auth-layout__header">
           <ConvoiaMark size={40} state="idle" />
@@ -53,6 +69,27 @@ export function AuthLayout({ children, title, subtitle, footer, wide = false, cl
           ))}
         </div>
       </div>
+    </div>
+  )
+
+  return (
+    <div className={rootClass}>
+      <div className="auth-layout__ambient" />
+
+      <Link to="/" className="auth-layout__back mono-label">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+          <path d="M19 12H5M12 19l-7-7 7-7" />
+        </svg>
+        BACK TO HOME
+      </Link>
+
+      {formColumn}
+
+      {rightPane && (
+        <div className="auth-layout__split-pane" aria-hidden="true">
+          {rightPane}
+        </div>
+      )}
     </div>
   )
 }

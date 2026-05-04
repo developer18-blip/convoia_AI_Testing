@@ -1,0 +1,391 @@
+/* ═══════════════════════════════════════════════════════════════
+   Split-pane auth layout — form on the left, decorative right pane.
+   Activated by adding the `auth-layout--split` modifier to the root
+   .auth-layout container; opt-in via AuthLayout's `rightPane` prop.
+   Below 1024px the right pane is hidden and the form re-centers, so
+   nothing about the existing single-column flow regresses.
+   ═══════════════════════════════════════════════════════════════ */
+
+.auth-layout--split {
+  display: grid;
+  grid-template-columns: minmax(420px, 1fr) minmax(0, 1.1fr);
+  align-items: stretch;
+  justify-items: stretch;
+  padding: 0;
+}
+
+/* The form column wraps the existing card + provider chips so the split
+   layout doesn't have to reach inside AuthLayout's internals. Centered
+   vertically + horizontally inside its column with the same padding the
+   single-column variant uses. */
+.auth-layout__split-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8) var(--space-6);
+  position: relative;
+  z-index: 1;
+}
+
+/* Right pane host — relatively positioned so children can absolutely
+   anchor decorative glow + scroll-locked content. Hidden under 1024px;
+   the form below that breakpoint takes the full width as before. */
+.auth-layout__split-pane {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-12) var(--space-8);
+  border-left: var(--border-thin) solid var(--border-default);
+  background:
+    radial-gradient(700px 500px at 70% 30%, rgba(20, 184, 205, 0.08), transparent 65%),
+    radial-gradient(500px 400px at 30% 80%, rgba(20, 184, 205, 0.05), transparent 60%);
+  overflow: hidden;
+}
+
+/* Subtle inner ring on the right pane edge for depth without an extra
+   border (which would clash with the existing auth-layout ambient). */
+.auth-layout__split-pane::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(20, 184, 205, 0.04), transparent 40%, transparent 60%, rgba(20, 184, 205, 0.04));
+  z-index: 0;
+}
+
+/* Light-mode override — translucent panel needs slightly stronger
+   accent to stay visible on the lighter surface. */
+[data-theme='light'] .auth-layout__split-pane,
+html.light .auth-layout__split-pane {
+  border-left-color: rgba(15, 23, 42, 0.08);
+  background:
+    radial-gradient(700px 500px at 70% 30%, rgba(20, 184, 205, 0.10), transparent 65%),
+    radial-gradient(500px 400px at 30% 80%, rgba(20, 184, 205, 0.07), transparent 60%);
+}
+
+/* ── Below 1024px: revert to single-column ─────────────────────── */
+@media (max-width: 1024px) {
+  .auth-layout--split {
+    grid-template-columns: 1fr;
+    padding: var(--space-8) var(--space-4);
+  }
+
+  .auth-layout__split-pane {
+    display: none;
+  }
+
+  .auth-layout__split-form {
+    padding: 0;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LoginCarousel — quiet platform-stats panel for returning users.
+   ═══════════════════════════════════════════════════════════════ */
+
+.login-carousel {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.login-carousel__header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.login-carousel__eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+
+.login-carousel__title {
+  font-size: 36px;
+  line-height: 1.15;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.login-carousel__subtitle {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  margin: 0;
+  max-width: 36ch;
+}
+
+.login-carousel__stage {
+  position: relative;
+  min-height: 120px;
+  display: flex;
+  align-items: stretch;
+}
+
+.login-carousel__slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-6);
+  border-radius: var(--radius-lg);
+  border: var(--border-thin) solid var(--border-default);
+  background: var(--surface-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 700ms var(--ease-default), transform 700ms var(--ease-default);
+}
+
+.login-carousel__slide--active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.login-carousel__slide-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.login-carousel__provider-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.login-carousel__provider-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
+.login-carousel__slide-body {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.login-carousel__indicator {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.login-carousel__dot {
+  width: 24px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border-default);
+  transition: background 400ms var(--ease-default);
+}
+
+.login-carousel__dot--active {
+  background: var(--accent);
+}
+
+.login-carousel__stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.login-carousel__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.02);
+  border: var(--border-thin) solid var(--border-subtle);
+}
+
+.login-carousel__stat-label {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+}
+
+.login-carousel__stat-value {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RegisterDashboard — faux dashboard preview for new users.
+   ═══════════════════════════════════════════════════════════════ */
+
+.register-dashboard {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.register-dashboard__header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.register-dashboard__eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+}
+
+.register-dashboard__title {
+  font-size: 32px;
+  line-height: 1.2;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.register-dashboard__subtitle {
+  font-size: 15px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.5;
+  max-width: 38ch;
+}
+
+.register-dashboard__panel {
+  border-radius: var(--radius-lg);
+  border: var(--border-thin) solid var(--border-default);
+  background: var(--surface-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.register-dashboard__panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.register-dashboard__panel-title {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+}
+
+.register-dashboard__model-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.register-dashboard__model-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: var(--border-thin) solid var(--border-default);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.register-dashboard__chat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.register-dashboard__chat-msg {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.register-dashboard__chat-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--surface-1, rgba(20, 184, 205, 0.08));
+  border: var(--border-thin) solid var(--border-default);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.register-dashboard__chat-bubble {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.02);
+  border: var(--border-thin) solid var(--border-subtle);
+  flex: 1;
+  min-width: 0;
+}
+
+.register-dashboard__features {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.register-dashboard__feature {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: var(--border-thin) solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.register-dashboard__feature-value {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: -0.01em;
+}
+
+.register-dashboard__feature-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.3;
+}
