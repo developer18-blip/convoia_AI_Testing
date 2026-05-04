@@ -358,6 +358,7 @@ export async function generateVideo(
   const MAX_POLLS = 30;
   const POLL_INTERVAL = 10000;
   let result: any = null;
+  let everSawDone = false;
 
   for (let i = 0; i < MAX_POLLS; i++) {
     await new Promise(r => setTimeout(r, POLL_INTERVAL));
@@ -372,15 +373,46 @@ export async function generateVideo(
       );
 
       if (pollRes.data?.done) {
+        everSawDone = true;
+        // Google long-running operations signal failure via a top-level
+        // `error` field instead of `response`/`result`. Without surfacing
+        // it, the post-loop check fires "timed out after 5 minutes" — a
+        // lie when the real reason is e.g. safety-filter rejection on a
+        // violent prompt that gets done:true + error within ~10 seconds.
+        if (pollRes.data.error) {
+          const err = pollRes.data.error;
+          logger.error(`Veo operation failed: ${JSON.stringify(err)}`);
+          const msg = err.message || 'unknown error';
+          // Most common rejection on Veo is the safety filter; suggest
+          // the prompt-rewrite fix the user can actually act on.
+          if (/filter|safety|policy|prohibited|inappropriate|blocked/i.test(msg)) {
+            throw new Error(
+              `Video request was blocked by Google's safety filter (${msg}). ` +
+              `Try simplifying your prompt — avoid violence, real people, brand names, or text overlays.`,
+            );
+          }
+          throw new Error(`Veo rejected the request: ${msg}`);
+        }
         result = pollRes.data.response || pollRes.data.result;
         break;
       }
     } catch (pollErr: any) {
+      // Re-throw our own thrown errors (safety filter, etc) — they're
+      // already user-facing. Network errors stay swallowed for retry.
+      if (pollErr instanceof Error && /Veo|safety filter/i.test(pollErr.message)) {
+        throw pollErr;
+      }
       logger.warn(`Veo poll attempt ${i + 1} failed: ${pollErr.message}`);
     }
   }
 
   if (!result) {
+    if (everSawDone) {
+      // Operation completed but with no extractable response — usually
+      // means the response field used a key we don't recognise. Worth
+      // showing the user something more accurate than "timed out".
+      throw new Error('Veo finished the operation but returned no video data. Try a different prompt.');
+    }
     throw new Error('Video generation timed out after 5 minutes');
   }
 
