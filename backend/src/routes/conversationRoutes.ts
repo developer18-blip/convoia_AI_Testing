@@ -152,6 +152,32 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
   res.json({ success: true, message: 'Conversation deleted' });
 }));
 
+// DELETE /api/conversations/:id/messages/from/:messageId
+// Time-travel cleanup for edit-and-resend: hard-deletes the named message
+// AND every message in the same conversation with createdAt >= the anchor's
+// createdAt. Used by the chat client to drop the original user turn and the
+// AI response (plus anything after) before regenerating from the edited
+// content. Idempotent at the row level — re-running with the same anchor
+// just deletes 0 additional rows.
+router.delete('/:id/messages/from/:messageId', asyncHandler(async (req: Request, res: Response) => {
+  const conv = await prisma.conversation.findUnique({ where: { id: req.params.id } });
+  if (!conv) throw new AppError('Conversation not found', 404);
+  if (conv.userId !== req.user!.userId) throw new AppError('Unauthorized', 403);
+
+  const anchor = await prisma.chatMessage.findUnique({ where: { id: req.params.messageId } });
+  if (!anchor || anchor.conversationId !== req.params.id) {
+    throw new AppError('Message not found in conversation', 404);
+  }
+
+  const result = await prisma.chatMessage.deleteMany({
+    where: {
+      conversationId: req.params.id,
+      createdAt: { gte: anchor.createdAt },
+    },
+  });
+  res.json({ success: true, data: { deleted: result.count } });
+}));
+
 // POST /api/conversations/:id/messages — Save messages to a conversation
 const MAX_MESSAGE_CONTENT_CHARS = 100_000; // ~25K tokens; generous for code/docs
 router.post('/:id/messages', asyncHandler(async (req: Request, res: Response) => {

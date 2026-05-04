@@ -864,7 +864,11 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
         })()}
 
         {/* Document Download Bar — at the end after all content */}
-        {documentInfo?.worthy && !message.isLoading && (
+        {/* Hide until the SSE stream has fully completed — `isLoading` flips to
+            false on the first chunk so partial text can render, so we also gate
+            on `isStreaming` to avoid the bar appearing mid-stream and pushing
+            the message content around as more chunks arrive. */}
+        {documentInfo?.worthy && !message.isLoading && !message.isStreaming && (
           <DocumentDownloadBar content={message.content} contentRef={contentRef} title={documentInfo.title} />
         )}
 
@@ -873,8 +877,10 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
           <FileDownloadCard file={message.fileGeneration} />
         )}
 
-        {/* Try with another model — lazy execution */}
-        {showActions && message.content.length > 20 && onRetry && (
+        {/* Try with another model — lazy execution. Hidden until the stream
+            has fully finished (or been stopped) so the chips don't pop in/out
+            mid-generation. Same gate as the download bar + action row below. */}
+        {showActions && message.content.length > 20 && onRetry && !message.isLoading && !message.isStreaming && (
           <div style={{
             display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px',
             opacity: showActions ? 1 : 0, transition: 'opacity 200ms',
@@ -901,7 +907,12 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
           </div>
         )}
 
-        {/* Meta + action buttons */}
+        {/* Meta + action buttons — copy/canvas/regenerate/feedback/delete plus
+            cost+token meta. Hidden during streaming so users can't click stale
+            actions on partial output; reappears the moment isStreaming clears
+            (which happens in both the natural-completion finally block and in
+            stopStreaming() when the user cancels). */}
+        {!message.isLoading && !message.isStreaming && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: '12px', marginTop: '8px',
           opacity: showActions ? 1 : 0, transition: 'opacity 150ms',
@@ -935,6 +946,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
             </span>
           )}
         </div>
+        )}
       </div>
     </div>
   )

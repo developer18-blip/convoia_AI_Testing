@@ -274,6 +274,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [agentMode, setAgentMode] = useState(false)
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  // Mirror of `messages` so closure-bound callers (sendMessage, sendWithContext,
+  // editAndResend) always read the latest list. Without this, an editAndResend
+  // that calls setMessages(trimmed) and then sendMessage would have sendMessage
+  // build its conversation history from the pre-trim closure, defeating the
+  // time-travel semantics.
+  const messagesRef = useRef<Message[]>([])
+  useEffect(() => { messagesRef.current = messages }, [messages])
 
   const stopStreaming = useCallback(() => {
     if (abortRef.current) {
@@ -281,8 +288,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       abortRef.current = null
     }
     setIsStreaming(false)
-    // Remove isLoading from any streaming message
-    setMessages((prev) => prev.map((m) => m.isLoading ? { ...m, isLoading: false, content: m.content || '*(Generation stopped)*' } : m))
+    // Remove isLoading + isStreaming from any in-flight assistant message so
+    // post-completion UI (download bar, action chips) can render.
+    setMessages((prev) => prev.map((m) => (m.isLoading || m.isStreaming)
+      ? { ...m, isLoading: false, isStreaming: false, content: m.content || '*(Generation stopped)*' }
+      : m
+    ))
   }, [])
 
   // Reload conversations when user changes — localStorage is primary, backend supplements
@@ -474,7 +485,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     const userMsg: Message = { id: uuidv4(), role: 'user', content, timestamp: new Date().toISOString() }
     const assistantId = uuidv4()
     const streamingMsg: Message = {
-      id: assistantId, role: 'assistant', content: '', timestamp: new Date().toISOString(), isLoading: true,
+      id: assistantId, role: 'assistant', content: '', timestamp: new Date().toISOString(), isLoading: true, isStreaming: true,
       ...(councilOpts ? { council: emptyCouncilState(content) } : {}),
     }
 
@@ -486,16 +497,18 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     abortRef.current = controller
 
     try {
-      // Cap history to last 20 messages to prevent token explosion in long conversations
+      // Cap history to last 20 messages to prevent token explosion in long conversations.
+      // Read from messagesRef so editAndResend's just-trimmed state is visible here
+      // (the closure-bound `messages` would still hold the pre-trim list).
       const MAX_HISTORY = 20
-      const fullHistory = [...messages, userMsg]
+      const fullHistory = [...messagesRef.current, userMsg]
       const cappedHistory = fullHistory.length > MAX_HISTORY ? fullHistory.slice(-MAX_HISTORY) : fullHistory
       const allMsgs = cappedHistory.map((m) => ({ role: m.role, content: m.content }))
       const token = localStorage.getItem('convoia_token')
       const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
       // Find the most recent image from conversation including current message
-      const lastImage = [...messages, userMsg].reverse().find((m) => m.imagePreview)?.imagePreview
+      const lastImage = [...messagesRef.current, userMsg].reverse().find((m) => m.imagePreview)?.imagePreview
 
       const response = await fetch(`${baseUrl}/ai/query/stream`, {
         method: 'POST',
@@ -523,8 +536,42 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       let buffer = ''
       let accumulated = ''
       let metadata: { model?: string; provider?: string; tokens?: { input: number; output: number }; cost?: { charged: string }; imageUrl?: string; videoUrl?: string; videoGenerated?: boolean; imageGenerated?: boolean; council?: boolean; councilMeta?: any } = {}
-      let _ft: ReturnType<typeof setTimeout> | null = null
-      const _flush = () => { const s = accumulated; setMessages((p) => p.map((m) => m.id === assistantId ? { ...m, content: s, isLoading: false } : m)) }
+
+      // ── Smooth-typing flush ─────────────────────────────────────────────
+      // The previous setTimeout(_, 80) approach batched chunks into 12.5fps
+      // bursts — visible jumps of text every 80ms. Anthropic + ChatGPT do
+      // incremental rAF-paced rendering so text appears at a steady cadence
+      // regardless of how the network delivered chunks. We do the same: keep
+      // `displayed` lagging slightly behind `accumulated`, advance it a few
+      // characters per animation frame, and drain on stream end. Dynamic
+      // pacing accelerates when backlog grows so fast providers (100+ tok/s)
+      // don't feel laggy.
+      let displayed = ''
+      let rafId: number | null = null
+      const animate = () => {
+        rafId = null
+        const remaining = accumulated.length - displayed.length
+        if (remaining <= 0) return
+        const charsThisFrame = Math.max(4, Math.ceil(remaining / 30))
+        displayed = accumulated.slice(0, displayed.length + Math.min(charsThisFrame, remaining))
+        setMessages((p) => p.map((m) => m.id === assistantId ? { ...m, content: displayed, isLoading: false } : m))
+        rafId = requestAnimationFrame(animate)
+      }
+      const scheduleAnim = () => { if (rafId === null) rafId = requestAnimationFrame(animate) }
+      const drainAnim = () => {
+        if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null }
+        if (displayed !== accumulated) {
+          displayed = accumulated
+          setMessages((p) => p.map((m) => m.id === assistantId ? { ...m, content: displayed, isLoading: false } : m))
+        }
+      }
+      // Sync the animation buffer to a manually-set content (called when
+      // other event types overwrite the message content, so the animator
+      // doesn't type-out stale text after the reset).
+      const syncDisplayedTo = (s: string) => {
+        if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null }
+        displayed = s
+      }
 
       while (true) {
         const { done, value } = await reader.read()
@@ -549,14 +596,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
             if (parsed.type === 'chunk') {
               accumulated += parsed.content
-              // Throttle UI updates to every 80ms instead of every chunk
-              if (!_ft) { _ft = setTimeout(() => { _ft = null; _flush() }, 80) }
+              scheduleAnim()
             } else if (parsed.type === 'status') {
+              syncDisplayedTo('')
               setMessages((prev) => prev.map((m) =>
                 m.id === assistantId ? { ...m, content: '', isLoading: true, statusText: parsed.content } : m
               ))
             } else if (parsed.type === 'web_search') {
               accumulated = ''
+              syncDisplayedTo('')
               setMessages((prev) => prev.map((m) =>
                 m.id === assistantId ? { ...m, content: '', isLoading: false, webSearch: { query: parsed.query, sources: parsed.sources || [] } } : m
               ))
@@ -588,6 +636,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                 m.id === assistantId ? { ...m, content: accumulated, isLoading: false } : m
               ))
             } else if (parsed.type === 'file_generation_start') {
+              syncDisplayedTo('')
               setMessages((prev) => prev.map((m) =>
                 m.id === assistantId ? { ...m, content: '', isLoading: true, statusText: `Generating your ${parsed.formatLabel}...` } : m
               ))
@@ -628,8 +677,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Clear throttle timer BEFORE final state (prevents overwriting videoUrl/imageUrl)
-      if (_ft) clearTimeout(_ft)
+      // Drain animation BEFORE the final-state setMessages so any rAF that
+      // hasn't fired yet doesn't overwrite the metadata (videoUrl/imageUrl/etc)
+      // we're about to bake in.
+      drainAnim()
       setMessages((prev) => prev.map((m) => {
         if (m.id !== assistantId) return m
         // Council mode: bake final phase + meta into council state; content becomes the verdict text
@@ -699,6 +750,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     } finally {
       abortRef.current = null
       setIsStreaming(false)
+      // Mark this specific assistant message as no-longer-streaming so the
+      // download bar / action UI can render. Stays as a no-op for messages
+      // that already finished (the .map only matches the current assistantId).
+      setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, isStreaming: false } : m))
     }
   }, [messages])
 
@@ -712,7 +767,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
     const assistantId = uuidv4()
     const streamingMsg: Message = {
-      id: assistantId, role: 'assistant', content: '', timestamp: new Date().toISOString(), isLoading: true,
+      id: assistantId, role: 'assistant', content: '', timestamp: new Date().toISOString(), isLoading: true, isStreaming: true,
       ...(councilOpts ? { council: emptyCouncilState(content) } : {}),
     }
 
@@ -725,9 +780,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     abortRef.current = controller
 
     try {
-      // Cap history to last 20 messages to prevent token explosion
+      // Cap history to last 20 messages to prevent token explosion.
+      // messagesRef so editAndResend's trimmed-state reads correctly here too.
       const MAX_HIST = 20
-      const fullHist = [...messages, userMsg]
+      const fullHist = [...messagesRef.current, userMsg]
       const cappedHist = fullHist.length > MAX_HIST ? fullHist.slice(-MAX_HIST) : fullHist
       const history = cappedHist.map((m) => ({ role: m.role, content: m.content }))
       // Embed document/file context directly into the last user message
@@ -781,8 +837,42 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       let buffer = ''
       let accumulated = ''
       let metadata: { model?: string; provider?: string; tokens?: { input: number; output: number }; cost?: { charged: string }; imageUrl?: string; videoUrl?: string; videoGenerated?: boolean; imageGenerated?: boolean; council?: boolean; councilMeta?: any } = {}
-      let _ft: ReturnType<typeof setTimeout> | null = null
-      const _flush = () => { const s = accumulated; setMessages((p) => p.map((m) => m.id === assistantId ? { ...m, content: s, isLoading: false } : m)) }
+
+      // ── Smooth-typing flush ─────────────────────────────────────────────
+      // The previous setTimeout(_, 80) approach batched chunks into 12.5fps
+      // bursts — visible jumps of text every 80ms. Anthropic + ChatGPT do
+      // incremental rAF-paced rendering so text appears at a steady cadence
+      // regardless of how the network delivered chunks. We do the same: keep
+      // `displayed` lagging slightly behind `accumulated`, advance it a few
+      // characters per animation frame, and drain on stream end. Dynamic
+      // pacing accelerates when backlog grows so fast providers (100+ tok/s)
+      // don't feel laggy.
+      let displayed = ''
+      let rafId: number | null = null
+      const animate = () => {
+        rafId = null
+        const remaining = accumulated.length - displayed.length
+        if (remaining <= 0) return
+        const charsThisFrame = Math.max(4, Math.ceil(remaining / 30))
+        displayed = accumulated.slice(0, displayed.length + Math.min(charsThisFrame, remaining))
+        setMessages((p) => p.map((m) => m.id === assistantId ? { ...m, content: displayed, isLoading: false } : m))
+        rafId = requestAnimationFrame(animate)
+      }
+      const scheduleAnim = () => { if (rafId === null) rafId = requestAnimationFrame(animate) }
+      const drainAnim = () => {
+        if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null }
+        if (displayed !== accumulated) {
+          displayed = accumulated
+          setMessages((p) => p.map((m) => m.id === assistantId ? { ...m, content: displayed, isLoading: false } : m))
+        }
+      }
+      // Sync the animation buffer to a manually-set content (called when
+      // other event types overwrite the message content, so the animator
+      // doesn't type-out stale text after the reset).
+      const syncDisplayedTo = (s: string) => {
+        if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null }
+        displayed = s
+      }
 
       while (true) {
         const { done, value } = await reader.read()
@@ -807,14 +897,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
             if (parsed.type === 'chunk') {
               accumulated += parsed.content
-              // Throttle UI updates to every 80ms instead of every chunk
-              if (!_ft) { _ft = setTimeout(() => { _ft = null; _flush() }, 80) }
+              scheduleAnim()
             } else if (parsed.type === 'status') {
+              syncDisplayedTo('')
               setMessages((prev) => prev.map((m) =>
                 m.id === assistantId ? { ...m, content: '', isLoading: true, statusText: parsed.content } : m
               ))
             } else if (parsed.type === 'web_search') {
               accumulated = ''
+              syncDisplayedTo('')
               setMessages((prev) => prev.map((m) =>
                 m.id === assistantId ? { ...m, content: '', isLoading: false, webSearch: { query: parsed.query, sources: parsed.sources || [] } } : m
               ))
@@ -843,6 +934,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                 m.id === assistantId ? { ...m, content: accumulated, isLoading: false } : m
               ))
             } else if (parsed.type === 'file_generation_start') {
+              syncDisplayedTo('')
               setMessages((prev) => prev.map((m) =>
                 m.id === assistantId ? { ...m, content: '', isLoading: true, statusText: `Generating your ${parsed.formatLabel}...` } : m
               ))
@@ -883,8 +975,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Clear throttle timer BEFORE final state (prevents overwriting videoUrl/imageUrl)
-      if (_ft) clearTimeout(_ft)
+      // Drain animation BEFORE the final-state setMessages so any rAF that
+      // hasn't fired yet doesn't overwrite the metadata (videoUrl/imageUrl/etc)
+      // we're about to bake in.
+      drainAnim()
       setMessages((prev) => prev.map((m) => {
         if (m.id !== assistantId) return m
         if (m.council && metadata.council) {
@@ -951,16 +1045,68 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     } finally {
       abortRef.current = null
       setIsStreaming(false)
+      // See sendMessage's finally block: clear the per-message streaming flag
+      // so the download bar / action chips can render now that we're done.
+      setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, isStreaming: false } : m))
     }
   }, [messages])
 
+  // Time-travel edit: drop the edited message and everything after it (the AI
+  // response and any follow-ups), then resend with the new content. Mirrors
+  // ChatGPT semantics — discarded messages are not preserved as a branch.
   const editAndResend = useCallback(async (messageId: string, newContent: string, modelId: string, industry?: string, agentId?: string) => {
     const msgIndex = messages.findIndex((m) => m.id === messageId)
     if (msgIndex === -1) return
-    const trimmed = messages.slice(0, msgIndex)
-    setMessages(trimmed)
-    await sendMessage(newContent, modelId, industry, agentId)
-  }, [messages, sendMessage])
+
+    // Capture attachments before mutating state so the new user message keeps
+    // the same files/images the original had attached.
+    const original = messages[msgIndex]
+    const attachmentExtras: Partial<Message> = {}
+    if (original.fileAttachment) attachmentExtras.fileAttachment = original.fileAttachment
+    if (original.imagePreview) attachmentExtras.imagePreview = original.imagePreview
+    if (original.imagePreviews && original.imagePreviews.length > 0) attachmentExtras.imagePreviews = original.imagePreviews
+    const hasAttachments = Object.keys(attachmentExtras).length > 0
+
+    // Abort any in-flight stream so the new generation doesn't race with the
+    // old one. Mirrors stopStreaming() but skips its placeholder-text mutation
+    // since we're about to drop the streaming message anyway.
+    if (abortRef.current) {
+      abortRef.current.abort()
+      abortRef.current = null
+    }
+    setIsStreaming(false)
+
+    // Cancel the pending debounced backend sync — otherwise the trimmed-but-
+    // not-yet-flushed state would re-POST messages we're about to delete.
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current)
+      syncTimeoutRef.current = null
+    }
+
+    // Trim local state immediately so the UI reflects the new conversation
+    // shape before the backend roundtrip lands. messagesRef is updated by the
+    // useEffect on the next commit, before the new sendMessage reads it.
+    setMessages(messages.slice(0, msgIndex))
+
+    // Hard-delete the edited message and every later message in the same
+    // conversation. Best-effort: if the request fails, local trim still holds
+    // for this session and the user can retry. We do this BEFORE the new
+    // send so the conversation history the backend sees on the next stream
+    // matches the visible UI.
+    if (activeId) {
+      try {
+        await api.delete(`/conversations/${activeId}/messages/from/${messageId}`)
+      } catch { /* silent — local truncation already applied */ }
+    }
+
+    // Resend. sendWithContext preserves messageExtras (attachments) on the new
+    // user message; sendMessage is the cheaper path when there's nothing to carry.
+    if (hasAttachments) {
+      await sendWithContext(newContent, modelId, null, attachmentExtras, industry, agentId)
+    } else {
+      await sendMessage(newContent, modelId, industry, agentId)
+    }
+  }, [messages, sendMessage, sendWithContext, activeId])
 
   const deleteMessage = useCallback((messageId: string) => {
     setMessages((prev) => prev.filter((m) => m.id !== messageId))
