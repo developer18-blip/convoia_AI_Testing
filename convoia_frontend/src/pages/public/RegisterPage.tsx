@@ -443,7 +443,7 @@ export function RegisterPage() {
             </Button>
 
             <p className="mono-label" style={{ textAlign: 'center', margin: 0, fontSize: 10, color: 'var(--text-tertiary)' }}>
-              NO CREDIT CARD &middot; 10K FREE TOKENS TO START
+              NO CREDIT CARD &middot; 100K FREE TOKENS TO START
             </p>
 
             {isLoading && <ComputationLine label="PROVISIONING WORKSPACE" />}

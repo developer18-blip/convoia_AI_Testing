@@ -135,6 +135,22 @@ html.light .auth-layout__split-pane {
   align-items: stretch;
 }
 
+.login-carousel__stage--interactive {
+  cursor: pointer;
+  outline: none;
+  border-radius: var(--radius-lg);
+  transition: transform 200ms var(--ease-default);
+}
+
+.login-carousel__stage--interactive:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.login-carousel__stage--interactive:hover .login-carousel__slide--active {
+  transform: translateY(-2px);
+  border-color: rgba(20, 184, 205, 0.4);
+}
+
 .login-carousel__slide {
   position: absolute;
   inset: 0;
@@ -195,10 +211,27 @@ html.light .auth-layout__split-pane {
   height: 3px;
   border-radius: 2px;
   background: var(--border-default);
-  transition: background 400ms var(--ease-default);
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: background 400ms var(--ease-default), transform 200ms var(--ease-default);
+}
+
+.login-carousel__dot:hover {
+  background: var(--text-tertiary);
+  transform: scaleY(1.5);
+}
+
+.login-carousel__dot:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .login-carousel__dot--active {
+  background: var(--accent);
+}
+
+.login-carousel__dot--active:hover {
   background: var(--accent);
 }
 
@@ -232,6 +265,76 @@ html.light .auth-layout__split-pane {
   font-weight: 600;
   color: var(--text-primary);
   letter-spacing: -0.01em;
+}
+
+/* CTA tile linking to /register — sits below the stats so returning users
+   can ignore it but misclickers see it as an obvious next step. */
+.login-carousel__cta {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-lg);
+  border: var(--border-thin) solid rgba(20, 184, 205, 0.25);
+  background: linear-gradient(
+    135deg,
+    rgba(20, 184, 205, 0.06) 0%,
+    rgba(20, 184, 205, 0.02) 100%
+  );
+  text-decoration: none;
+  transition: border-color 200ms var(--ease-default),
+              background 200ms var(--ease-default),
+              transform 200ms var(--ease-default);
+}
+
+.login-carousel__cta:hover {
+  border-color: var(--accent);
+  background: linear-gradient(
+    135deg,
+    rgba(20, 184, 205, 0.10) 0%,
+    rgba(20, 184, 205, 0.04) 100%
+  );
+  transform: translateY(-1px);
+}
+
+.login-carousel__cta:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.login-carousel__cta-label {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+  grid-column: 1;
+}
+
+.login-carousel__cta-headline {
+  font-size: 14px;
+  color: var(--text-secondary);
+  grid-column: 1;
+  line-height: 1.35;
+}
+
+.login-carousel__cta-highlight {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.login-carousel__cta-arrow {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  font-size: 18px;
+  color: var(--accent);
+  transition: transform 200ms var(--ease-default);
+}
+
+.login-carousel__cta:hover .login-carousel__cta-arrow {
+  transform: translateX(4px);
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -323,6 +426,21 @@ html.light .auth-layout__split-pane {
   font-family: var(--font-mono);
   color: var(--text-secondary);
   background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  transition: border-color 180ms var(--ease-default),
+              background 180ms var(--ease-default),
+              color 180ms var(--ease-default),
+              transform 180ms var(--ease-default);
+}
+
+.register-dashboard__model-chip:hover,
+.register-dashboard__model-chip--active {
+  transform: translateY(-1px);
+}
+
+.register-dashboard__model-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .register-dashboard__chat {
@@ -359,6 +477,66 @@ html.light .auth-layout__split-pane {
   border: var(--border-thin) solid var(--border-subtle);
   flex: 1;
   min-width: 0;
+  min-height: 60px;
+}
+
+/* Blinking caret at the end of the typewriter text — soft accent so it
+   reads as "currently being typed" without being loud. */
+.register-dashboard__caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--accent);
+  animation: register-dashboard-caret-blink 900ms steps(2, end) infinite;
+  border-radius: 1px;
+}
+
+@keyframes register-dashboard-caret-blink {
+  to { background: transparent; }
+}
+
+/* Pulsing dot next to the STREAMING label — subtle "this is alive" cue. */
+.register-dashboard__streaming-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 0 var(--accent);
+  animation: register-dashboard-pulse 1.6s ease-out infinite;
+}
+
+@keyframes register-dashboard-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(20, 184, 205, 0.55); }
+  70%  { box-shadow: 0 0 0 6px rgba(20, 184, 205, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(20, 184, 205, 0); }
+}
+
+/* "Routed to" line under the chat bubble — names the model that's
+   "responding" so the typewriter loop tells a routing story. */
+.register-dashboard__chat-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: var(--border-thin) dashed var(--border-subtle);
+  margin-top: 4px;
+}
+
+.register-dashboard__chat-meta-label {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+}
+
+.register-dashboard__chat-meta-value {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: -0.005em;
 }
 
 .register-dashboard__features {
@@ -375,6 +553,16 @@ html.light .auth-layout__split-pane {
   border-radius: var(--radius-md);
   border: var(--border-thin) solid var(--border-subtle);
   background: rgba(255, 255, 255, 0.015);
+  transition: border-color 180ms var(--ease-default),
+              transform 180ms var(--ease-default),
+              background 180ms var(--ease-default);
+  cursor: default;
+}
+
+.register-dashboard__feature:hover {
+  border-color: rgba(20, 184, 205, 0.35);
+  background: rgba(20, 184, 205, 0.04);
+  transform: translateY(-1px);
 }
 
 .register-dashboard__feature-value {
