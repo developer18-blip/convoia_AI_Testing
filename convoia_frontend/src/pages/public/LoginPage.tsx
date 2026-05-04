@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { GoogleLogin } from '@react-oauth/google'
 import { AuthLayout } from '../../components/auth/AuthLayout'
+import { LoginCarousel } from '../../components/auth/LoginCarousel'
 import { Input } from '../../components/primitives/Input'
 import { Button } from '../../components/primitives/Button'
 import { SignalLine } from '../../components/primitives/SignalLine'
@@ -11,6 +12,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
 import api from '../../lib/api'
 import '../../styles/login-page.css'
+import '../../styles/auth-split-layout.css'
 
 export function LoginPage() {
   const { login, googleLogin } = useAuth()
@@ -78,6 +80,7 @@ export function LoginPage() {
         className="login-page"
         title="Welcome back"
         subtitle="Sign in to continue to Convoia AI"
+        rightPane={<LoginCarousel />}
         footer={
           <span>
             Don't have an account?{' '}
