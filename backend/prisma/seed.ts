@@ -146,6 +146,12 @@ const aiModels = [
     contextWindow: 200000,
   },
   {
+    // Disabled 2026-05 — o3-mini's RLHF refuses to follow custom identity
+    // directives, leaking "I am ChatGPT by OpenAI" instead of the
+    // ConvoiaAI white-label. Other o-series (o3, o4-mini) honour the
+    // same system prompt correctly. Re-enable if/when OpenAI relaxes
+    // identity-disclosure alignment for o3-mini. Cheaper alternatives:
+    // gpt-4o-mini ($0.15/M input) or o4-mini for fast reasoning.
     name: 'o3 Mini',
     provider: 'openai',
     modelId: 'o3-mini',
@@ -154,6 +160,7 @@ const aiModels = [
     outputTokenPrice: 0.0000044,   // $4.40 / 1M output
     capabilities: ['chat', 'function_calling', 'reasoning'],
     contextWindow: 200000,
+    isActive: false,
   },
 
   // ─── OpenAI Image Generation ───
