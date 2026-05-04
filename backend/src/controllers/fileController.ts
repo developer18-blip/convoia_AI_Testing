@@ -195,11 +195,11 @@ async function ocrPdfWithVision(
       if (text.length > 20) {
         logger.info(`OCR: Gemini extracted ${text.length} chars from scanned PDF`)
 
-        // Bill actual provider tokens — Gemini 2.0 Flash
+        // Bill actual provider tokens — Gemini 2.5 Flash
         const gInTok = resp.data?.usageMetadata?.promptTokenCount || 0
         const gOutTok = resp.data?.usageMetadata?.candidatesTokenCount || 0
         const gemini = await prisma.aIModel.findUnique({
-          where: { modelId: 'gemini-2.0-flash' },
+          where: { modelId: 'gemini-2.5-flash' },
         })
         if (gemini && (gInTok + gOutTok) > 0) {
           const providerCost = gInTok * gemini.inputTokenPrice + gOutTok * gemini.outputTokenPrice
@@ -209,7 +209,7 @@ async function ocrPdfWithVision(
             userId,
             tokens: walletTokens,
             reference: `ocr-gemini-${Date.now()}`,
-            description: `[OCR] Scanned PDF via Gemini 2.0 Flash (${gInTok}/${gOutTok} tokens)`,
+            description: `[OCR] Scanned PDF via Gemini 2.5 Flash (${gInTok}/${gOutTok} tokens)`,
             organizationId,
           })
           try {
