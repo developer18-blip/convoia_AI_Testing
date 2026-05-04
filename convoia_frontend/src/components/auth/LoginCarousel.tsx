@@ -55,9 +55,21 @@ export function LoginCarousel() {
     else if (e.key === 'ArrowLeft') { e.preventDefault(); prev() }
   }
 
+  // Tint the carousel chrome to match the active slide's provider — eyebrow,
+  // active dot, slide border. Set as inline CSS custom properties so the CSS
+  // can reference them without React owning the styling. Falls back to the
+  // brand turquoise via var() defaults when no slide is active (initial paint).
+  const activeTheme = PROVIDER_THEMES[SLIDES[active].providerKey]
+  const tintStyle = {
+    '--slide-accent': activeTheme.primary,
+    '--slide-accent-soft': activeTheme.soft,
+    '--slide-accent-border': activeTheme.border,
+  } as React.CSSProperties
+
   return (
     <div
       className="login-carousel"
+      style={tintStyle}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
