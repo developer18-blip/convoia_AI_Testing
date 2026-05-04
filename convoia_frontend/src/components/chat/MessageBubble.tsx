@@ -9,6 +9,7 @@ import { InlineChart, extractCharts } from './InlineChart'
 import { DocumentDownloadBar } from './DocumentDownloadBar'
 import { FileDownloadCard } from './FileDownloadCard'
 import { copyText, stripHtmlAndEntities } from '../../lib/clipboard'
+import { elementToClipboardPayload, copyHtmlAndText } from '../../lib/contentExport'
 import { isDocumentWorthy } from '../../lib/documentDetector'
 import { formatCurrency, formatTokens } from '../../lib/utils'
 import type { Message } from '../../types'
@@ -289,15 +290,18 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
     e?.stopPropagation()
     e?.preventDefault()
 
-    // Prefer what the user actually sees: the rendered plain text from
-    // the DOM (strips **bold** asterisks, list bullets, etc. so pasting
-    // into an email / Slack doesn't show raw markdown syntax).
-    // Falls back to the raw message string if the ref isn't mounted yet
-    // (e.g. user-message bubble, which has no contentRef).
-    const rendered = contentRef.current?.innerText?.trim()
-    const textToCopy = rendered || stripHtmlAndEntities(message.content)
-
-    const ok = await copyText(textToCopy)
+    // Prefer the rendered DOM (so destinations like Notion/Word/Gmail
+    // get formatted HTML with portable hex colors via the export adapter,
+    // and plain-text fallback so Notepad still gets readable markdown).
+    // Falls back to plain-text-only stripping for user bubbles where
+    // contentRef isn't mounted.
+    let ok = false
+    if (contentRef.current) {
+      const { html, text } = elementToClipboardPayload(contentRef.current)
+      ok = await copyHtmlAndText(html, text)
+    } else {
+      ok = await copyText(stripHtmlAndEntities(message.content))
+    }
     if (ok) {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
