@@ -159,6 +159,12 @@ export interface Message {
   provider?: string
   timestamp: string
   isLoading?: boolean
+  // True from the moment the assistant message is appended to the list until
+  // the SSE stream finishes. Distinct from `isLoading`, which the renderer
+  // flips to `false` on the first chunk so the partial text can show through.
+  // Use this to gate post-completion UI (download bar, action chips, etc.)
+  // so they don't appear mid-stream and cause layout shifts.
+  isStreaming?: boolean
   error?: string
   agentRun?: AgentRun
   codeBlocks?: CodeExecution[]
