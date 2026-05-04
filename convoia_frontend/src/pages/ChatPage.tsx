@@ -65,14 +65,25 @@ export function ChatPage() {
     if (window.innerWidth < 768) setLeftOpen(false)
   }, [])
 
-  // Update model badge when a response finishes
+  // Update the model badge AND the global accent when a response finishes.
+  // The picker may show a different value than what actually responded —
+  // e.g. 'auto' resolves to a concrete model server-side, or the response
+  // model just differs from the user's last manual selection. Sync the
+  // accent to whatever actually generated the reply so the chat surface
+  // reflects the responding provider.
   useEffect(() => {
     if (prevStreaming.current && !isStreaming) {
       const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant')
-      if (lastAssistant?.model) setLastResponseModel(lastAssistant.model)
+      if (lastAssistant?.model) {
+        setLastResponseModel(lastAssistant.model)
+        setActiveModel(resolveModelSlug(lastAssistant.model))
+      }
     }
     prevStreaming.current = isStreaming
-  }, [isStreaming, messages])
+    // resolveModelSlug closes over `models`; safe to omit per the same
+    // rationale as the other effects in this file.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isStreaming, messages, setActiveModel])
 
 
 
@@ -122,18 +133,27 @@ export function ChatPage() {
     setCouncilModels(councilKey ? councilKey.split(',') : [])
   }, [councilKey, setCouncilModels])
 
-  // Router picked a model — flip the selector to the resolved modelId
+  // Router picked a model — flip the selector AND the accent to the resolved
+  // modelId. Without the setActiveModel call, the picker re-renders showing
+  // the new model but the chat surface stays the previous accent until the
+  // response completes (or stays stuck if the response also doesn't trigger
+  // the lastResponseModel effect). Setting it on the auto-pick event makes
+  // the accent flip the moment the router commits.
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as { modelId?: string } | undefined
       const resolved = detail?.modelId
       if (!resolved) return
       const match = models.find((m) => m.modelId === resolved || m.id === resolved)
-      if (match) setSelectedModelId(match.id)
+      if (match) {
+        setSelectedModelId(match.id)
+        setActiveModel(resolveModelSlug(match.id))
+      }
     }
     window.addEventListener('convoia:auto_model', handler)
     return () => window.removeEventListener('convoia:auto_model', handler)
-  }, [models])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [models, setActiveModel])
 
   useEffect(() => {
     if (activeConversation) {
