@@ -580,6 +580,7 @@ export function ChatPage() {
           <MessageArea
             messages={messages}
             isLoading={isStreaming}
+            conversationId={activeConversationId}
             onRetry={() => retryLastMessage(selectedModelId, industry || undefined, selectedAgent?.id)}
             onSuggestedPrompt={(prompt) => messageInputRef.current?.setInputText(prompt)}
             onEditMessage={handleEditMessage}

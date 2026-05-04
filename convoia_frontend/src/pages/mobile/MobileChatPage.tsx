@@ -412,6 +412,7 @@ export function MobileChatPage() {
           <MessageArea
             messages={messages}
             isLoading={isStreaming}
+            conversationId={activeConversationId}
             onRetry={() => retryLastMessage(selectedModelId, undefined, selectedAgent?.id)}
             onEditMessage={(id, content) => editAndResend(id, content, selectedModelId, undefined, selectedAgent?.id)}
             onDeleteMessage={deleteMessage}
