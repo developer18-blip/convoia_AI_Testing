@@ -296,7 +296,7 @@ export function RegisterPage() {
               </span>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <div className="auth-google" style={{ display: 'flex', justifyContent: 'center' }}>
               <GoogleLogin
                 onSuccess={async (credentialResponse) => {
                   if (!credentialResponse.credential) return
@@ -438,6 +438,10 @@ export function RegisterPage() {
             <Button type="submit" variant="primary" size="lg" loading={isLoading} disabled={isLoading}>
               {isLoading ? 'Creating account...' : 'Create account'}
             </Button>
+
+            <p className="mono-label" style={{ textAlign: 'center', margin: 0, fontSize: 10, color: 'var(--text-tertiary)' }}>
+              NO CREDIT CARD &middot; 10K FREE TOKENS TO START
+            </p>
 
             {isLoading && <ComputationLine label="PROVISIONING WORKSPACE" />}
           </form>
