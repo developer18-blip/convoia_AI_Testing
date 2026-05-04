@@ -309,13 +309,22 @@ async function validateModels() {
       groq: !!config.apiKeys.groq,
     };
 
-    // Deprecated model IDs that providers have shut down
+    // Deprecated / disabled model IDs — kept off regardless of API key presence.
+    // The "re-activate" step below would otherwise undo our deactivations on
+    // every PM2 restart, so any model we've intentionally turned off must be
+    // listed here.
     const DEPRECATED_MODELS = [
       'gemini-3-pro-preview',       // Deprecated by Google March 9, 2026
       'gemini-3-pro-image-preview', // Deprecated with Gemini 3 Pro
       'sonar-reasoning',            // Deprecated by Perplexity April 2026
       'grok-2-1212',                // Deprecated by xAI — replaced by Grok 4
       'grok-2-vision-1212',         // Deprecated by xAI — replaced by Grok 4
+      // Disabled 2026-05 — pre-launch model triage (POST-FIX-VERIFICATION-2026-05-04.md)
+      'gemini-2.0-flash',           // Deprecated upstream by Google — bare modelId returns 404
+      'o3-mini',                    // RLHF resists white-label identity directive ("I am ChatGPT...")
+      'gpt-4.1-nano',               // Same alignment-resistant identity leak as o3-mini
+      'sonar',                      // Leaks "I am Perplexity by PervoiaAI" (brand-name corruption)
+      'sonar-pro',                  // Same leak pattern as sonar
     ];
 
     // 1. Deactivate models without API keys
