@@ -107,8 +107,12 @@ html.light .auth-layout__split-pane {
 .login-carousel__eyebrow {
   font-size: 11px;
   letter-spacing: 0.12em;
-  color: var(--accent);
+  /* Tracks the active slide's provider via --slide-accent set inline by
+     LoginCarousel.tsx. Falls back to the brand accent on initial paint
+     before the first effect runs. */
+  color: var(--slide-accent, var(--accent));
   text-transform: uppercase;
+  transition: color 600ms var(--ease-default);
 }
 
 .login-carousel__title {
@@ -148,7 +152,8 @@ html.light .auth-layout__split-pane {
 
 .login-carousel__stage--interactive:hover .login-carousel__slide--active {
   transform: translateY(-2px);
-  border-color: rgba(20, 184, 205, 0.4);
+  /* Hover ring picks up the active provider's brand-tinted border. */
+  border-color: var(--slide-accent-border, rgba(20, 184, 205, 0.4));
 }
 
 .login-carousel__slide {
@@ -228,11 +233,13 @@ html.light .auth-layout__split-pane {
 }
 
 .login-carousel__dot--active {
-  background: var(--accent);
+  /* Tracks the active slide's provider color (set inline on root). */
+  background: var(--slide-accent, var(--accent));
+  transition: background 600ms var(--ease-default);
 }
 
 .login-carousel__dot--active:hover {
-  background: var(--accent);
+  background: var(--slide-accent, var(--accent));
 }
 
 .login-carousel__stats {
