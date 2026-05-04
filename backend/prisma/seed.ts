@@ -287,6 +287,10 @@ const aiModels = [
     contextWindow: 1048576,
   },
   {
+    // Deprecated upstream by Google (2026-05) — bare `gemini-2.0-flash`
+    // model ID returns 404 from generativelanguage.googleapis.com. Kept
+    // in seed for historical reference; isActive=false hides it from
+    // the picker. Use gemini-2.5-flash / gemini-2.5-flash-lite instead.
     name: 'Gemini 2.0 Flash',
     provider: 'google',
     modelId: 'gemini-2.0-flash',
@@ -295,6 +299,7 @@ const aiModels = [
     outputTokenPrice: 0.0000004,   // $0.40 / 1M output
     capabilities: ['chat', 'vision', 'function_calling', 'json_mode'],
     contextWindow: 1048576,
+    isActive: false,
   },
 
   // ─── Google Image Generation ───
