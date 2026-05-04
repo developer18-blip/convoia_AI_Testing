@@ -25,7 +25,7 @@
   inset: 0;
   background:
     radial-gradient(900px 600px at 15% 20%, rgba(20, 184, 205, 0.10), transparent 60%),
-    radial-gradient(800px 500px at 85% 70%, rgba(15, 23, 42, 0.32), transparent 60%),
+    radial-gradient(900px 600px at 85% 75%, rgba(20, 184, 205, 0.08), transparent 60%),
     radial-gradient(600px 500px at 70% 25%, rgba(30, 27, 75, 0.18), transparent 60%);
   z-index: 0;
   pointer-events: none;
@@ -38,14 +38,14 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  color: var(--text-tertiary);
+  color: var(--accent);
   text-decoration: none;
   transition: color var(--duration-fast) var(--ease-default);
   z-index: 2;
 }
 
 .auth-layout__back:hover {
-  color: var(--text-primary);
+  color: var(--accent-hover);
 }
 
 .auth-layout__card {
@@ -161,4 +161,20 @@
   --color-primary-hover: var(--accent-400);
   --color-primary-light: rgba(20, 184, 205, 0.10);
   --color-primary-glow:  rgba(20, 184, 205, 0.20);
+}
+
+/* Premium corner radius — scoped to the auth card. Bumps form inputs and
+   the primary CTA from 8px (--radius-md) to 12px (--radius-lg) for a
+   softer, friendlier feel. The Google button is rendered by a third-party
+   component, so we clip its outer wrapper to keep edges consistent. */
+.auth-layout__card .input-field__wrap,
+.auth-layout__card .btn,
+.auth-layout__card select {
+  border-radius: var(--radius-lg);
+}
+
+.auth-layout__card .login-page__google > div,
+.auth-layout__card .auth-google > div {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
 }
