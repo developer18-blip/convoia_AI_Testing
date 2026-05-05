@@ -1209,6 +1209,7 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
                     crossExamDurationMs: metadata.crossExamDurationMs,
                     verdictDurationMs: metadata.verdictDurationMs,
                     totalDurationMs: metadata.totalDurationMs,
+                    phase2Status: metadata.phase2Status,
                   },
                 })}\n\n`);
                 res.write('data: [DONE]\n\n');

@@ -518,6 +518,12 @@ export async function runCouncil(
   }
 
   const crossExamDuration = Date.now() - phase2Start;
+
+  // Single structured log line for production telemetry.
+  logger.info(`Council phase2Status=${phase2Status} crossExamDuration=${crossExamDuration}ms${
+    phase2Status === 'skipped' ? ` skipThreshold=${envConfig.apex.phase2SkipThreshold}` : ''
+  }`);
+
   callbacks.onCrossExamComplete(crossExamDuration);
 
   // ── Phase 3: verdict streamed to user ─────────────────────────────────
