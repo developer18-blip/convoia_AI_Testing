@@ -83,6 +83,12 @@ export const config = {
   // can stream for 2-4 minutes. 120s was cutting off legitimate completions.
   // Nginx /api/ai/query/stream is also at 600s so these match.
   aiRequestTimeout: parseInt(process.env.AI_REQUEST_TIMEOUT || '600000', 10),
+
+  // Apex / Council Mode — Day 2 feature flags
+  // Default OFF; flip via env to enable. See backend/.env.example.
+  apex: {
+    phase2FallbackHardened: process.env.APEX_PHASE2_FALLBACK_HARDENED === 'true',
+  },
 };
 
 export default config;
