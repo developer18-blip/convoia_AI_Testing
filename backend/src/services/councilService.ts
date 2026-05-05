@@ -4,7 +4,7 @@
  * Orchestrates the 3-phase pipeline:
  *   Phase 1: Parallel structured queries to N models (2-5)
  *   Phase 2: Cross-examination by the strongest model
- *   Phase 3: Verdict synthesis streamed to the user (Haiku moderator)
+ *   Phase 3: Verdict synthesis streamed to the user (Sonnet moderator)
  *
  * Billing: user pays for every API call — N + 2 UsageLog rows total.
  */
@@ -15,6 +15,14 @@ import { TokenWalletService } from './tokenWalletService.js';
 import { costAdjustedTokens } from '../config/tokenPackages.js';
 import prisma from '../config/db.js';
 import logger from '../config/logger.js';
+
+/**
+ * The moderator (Phase 3 verdict synthesizer) is configurable via this
+ * substring match. We previously used Haiku for cost; switched to Sonnet
+ * 4.6 on Day 1 of the synthesis-quality rebuild because Haiku is too weak
+ * to adjudicate substantive disagreement with conviction.
+ */
+const MODERATOR_MODEL_SUBSTRING = 'claude-sonnet-4-6';
 
 export interface CouncilConfig {
   userId: string;
@@ -99,7 +107,7 @@ export async function runCouncil(
   const strongestModel = [...models].sort((a, b) => b.outputTokenPrice - a.outputTokenPrice)[0];
 
   const moderatorModel = await prisma.aIModel.findFirst({
-    where: { modelId: { contains: 'claude-haiku' }, isActive: true },
+    where: { modelId: { contains: MODERATOR_MODEL_SUBSTRING }, isActive: true },
     select: {
       id: true, modelId: true, name: true, provider: true,
       inputTokenPrice: true, outputTokenPrice: true, markupPercentage: true,
@@ -107,7 +115,7 @@ export async function runCouncil(
   });
 
   if (!moderatorModel) {
-    callbacks.onError(new Error('Moderator model (Claude Haiku) not available'));
+    callbacks.onError(new Error(`Moderator model (${MODERATOR_MODEL_SUBSTRING}) not available`));
     return;
   }
 
