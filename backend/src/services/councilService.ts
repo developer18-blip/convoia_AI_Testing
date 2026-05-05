@@ -76,8 +76,8 @@ export async function runCouncil(
   const startTime = Date.now();
   const statusMessages = getModelStatusMessages(config.intent);
 
-  if (config.modelIds.length < 2 || config.modelIds.length > 5) {
-    callbacks.onError(new Error(`Council requires 2-5 models, got ${config.modelIds.length}`));
+  if (config.modelIds.length < 2 || config.modelIds.length > 3) {
+    callbacks.onError(new Error(`Council requires 2-3 models, got ${config.modelIds.length}`));
     return;
   }
 
