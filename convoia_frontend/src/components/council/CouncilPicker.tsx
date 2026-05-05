@@ -16,13 +16,13 @@ export function CouncilPicker({ activeModels, initialSelectedIds = [], variant =
 
   const sections = useMemo(() => groupModelsByCategory(activeModels), [activeModels])
 
-  const canConfirm = selected.length >= 2 && selected.length <= 5
-  const maxReached = selected.length >= 5
+  const canConfirm = selected.length >= 2 && selected.length <= 3
+  const maxReached = selected.length >= 3
 
   const toggle = (id: string) => {
     setSelected((prev) => {
       if (prev.includes(id)) return prev.filter((x) => x !== id)
-      if (prev.length >= 5) return prev
+      if (prev.length >= 3) return prev
       return [...prev, id]
     })
   }
@@ -45,7 +45,7 @@ export function CouncilPicker({ activeModels, initialSelectedIds = [], variant =
             <Zap size={16} fill="white" />
           </div>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div className="council-picker-title">Select 2–5 models</div>
+            <div className="council-picker-title">Select 2–3 models</div>
             <div className="council-picker-subtitle">
               {selected.length} selected{maxReached ? ' · max reached' : ''}
             </div>
