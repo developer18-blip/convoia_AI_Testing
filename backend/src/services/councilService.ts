@@ -15,6 +15,7 @@ import { TokenWalletService } from './tokenWalletService.js';
 import { costAdjustedTokens } from '../config/tokenPackages.js';
 import prisma from '../config/db.js';
 import logger from '../config/logger.js';
+import { config as envConfig } from '../config/env.js';
 
 /**
  * The moderator (Phase 3 verdict synthesizer) is configurable via this
@@ -23,6 +24,18 @@ import logger from '../config/logger.js';
  * to adjudicate substantive disagreement with conviction.
  */
 const MODERATOR_MODEL_SUBSTRING = 'claude-sonnet-4-6';
+
+/**
+ * Phase 2 outcome status — passed to Phase 3 as a preamble in the
+ * crossExamination input string, and included in CouncilMetadata for
+ * production telemetry.
+ *
+ *   ok               → cross-exam ran cleanly, Phase 3 input unchanged from Day 1
+ *   skipped          → conditional skip fired (responses agreed); raw responses passed
+ *   degraded         → cross-exam threw; structured fallback (preamble + raw responses)
+ *   degraded_legacy  → flag-off path or hardened-fallback construction itself failed
+ */
+export type Phase2Status = 'ok' | 'degraded' | 'skipped' | 'degraded_legacy';
 
 export interface CouncilConfig {
   userId: string;
@@ -64,6 +77,7 @@ export interface CouncilMetadata {
   crossExamDurationMs: number;
   verdictDurationMs: number;
   totalDurationMs: number;
+  phase2Status: Phase2Status;
 }
 
 type CouncilModel = {
@@ -76,6 +90,47 @@ type CouncilModel = {
   markupPercentage: number;
   contextWindow: number;
 };
+
+// ── Day 2 helpers ─────────────────────────────────────────────────────
+
+/**
+ * Concat raw Phase 1 responses for use as Phase 3 input when no structured
+ * cross-exam output is available (skipped or degraded paths).
+ *
+ * truncate=1000 reproduces the exact Day 1 legacy fallback formatting,
+ * for the degraded_legacy path. Untruncated form is used by the
+ * skipped/degraded paths so Phase 3 has full context.
+ */
+function buildRawResponseConcat(
+  results: Array<{ model: { name: string }; response: string }>,
+  truncate?: number,
+): string {
+  return results
+    .map(r => truncate
+      ? `${r.model.name}: ${r.response.substring(0, truncate)}`
+      : `${r.model.name}:\n${r.response}`)
+    .join('\n\n---\n\n');
+}
+
+/**
+ * Preamble prepended to the crossExamination string before the locked
+ * Day 1 Phase 3 prompt is built. The Day 1 system prompt and the body
+ * of getPhase3Prompt() stay bit-identical — situational awareness is
+ * delivered in the user-message data layer only.
+ */
+function buildPhase3Preamble(status: Phase2Status): string {
+  switch (status) {
+    case 'ok':
+      return '';
+    case 'degraded':
+      return 'NOTE: cross-examination step failed. Below are the raw model responses without structured analysis. Synthesize cautiously — there may be unresolved disagreements not visible in the input.\n\n';
+    case 'skipped':
+      return 'NOTE: cross-examination was skipped because all models reached substantively similar conclusions. Below are the model responses directly. Synthesize the consensus answer.\n\n';
+    case 'degraded_legacy':
+      // Bit-identical Day 1 behavior: no preamble.
+      return '';
+  }
+}
 
 export async function runCouncil(
   config: CouncilConfig,
@@ -268,68 +323,86 @@ export async function runCouncil(
   let crossExamination = '';
   let phase2InputTokens = 0;
   let phase2OutputTokens = 0;
+  let phase2Status: Phase2Status = 'ok';
 
-  try {
-    const crossExamPrompt = getPhase2Prompt(
-      config.query,
-      successfulResults.map(r => ({ modelName: r.model.name, response: r.response })),
-      strongestModel.name,
-    );
+  // Cross-exam runs only if not skipped above.
+  if (phase2Status === 'ok') {
+    try {
+      const crossExamPrompt = getPhase2Prompt(
+        config.query,
+        successfulResults.map(r => ({ modelName: r.model.name, response: r.response })),
+        strongestModel.name,
+      );
 
-    const phase2Result = await AIGatewayService.sendMessage({
-      userId: config.userId,
-      organizationId: config.organizationId,
-      modelId: strongestModel.id,
-      messages: [{ role: 'user', content: crossExamPrompt }],
-      agentConfig: {
-        systemPrompt: 'You are a rigorous intellectual cross-examiner. Analyze with precision. No filler.',
-        temperature: 0.3,
-        maxTokens: 4096,
-        topP: 0.9,
-        name: 'Cross-Examiner',
-      },
-      maxOutputTokens: 4096,
-      thinkingEnabled: config.thinkingEnabled,
-    });
-
-    crossExamination = phase2Result.response;
-    phase2InputTokens = phase2Result.inputTokens;
-    phase2OutputTokens = phase2Result.outputTokens;
-
-    const p2ProviderCost = phase2InputTokens * strongestModel.inputTokenPrice + phase2OutputTokens * strongestModel.outputTokenPrice;
-    const p2CustomerPrice = p2ProviderCost * (1 + strongestModel.markupPercentage / 100);
-    const p2WalletTokens = costAdjustedTokens(p2CustomerPrice, phase2InputTokens + phase2OutputTokens);
-
-    await TokenWalletService.deductTokens({
-      userId: config.userId,
-      tokens: p2WalletTokens,
-      reference: strongestModel.id,
-      description: `Council cross-exam: ${strongestModel.name}`,
-      organizationId: config.organizationId,
-    });
-
-    await prisma.usageLog.create({
-      data: {
+      const phase2Result = await AIGatewayService.sendMessage({
         userId: config.userId,
         organizationId: config.organizationId,
         modelId: strongestModel.id,
-        prompt: '[Council cross-examination]',
-        response: crossExamination.substring(0, 500),
-        tokensInput: phase2InputTokens,
-        tokensOutput: phase2OutputTokens,
-        totalTokens: phase2InputTokens + phase2OutputTokens,
-        providerCost: p2ProviderCost,
-        markupPercentage: strongestModel.markupPercentage,
-        customerPrice: p2CustomerPrice,
-        status: 'completed',
-      },
-    });
-  } catch (err: any) {
-    logger.error(`Council Phase 2 failed: ${err.message}`);
-    // Fallback: concat raw responses so Phase 3 still produces something
-    crossExamination = successfulResults
-      .map(r => `${r.model.name}: ${r.response.substring(0, 1000)}`)
-      .join('\n\n---\n\n');
+        messages: [{ role: 'user', content: crossExamPrompt }],
+        agentConfig: {
+          systemPrompt: 'You are a rigorous intellectual cross-examiner. Analyze with precision. No filler.',
+          temperature: 0.3,
+          maxTokens: 4096,
+          topP: 0.9,
+          name: 'Cross-Examiner',
+        },
+        maxOutputTokens: 4096,
+        thinkingEnabled: config.thinkingEnabled,
+      });
+
+      crossExamination = phase2Result.response;
+      phase2InputTokens = phase2Result.inputTokens;
+      phase2OutputTokens = phase2Result.outputTokens;
+
+      const p2ProviderCost = phase2InputTokens * strongestModel.inputTokenPrice + phase2OutputTokens * strongestModel.outputTokenPrice;
+      const p2CustomerPrice = p2ProviderCost * (1 + strongestModel.markupPercentage / 100);
+      const p2WalletTokens = costAdjustedTokens(p2CustomerPrice, phase2InputTokens + phase2OutputTokens);
+
+      await TokenWalletService.deductTokens({
+        userId: config.userId,
+        tokens: p2WalletTokens,
+        reference: strongestModel.id,
+        description: `Council cross-exam: ${strongestModel.name}`,
+        organizationId: config.organizationId,
+      });
+
+      await prisma.usageLog.create({
+        data: {
+          userId: config.userId,
+          organizationId: config.organizationId,
+          modelId: strongestModel.id,
+          prompt: '[Council cross-examination]',
+          response: crossExamination.substring(0, 500),
+          tokensInput: phase2InputTokens,
+          tokensOutput: phase2OutputTokens,
+          totalTokens: phase2InputTokens + phase2OutputTokens,
+          providerCost: p2ProviderCost,
+          markupPercentage: strongestModel.markupPercentage,
+          customerPrice: p2CustomerPrice,
+          status: 'completed',
+        },
+      });
+    } catch (err: any) {
+      logger.error(`Council Phase 2 failed: ${err.message}`);
+
+      if (envConfig.apex.phase2FallbackHardened) {
+        try {
+          // Hardened path: full responses, structured signal to Phase 3.
+          phase2Status = 'degraded';
+          crossExamination = buildRawResponseConcat(successfulResults);
+        } catch (innerErr: any) {
+          // Defensive — string concat shouldn't fail, but if it does,
+          // fall through to legacy and tag for telemetry.
+          logger.error(`Hardened fallback construction failed: ${innerErr.message}`);
+          phase2Status = 'degraded_legacy';
+          crossExamination = buildRawResponseConcat(successfulResults, 1000);
+        }
+      } else {
+        // Flag off → bit-identical Day 1 behavior (raw concat truncated to 1K)
+        phase2Status = 'degraded_legacy';
+        crossExamination = buildRawResponseConcat(successfulResults, 1000);
+      }
+    }
   }
 
   const crossExamDuration = Date.now() - phase2Start;
@@ -343,7 +416,7 @@ export async function runCouncil(
 
   const verdictPrompt = getPhase3Prompt(
     config.query,
-    crossExamination,
+    buildPhase3Preamble(phase2Status) + crossExamination,
     successfulResults.map(r => r.model.name),
     successfulResults.length,
   );
@@ -445,6 +518,7 @@ export async function runCouncil(
             crossExamDurationMs: crossExamDuration,
             verdictDurationMs: verdictDuration,
             totalDurationMs: totalDuration,
+            phase2Status,
           });
 
           logger.info(`Council complete: ${models.length} models, ${totalTokens} tokens, $${totalCost.toFixed(4)}, ${totalDuration}ms`);
