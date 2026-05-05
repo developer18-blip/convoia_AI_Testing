@@ -936,8 +936,8 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
     const isCouncilMode = req.body.councilMode === true && Array.isArray(req.body.councilModelIds);
     if (isCouncilMode) {
       const councilModelIds: string[] = req.body.councilModelIds;
-      if (councilModelIds.length < 2 || councilModelIds.length > 5) {
-        res.write(`data: ${JSON.stringify({ type: 'error', content: 'Council requires 2-5 models.' })}\n\n`);
+      if (councilModelIds.length < 2 || councilModelIds.length > 3) {
+        res.write(`data: ${JSON.stringify({ type: 'error', content: 'Council requires 2-3 models.' })}\n\n`);
         res.write('data: [DONE]\n\n');
         res.end();
         return;
