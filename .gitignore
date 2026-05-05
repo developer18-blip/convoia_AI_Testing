@@ -27,3 +27,10 @@ Thumbs.db
 # Coverage
 coverage/
 .claude/
+
+# Apex test-suite artifacts (captures, internal helpers, transient files)
+scripts/apex-test-suite/baseline-*/
+scripts/apex-test-suite/day1-*/
+scripts/apex-test-suite/_seed-*.mjs
+scripts/apex-test-suite/_gate1-*.md
+scripts/apex-test-suite/_backend-local.pid
