@@ -11,55 +11,11 @@
  * Computes cosine similarity in JS for retrieval
  */
 
-import OpenAI from 'openai';
 import prismaClient from '../config/db.js';
-import { config } from '../config/env.js';
 import logger from '../config/logger.js';
+import { getEmbedding, cosineSimilarity } from './embeddingService.js';
 
 const prisma = prismaClient as any;
-
-// ── Embedding Service ────────────────────────────────────────────────
-
-let openai: OpenAI | null = null;
-function getOpenAI(): OpenAI {
-  if (!openai) openai = new OpenAI({ apiKey: config.apiKeys.openai });
-  return openai;
-}
-
-const EMBEDDING_MODEL = 'text-embedding-3-small';
-const EMBEDDING_DIMENSIONS = 256; // Reduced dimensions for efficiency
-
-/**
- * Generate embedding for a text. Cost: ~$0.00001 per call
- */
-async function getEmbedding(text: string): Promise<number[]> {
-  try {
-    const response = await getOpenAI().embeddings.create({
-      model: EMBEDDING_MODEL,
-      input: text.substring(0, 2000), // cap input
-      dimensions: EMBEDDING_DIMENSIONS,
-    });
-    return response.data[0].embedding;
-  } catch (err: any) {
-    logger.error(`Embedding failed: ${err.message}`);
-    return [];
-  }
-}
-
-/**
- * Cosine similarity between two vectors
- */
-function cosineSimilarity(a: number[], b: number[]): number {
-  if (a.length !== b.length || a.length === 0) return 0;
-  let dotProduct = 0, normA = 0, normB = 0;
-  for (let i = 0; i < a.length; i++) {
-    dotProduct += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
-  }
-  const denom = Math.sqrt(normA) * Math.sqrt(normB);
-  return denom === 0 ? 0 : dotProduct / denom;
-}
 
 // ── Memory Types ─────────────────────────────────────────────────────
 

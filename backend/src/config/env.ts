@@ -85,9 +85,19 @@ export const config = {
   aiRequestTimeout: parseInt(process.env.AI_REQUEST_TIMEOUT || '600000', 10),
 
   // Apex / Council Mode — Day 2 feature flags
-  // Default OFF; flip via env to enable. See backend/.env.example.
+  // Both default OFF; flip via env to enable. See backend/.env.example.
   apex: {
     phase2FallbackHardened: process.env.APEX_PHASE2_FALLBACK_HARDENED === 'true',
+    phase2ConditionalSkip: process.env.APEX_PHASE2_CONDITIONAL_SKIP === 'true',
+    // Empirical 0.80 threshold from baseline similarity scan (60% skip rate
+    // at min-pairwise across the 15-query test suite). Tunable via env so
+    // Day 3 can lower to 0.75 without redeploy if quality holds.
+    phase2SkipThreshold: (() => {
+      const raw = process.env.APEX_PHASE2_SKIP_THRESHOLD;
+      if (!raw) return 0.80;
+      const parsed = parseFloat(raw);
+      return (Number.isFinite(parsed) && parsed >= 0 && parsed <= 1) ? parsed : 0.80;
+    })(),
   },
 };
 

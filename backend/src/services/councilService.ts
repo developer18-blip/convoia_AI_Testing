@@ -16,6 +16,7 @@ import { costAdjustedTokens } from '../config/tokenPackages.js';
 import prisma from '../config/db.js';
 import logger from '../config/logger.js';
 import { config as envConfig } from '../config/env.js';
+import { getEmbedding, cosineSimilarity } from './embeddingService.js';
 
 /**
  * The moderator (Phase 3 verdict synthesizer) is configurable via this
@@ -129,6 +130,50 @@ function buildPhase3Preamble(status: Phase2Status): string {
     case 'degraded_legacy':
       // Bit-identical Day 1 behavior: no preamble.
       return '';
+  }
+}
+
+type SkipDecision =
+  | { skip: true; minPairwiseSim: number; pairwiseSims: number[] }
+  | { skip: false; minPairwiseSim: number; pairwiseSims: number[]; reason: string };
+
+/**
+ * Decide whether to skip Phase 2 based on Phase 1 response similarity.
+ * Skip iff ALL pairwise cosine similarities meet or exceed the threshold —
+ * the minimum pairwise score is the binding constraint. Fail-safe: any
+ * error or timeout returns { skip: false } so the caller proceeds with
+ * Phase 2 normally (Day 1 behavior).
+ */
+async function decidePhase2Skip(
+  responses: Array<{ modelName: string; response: string }>,
+  threshold: number,
+  timeoutMs = 5000,
+): Promise<SkipDecision> {
+  if (responses.length < 2) {
+    return { skip: false, minPairwiseSim: 0, pairwiseSims: [], reason: 'fewer_than_2_responses' };
+  }
+  try {
+    const embedAll = Promise.all(responses.map(r => getEmbedding(r.response)));
+    const timeout = new Promise<never>((_, rej) =>
+      setTimeout(() => rej(new Error('embedding_timeout')), timeoutMs),
+    );
+    const embeddings = await Promise.race([embedAll, timeout]);
+    if (embeddings.some(e => e.length === 0)) {
+      return { skip: false, minPairwiseSim: 0, pairwiseSims: [], reason: 'empty_embedding' };
+    }
+    const sims: number[] = [];
+    for (let i = 0; i < embeddings.length; i++) {
+      for (let j = i + 1; j < embeddings.length; j++) {
+        sims.push(cosineSimilarity(embeddings[i], embeddings[j]));
+      }
+    }
+    const minSim = Math.min(...sims);
+    return minSim >= threshold
+      ? { skip: true, minPairwiseSim: minSim, pairwiseSims: sims }
+      : { skip: false, minPairwiseSim: minSim, pairwiseSims: sims, reason: 'below_threshold' };
+  } catch (err: any) {
+    logger.warn(`Phase 2 skip decision failed: ${err.message} — falling through to Phase 2`);
+    return { skip: false, minPairwiseSim: 0, pairwiseSims: [], reason: err.message };
   }
 }
 
@@ -324,6 +369,24 @@ export async function runCouncil(
   let phase2InputTokens = 0;
   let phase2OutputTokens = 0;
   let phase2Status: Phase2Status = 'ok';
+
+  // ── Day 2: conditional skip ────────────────────────────────────────
+  // Default-off via APEX_PHASE2_CONDITIONAL_SKIP. When enabled, embed
+  // the Phase 1 responses, compute pairwise cosine similarity, and skip
+  // cross-exam entirely when all pairs clear the threshold.
+  if (envConfig.apex.phase2ConditionalSkip) {
+    const decision = await decidePhase2Skip(
+      successfulResults.map(r => ({ modelName: r.model.name, response: r.response })),
+      envConfig.apex.phase2SkipThreshold,
+    );
+    if (decision.skip) {
+      phase2Status = 'skipped';
+      crossExamination = buildRawResponseConcat(successfulResults);
+      logger.info(`Council Phase 2: SKIPPED — minPairwiseSim=${decision.minPairwiseSim.toFixed(3)} threshold=${envConfig.apex.phase2SkipThreshold}`);
+    } else {
+      logger.info(`Council Phase 2: not skipping — minPairwiseSim=${decision.minPairwiseSim.toFixed(3)} reason=${decision.reason}`);
+    }
+  }
 
   // Cross-exam runs only if not skipped above.
   if (phase2Status === 'ok') {
