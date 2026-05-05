@@ -1,0 +1,134 @@
+{
+  "$schema": "./queries.schema.json",
+  "version": 1,
+  "createdAt": "2026-05-05",
+  "purpose": "15-query contract for measuring Apex (Council Mode) synthesis quality. Each query is run against current and rebuilt Apex; outputs are scored on voice unity, conviction, conciseness, resolution, and readability.",
+  "scoring": {
+    "dimensions": [
+      { "key": "voiceUnity", "label": "Voice unity", "scale": "1=pure committee voice, 5=pure single-author voice" },
+      { "key": "conviction", "label": "Conviction", "scale": "1=heavily hedged, 5=confident and definitive" },
+      { "key": "conciseness", "label": "Conciseness", "scale": "1=bloated/repetitive, 5=tight" },
+      { "key": "resolution", "label": "Resolution", "scale": "1=lists disagreements without resolving, 5=adjudicates with reasoning" },
+      { "key": "readability", "label": "Readability", "scale": "1=jarring/machine-assembled, 5=soothing/expert-written" }
+    ]
+  },
+  "categories": [
+    {
+      "id": "A",
+      "label": "Factual with consensus expected",
+      "rubricFocus": "Synthesis efficiency — do not bloat agreed answers. The verdict should be tight and authoritative, not a recap of three models converging."
+    },
+    {
+      "id": "B",
+      "label": "Opinion with substantive disagreement expected",
+      "rubricFocus": "Adjudication quality — must commit to a recommendation when models disagree, not list both sides equally. Hedge only when genuinely warranted."
+    },
+    {
+      "id": "C",
+      "label": "Nuanced with conditional answers",
+      "rubricFocus": "Conditional framing — \"for case X do A; for case Y do B\" with definitive commitment within each case. No mush."
+    },
+    {
+      "id": "D",
+      "label": "Coding tasks",
+      "rubricFocus": "Technical synthesis — produce one clean implementation, not a comparison table of three. Resolve subtle differences (typing, edge cases, idioms) silently into the chosen implementation."
+    },
+    {
+      "id": "E",
+      "label": "Open-ended / strategic",
+      "rubricFocus": "Unified-voice synthesis — read like a thoughtful expert wrote it. No \"the council suggests\" or \"models recommend\". One coherent argument."
+    }
+  ],
+  "queries": [
+    {
+      "id": "A1",
+      "category": "A",
+      "prompt": "What's the difference between TCP and UDP?",
+      "successCriteria": "Tight, authoritative explanation of the practical differences (reliability, ordering, header overhead, use cases). No restatement of agreement between models."
+    },
+    {
+      "id": "A2",
+      "category": "A",
+      "prompt": "Explain how database indexes work.",
+      "successCriteria": "Clear explanation of B-tree indexing, lookup vs scan, write tradeoff, and when you'd add or skip an index. Not a glossary."
+    },
+    {
+      "id": "A3",
+      "category": "A",
+      "prompt": "What does the Big O notation O(n log n) mean?",
+      "successCriteria": "Plain-language explanation grounded in a concrete example (e.g. merge sort). Definitive, not three model summaries stitched together."
+    },
+    {
+      "id": "B1",
+      "category": "B",
+      "prompt": "For a new B2B SaaS startup with 2 engineers, should they use Postgres or MongoDB?",
+      "successCriteria": "Commit to one answer (expected: Postgres) with the strongest reasoning. Acknowledge when MongoDB might be the right call — briefly. No \"it depends\" cop-out as the headline."
+    },
+    {
+      "id": "B2",
+      "category": "B",
+      "prompt": "Is microservices architecture worth the complexity for a 10-person engineering team?",
+      "successCriteria": "Commit to a position (expected: no, monolith first) with operational reasoning (deployment, observability, team coupling). Acknowledge edge cases briefly."
+    },
+    {
+      "id": "B3",
+      "category": "B",
+      "prompt": "Should a JavaScript dev in 2026 learn TypeScript before Vue 3?",
+      "successCriteria": "Commit to ordering (expected: TypeScript first) with reasoning about transferability and the typing payoff. No symmetric \"depends on goals\" framing."
+    },
+    {
+      "id": "C1",
+      "category": "C",
+      "prompt": "Should I use server components or client components in Next.js?",
+      "successCriteria": "Conditional framing: server by default, client when you need interactivity / browser APIs / state. Each case treated definitively, not as a hedge."
+    },
+    {
+      "id": "C2",
+      "category": "C",
+      "prompt": "Should our team write integration tests or unit tests?",
+      "successCriteria": "Definitive: do both, with a clear ratio guidance and which to lead with depending on team size and surface area. No empty \"a balance is best\"."
+    },
+    {
+      "id": "C3",
+      "category": "C",
+      "prompt": "Is it better to fix code style issues with linters or in code review?",
+      "successCriteria": "Linters for mechanical style; code review for substance. Definitive within each case, no list-of-tradeoffs muddle."
+    },
+    {
+      "id": "D1",
+      "category": "D",
+      "prompt": "Write a debounce function in TypeScript with proper types.",
+      "successCriteria": "One clean, correctly typed implementation. Generic over the wrapped function's args/return. Brief explanatory prose around it. Not three competing implementations."
+    },
+    {
+      "id": "D2",
+      "category": "D",
+      "prompt": "Show me an idempotent retry function for HTTP requests.",
+      "successCriteria": "One implementation with exponential backoff + jitter, idempotency key handling, and clear retry conditions (5xx, network, not 4xx). Not a survey."
+    },
+    {
+      "id": "D3",
+      "category": "D",
+      "prompt": "Implement a simple LRU cache in Python with O(1) get and set.",
+      "successCriteria": "One implementation using OrderedDict (or dict + doubly linked list). Clean, complete, with brief explanation of why it's O(1). Not multiple variants."
+    },
+    {
+      "id": "E1",
+      "category": "E",
+      "prompt": "How should I think about technical debt vs feature velocity?",
+      "successCriteria": "Coherent argument from one voice. Concrete framing (e.g. interest payments, debt categories, when to pay down). No bullet-list of perspectives."
+    },
+    {
+      "id": "E2",
+      "category": "E",
+      "prompt": "What's the right way to onboard a new senior engineer?",
+      "successCriteria": "Confident playbook from one voice. Specific milestones (week 1, month 1, quarter 1) and the failure modes to avoid. Not a checklist of best practices."
+    },
+    {
+      "id": "E3",
+      "category": "E",
+      "prompt": "How do I evaluate if I'm in a good engineering culture?",
+      "successCriteria": "Sharp, opinionated diagnostic from one voice. Specific signals (positive and negative) the reader can check this week. Not a wishlist of generic culture traits."
+    }
+  ]
+}
