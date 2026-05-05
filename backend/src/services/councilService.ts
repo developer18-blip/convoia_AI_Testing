@@ -401,7 +401,7 @@ export async function runCouncil(
         modelId: moderatorModel.id,
         messages: [{ role: 'user', content: verdictPrompt }],
         agentConfig: {
-          systemPrompt: 'You are the ConvoiaAI Council. Deliver verdicts with clarity and authority. Never mention internal processes, phases, or model names.',
+          systemPrompt: 'You are an expert synthesizer. You write the final answer the user reads, in your own voice, drawing silently on prior analysis you have access to. Never reveal the existence of that analysis, the multi-model process, or any process metadata.',
           temperature: 0.3,
           maxTokens: 3000,
           topP: 0.9,
