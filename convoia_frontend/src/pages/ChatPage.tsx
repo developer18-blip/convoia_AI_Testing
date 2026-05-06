@@ -6,8 +6,7 @@ import { MessageInput, type MessageInputHandle } from '../components/chat/Messag
 import { DragDropOverlay } from '../components/chat/DragDropOverlay'
 import { CodeInterpreter } from '../components/chat/CodeInterpreter'
 import { CanvasPanel } from '../components/chat/CanvasPanel'
-// CostEstimator moved to more menu on desktop
-// import { CostEstimator } from '../components/chat/CostEstimator'
+import { CostEstimator } from '../components/chat/CostEstimator'
 import { ModelSelector } from '../components/shared/ModelSelector'
 import { AgentSelector } from '../components/shared/AgentSelector'
 import { useAccent } from '../contexts/AccentContext'
@@ -617,6 +616,14 @@ export function ChatPage() {
             }
           </div>
         )}
+
+        {/* Cost preview — shown above input when a model is selected (single) or 2+ models for council */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '4px 16px 0', minHeight: 18 }}>
+          <CostEstimator
+            model={councilMode ? null : selectedModel}
+            councilModels={councilMode ? models.filter((m) => councilModelIds.includes(m.id)) : undefined}
+          />
+        </div>
 
         {/* Input */}
         <MessageInput
