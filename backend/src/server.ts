@@ -37,6 +37,7 @@ import memoryRoutes from './routes/memoryRoutes.js';
 import audioRoutes from './routes/audioRoutes.js';
 import walletRoutes from './routes/walletRoutes.js';
 import agentToolRoutes from './routes/agentToolRoutes.js';
+import userRoutes from './routes/userRoutes.js';
 import { startLocalCleanup as startFileGenCleanup } from './services/fileGenerationService.js';
 
 const app: Express = express();
@@ -267,6 +268,7 @@ app.use('/api/memory', memoryRoutes);
 app.use('/api/audio', audioRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/agent-tools', agentToolRoutes);
+app.use('/api/users', userRoutes);
 
 // ============== 404 HANDLER ==============
 app.use('*', (req: Request, res: Response) => {

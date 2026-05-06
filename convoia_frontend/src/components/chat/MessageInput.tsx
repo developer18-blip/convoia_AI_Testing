@@ -1,6 +1,7 @@
 import { forwardRef, useImperativeHandle, useState, useRef, useEffect, useMemo, type KeyboardEvent } from 'react'
 import { ArrowUp, Plus, Square, X, Link2 } from 'lucide-react'
 import { VoiceInputButton } from './VoiceInputButton'
+import { RecentQueriesButton } from './RecentQueriesButton'
 import { ImageGenerationModal } from './ImageGenerationModal'
 import { AttachmentChip } from './AttachmentChip'
 
@@ -526,6 +527,18 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
                 onAutoSend={(text) => { onSend(text) }}
                 disabled={isLoading || fileLoading}
                 onSpeakResponse={latestAIResponse}
+              />
+              <RecentQueriesButton
+                onSelect={(text) => {
+                  setValue(text)
+                  requestAnimationFrame(() => {
+                    const el = textareaRef.current
+                    if (!el) return
+                    el.focus()
+                    const len = text.length
+                    el.setSelectionRange(len, len)
+                  })
+                }}
               />
             </div>
 
