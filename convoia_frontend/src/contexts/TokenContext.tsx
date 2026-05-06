@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState, useCallback, type ReactNode } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import api from '../lib/api'
+import { computeTokenThresholds, tokenLevelForBalance, type TokenLevel, type TokenThresholds } from '../lib/tokenThresholds'
 
 interface TokenContextType {
   tokenBalance: number
@@ -8,6 +9,9 @@ interface TokenContextType {
   totalPurchased: number
   totalUsed: number
   allocatedTokens: number
+  largestPurchaseLast90Days: number | null
+  thresholds: TokenThresholds
+  tokenLevel: TokenLevel
   isLoading: boolean
   hasTokens: boolean           // true if tokenBalance > 0
   refresh: () => Promise<void>
@@ -29,6 +33,7 @@ export function TokenProvider({ children }: { children: ReactNode }) {
   const [totalPurchased, setTotalPurchased] = useState(0)
   const [totalUsed, setTotalUsed] = useState(0)
   const [allocatedTokens, setAllocatedTokens] = useState(0)
+  const [largestPurchaseLast90Days, setLargestPurchaseLast90Days] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   const refresh = useCallback(async () => {
@@ -40,6 +45,9 @@ export function TokenProvider({ children }: { children: ReactNode }) {
       setTotalPurchased(data.totalPurchased || 0)
       setTotalUsed(data.totalUsed || 0)
       setAllocatedTokens(data.allocatedTokens || 0)
+      setLargestPurchaseLast90Days(
+        typeof data.largestPurchaseLast90Days === 'number' ? data.largestPurchaseLast90Days : null,
+      )
     } catch {
       // silent
     } finally {
@@ -54,6 +62,7 @@ export function TokenProvider({ children }: { children: ReactNode }) {
       setTotalPurchased(0)
       setTotalUsed(0)
       setAllocatedTokens(0)
+      setLargestPurchaseLast90Days(null)
       setIsLoading(false)
     }
   }, [isAuthenticated, refresh])
@@ -74,6 +83,15 @@ export function TokenProvider({ children }: { children: ReactNode }) {
 
   const hasEnoughTokens = useCallback((needed: number) => tokenBalance >= needed, [tokenBalance])
 
+  const thresholds = useMemo(
+    () => computeTokenThresholds(largestPurchaseLast90Days),
+    [largestPurchaseLast90Days],
+  )
+  const tokenLevel = useMemo(
+    () => tokenLevelForBalance(tokenBalance, thresholds),
+    [tokenBalance, thresholds],
+  )
+
   return (
     <TokenContext.Provider value={{
       tokenBalance,
@@ -81,6 +99,9 @@ export function TokenProvider({ children }: { children: ReactNode }) {
       totalPurchased,
       totalUsed,
       allocatedTokens,
+      largestPurchaseLast90Days,
+      thresholds,
+      tokenLevel,
       isLoading,
       hasTokens: tokenBalance > 0,
       refresh,

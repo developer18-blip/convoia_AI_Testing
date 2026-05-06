@@ -12,6 +12,21 @@ export const getTokenBalance = asyncHandler(
     const wallet = await TokenWalletService.getOrCreateWallet(req.user.userId);
     const history = await TokenWalletService.getTransactionHistory(req.user.userId, 5);
 
+    // Largest token purchase in the last 90 days. Used by frontend to size
+    // the low-balance warning thresholds (10% / 2% of largest purchase, with
+    // floor + ceiling). Indexed query on (userId) with createdAt range —
+    // cheap enough that no additional cache is needed alongside the existing
+    // 30s frontend polling.
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const largest = await prisma.tokenPurchase.findFirst({
+      where: {
+        userId: req.user.userId,
+        createdAt: { gte: ninetyDaysAgo },
+      },
+      orderBy: { tokensPurchased: 'desc' },
+      select: { tokensPurchased: true },
+    });
+
     res.json({
       success: true,
       data: {
@@ -19,6 +34,7 @@ export const getTokenBalance = asyncHandler(
         totalPurchased: wallet.totalTokensPurchased,
         totalUsed: wallet.totalTokensUsed,
         allocatedTokens: wallet.allocatedTokens,
+        largestPurchaseLast90Days: largest?.tokensPurchased ?? null,
         formatted: {
           balance: TokenWalletService.formatTokens(wallet.tokenBalance),
           totalPurchased: TokenWalletService.formatTokens(wallet.totalTokensPurchased),
