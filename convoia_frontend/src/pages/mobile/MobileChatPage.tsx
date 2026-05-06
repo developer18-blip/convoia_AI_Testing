@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { MessageArea } from '../../components/chat/MessageArea'
 import { MessageInput } from '../../components/chat/MessageInput'
+import { CostEstimator } from '../../components/chat/CostEstimator'
 import { useChat } from '../../hooks/useChat'
 import { useModels } from '../../hooks/useModels'
 import { useAgents } from '../../hooks/useAgents'
@@ -429,6 +430,12 @@ export function MobileChatPage() {
 
       {/* Input */}
       <div style={{ flexShrink: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '4px 12px 0', minHeight: 18 }}>
+          <CostEstimator
+            model={councilMode ? null : selectedModel}
+            councilModels={councilMode ? models.filter((m) => councilModelIds.includes(m.id)) : undefined}
+          />
+        </div>
         <MessageInput
           onSend={handleSend}
           isLoading={isStreaming}
