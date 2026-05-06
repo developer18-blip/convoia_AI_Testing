@@ -1,5 +1,5 @@
 /**
- * Council Service — Multi-Model Consensus Engine
+ * Apollo Service — Multi-Model Consensus Engine
  *
  * Orchestrates the 3-phase pipeline:
  *   Phase 1: Parallel structured queries to N models (2-5)
@@ -203,7 +203,7 @@ export async function runCouncil(
   const statusMessages = getModelStatusMessages(config.intent);
 
   if (config.modelIds.length < 2 || config.modelIds.length > 3) {
-    callbacks.onError(new Error(`Council requires 2-3 models, got ${config.modelIds.length}`));
+    callbacks.onError(new Error(`Apollo requires 2-3 models, got ${config.modelIds.length}`));
     return;
   }
 
@@ -265,14 +265,14 @@ export async function runCouncil(
   const balance = await TokenWalletService.getBalance(config.userId);
   if (balance.tokenBalance < estimatedWalletTokens) {
     callbacks.onError(new Error(
-      `Council requires approximately ${estimatedWalletTokens.toLocaleString()} tokens. ` +
+      `Apollo requires approximately ${estimatedWalletTokens.toLocaleString()} tokens. ` +
       `You have ${balance.tokenBalance.toLocaleString()}. Try selecting fewer or cheaper models.`
     ));
     return;
   }
 
   // ── Phase 1: parallel structured queries ──────────────────────────────
-  logger.info(`Council starting: ${models.length} models, query="${config.query.substring(0, 80)}"`);
+  logger.info(`Apollo starting: ${models.length} models, query="${config.query.substring(0, 80)}"`);
 
   type PhaseResult = {
     model: CouncilModel;
@@ -348,7 +348,7 @@ export async function runCouncil(
         userId: config.userId,
         tokens: walletTokens,
         reference: model.id,
-        description: `Council: ${model.name}`,
+        description: `Apollo: ${model.name}`,
         organizationId: config.organizationId,
       });
 
@@ -378,11 +378,11 @@ export async function runCouncil(
       });
 
       callbacks.onModelComplete(model.name, index, durationMs, totalTokens);
-      logger.info(`Council Phase 1: ${model.name} complete — ${totalTokens} tokens, ${durationMs}ms`);
+      logger.info(`Apollo Phase 1: ${model.name} complete — ${totalTokens} tokens, ${durationMs}ms`);
     } catch (err: any) {
       if (progressInterval) { clearInterval(progressInterval); progressInterval = undefined; }
       const durationMs = Date.now() - modelStart;
-      logger.error(`Council Phase 1: ${model.name} failed — ${err.message}`);
+      logger.error(`Apollo Phase 1: ${model.name} failed — ${err.message}`);
 
       phase1Results.push({
         model,
@@ -403,7 +403,7 @@ export async function runCouncil(
 
   if (successfulResults.length < 2) {
     callbacks.onError(new Error(
-      `Only ${successfulResults.length} model(s) responded successfully. Council requires at least 2.`
+      `Only ${successfulResults.length} model(s) responded successfully. Apollo requires at least 2.`
     ));
     return;
   }
@@ -412,7 +412,7 @@ export async function runCouncil(
   callbacks.onCrossExamStart();
   const phase2Start = Date.now();
 
-  logger.info(`Council Phase 2: Cross-examination by ${strongestModel.name}`);
+  logger.info(`Apollo Phase 2: Cross-examination by ${strongestModel.name}`);
 
   let crossExamination = '';
   let phase2InputTokens = 0;
@@ -431,9 +431,9 @@ export async function runCouncil(
     if (decision.skip) {
       phase2Status = 'skipped';
       crossExamination = buildRawResponseConcat(successfulResults);
-      logger.info(`Council Phase 2: SKIPPED — minPairwiseSim=${decision.minPairwiseSim.toFixed(3)} threshold=${envConfig.apex.phase2SkipThreshold}`);
+      logger.info(`Apollo Phase 2: SKIPPED — minPairwiseSim=${decision.minPairwiseSim.toFixed(3)} threshold=${envConfig.apex.phase2SkipThreshold}`);
     } else {
-      logger.info(`Council Phase 2: not skipping — minPairwiseSim=${decision.minPairwiseSim.toFixed(3)} reason=${decision.reason}`);
+      logger.info(`Apollo Phase 2: not skipping — minPairwiseSim=${decision.minPairwiseSim.toFixed(3)} reason=${decision.reason}`);
     }
   }
 
@@ -474,7 +474,7 @@ export async function runCouncil(
         userId: config.userId,
         tokens: p2WalletTokens,
         reference: strongestModel.id,
-        description: `Council cross-exam: ${strongestModel.name}`,
+        description: `Apollo cross-exam: ${strongestModel.name}`,
         organizationId: config.organizationId,
       });
 
@@ -483,7 +483,7 @@ export async function runCouncil(
           userId: config.userId,
           organizationId: config.organizationId,
           modelId: strongestModel.id,
-          prompt: '[Council cross-examination]',
+          prompt: '[Apollo cross-examination]',
           response: crossExamination.substring(0, 500),
           tokensInput: phase2InputTokens,
           tokensOutput: phase2OutputTokens,
@@ -495,7 +495,7 @@ export async function runCouncil(
         },
       });
     } catch (err: any) {
-      logger.error(`Council Phase 2 failed: ${err.message}`);
+      logger.error(`Apollo Phase 2 failed: ${err.message}`);
 
       if (envConfig.apex.phase2FallbackHardened) {
         try {
@@ -520,7 +520,7 @@ export async function runCouncil(
   const crossExamDuration = Date.now() - phase2Start;
 
   // Single structured log line for production telemetry.
-  logger.info(`Council phase2Status=${phase2Status} crossExamDuration=${crossExamDuration}ms${
+  logger.info(`Apollo phase2Status=${phase2Status} crossExamDuration=${crossExamDuration}ms${
     phase2Status === 'skipped' ? ` skipThreshold=${envConfig.apex.phase2SkipThreshold}` : ''
   }`);
 
@@ -530,7 +530,7 @@ export async function runCouncil(
   callbacks.onVerdictStart();
   const phase3Start = Date.now();
 
-  logger.info('Council Phase 3: Verdict synthesis');
+  logger.info('Apollo Phase 3: Verdict synthesis');
 
   const verdictPrompt = getPhase3Prompt(
     config.query,
@@ -554,7 +554,7 @@ export async function runCouncil(
           temperature: 0.3,
           maxTokens: 3000,
           topP: 0.9,
-          name: 'ConvoiaAI Council',
+          name: 'ConvoiaAI Apollo',
         },
         maxOutputTokens: 3000,
       },
@@ -574,7 +574,7 @@ export async function runCouncil(
             userId: config.userId,
             tokens: p3WalletTokens,
             reference: moderatorModel.id,
-            description: 'Council verdict: ConvoiaAI',
+            description: 'Apollo verdict: ConvoiaAI',
             organizationId: config.organizationId,
           });
 
@@ -583,8 +583,8 @@ export async function runCouncil(
               userId: config.userId,
               organizationId: config.organizationId,
               modelId: moderatorModel.id,
-              prompt: '[Council verdict synthesis]',
-              response: '[Council verdict — streamed]',
+              prompt: '[Apollo verdict synthesis]',
+              response: '[Apollo verdict — streamed]',
               tokensInput: inputTokens,
               tokensOutput: outputTokens,
               totalTokens: inputTokens + outputTokens,
@@ -639,16 +639,16 @@ export async function runCouncil(
             phase2Status,
           });
 
-          logger.info(`Council complete: ${models.length} models, ${totalTokens} tokens, $${totalCost.toFixed(4)}, ${totalDuration}ms`);
+          logger.info(`Apollo complete: ${models.length} models, ${totalTokens} tokens, $${totalCost.toFixed(4)}, ${totalDuration}ms`);
         },
         onError: (err: Error) => {
-          logger.error(`Council Phase 3 streaming failed: ${err.message}`);
+          logger.error(`Apollo Phase 3 streaming failed: ${err.message}`);
           callbacks.onError(err);
         },
       },
     );
   } catch (err: any) {
-    logger.error(`Council Phase 3 failed: ${err.message}`);
+    logger.error(`Apollo Phase 3 failed: ${err.message}`);
     callbacks.onError(err);
   }
 }

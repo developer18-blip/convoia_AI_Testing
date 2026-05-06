@@ -1078,14 +1078,14 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
     }
 
     // ── COUNCIL MODE — Multi-Model Consensus ───────────────────────────────
-    // Fires when the frontend requests the LLM Council. Runs the 3-phase
+    // Fires when the frontend requests the LLM Apollo. Runs the 3-phase
     // pipeline (parallel queries → cross-examination → verdict) and streams
     // structured SSE events so the UI can render live execution state.
     const isCouncilMode = req.body.councilMode === true && Array.isArray(req.body.councilModelIds);
     if (isCouncilMode) {
       const councilModelIds: string[] = req.body.councilModelIds;
       if (councilModelIds.length < 2 || councilModelIds.length > 3) {
-        res.write(`data: ${JSON.stringify({ type: 'error', content: 'Council requires 2-3 models.' })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'error', content: 'Apollo requires 2-3 models.' })}\n\n`);
         res.write('data: [DONE]\n\n');
         res.end();
         return;
@@ -1173,7 +1173,7 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
             },
             onVerdictStart: () => {
               if (!streamEnded && !res.writableEnded) {
-                res.write(`data: ${JSON.stringify({ type: 'council_verdict_start', status: 'ConvoiaAI Council is synthesizing the final verdict...' })}\n\n`);
+                res.write(`data: ${JSON.stringify({ type: 'council_verdict_start', status: 'ConvoiaAI Apollo is synthesizing the final verdict...' })}\n\n`);
               }
             },
             onVerdictChunk: (text) => {
@@ -1202,7 +1202,7 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
                   tokens: { input: metadata.totalInputTokens, output: metadata.totalOutputTokens, total: metadata.totalTokens },
                   tokensUsed: metadata.totalWalletTokens,
                   cost: { charged: metadata.totalCost.toFixed(6) },
-                  model: 'ConvoiaAI Council',
+                  model: 'ConvoiaAI Apollo',
                   provider: 'council',
                   councilMeta: {
                     modelsUsed: metadata.modelResults.length,
@@ -1218,7 +1218,7 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
             },
             onError: (error) => {
               if (!streamEnded && !res.writableEnded) {
-                res.write(`data: ${JSON.stringify({ type: 'error', content: `Council error: ${error.message}` })}\n\n`);
+                res.write(`data: ${JSON.stringify({ type: 'error', content: `Apollo error: ${error.message}` })}\n\n`);
                 res.write('data: [DONE]\n\n');
                 res.end();
               }
@@ -1226,7 +1226,7 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
           },
         );
       } catch (err: any) {
-        logger.error(`Council setup failed: ${err.message}`);
+        logger.error(`Apollo setup failed: ${err.message}`);
         if (!streamEnded && !res.writableEnded) {
           res.write(`data: ${JSON.stringify({ type: 'error', content: err.message })}\n\n`);
           res.write('data: [DONE]\n\n');
