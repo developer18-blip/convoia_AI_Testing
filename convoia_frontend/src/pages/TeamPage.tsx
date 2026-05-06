@@ -146,7 +146,7 @@ export function TeamPage() {
     fetchData()
   }, [])
 
-  // Filtered members
+  // Filtered members — sorted alphabetically by name (A→Z, locale-aware, case-insensitive)
   const filteredMembers = useMemo(() => {
     let result = members
     if (searchQuery) {
@@ -158,7 +158,9 @@ export function TeamPage() {
     if (roleFilter !== 'all') {
       result = result.filter((m) => m.role === roleFilter)
     }
-    return result
+    return [...result].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+    )
   }, [members, searchQuery, roleFilter])
 
   const pendingInvites = invites.filter((i) => i.status === 'pending')
