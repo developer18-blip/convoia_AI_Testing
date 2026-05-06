@@ -80,7 +80,7 @@ export function CouncilPicker({ activeModels, initialSelectedIds = [], variant =
                       className={classes}
                       onClick={() => !disabled && toggle(m.id)}
                       disabled={disabled}
-                      title={isRecommended && !isSelected ? 'Recommended for Council' : undefined}
+                      title={isRecommended && !isSelected ? 'Recommended for Apollo' : undefined}
                     >
                       {m.name}
                     </button>
@@ -101,7 +101,7 @@ export function CouncilPicker({ activeModels, initialSelectedIds = [], variant =
           onClick={() => canConfirm && onConfirm(selected)}
           disabled={!canConfirm}
         >
-          {canConfirm ? `Start council (${selected.length} models)` : 'Select at least 2 models'}
+          {canConfirm ? `Start Apollo (${selected.length} models)` : 'Select at least 2 models'}
         </button>
       </div>
     </>

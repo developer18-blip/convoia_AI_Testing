@@ -9,12 +9,12 @@ interface Props {
 
 export function CouncilChip({ active, count, onClick, variant = 'mobile' }: Props) {
   const isMobile = variant === 'mobile'
-  const label = count > 0 ? `Council (${count})` : 'Council'
+  const label = count > 0 ? `Apollo (${count})` : 'Apollo'
 
   return (
     <button
       onClick={onClick}
-      title="LLM Council — multi-model consensus"
+      title="Apollo — query multiple models, moderator cross-examines answers"
       style={{
         padding: isMobile ? '6px 12px' : '5px 12px',
         borderRadius: '100px',

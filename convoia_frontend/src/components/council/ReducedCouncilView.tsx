@@ -26,7 +26,7 @@ export function ReducedCouncilView({ singleResponse, totalAttempted, errorMessag
         <AlertTriangle size={16} style={{ color: '#F59E0B', flexShrink: 0, marginTop: 2 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--council-text)' }}>
-            Council couldn't reach consensus
+            Apollo couldn't reach consensus
           </div>
           <div style={{ fontSize: '12px', color: 'var(--council-text-dim)', marginTop: 2 }}>
             Only 1 of {totalAttempted} models responded successfully. Showing the response from {singleResponse.name}:

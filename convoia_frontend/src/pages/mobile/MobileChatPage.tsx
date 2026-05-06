@@ -74,7 +74,7 @@ export function MobileChatPage() {
     // Council mode uses councilModelIds; selectedModelId doesn't matter for validation.
     if (!councilMode && !selectedModelId) { toast.error('Please select a model'); return }
     if (councilMode && councilModelIds.length < 2) {
-      toast.error('Select at least 2 models for Council')
+      toast.error('Select at least 2 models for Apollo')
       return
     }
     if (tokenBalance <= 0) {
@@ -84,7 +84,7 @@ export function MobileChatPage() {
     if (!activeConversationId) {
       createConversation(
         councilMode ? councilModelIds[0] : selectedModelId,
-        councilMode ? 'ConvoiaAI Council' : (selectedModel?.name || 'AI'),
+        councilMode ? 'ConvoiaAI Apollo' : (selectedModel?.name || 'AI'),
       )
     }
     const councilOpts = councilMode ? { modelIds: councilModelIds } : undefined
@@ -101,7 +101,7 @@ export function MobileChatPage() {
   const handleSendWithContext = (text: string, systemContext: string | null, extras?: any) => {
     if (!activeConversationId) createConversation(
       councilMode ? councilModelIds[0] : selectedModelId,
-      councilMode ? 'ConvoiaAI Council' : (selectedModel?.name || 'AI'),
+      councilMode ? 'ConvoiaAI Apollo' : (selectedModel?.name || 'AI'),
     )
     const messageExtras: Partial<Message> = {}
     if (extras?.fileAttachment) messageExtras.fileAttachment = extras.fileAttachment
@@ -144,7 +144,7 @@ export function MobileChatPage() {
             setCouncilModelIds(ids)
             setCouncilMode(true)
             setShowCouncilPicker(false)
-            toast.success(`Council activated — ${ids.length} models`)
+            toast.success(`Apollo activated — ${ids.length} models`)
           }}
           onClose={() => setShowCouncilPicker(false)}
         />

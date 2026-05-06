@@ -193,7 +193,7 @@ export function ChatPage() {
       return
     }
     if (councilMode && councilModelIds.length < 2) {
-      toast.error('Select at least 2 models for Council')
+      toast.error('Select at least 2 models for Apollo')
       return
     }
 
@@ -215,7 +215,7 @@ export function ChatPage() {
     }
 
     const primaryModelId = councilMode ? councilModelIds[0] : selectedModelId
-    const primaryModelName = councilMode ? 'ConvoiaAI Council' : (selectedModel?.name || 'AI')
+    const primaryModelName = councilMode ? 'ConvoiaAI Apollo' : (selectedModel?.name || 'AI')
 
     let convId = activeConversationId
     if (!convId) {
@@ -421,7 +421,7 @@ export function ChatPage() {
                     setCouncilModelIds(ids)
                     setCouncilMode(true)
                     setShowCouncilPicker(false)
-                    toast.success(`Council activated — ${ids.length} models`)
+                    toast.success(`Apollo activated — ${ids.length} models`)
                   }}
                   onClose={() => setShowCouncilPicker(false)}
                 />
