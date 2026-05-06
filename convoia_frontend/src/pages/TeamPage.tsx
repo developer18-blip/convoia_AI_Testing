@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import {
   Users, Activity, DollarSign, UserPlus, Mail, Copy, Check, X,
   MoreHorizontal, Shield, ArrowRight, Search, RefreshCw, Trash2,
+  ChevronDown,
 } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { StatCard } from '../components/shared/StatCard'
 import { Card } from '../components/ui/Card'
 import { Avatar } from '../components/ui/Avatar'
@@ -102,6 +104,26 @@ export function TeamPage() {
   // Role change modal
   const [roleChangeTarget, setRoleChangeTarget] = useState<TeamMember | null>(null)
   const [newRole, setNewRole] = useState('')
+
+  // Section collapse state — persisted per-section in localStorage; default expanded
+  const [invitesExpanded, setInvitesExpanded] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem('convoia_settings_team_pendinginvites_expanded')
+      return stored === null ? true : stored === 'true'
+    } catch { return true }
+  })
+  const [membersExpanded, setMembersExpanded] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem('convoia_settings_team_members_expanded')
+      return stored === null ? true : stored === 'true'
+    } catch { return true }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('convoia_settings_team_pendinginvites_expanded', String(invitesExpanded)) } catch {}
+  }, [invitesExpanded])
+  useEffect(() => {
+    try { localStorage.setItem('convoia_settings_team_members_expanded', String(membersExpanded)) } catch {}
+  }, [membersExpanded])
 
   const fetchData = async () => {
     try {
@@ -275,53 +297,93 @@ export function TeamPage() {
       {/* Pending Invites */}
       {pendingInvites.length > 0 && (
         <Card padding="none">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <button
+            type="button"
+            onClick={() => setInvitesExpanded((v) => !v)}
+            aria-expanded={invitesExpanded}
+            aria-controls="pending-invites-content"
+            className={`w-full flex items-center justify-between px-5 py-4 hover:bg-surface-2/50 transition-colors text-left min-h-[44px] ${invitesExpanded ? 'border-b border-border' : ''}`}
+          >
             <div className="flex items-center gap-2">
               <Mail size={16} className="text-primary" />
               <h3 className="text-sm font-medium text-text-secondary">
                 Pending Invites ({pendingInvites.length})
               </h3>
             </div>
-          </div>
-          <div className="divide-y divide-border/50">
-            {pendingInvites.map((inv) => (
-              <div key={inv.id} className="px-5 py-3 flex items-center gap-4">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-text-primary">{inv.email}</p>
-                  <p className="text-xs text-text-muted">
-                    <Badge size="sm" variant="primary">{inv.role}</Badge>
-                    <span className="ml-2">Invited by {inv.invitedBy}</span>
-                    <span className="ml-2 text-text-dim">
-                      Expires {new Date(inv.expiresAt).toLocaleDateString()}
-                    </span>
-                  </p>
+            <ChevronDown
+              size={16}
+              className="text-text-muted transition-transform duration-150 ease-out"
+              style={{ transform: invitesExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+            />
+          </button>
+          <AnimatePresence initial={false}>
+            {invitesExpanded && (
+              <motion.div
+                id="pending-invites-content"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.15, ease: 'easeOut' }}
+                style={{ overflow: 'hidden' }}
+              >
+                <div className="divide-y divide-border/50">
+                  {pendingInvites.map((inv) => (
+                    <div key={inv.id} className="px-5 py-3 flex items-center gap-4">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-text-primary">{inv.email}</p>
+                        <p className="text-xs text-text-muted">
+                          <Badge size="sm" variant="primary">{inv.role}</Badge>
+                          <span className="ml-2">Invited by {inv.invitedBy}</span>
+                          <span className="ml-2 text-text-dim">
+                            Expires {new Date(inv.expiresAt).toLocaleDateString()}
+                          </span>
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => handleResendInvite(inv.id)}
+                          className="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-primary/5 transition-colors"
+                          title="Resend invite"
+                        >
+                          <RefreshCw size={14} />
+                        </button>
+                        <button
+                          onClick={() => setConfirmAction({ type: 'revoke', id: inv.id, name: inv.email })}
+                          className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/5 transition-colors"
+                          title="Revoke invite"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => handleResendInvite(inv.id)}
-                    className="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-primary/5 transition-colors"
-                    title="Resend invite"
-                  >
-                    <RefreshCw size={14} />
-                  </button>
-                  <button
-                    onClick={() => setConfirmAction({ type: 'revoke', id: inv.id, name: inv.email })}
-                    className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/5 transition-colors"
-                    title="Revoke invite"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </Card>
       )}
 
       {/* Members Table */}
       <Card padding="none">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border gap-3 flex-wrap">
-          <h3 className="text-sm font-medium text-text-secondary">Team Members</h3>
+        <div className={`flex items-center justify-between px-5 py-4 gap-3 flex-wrap ${membersExpanded ? 'border-b border-border' : ''}`}>
+          <button
+            type="button"
+            onClick={() => setMembersExpanded((v) => !v)}
+            aria-expanded={membersExpanded}
+            aria-controls="team-members-content"
+            className="flex items-center gap-2 text-left hover:opacity-80 transition-opacity min-h-[44px]"
+          >
+            <Users size={16} className="text-primary" />
+            <h3 className="text-sm font-medium text-text-secondary">
+              Team Members ({members.length})
+            </h3>
+            <ChevronDown
+              size={16}
+              className="text-text-muted transition-transform duration-150 ease-out ml-1"
+              style={{ transform: membersExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+            />
+          </button>
           <div className="flex items-center gap-3">
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
@@ -346,16 +408,26 @@ export function TeamPage() {
           </div>
         </div>
 
-        {filteredMembers.length === 0 ? (
-          <EmptyState
-            icon={<Users size={40} />}
-            title="No team members"
-            description={searchQuery ? 'No members match your search.' : 'Invite team members to get started.'}
-            action={!searchQuery ? { label: 'Invite', onClick: () => setShowInvite(true) } : undefined}
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
+        <AnimatePresence initial={false}>
+          {membersExpanded && (
+            <motion.div
+              id="team-members-content"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.15, ease: 'easeOut' }}
+              style={{ overflow: 'hidden' }}
+            >
+              {filteredMembers.length === 0 ? (
+                <EmptyState
+                  icon={<Users size={40} />}
+                  title="No team members"
+                  description={searchQuery ? 'No members match your search.' : 'Invite team members to get started.'}
+                  action={!searchQuery ? { label: 'Invite', onClick: () => setShowInvite(true) } : undefined}
+                />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
               <thead>
                 <tr style={{ background: 'var(--color-primary)', color: 'white' }}>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ borderRadius: '8px 0 0 0' }}>Member</th>
@@ -444,6 +516,9 @@ export function TeamPage() {
             </table>
           </div>
         )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </Card>
 
       {/* ── INVITE MODAL ────────────────────────── */}
