@@ -14,7 +14,7 @@ export function VerdictBox({ verdict, isStreaming, phase2Status, degradedNote }:
     <div className="council-verdict-card">
       <div className="council-verdict-header">
         <div className="council-verdict-icon">C</div>
-        <div className="council-verdict-title">ConvoiaAI Apex</div>
+        <div className="council-verdict-title">ConvoiaAI Apollo</div>
         <Phase2StatusBadge status={phase2Status} />
         {degradedNote && (
           <span

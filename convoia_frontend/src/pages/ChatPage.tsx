@@ -238,7 +238,7 @@ export function ChatPage() {
     }
 
     const primaryModelId = councilMode ? councilModelIds[0] : selectedModelId
-    const primaryModelName = councilMode ? 'ConvoiaAI Apex' : (selectedModel?.name || 'AI')
+    const primaryModelName = councilMode ? 'ConvoiaAI Apollo' : (selectedModel?.name || 'AI')
 
     // First-send commit: shift accent to picked model the moment the chat
     // commits. Subsequent sends won't touch accent (picker changes update
