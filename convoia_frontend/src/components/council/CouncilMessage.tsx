@@ -1,11 +1,12 @@
-import { useMemo } from 'react'
-import { AlertCircle } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { AlertCircle, ChevronDown } from 'lucide-react'
 import type { CouncilState, CouncilPhase } from '../../types'
 import { ModelStatusCard } from './ModelStatusCard'
 import { CrossExamCard } from './CrossExamCard'
-import { VerdictBox, getAgreementLevel } from './VerdictBox'
+import { VerdictBox } from './VerdictBox'
 import { ResponsePanel } from './ResponsePanel'
 import { CouncilFooter } from './CouncilFooter'
+import { ReducedCouncilView } from './ReducedCouncilView'
 
 interface Props {
   council: CouncilState
@@ -34,6 +35,7 @@ export function CouncilMessage({ council }: Props) {
 
   const completedCount = models.filter((m) => m.status === 'complete').length
   const errorCount = models.filter((m) => m.status === 'error').length
+  const failedNames = models.filter((m) => m.status === 'error').map((m) => m.modelName)
   const totalCount = models.length
   const doneCount = completedCount + errorCount
   const progressPct = totalCount > 0 ? (doneCount / totalCount) * 100 : 0
@@ -45,14 +47,18 @@ export function CouncilMessage({ council }: Props) {
         ? 'All models complete'
         : `${completedCount} of ${totalCount} models complete`
 
-  const agreementLevel = useMemo(() => getAgreementLevel(verdict), [verdict])
+  // Master expand/collapse for drill-down panels
+  const [allExpanded, setAllExpanded] = useState(false)
+
+  // Edge cases: detect reduced-council (1 successful response despite errored phase)
+  const isReducedCouncil = phase === 'error' && modelResponses.length === 1
 
   const cardsDim = phase === 'verdict' || phase === 'complete'
   const showCrossExam = phase === 'crossexam' || phase === 'crossexam_done' || phase === 'verdict' || phase === 'complete'
   const crossExamActive = phase === 'crossexam'
   const crossExamStart = useMemo(
     () => Date.now() - (crossExamDurationMs || 0),
-    // intentionally only set when entering crossexam phase
+    // intentionally only set when entering crossexam phase — value is unused once the phase leaves
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [phase === 'crossexam'],
   )
@@ -65,12 +71,16 @@ export function CouncilMessage({ council }: Props) {
 
   const badge = badgeForPhase(phase, totalCount)
 
+  // Degraded note: complete phase but at least one Phase 1 model failed
+  const degradedNote = (phase === 'complete' && errorCount > 0)
+    ? `${completedCount} of ${totalCount} models${failedNames.length > 0 ? ` (${failedNames.join(', ')} failed)` : ''}`
+    : undefined
+
   return (
     <div style={{ marginBottom: '28px', animation: 'fadeSlideIn 200ms ease-out' }}>
       <style>{`@keyframes fadeSlideIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }`}</style>
 
-      {/* Council header — the MessageBubble avatar already shows the ⚡ icon,
-          so we only render title + status + badge here (no duplicate circle). */}
+      {/* Council header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--council-text)' }}>
@@ -83,8 +93,17 @@ export function CouncilMessage({ council }: Props) {
         <span className={`council-badge ${badge.cls}`}>{badge.label}</span>
       </div>
 
-      {/* Error banner */}
-      {phase === 'error' && (
+      {/* Reduced council view — 1 of N succeeded; show salvaged response instead of hard error */}
+      {isReducedCouncil && (
+        <ReducedCouncilView
+          singleResponse={modelResponses[0]}
+          totalAttempted={totalCount}
+          errorMessage={errorMessage}
+        />
+      )}
+
+      {/* Error banner — only when no salvageable single response exists */}
+      {phase === 'error' && !isReducedCouncil && (
         <div style={{
           padding: '10px 12px', borderRadius: '10px', marginBottom: '10px',
           background: 'var(--council-red-bg)', border: '0.5px solid var(--council-red-border)',
@@ -92,7 +111,7 @@ export function CouncilMessage({ council }: Props) {
           color: 'var(--council-red)', fontSize: '13px',
         }}>
           <AlertCircle size={16} />
-          <span>{errorMessage || 'Apex failed'}</span>
+          <span>{errorMessage || 'Apex failed — edit your message above and try again.'}</span>
         </div>
       )}
 
@@ -132,14 +151,53 @@ export function CouncilMessage({ council }: Props) {
 
       {/* Phase 3: Verdict */}
       {showVerdict && verdict && (
-        <VerdictBox verdict={verdict} isStreaming={verdictStreaming} agreementLevel={agreementLevel} />
+        <VerdictBox
+          verdict={verdict}
+          isStreaming={verdictStreaming}
+          phase2Status={meta?.phase2Status}
+          degradedNote={degradedNote}
+        />
       )}
 
-      {/* Phase 4: Individual responses */}
+      {/* Phase 4: Drill-down — individual responses with master expand/collapse */}
       {showResponses && (
         <div>
-          <div className="council-responses-label">Individual model responses</div>
-          {modelResponses.map((r, i) => <ResponsePanel key={`${r.name}-${i}`} resp={r} />)}
+          <button
+            type="button"
+            onClick={() => setAllExpanded((v) => !v)}
+            aria-expanded={allExpanded}
+            className="council-responses-header"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              width: '100%',
+              padding: '10px 0 8px',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: 600,
+              color: 'var(--council-text-dim)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+            }}
+          >
+            <span>How Apex reasoned ({modelResponses.length})</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, textTransform: 'none', fontWeight: 500, letterSpacing: 0 }}>
+              <span>{allExpanded ? 'Collapse all' : 'Expand all'}</span>
+              <ChevronDown
+                size={13}
+                style={{
+                  transition: 'transform 150ms ease-out',
+                  transform: allExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                }}
+              />
+            </span>
+          </button>
+          {modelResponses.map((r, i) => (
+            <ResponsePanel key={`${r.name}-${i}`} resp={r} forceOpen={allExpanded} />
+          ))}
         </div>
       )}
 

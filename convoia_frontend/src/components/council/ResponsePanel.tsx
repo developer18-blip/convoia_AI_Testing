@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -8,6 +8,7 @@ import { providerBadgeClass } from './councilConstants'
 
 interface Props {
   resp: CouncilModelResponse
+  forceOpen?: boolean
 }
 
 // Best-effort provider detection from the model's display name.
@@ -25,8 +26,12 @@ function inferProvider(modelName: string): string {
   return 'xai'
 }
 
-export function ResponsePanel({ resp }: Props) {
+export function ResponsePanel({ resp, forceOpen }: Props) {
   const [open, setOpen] = useState(false)
+  // Sync local state with parent's master toggle when it changes
+  useEffect(() => {
+    if (typeof forceOpen === 'boolean') setOpen(forceOpen)
+  }, [forceOpen])
   const provider = inferProvider(resp.name)
   const providerLabel = provider.charAt(0).toUpperCase() + provider.slice(1)
 

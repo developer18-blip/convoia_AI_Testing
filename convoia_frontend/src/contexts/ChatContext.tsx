@@ -709,6 +709,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                 crossExamDurationMs: metadata.councilMeta?.crossExamDurationMs || 0,
                 verdictDurationMs: metadata.councilMeta?.verdictDurationMs || 0,
                 modelsUsed: metadata.councilMeta?.modelsUsed || m.council.models.length,
+                phase2Status: metadata.councilMeta?.phase2Status,
               },
             },
           }
@@ -1014,6 +1015,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                 crossExamDurationMs: metadata.councilMeta?.crossExamDurationMs || 0,
                 verdictDurationMs: metadata.councilMeta?.verdictDurationMs || 0,
                 modelsUsed: metadata.councilMeta?.modelsUsed || m.council.models.length,
+                phase2Status: metadata.councilMeta?.phase2Status,
               },
             },
           }
