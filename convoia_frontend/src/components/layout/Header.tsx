@@ -7,7 +7,51 @@ import { useTheme } from '../../hooks/useTheme'
 import { useTokens } from '../../contexts/TokenContext'
 import { Avatar } from '../ui/Avatar'
 import { Dropdown } from '../ui/Dropdown'
+import { LowTokenPopover } from './LowTokenPopover'
+import type { TokenLevel } from '../../lib/tokenThresholds'
 import api from '../../lib/api'
+
+// ── Low-token dismissal persistence ────────────────────────────────────
+// Tracks which threshold the user dismissed at, when, and the balance at
+// dismissal time. Used to suppress auto-show on the SAME tier while
+// allowing escalation (warning → critical) and re-arm (refill above
+// threshold then drop again).
+const LOW_TOKEN_DISMISSAL_KEY = 'convoia_low_token_dismissed'
+type LowTokenDismissal = {
+  threshold: 'warning' | 'critical'
+  dismissedAt: string
+  balanceAtDismissal: number
+}
+function getLowTokenDismissal(): LowTokenDismissal | null {
+  try {
+    const raw = localStorage.getItem(LOW_TOKEN_DISMISSAL_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed || (parsed.threshold !== 'warning' && parsed.threshold !== 'critical')) return null
+    return parsed as LowTokenDismissal
+  } catch {
+    return null
+  }
+}
+function saveLowTokenDismissal(level: 'warning' | 'critical', balance: number) {
+  try {
+    localStorage.setItem(LOW_TOKEN_DISMISSAL_KEY, JSON.stringify({
+      threshold: level,
+      dismissedAt: new Date().toISOString(),
+      balanceAtDismissal: balance,
+    } satisfies LowTokenDismissal))
+  } catch { /* localStorage may be blocked in private mode */ }
+}
+function clearLowTokenDismissal() {
+  try { localStorage.removeItem(LOW_TOKEN_DISMISSAL_KEY) } catch {}
+}
+// Don't auto-show on same-tier dismissal; do escalate from warning → critical.
+function shouldAutoShowLowToken(currentLevel: 'warning' | 'critical'): boolean {
+  const d = getLowTokenDismissal()
+  if (!d) return true
+  if (d.threshold === 'warning' && currentLevel === 'critical') return true
+  return false
+}
 
 const pageTitles: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -58,9 +102,74 @@ export function Header({ onMenuClick }: HeaderProps) {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
-  const { formattedBalance } = useTokens()
+  const { formattedBalance, tokenBalance, tokenLevel } = useTokens()
 
   const canBuyTokens = !user?.organizationId || user?.role === 'org_owner' || user?.role === 'platform_admin'
+
+  // ── Low-token warning state ─────────────────────────────────────────
+  const tokenChipRef = useRef<HTMLButtonElement>(null)
+  const [showLowTokenPopover, setShowLowTokenPopover] = useState(false)
+  // Track previous level to detect threshold crossings. Initial null prevents
+  // auto-firing on first mount when balance is already below threshold —
+  // user only sees the popover automatically when balance CROSSES into the
+  // tier (or when they manually click the chip).
+  const prevTokenLevelRef = useRef<TokenLevel | null>(null)
+
+  useEffect(() => {
+    const prev = prevTokenLevelRef.current
+    const curr = tokenLevel
+    // Initialize on first observation; don't fire popover.
+    if (prev === null) {
+      prevTokenLevelRef.current = curr
+      return
+    }
+    // Re-arm: when balance climbs back above warning threshold, clear
+    // dismissal state so the next drop below will fire the popover fresh.
+    if (curr === 'normal' && prev !== 'normal') {
+      clearLowTokenDismissal()
+    }
+    // Crossing into a worse tier — auto-show subject to dismissal state.
+    const crossedIntoWarning = prev === 'normal' && curr === 'warning'
+    const crossedIntoCritical = curr === 'critical' && prev !== 'critical'
+    if ((crossedIntoWarning || crossedIntoCritical) && shouldAutoShowLowToken(curr)) {
+      setShowLowTokenPopover(true)
+    }
+    prevTokenLevelRef.current = curr
+  }, [tokenLevel])
+
+  // Auto-dismiss warning after 8s. Critical persists until manually closed.
+  useEffect(() => {
+    if (!showLowTokenPopover || tokenLevel !== 'warning') return
+    const timer = window.setTimeout(() => {
+      setShowLowTokenPopover(false)
+      saveLowTokenDismissal('warning', tokenBalance)
+    }, 8000)
+    return () => window.clearTimeout(timer)
+  }, [showLowTokenPopover, tokenLevel, tokenBalance])
+
+  const handleCloseLowTokenPopover = useCallback(() => {
+    setShowLowTokenPopover(false)
+    if (tokenLevel === 'warning' || tokenLevel === 'critical') {
+      saveLowTokenDismissal(tokenLevel, tokenBalance)
+    }
+  }, [tokenLevel, tokenBalance])
+
+  const handleRefillTokens = useCallback(() => {
+    setShowLowTokenPopover(false)
+    navigate('/tokens/buy')
+  }, [navigate])
+
+  // Override chip click when in warning/critical: toggle popover instead
+  // of jumping straight to buy page (Refill button inside popover does that).
+  const handleTokenChipClick = useCallback(() => {
+    if (tokenLevel !== 'normal') {
+      setShowLowTokenPopover((v) => !v)
+    } else if (canBuyTokens) {
+      navigate('/tokens/buy')
+    } else {
+      navigate('/dashboard')
+    }
+  }, [tokenLevel, canBuyTokens, navigate])
   const title = pageTitles[location.pathname] || 'ConvoiaAI'
 
   // Notifications
@@ -211,21 +320,81 @@ export function Header({ onMenuClick }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-1.5">
-        {/* Token balance */}
+        {/* Pulse keyframes — only animate when tokens are below threshold.
+            prefers-reduced-motion override is in the @media block. */}
+        <style>{`
+          @keyframes token-pulse-warning {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); }
+            50%      { box-shadow: 0 0 0 4px rgba(245,158,11,0.18); }
+          }
+          @keyframes token-pulse-critical {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+            50%      { box-shadow: 0 0 0 6px rgba(239,68,68,0.28); }
+          }
+          .token-chip--warning  { animation: token-pulse-warning  1.4s ease-in-out infinite; }
+          .token-chip--critical { animation: token-pulse-critical 1.0s ease-in-out infinite; }
+          @media (prefers-reduced-motion: reduce) {
+            .token-chip--warning, .token-chip--critical { animation: none; }
+          }
+        `}</style>
+
+        {/* Token balance — chip transforms color + pulses when low */}
         <motion.button
+          ref={tokenChipRef}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          onClick={() => canBuyTokens ? navigate('/tokens/buy') : navigate('/dashboard')}
-          className="hidden sm:flex items-center gap-2"
+          onClick={handleTokenChipClick}
+          aria-label={
+            tokenLevel === 'critical' ? `Tokens almost depleted: ${formattedBalance}. Click for refill options.`
+            : tokenLevel === 'warning' ? `Tokens running low: ${formattedBalance}. Click for refill options.`
+            : `Tokens: ${formattedBalance}. Click to buy more.`
+          }
+          className={`hidden sm:flex items-center gap-2${tokenLevel !== 'normal' ? ` token-chip--${tokenLevel}` : ''}`}
           style={{
-            padding: '5px 10px', background: 'var(--chat-hover)', border: '1px solid var(--chat-border)',
-            borderRadius: '10px', fontSize: '13px', fontFamily: 'monospace', fontWeight: 600,
-            color: 'var(--color-text-primary)', cursor: 'pointer', transition: 'border-color 150ms',
+            padding: '5px 10px',
+            background:
+              tokenLevel === 'critical' ? 'rgba(239,68,68,0.10)'
+              : tokenLevel === 'warning' ? 'rgba(245,158,11,0.10)'
+              : 'var(--chat-hover)',
+            border: `1px solid ${
+              tokenLevel === 'critical' ? '#ef4444'
+              : tokenLevel === 'warning' ? '#f59e0b'
+              : 'var(--chat-border)'
+            }`,
+            borderRadius: '10px',
+            fontSize: '13px',
+            fontFamily: 'monospace',
+            fontWeight: 600,
+            color:
+              tokenLevel === 'critical' ? '#ef4444'
+              : tokenLevel === 'warning' ? '#f59e0b'
+              : 'var(--color-text-primary)',
+            cursor: 'pointer',
+            transition: 'background-color 250ms ease, border-color 250ms ease, color 250ms ease',
           }}
         >
-          <Zap size={13} style={{ color: 'var(--color-accent-end)' }} />
+          <Zap
+            size={13}
+            style={{
+              color:
+                tokenLevel === 'critical' ? '#ef4444'
+                : tokenLevel === 'warning' ? '#f59e0b'
+                : 'var(--color-accent-end)',
+            }}
+          />
           {formattedBalance}
         </motion.button>
+
+        {/* Low-token warning popover — anchored to chip via ref + portaled to body */}
+        {showLowTokenPopover && (tokenLevel === 'warning' || tokenLevel === 'critical') && (
+          <LowTokenPopover
+            level={tokenLevel}
+            formattedBalance={formattedBalance}
+            anchorRef={tokenChipRef}
+            onClose={handleCloseLowTokenPopover}
+            onRefill={handleRefillTokens}
+          />
+        )}
 
         {/* Theme toggle */}
         <motion.button
