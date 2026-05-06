@@ -16,6 +16,11 @@ export function ModelStatusCard({ model, dimmed }: Props) {
     return () => clearInterval(id)
   }, [status, startTime])
 
+  // Soft timeout: 60s threshold while still thinking. Pure UI signal — does not
+  // cancel the request. Provider SDK timeouts are still authoritative.
+  const SOFT_TIMEOUT_MS = 60_000
+  const isSlow = status === 'thinking' && elapsed > SOFT_TIMEOUT_MS
+
   const displayTime = status === 'thinking'
     ? `${(elapsed / 1000).toFixed(1)}s…`
     : status === 'complete'
@@ -54,7 +59,7 @@ export function ModelStatusCard({ model, dimmed }: Props) {
             ? (error || 'Failed')
             : status === 'complete'
               ? `Analysis complete · ${tokenCount.toLocaleString()} tokens`
-              : statusMessage || 'Queued…'}
+              : (statusMessage || 'Queued…') + (isSlow ? ' (taking longer than usual)' : '')}
         </div>
       </div>
       <div className={`council-exec-time ${status === 'complete' ? 'council-exec-time--complete' : ''}`}>

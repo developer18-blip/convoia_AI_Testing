@@ -223,6 +223,11 @@ export interface CouncilModelResponse {
   tokens: number
 }
 
+// Phase 2 outcome status — surfaced by Day 2 backend in councilMeta.
+// Frontend uses this as ground-truth for the agreement badge
+// (replaces the old prose-keyword heuristic that broke after Day 1's prompt rewrite).
+export type Phase2Status = 'ok' | 'degraded' | 'skipped' | 'degraded_legacy'
+
 export interface CouncilMeta {
   totalTokens: number
   totalCost: string
@@ -230,6 +235,7 @@ export interface CouncilMeta {
   crossExamDurationMs: number
   verdictDurationMs: number
   modelsUsed: number
+  phase2Status?: Phase2Status
 }
 
 export interface CouncilState {
