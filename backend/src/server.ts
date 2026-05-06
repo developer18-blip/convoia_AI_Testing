@@ -38,6 +38,7 @@ import userFactRoutes from './routes/userFactRoutes.js';
 import audioRoutes from './routes/audioRoutes.js';
 import walletRoutes from './routes/walletRoutes.js';
 import agentToolRoutes from './routes/agentToolRoutes.js';
+import userRoutes from './routes/userRoutes.js';
 import { startLocalCleanup as startFileGenCleanup } from './services/fileGenerationService.js';
 import { startFactExtractionJob } from './jobs/factExtractionJob.js';
 
@@ -276,6 +277,7 @@ app.use('/api/user/facts', userFactRoutes);
 app.use('/api/audio', audioRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/agent-tools', agentToolRoutes);
+app.use('/api/users', userRoutes);
 
 // ============== 404 HANDLER ==============
 app.use('*', (req: Request, res: Response) => {
