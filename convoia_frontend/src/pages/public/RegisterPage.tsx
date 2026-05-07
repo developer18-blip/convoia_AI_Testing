@@ -314,7 +314,7 @@ export function RegisterPage() {
                 theme="outline"
                 shape="rectangular"
                 size="large"
-                width="360"
+                width="340"
                 text="signup_with"
               />
             </div>

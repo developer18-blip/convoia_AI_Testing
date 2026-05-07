@@ -104,7 +104,7 @@ export function LoginPage() {
             theme="outline"
             shape="rectangular"
             size="large"
-            width="360"
+            width="340"
             text="continue_with"
           />
         </div>
