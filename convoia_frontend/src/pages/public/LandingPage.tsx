@@ -319,7 +319,7 @@ export function LandingPage() {
                 </div>
                 <div className="lp-metric-tile">
                   <div className="mono-label" style={{ fontSize: 10 }}>TOP MODEL</div>
-                  <div className="mono" style={{ fontSize: 14, fontWeight: 500, marginTop: 2, color: 'var(--text-primary)' }}>claude-opus-4.6</div>
+                  <div className="mono" style={{ fontSize: 14, fontWeight: 500, marginTop: 2, color: 'var(--text-primary)' }}>claude-opus-4.7</div>
                   <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>2.1M tokens · 48%</div>
                 </div>
                 <div className="lp-metric-tile">
