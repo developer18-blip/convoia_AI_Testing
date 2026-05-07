@@ -73,7 +73,7 @@ export function CodeBlock({ language = 'text', children, onRun, onOpenInCanvas }
       border: '1px solid var(--chat-code-border)', backgroundColor: 'var(--chat-code-bg)',
     }}>
       {/* Header */}
-      <div style={{
+      <div data-pdf-skip="true" style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '8px 14px', backgroundColor: 'var(--chat-code-header)',
         borderBottom: '1px solid var(--chat-code-border)',
