@@ -2,8 +2,7 @@ import { useEffect, useState, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Users, Activity, DollarSign, UserPlus, Mail, Copy, Check, X,
-  MoreHorizontal, Shield, ArrowRight, Search, RefreshCw, Trash2,
-  ChevronDown,
+  MoreHorizontal, Shield, ArrowRight, Search, RefreshCw, Trash2, ChevronDown, Zap,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { StatCard } from '../components/shared/StatCard'
@@ -20,6 +19,7 @@ import { ErrorState } from '../components/shared/ErrorState'
 import { EmptyState } from '../components/shared/EmptyState'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../hooks/useToast'
+import { useTokens } from '../contexts/TokenContext'
 import { formatCurrency, formatNumber, formatTokens, formatDate } from '../lib/utils'
 import api from '../lib/api'
 
@@ -70,7 +70,9 @@ export function TeamPage() {
   const navigate = useNavigate()
   const toast = useToast()
   const { user } = useAuth()
+  const { tokenBalance, formattedBalance, refresh: refreshTokens } = useTokens()
   const isOwner = user?.role === 'org_owner' || user?.role === 'platform_admin'
+  const canAssignTokens = isOwner || user?.role === 'manager'
 
   // Data state
   const [members, setMembers] = useState<TeamMember[]>([])
@@ -124,6 +126,10 @@ export function TeamPage() {
   useEffect(() => {
     try { localStorage.setItem('convoia_settings_team_members_expanded', String(membersExpanded)) } catch {}
   }, [membersExpanded])
+  // Assign tokens modal
+  const [assignTokensTarget, setAssignTokensTarget] = useState<TeamMember | null>(null)
+  const [assignTokensAmount, setAssignTokensAmount] = useState('')
+  const [isAssigningTokens, setIsAssigningTokens] = useState(false)
 
   const fetchData = async () => {
     try {
@@ -263,6 +269,32 @@ export function TeamPage() {
       fetchData()
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to change role')
+    }
+  }
+
+  const handleAssignTokens = async () => {
+    if (!assignTokensTarget || !assignTokensAmount) return
+    const tokens = parseInt(assignTokensAmount)
+    if (!tokens || tokens <= 0) {
+      toast.error('Enter a positive token amount')
+      return
+    }
+    if (tokens > tokenBalance) {
+      toast.error(`Insufficient balance. You have ${formattedBalance}.`)
+      return
+    }
+    try {
+      setIsAssigningTokens(true)
+      await api.post('/token-wallet/allocate', { toUserId: assignTokensTarget.id, tokens })
+      toast.success(`${formatTokens(tokens)} tokens assigned to ${assignTokensTarget.name}`)
+      setAssignTokensTarget(null)
+      setAssignTokensAmount('')
+      refreshTokens()
+      fetchData()
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to assign tokens')
+    } finally {
+      setIsAssigningTokens(false)
     }
   }
 
@@ -506,6 +538,11 @@ export function TeamPage() {
                           isOwner={isOwner}
                           onViewProfile={() => navigate(`/team/${m.id}`)}
                           onSetBudget={() => { setBudgetTarget(m); setBudgetCap(String(m.budget?.monthlyCap || '')) }}
+                          onAssignTokens={
+                            canAssignTokens && m.id !== user?.id && m.role !== 'org_owner'
+                              ? () => { setAssignTokensTarget(m); setAssignTokensAmount('') }
+                              : undefined
+                          }
                           onChangeRole={() => { setRoleChangeTarget(m); setNewRole(m.role) }}
                           onRemove={() => setConfirmAction({ type: 'remove', id: m.id, name: m.name })}
                           onDelete={isOwner ? () => setConfirmAction({ type: 'delete', id: m.id, name: m.name }) : undefined}
@@ -633,6 +670,37 @@ export function TeamPage() {
         </div>
       </Modal>
 
+      {/* ── ASSIGN TOKENS MODAL ─────────────────── */}
+      <Modal
+        isOpen={!!assignTokensTarget}
+        onClose={() => setAssignTokensTarget(null)}
+        title={`Assign Tokens to ${assignTokensTarget?.name ?? ''}`}
+      >
+        <div className="space-y-4">
+          <div className="bg-surface-2 border border-border rounded-lg p-3 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-text-muted">Your available balance</p>
+              <p className="text-lg font-mono text-primary">{formattedBalance}</p>
+            </div>
+            <Zap size={24} className="text-primary opacity-60" />
+          </div>
+          <Input
+            label="Tokens to assign"
+            type="number"
+            value={assignTokensAmount}
+            onChange={(e) => setAssignTokensAmount(e.target.value)}
+            placeholder="e.g. 100000"
+          />
+          <p className="text-xs text-text-muted">
+            Tokens are transferred from your wallet to {assignTokensTarget?.name ?? 'this member'}'s allocation.
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={() => setAssignTokensTarget(null)}>Cancel</Button>
+            <Button onClick={handleAssignTokens} isLoading={isAssigningTokens}>Assign Tokens</Button>
+          </div>
+        </div>
+      </Modal>
+
       {/* ── ROLE CHANGE MODAL ───────────────────── */}
       <Modal
         isOpen={!!roleChangeTarget}
@@ -714,6 +782,7 @@ function MemberActions({
   isOwner,
   onViewProfile,
   onSetBudget,
+  onAssignTokens,
   onChangeRole,
   onRemove,
   onDelete,
@@ -722,6 +791,7 @@ function MemberActions({
   isOwner: boolean
   onViewProfile: () => void
   onSetBudget: () => void
+  onAssignTokens?: () => void
   onChangeRole: () => void
   onRemove: () => void
   onDelete?: () => void
@@ -770,6 +840,14 @@ function MemberActions({
             >
               <Shield size={14} /> Set Budget
             </button>
+            {onAssignTokens && (
+              <button
+                onClick={() => { onAssignTokens(); setOpen(false) }}
+                className="w-full px-3 py-2 text-left text-sm text-text-secondary hover:bg-surface-2 transition-colors flex items-center gap-2"
+              >
+                <Zap size={14} /> Assign Tokens
+              </button>
+            )}
             {isOwner && member.role !== 'org_owner' && (
               <button
                 onClick={() => { onChangeRole(); setOpen(false) }}
