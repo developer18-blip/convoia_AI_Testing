@@ -153,7 +153,7 @@ export function PricingPage() {
           <div className="lp-final-cta__ambient" />
           <ConvoiaMark size={48} state="council" />
           <h2 className="text-h1" style={{ marginTop: 24, marginBottom: 12, color: 'var(--text-primary)' }}>
-            Start with 500K free tokens
+            Start free — no subscription
           </h2>
           <p className="text-body-lg" style={{ color: 'var(--text-secondary)', marginBottom: 32 }}>
             No credit card required. Test every model before you spend a cent.

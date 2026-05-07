@@ -139,7 +139,7 @@ export function LoginCarousel() {
       <Link to="/register" className="login-carousel__cta">
         <span className="login-carousel__cta-label">New to Convoia?</span>
         <span className="login-carousel__cta-headline">
-          Get <span className="login-carousel__cta-highlight">100K free tokens</span> to start
+          Pay only <span className="login-carousel__cta-highlight">when you use it</span>
         </span>
         <span className="login-carousel__cta-arrow" aria-hidden="true">→</span>
       </Link>

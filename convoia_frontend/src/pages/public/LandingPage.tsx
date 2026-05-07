@@ -132,7 +132,7 @@ const FEATURES = [
 ]
 
 const HOW_STEPS = [
-  { num: '01', title: 'Sign up in 30 seconds', body: 'Email + password. No credit card. 500K free tokens to test every model.' },
+  { num: '01', title: 'Sign up in 30 seconds', body: 'Email + password. No credit card. Test every model from one dashboard.' },
   { num: '02', title: 'Pick a model, or let us pick', body: 'Choose from Claude, GPT, Gemini, and 32 more. Or let Auto-Route pick the best model for the task.' },
   { num: '03', title: 'See your savings in real time', body: 'Every query shows the cost. Compare against running the same workload on direct APIs. Most teams save 40–60%.' },
 ]
@@ -214,7 +214,7 @@ export function LandingPage() {
                   <path d="M5 12h14M13 5l7 7-7 7" />
                 </svg>
               }>
-                Start free — 500K tokens
+                Start free — no subscription
               </Button>
             </Link>
             <a href="#how-it-works">
@@ -584,7 +584,7 @@ export function LandingPage() {
                 <path d="M5 12h14M13 5l7 7-7 7" />
               </svg>
             }>
-              Start free — 500K tokens
+              Start free — no subscription
             </Button>
           </Link>
           <div className="mono-label" style={{ marginTop: 20, opacity: 0.6 }}>NO CREDIT CARD · CANCEL ANYTIME</div>
