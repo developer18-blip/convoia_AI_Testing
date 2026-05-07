@@ -47,7 +47,7 @@ const TIERS: Tier[] = [
 
 const FAQ = [
   { q: 'How does token pricing work?',
-    a: 'Tokens are units of AI processing. Cheap models like GPT-4o-mini use fewer tokens per message. Premium models like Claude Opus 4.6 use more. We show exact cost before each query.' },
+    a: 'Tokens are units of AI processing. Cheap models like GPT-4o-mini use fewer tokens per message. Premium models like Claude Opus 4.7 use more. We show exact cost before each query.' },
   { q: 'Do tokens expire?',
     a: 'No. Tokens never expire. Buy once, use them whenever you need.' },
   { q: 'Can I switch between models?',

@@ -14,14 +14,13 @@ import { useAccent } from '../../contexts/AccentContext'
 type TierVariant = 'primary' | 'secondary' | 'outline'
 
 const PROVIDERS: Array<{ key: ProviderKey; models: string }> = [
-  { key: 'openai', models: 'GPT-5.4, GPT-4.1, o3, o4-mini' },
-  { key: 'anthropic', models: 'Claude Opus 4.6, Sonnet 4.6, Haiku 4.5' },
+  { key: 'openai', models: 'GPT-5.5, GPT-5.4, GPT-5, o3' },
+  { key: 'anthropic', models: 'Claude Opus 4.7, Sonnet 4.6, Haiku 4.5' },
   { key: 'google', models: 'Gemini 3.1 Pro, 2.5 Pro, 2.5 Flash' },
-  { key: 'perplexity', models: 'Sonar Pro, Sonar Reasoning Pro' },
-  { key: 'xai', models: 'Grok 4.20, Grok 3, Grok 3 Mini' },
+  { key: 'perplexity', models: 'Sonar Reasoning Pro, Deep Research' },
+  { key: 'xai', models: 'Grok 4.20, Grok 4.1 Fast, Grok 3' },
   { key: 'deepseek', models: 'DeepSeek Chat, Reasoner' },
-  { key: 'mistral', models: 'Mistral Large, Mistral Small' },
-  { key: 'meta', models: 'Llama 3.3 70B, Mixtral 8x7B' },
+  { key: 'mistral', models: 'Mistral Large, Medium, Codestral' },
 ]
 
 interface Tier {
