@@ -1,13 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronDown, RotateCcw, Sparkles, X } from 'lucide-react'
+import { ChevronDown, RotateCcw, Sparkles } from 'lucide-react'
 import { useChatbot } from '../../hooks/useChatbot'
 import { ChatbotMessage } from './ChatbotMessage'
 import { ChatbotInput } from './ChatbotInput'
 
 const STORAGE_OPENED_KEY = 'convoia_chatbot_opened_v1'
-const STORAGE_DISMISSED_KEY = 'convoia_chatbot_dismissed_v1'
 
 const STARTER_QUESTIONS = [
   'What is Convoia AI?',
@@ -34,9 +33,6 @@ export function ChatbotWidget() {
   const [isOpen, setIsOpen] = useState(false)
   const [hasOpenedBefore, setHasOpenedBefore] = useState(() => {
     try { return localStorage.getItem(STORAGE_OPENED_KEY) === '1' } catch { return false }
-  })
-  const [isDismissed, setIsDismissed] = useState(() => {
-    try { return localStorage.getItem(STORAGE_DISMISSED_KEY) === '1' } catch { return false }
   })
   const [pendingDraft, setPendingDraft] = useState<string | undefined>(undefined)
   const { messages, isStreaming, sendMessage, reset } = useChatbot()
@@ -101,13 +97,7 @@ export function ChatbotWidget() {
     setIsOpen(false)
   }
 
-  const handleDismissForever = () => {
-    try { localStorage.setItem(STORAGE_DISMISSED_KEY, '1') } catch { /* ignore */ }
-    setIsDismissed(true)
-    setIsOpen(false)
-  }
-
-  if (isHidden || isDismissed) return null
+  if (isHidden) return null
 
   return (
     <>
@@ -266,14 +256,6 @@ export function ChatbotWidget() {
                 style={iconBtnStyle}
               >
                 <ChevronDown size={16} strokeWidth={2.2} />
-              </button>
-              <button
-                onClick={handleDismissForever}
-                aria-label="Dismiss chatbot"
-                title="Hide forever (this session)"
-                style={iconBtnStyle}
-              >
-                <X size={14} strokeWidth={2.2} />
               </button>
             </div>
 
