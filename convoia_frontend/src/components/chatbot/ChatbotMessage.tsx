@@ -4,13 +4,15 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Sparkles } from 'lucide-react'
 import { ChatbotCTACard } from './ChatbotCTACard'
-import { parseAssistantMessage, resolveActionRoute } from '../../hooks/useChatbot'
+import { parseAssistantMessage } from '../../hooks/useChatbot'
 import type { ChatbotMessage as MsgType } from '../../hooks/useChatbot'
 
 interface ChatbotMessageProps {
   message: MsgType
   onFollowupClick: (question: string) => void
-  onCtaNavigate: (route: string) => void
+  /** Receives the raw action_id emitted by the bot — the widget resolves
+   *  + auth-checks + navigates so the logic lives in one place. */
+  onCtaNavigate: (actionId: string) => void
 }
 
 function formatCost(cost?: number): string | null {
@@ -135,10 +137,7 @@ function ChatbotMessageBase({ message, onFollowupClick, onCtaNavigate }: Chatbot
           {cta && !message.isStreaming && (
             <ChatbotCTACard
               cta={cta}
-              onClick={() => {
-                const route = resolveActionRoute(cta.actionId)
-                if (route) onCtaNavigate(route)
-              }}
+              onClick={() => onCtaNavigate(cta.actionId)}
             />
           )}
         </div>

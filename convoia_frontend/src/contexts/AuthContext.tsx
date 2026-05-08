@@ -102,10 +102,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(newToken)
       setUser(userData)
       setIsLoading(false)
-      // Mobile: land on /dashboard so the bottom-tab nav works correctly and
-      //   back from /chat returns to home (not login). Desktop: keep /chat as
-      //   the primary surface. replace:true so /login is removed from history.
-      navigate(isNative ? '/dashboard' : '/chat', { replace: true })
+      // Honor a stashed chatbot/CTA destination if present (same one-shot
+      // pattern as redirectByRole). Default is mobile /dashboard, desktop /chat.
+      let intended: string | null = null
+      try {
+        intended = sessionStorage.getItem('convoia_post_auth_redirect')
+        if (intended) sessionStorage.removeItem('convoia_post_auth_redirect')
+      } catch { /* ignore */ }
+      if (intended && intended.startsWith('/')) {
+        navigate(intended, { replace: true })
+      } else {
+        navigate(isNative ? '/dashboard' : '/chat', { replace: true })
+      }
     }
 
     window.addEventListener('convoia:auth', handleDeepLinkAuth)
@@ -114,8 +122,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const redirectByRole = useCallback(
     (_role: string) => {
-      // Mobile lands on /dashboard (home with bottom tabs) so back from /chat
-      // returns home. Desktop keeps /chat as the primary post-auth surface.
+      // If a chatbot CTA (or any flow) stashed an intended destination in
+      // sessionStorage, honor it once and clear. Otherwise fall back to
+      // the role default — mobile /dashboard, desktop /chat.
+      let intended: string | null = null
+      try {
+        intended = sessionStorage.getItem('convoia_post_auth_redirect')
+        if (intended) sessionStorage.removeItem('convoia_post_auth_redirect')
+      } catch { /* private mode / quota — fall through to default */ }
+
+      if (intended && intended.startsWith('/')) {
+        navigate(intended, { replace: true })
+        return
+      }
       navigate(isNative ? '/dashboard' : '/chat', { replace: true })
     },
     [navigate]

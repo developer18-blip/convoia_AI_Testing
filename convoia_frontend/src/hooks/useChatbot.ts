@@ -258,28 +258,160 @@ export function parseAssistantMessage(content: string): ParsedAssistantMessage {
 }
 
 /**
- * Map the bot's action_id to a frontend route. Public IDs that are
- * okay to expose to anonymous users go straight there; protected ones
- * route through /register so the visitor lands at the destination
- * after signup.
+ * Resolved action — the route to navigate to + whether it requires auth.
+ * The widget uses `isProtected` to decide whether to send a logged-out
+ * visitor through /register first (preserving intent via sessionStorage
+ * so AuthContext drops them at the destination, not the default /chat).
  */
-const ACTION_ROUTES: Record<string, string> = {
-  signup: '/register',
-  login: '/login',
-  pricing: '/#pricing',
-  privacy: '/privacy',
-  terms: '/terms',
-  api_docs: '/api-docs',
-  chat: '/chat',
-  buy_tokens: '/tokens/buy',
-  buy_starter: '/tokens/buy?package=starter',
-  buy_standard: '/tokens/buy?package=standard',
-  buy_popular: '/tokens/buy?package=popular',
-  buy_power: '/tokens/buy?package=power',
-  buy_pro: '/tokens/buy?package=pro',
-  buy_enterprise: '/tokens/buy?package=enterprise',
+export interface ResolvedAction {
+  path: string
+  isProtected: boolean
 }
 
-export function resolveActionRoute(actionId: string): string | null {
-  return ACTION_ROUTES[actionId] || null
+/**
+ * Master action map. Additions here automatically become callable by the
+ * bot — just teach it the new action_id in chatbotKnowledgeBase.ts and
+ * pick a sensible default label. Keys are normalized (lowercase, no
+ * whitespace) so a slightly off model emission still resolves.
+ */
+const ACTION_ROUTES: Record<string, ResolvedAction> = {
+  // Auth / public
+  signup:        { path: '/register',                          isProtected: false },
+  register:      { path: '/register',                          isProtected: false },
+  login:         { path: '/login',                             isProtected: false },
+  pricing:       { path: '/#pricing',                          isProtected: false },
+  features:      { path: '/#features',                         isProtected: false },
+  how_it_works:  { path: '/#how-it-works',                     isProtected: false },
+  reviews:       { path: '/#reviews',                          isProtected: false },
+  privacy:       { path: '/privacy',                           isProtected: false },
+  terms:         { path: '/terms',                             isProtected: false },
+
+  // Core app surfaces (require auth)
+  chat:          { path: '/chat',                              isProtected: true },
+  dashboard:     { path: '/dashboard',                         isProtected: true },
+  models:        { path: '/models',                            isProtected: true },
+  api_keys:      { path: '/api-keys',                          isProtected: true },
+  api_docs:      { path: '/api-docs',                          isProtected: true },
+
+  // Token purchase flows
+  buy_tokens:      { path: '/tokens/buy',                      isProtected: true },
+  buy_starter:     { path: '/tokens/buy?package=starter',      isProtected: true },
+  buy_standard:    { path: '/tokens/buy?package=standard',     isProtected: true },
+  buy_popular:     { path: '/tokens/buy?package=popular',      isProtected: true },
+  buy_power:       { path: '/tokens/buy?package=power',        isProtected: true },
+  buy_pro:         { path: '/tokens/buy?package=pro',          isProtected: true },
+  buy_enterprise:  { path: '/tokens/buy?package=enterprise',   isProtected: true },
+
+  // Settings / preferences (sub-tabs are query-driven; SettingsPage falls back
+  // to its default tab if the param isn't recognized — graceful degrade).
+  settings:        { path: '/settings',                        isProtected: true },
+  profile:         { path: '/settings?tab=profile',            isProtected: true },
+  language:        { path: '/settings?tab=profile',            isProtected: true },
+  preferences:     { path: '/settings?tab=preferences',        isProtected: true },
+  appearance:      { path: '/settings?tab=appearance',         isProtected: true },
+  notifications:   { path: '/settings?tab=notifications',      isProtected: true },
+  security:        { path: '/settings?tab=security',           isProtected: true },
+
+  // Billing / usage / wallet
+  usage:           { path: '/usage',                           isProtected: true },
+  budget:          { path: '/budget',                          isProtected: true },
+  wallet:          { path: '/dashboard',                       isProtected: true },
+  transactions:    { path: '/transactions',                    isProtected: true },
+
+  // Team / org (additional role gating happens at the route level — the
+  // user just bounces to /dashboard if their role can't see it; that's
+  // still better than dropping them on landing).
+  team:            { path: '/team',                            isProtected: true },
+  org:             { path: '/org',                             isProtected: true },
+  org_billing:     { path: '/org/billing',                     isProtected: true },
+  org_analytics:   { path: '/org/analytics',                   isProtected: true },
+
+  // Misc
+  tasks:           { path: '/tasks',                           isProtected: true },
+  sessions:        { path: '/sessions',                        isProtected: true },
+  reset_password:  { path: '/reset-password',                  isProtected: false },
+  verify_email:    { path: '/verify-email',                    isProtected: false },
+}
+
+/**
+ * Fuzzy fallback — when the bot emits an unfamiliar action_id, scan its
+ * keywords for a near-match. Conservative on purpose: each branch only
+ * fires on a clear keyword. Last-ditch fallback is /#pricing because
+ * sending the user to a meaningful surface beats a no-op every time.
+ */
+function fuzzyResolve(actionId: string): ResolvedAction | null {
+  const id = actionId.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+
+  // Tokens & purchase
+  if (/(buy|purchase|pay).*?(token|pack|plan|credit)|^token|credit|topup|top_up|recharge/.test(id)) {
+    return ACTION_ROUTES.buy_tokens
+  }
+  if (/(starter|5_dollar|5_buck)/.test(id))     return ACTION_ROUTES.buy_starter
+  if (/standard|14_dollar|2m/.test(id))          return ACTION_ROUTES.buy_standard
+  if (/popular|25_dollar|5m/.test(id))           return ACTION_ROUTES.buy_popular
+  if (/power|60_dollar|15m/.test(id))            return ACTION_ROUTES.buy_power
+  if (/^pro$|175_dollar|50m/.test(id))           return ACTION_ROUTES.buy_pro
+  if (/enterprise|300_dollar|100m/.test(id))     return ACTION_ROUTES.buy_enterprise
+
+  // Auth
+  if (/(sign|create).*account|register|signup|join/.test(id))   return ACTION_ROUTES.signup
+  if (/^login$|sign_?in|log_?in/.test(id))                       return ACTION_ROUTES.login
+
+  // Settings family
+  if (/language|locale|translate/.test(id))      return ACTION_ROUTES.language
+  if (/profile|account_info|my_account/.test(id)) return ACTION_ROUTES.profile
+  if (/appearance|theme|dark|light/.test(id))    return ACTION_ROUTES.appearance
+  if (/notification|email_alert|alert/.test(id)) return ACTION_ROUTES.notifications
+  if (/security|password|two_factor|2fa/.test(id)) return ACTION_ROUTES.security
+  if (/setting|preference|config/.test(id))      return ACTION_ROUTES.settings
+
+  // Billing / usage
+  if (/usage|consumption|stats|analytics/.test(id))      return ACTION_ROUTES.usage
+  if (/budget|spend_limit|cap/.test(id))                  return ACTION_ROUTES.budget
+  if (/wallet|balance/.test(id))                          return ACTION_ROUTES.wallet
+  if (/transaction|history|receipt|invoice/.test(id))     return ACTION_ROUTES.transactions
+
+  // Team / org
+  if (/team|member|colleague/.test(id))           return ACTION_ROUTES.team
+  if (/org_?billing/.test(id))                    return ACTION_ROUTES.org_billing
+  if (/org|organization|company/.test(id))        return ACTION_ROUTES.org
+
+  // Surfaces
+  if (/^chat$|conversation/.test(id))             return ACTION_ROUTES.chat
+  if (/dashboard|home|overview/.test(id))         return ACTION_ROUTES.dashboard
+  if (/^models?$|model_list/.test(id))            return ACTION_ROUTES.models
+  if (/api_?key/.test(id))                        return ACTION_ROUTES.api_keys
+  if (/api_?doc|developer/.test(id))              return ACTION_ROUTES.api_docs
+  if (/feature|capability/.test(id))              return ACTION_ROUTES.features
+  if (/how_?it_?work|tutorial|guide/.test(id))    return ACTION_ROUTES.how_it_works
+  if (/price|plan|cost/.test(id))                 return ACTION_ROUTES.pricing
+  if (/privacy/.test(id))                         return ACTION_ROUTES.privacy
+  if (/term|tos|conditions/.test(id))             return ACTION_ROUTES.terms
+
+  return null
+}
+
+/**
+ * Resolve a bot-emitted action_id to a navigable route. Tries exact match,
+ * then fuzzy keyword match, then accepts a path-shaped string as a literal
+ * route, then falls back to landing-pricing so the click is never a no-op.
+ */
+export function resolveActionRoute(actionId: string): ResolvedAction | null {
+  if (!actionId) return null
+  const normalized = actionId.toLowerCase().trim().replace(/\s+/g, '_').replace(/-/g, '_')
+
+  if (ACTION_ROUTES[normalized]) return ACTION_ROUTES[normalized]
+
+  const fuzzy = fuzzyResolve(normalized)
+  if (fuzzy) return fuzzy
+
+  // Path-like literals from the bot — accept as-is but flag as protected if
+  // not in our public list, so logged-out users get the redirect treatment.
+  if (actionId.startsWith('/')) {
+    const isPublic = /^\/(register|login|privacy|terms|reset-password|verify-email|join)(\/|\?|#|$)/.test(actionId)
+    return { path: actionId, isProtected: !isPublic }
+  }
+
+  // Last-resort: send to landing's pricing section. Public, useful, never empty.
+  return { path: '/#pricing', isProtected: false }
 }
