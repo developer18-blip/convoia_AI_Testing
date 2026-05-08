@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) || 'https://convoia.ai/api'
 
@@ -34,6 +34,16 @@ export function useChatbot() {
   const [error, setError] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
+  // Mirror messages into a ref so sendMessage can read the *current* value
+  // synchronously. Reading directly from state inside a useCallback closure
+  // would be stale (deps don't include `messages`), and reading inside a
+  // setMessages updater is async — by the time the updater runs, fetch has
+  // already fired with an empty payload. The ref sidesteps both.
+  const messagesRef = useRef<ChatbotMessage[]>([])
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
+
   const reset = useCallback(() => {
     abortRef.current?.abort()
     abortRef.current = null
@@ -48,28 +58,28 @@ export function useChatbot() {
 
     setError(null)
 
-    // Snapshot current messages + new user turn for the API payload.
-    // We can't trust state-after-set, so build the array explicitly.
-    const apiMessages: Array<{ role: 'user' | 'assistant'; content: string }> = []
-    setMessages((prev) => {
-      for (const m of prev) {
-        if (!m.isStreaming && !m.errored) apiMessages.push({ role: m.role, content: m.content })
-      }
-      apiMessages.push({ role: 'user', content: trimmed })
-      const userMsg: ChatbotMessage = {
-        id: `u_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        role: 'user',
-        content: trimmed,
-      }
-      const assistantMsg: ChatbotMessage = {
-        id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        role: 'assistant',
-        content: '',
-        isStreaming: true,
-      }
-      return [...prev, userMsg, assistantMsg]
-    })
+    // Build the API payload from the latest messages (read via ref) plus
+    // the new user turn. Then schedule the state update — order matters:
+    // payload must be assembled before fetch fires, state update can lag.
+    const apiMessages: Array<{ role: 'user' | 'assistant'; content: string }> = [
+      ...messagesRef.current
+        .filter((m) => !m.isStreaming && !m.errored)
+        .map((m) => ({ role: m.role, content: m.content })),
+      { role: 'user', content: trimmed },
+    ]
 
+    const userMsg: ChatbotMessage = {
+      id: `u_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      role: 'user',
+      content: trimmed,
+    }
+    const assistantMsg: ChatbotMessage = {
+      id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      role: 'assistant',
+      content: '',
+      isStreaming: true,
+    }
+    setMessages((prev) => [...prev, userMsg, assistantMsg])
     setIsStreaming(true)
 
     const controller = new AbortController()
