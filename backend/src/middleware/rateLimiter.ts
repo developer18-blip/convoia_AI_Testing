@@ -66,4 +66,37 @@ export const strictLimiter = rateLimit({
   validate: { xForwardedForHeader: false },
 });
 
+// Public visitor chatbot — anonymous, IP-keyed. We eat the token cost as
+// marketing CAC, so per-IP caps prevent any one visitor from grinding through
+// our budget. Burst cap is the tighter constraint; daily cap is the safety net.
+export const chatbotBurstLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 15,
+  message: {
+    success: false,
+    statusCode: 429,
+    code: 'CHATBOT_RATE_LIMIT',
+    message: "You've sent a lot of messages — give it an hour, then try again.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
+  keyGenerator: (req) => `chatbot-burst:${req.ip || 'unknown'}`,
+});
+
+export const chatbotDailyLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000, // 24 hours
+  max: 50,
+  message: {
+    success: false,
+    statusCode: 429,
+    code: 'CHATBOT_DAILY_LIMIT',
+    message: "You've reached today's chatbot limit. Try again tomorrow, or sign up to use the real models.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
+  keyGenerator: (req) => `chatbot-daily:${req.ip || 'unknown'}`,
+});
+
 export default apiLimiter;

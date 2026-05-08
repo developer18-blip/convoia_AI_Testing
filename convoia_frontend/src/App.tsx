@@ -8,6 +8,7 @@ import { TokenProvider } from './contexts/TokenContext'
 import { ChatProvider } from './contexts/ChatContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ToastContainer } from './components/ui/Toast'
+import { ChatbotWidget } from './components/chatbot/ChatbotWidget'
 import { AppShell } from './components/layout/AppShell'
 import { MobileAppShell } from './components/mobile/MobileAppShell'
 import { LoadingPage } from './components/shared/LoadingPage'
@@ -242,6 +243,7 @@ export default function App() {
                 <TokenProvider>
                   <ChatProvider>
                     <AppRoutes />
+                    {!isNative && <ChatbotWidget />}
                     <ToastContainer />
                   </ChatProvider>
                 </TokenProvider>
