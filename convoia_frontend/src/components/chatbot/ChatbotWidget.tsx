@@ -2,9 +2,15 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronDown, RotateCcw, Sparkles } from 'lucide-react'
-import { useChatbot } from '../../hooks/useChatbot'
+import { useChatbot, resolveActionRoute } from '../../hooks/useChatbot'
+import { useAuth } from '../../hooks/useAuth'
 import { ChatbotMessage } from './ChatbotMessage'
 import { ChatbotInput } from './ChatbotInput'
+
+/** sessionStorage key picked up by AuthContext after a successful login/
+ *  register so the user lands on their intended destination instead of
+ *  the default /chat. Lifecycle: set here, consumed once, then cleared. */
+export const POST_AUTH_REDIRECT_KEY = 'convoia_post_auth_redirect'
 
 const STORAGE_OPENED_KEY = 'convoia_chatbot_opened_v1'
 
@@ -30,6 +36,7 @@ const STARTER_QUESTIONS = [
 export function ChatbotWidget() {
   const location = useLocation()
   const navigate = useNavigate()
+  const { isAuthenticated } = useAuth()
   const [isOpen, setIsOpen] = useState(false)
   const [hasOpenedBefore, setHasOpenedBefore] = useState(() => {
     try { return localStorage.getItem(STORAGE_OPENED_KEY) === '1' } catch { return false }
@@ -76,24 +83,60 @@ export function ChatbotWidget() {
     setPendingDraft(q)
   }
 
-  const handleCtaNavigate = (route: string) => {
-    // External hash anchors and full URLs go through window; in-app routes use react-router
-    if (route.startsWith('http')) {
-      window.location.href = route
+  /**
+   * Auth-aware CTA navigation. The bot emits an action_id; we resolve it to
+   * a route + protection flag, then route based on auth state:
+   *
+   *   - Public route        -> navigate directly
+   *   - Hash anchor         -> navigate to /, smooth-scroll to section
+   *   - External http(s)    -> full-page window.location
+   *   - Protected + auth'd  -> navigate directly
+   *   - Protected + anon    -> stash destination in sessionStorage, send to
+   *                            /register; AuthContext consumes the stash
+   *                            after login and lands the user on the
+   *                            originally-requested page (so "Buy tokens"
+   *                            from a logged-out visit ends on /tokens/buy
+   *                            after signup, not the default /chat).
+   */
+  const handleCtaNavigate = (actionId: string) => {
+    const action = resolveActionRoute(actionId)
+    if (!action) {
+      // resolveActionRoute returns at worst /#pricing, so this branch is
+      // defensive only. Keep the widget open so the user can ask again.
       return
     }
-    if (route.startsWith('/#')) {
-      // Anchor on landing — close widget and navigate
-      navigate('/')
-      setTimeout(() => {
-        const id = route.slice(2)
+    const { path, isProtected } = action
+
+    if (path.startsWith('http')) {
+      window.location.href = path
+      return
+    }
+
+    if (path.startsWith('/#')) {
+      const id = path.slice(2).split('?')[0]
+      // If we're already on landing, just scroll. Otherwise route + scroll.
+      if (location.pathname === '/') {
         const el = document.getElementById(id)
         if (el) el.scrollIntoView({ behavior: 'smooth' })
-      }, 100)
+      } else {
+        navigate('/')
+        setTimeout(() => {
+          const el = document.getElementById(id)
+          if (el) el.scrollIntoView({ behavior: 'smooth' })
+        }, 120)
+      }
       setIsOpen(false)
       return
     }
-    navigate(route)
+
+    if (isProtected && !isAuthenticated) {
+      try { sessionStorage.setItem(POST_AUTH_REDIRECT_KEY, path) } catch { /* ignore quota */ }
+      navigate('/register', { state: { from: path } })
+      setIsOpen(false)
+      return
+    }
+
+    navigate(path)
     setIsOpen(false)
   }
 

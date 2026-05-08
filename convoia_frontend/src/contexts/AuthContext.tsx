@@ -4,6 +4,7 @@ import api from '../lib/api'
 import { setToken as setStorageToken, setRefreshToken as setStorageRefresh, setUserProfile, clearAuth } from '../lib/storage'
 import { useAccent } from './AccentContext'
 import type { User } from '../types'
+import { isNative } from '../lib/capacitor'
 
 interface AuthContextType {
   user: User | null
@@ -103,9 +104,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(newToken)
       setUser(userData)
       setIsLoading(false)
-      // Intellect is the primary surface — every role lands there on
-      // sign-in. Admins can reach /admin via the sidebar if they want.
-      navigate('/chat')
+      // Honor a stashed chatbot/CTA destination if present (same one-shot
+      // pattern as redirectByRole). Default is mobile /dashboard, desktop /chat.
+      let intended: string | null = null
+      try {
+        intended = sessionStorage.getItem('convoia_post_auth_redirect')
+        if (intended) sessionStorage.removeItem('convoia_post_auth_redirect')
+      } catch { /* ignore */ }
+      if (intended && intended.startsWith('/')) {
+        navigate(intended, { replace: true })
+      } else {
+        navigate(isNative ? '/dashboard' : '/chat', { replace: true })
+      }
     }
 
     window.addEventListener('convoia:auth', handleDeepLinkAuth)
@@ -114,11 +124,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const redirectByRole = useCallback(
     (_role: string) => {
-      // Post-login / post-register every role lands on Intellect.
-      // Prior behaviour sent platform_admins to /admin and everyone
-      // else to /dashboard — the dashboard is no longer the home
-      // surface now that Convoia AI is the product.
-      navigate('/chat')
+      // If a chatbot CTA (or any flow) stashed an intended destination in
+      // sessionStorage, honor it once and clear. Otherwise fall back to
+      // the role default — mobile /dashboard, desktop /chat.
+      let intended: string | null = null
+      try {
+        intended = sessionStorage.getItem('convoia_post_auth_redirect')
+        if (intended) sessionStorage.removeItem('convoia_post_auth_redirect')
+      } catch { /* private mode / quota — fall through to default */ }
+
+      if (intended && intended.startsWith('/')) {
+        navigate(intended, { replace: true })
+        return
+      }
+      navigate(isNative ? '/dashboard' : '/chat', { replace: true })
     },
     [navigate]
   )
