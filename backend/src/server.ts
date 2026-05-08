@@ -37,6 +37,7 @@ import memoryRoutes from './routes/memoryRoutes.js';
 import audioRoutes from './routes/audioRoutes.js';
 import walletRoutes from './routes/walletRoutes.js';
 import agentToolRoutes from './routes/agentToolRoutes.js';
+import publicChatbotRoutes from './routes/publicChatbotRoutes.js';
 import { startLocalCleanup as startFileGenCleanup } from './services/fileGenerationService.js';
 
 const app: Express = express();
@@ -128,6 +129,7 @@ logger.info(`CORS: env=${isDev ? 'dev' : 'prod'} allowedOrigins=[${allowedOrigin
 app.use(compression({
   filter: (req, res) => {
     if (req.path.includes('/query/stream')) return false;
+    if (req.path.includes('/chatbot/stream')) return false;
     return compression.filter(req, res);
   },
 }));
@@ -267,6 +269,7 @@ app.use('/api/memory', memoryRoutes);
 app.use('/api/audio', audioRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/agent-tools', agentToolRoutes);
+app.use('/api/public', publicChatbotRoutes);
 
 // ============== 404 HANDLER ==============
 app.use('*', (req: Request, res: Response) => {
