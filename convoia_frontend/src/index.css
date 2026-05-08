@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
 @theme {
-  /* ─── Dark Mode: Neon Green Palette ─── */
-  --color-primary: #10A37F;
-  --color-primary-hover: #0D8A6A;
-  --color-primary-light: rgba(16, 163, 127, 0.15);
-  --color-primary-glow: rgba(16, 163, 127, 0.08);
+  /* ─── Dark Mode: Convoia turquoise (#14B8CD) ─── */
+  --color-primary: #14B8CD;
+  --color-primary-hover: #0891B2;
+  --color-primary-light: rgba(20, 184, 205, 0.15);
+  --color-primary-glow: rgba(20, 184, 205, 0.08);
 
-  --color-accent-start: #10A37F;
-  --color-accent-mid: #34D399;
-  --color-accent-end: #6EE7B7;
+  --color-accent-start: #14B8CD;
+  --color-accent-mid: #22D3EE;
+  --color-accent-end: #67E8F9;
 
   --color-background: #0D0D0D;
   --color-surface: #171717;
@@ -37,16 +37,16 @@
   --font-sans: 'Inter', -apple-system, system-ui, sans-serif;
 }
 
-/* ─── Light theme overrides: White + Vibrant Blue ─── */
+/* ─── Light theme overrides: White + Convoia turquoise ─── */
 html.light {
-  --color-primary: #2563EB !important;
-  --color-primary-hover: #1D4ED8 !important;
-  --color-primary-light: rgba(37, 99, 235, 0.08) !important;
-  --color-primary-glow: rgba(37, 99, 235, 0.06) !important;
+  --color-primary: #14B8CD !important;
+  --color-primary-hover: #0891B2 !important;
+  --color-primary-light: rgba(20, 184, 205, 0.08) !important;
+  --color-primary-glow: rgba(20, 184, 205, 0.06) !important;
 
-  --color-accent-start: #2563EB !important;
-  --color-accent-mid: #3B82F6 !important;
-  --color-accent-end: #60A5FA !important;
+  --color-accent-start: #14B8CD !important;
+  --color-accent-mid: #22D3EE !important;
+  --color-accent-end: #67E8F9 !important;
 
   --color-background: #F8FAFC !important;
   --color-surface: #FFFFFF !important;
@@ -68,8 +68,8 @@ html.light {
   --color-info: #3B82F6 !important;
 
   --color-glass: rgba(255, 255, 255, 0.95) !important;
-  --color-glass-border: rgba(37, 99, 235, 0.08) !important;
-  --color-glass-hover: rgba(37, 99, 235, 0.04) !important;
+  --color-glass-border: rgba(20, 184, 205, 0.08) !important;
+  --color-glass-hover: rgba(20, 184, 205, 0.04) !important;
 }
 
 html.light,

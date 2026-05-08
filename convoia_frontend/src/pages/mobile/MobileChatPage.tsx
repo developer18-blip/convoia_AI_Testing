@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { v4 as uuidv4 } from 'uuid'
 import { MessageArea } from '../../components/chat/MessageArea'
 import { MessageInput } from '../../components/chat/MessageInput'
@@ -8,17 +9,34 @@ import { useAgents } from '../../hooks/useAgents'
 import { useAuth } from '../../hooks/useAuth'
 import { useTokens } from '../../contexts/TokenContext'
 import { useToast } from '../../hooks/useToast'
-import { Menu, Plus, X, Clock, ChevronDown, Sparkles } from 'lucide-react'
+import { ArrowLeft, Brain, Menu, Plus, X, Clock, ChevronDown, Sparkles } from 'lucide-react'
 import type { Agent, Message } from '../../types'
 import { CouncilChip } from '../../components/council/CouncilChip'
 import { CouncilPicker } from '../../components/council/CouncilPicker'
+import { useAccent } from '../../contexts/AccentContext'
+
+interface MessageExtras {
+  fileAttachment?: Message['fileAttachment']
+  imagePreview?: string
+  imagePreviews?: string[]
+}
 
 export function MobileChatPage() {
+  const navigate = useNavigate()
   const { models } = useModels()
   const { agents } = useAgents()
   const { user: authUser } = useAuth()
   const { tokenBalance, hasTokens } = useTokens()
   const toast = useToast()
+
+  // Tab bar is hidden on /chat, so this is the only way back to the rest of
+  // the app. Use the router stack when there's history (came from /dashboard
+  // etc.); fall back to /dashboard for cold loads / deep links.
+  const handleBack = () => {
+    const idx = (window.history.state as { idx?: number } | null)?.idx
+    if (typeof idx === 'number' && idx > 0) navigate(-1)
+    else navigate('/dashboard')
+  }
   const {
     conversations, activeConversationId, messages, isStreaming, stopStreaming,
     selectedAgent, setSelectedAgent, setAgentMode,
@@ -35,11 +53,6 @@ export function MobileChatPage() {
   const [councilModelIds, setCouncilModelIds] = useState<string[]>([])
   const [showCouncilPicker, setShowCouncilPicker] = useState(false)
 
-  // Auto-select first model (skip if 'auto' is already chosen)
-  useEffect(() => {
-    if (models.length > 0 && !selectedModelId) setSelectedModelId(models[0].id)
-  }, [models, selectedModelId])
-
   // Listen for auto_model events emitted by ChatContext when the router picks a model
   useEffect(() => {
     const handler = (e: Event) => {
@@ -50,14 +63,21 @@ export function MobileChatPage() {
     return () => window.removeEventListener('convoia:auto_model', handler)
   }, [])
 
-  // When agent is selected (from MobileAgentsPage), auto-select its default model
-  useEffect(() => {
-    if (selectedAgent?.defaultModelId) {
-      setSelectedModelId(selectedAgent.defaultModelId)
-    }
-  }, [selectedAgent])
+  const effectiveSelectedModelId = selectedModelId || selectedAgent?.defaultModelId || models[0]?.id || ''
+  const selectedModel = models.find((m) => m.id === effectiveSelectedModelId) || null
 
-  const selectedModel = models.find((m) => m.id === selectedModelId) || null
+  // Sync AccentContext with the active model so chat-surface chrome shifts to
+  // the provider's brand color (anthropic orange, openai green, etc).
+  const { setActiveModel, setCouncilModels } = useAccent()
+  useEffect(() => {
+    if (councilMode && councilModelIds.length > 0) {
+      setCouncilModels(councilModelIds)
+    } else {
+      setCouncilModels([])
+      const model = models.find((m) => m.id === effectiveSelectedModelId)
+      setActiveModel(model?.modelId || effectiveSelectedModelId || '')
+    }
+  }, [effectiveSelectedModelId, councilMode, councilModelIds, models, setActiveModel, setCouncilModels])
   const activeModels = models.filter(m => m.isActive)
   const activeAgents = agents.filter(a => a.isActive)
 
@@ -71,9 +91,9 @@ export function MobileChatPage() {
 
   const handleSend = async (content: string) => {
     // Council mode uses councilModelIds; selectedModelId doesn't matter for validation.
-    if (!councilMode && !selectedModelId) { toast.error('Please select a model'); return }
+    if (!councilMode && !effectiveSelectedModelId) { toast.error('Please select a model'); return }
     if (councilMode && councilModelIds.length < 2) {
-      toast.error('Select at least 2 models for Council')
+      toast.error('Select at least 2 models for Apex')
       return
     }
     if (tokenBalance <= 0) {
@@ -82,14 +102,14 @@ export function MobileChatPage() {
     }
     if (!activeConversationId) {
       createConversation(
-        councilMode ? councilModelIds[0] : selectedModelId,
-        councilMode ? 'ConvoiaAI Council' : (selectedModel?.name || 'AI'),
+        councilMode ? councilModelIds[0] : effectiveSelectedModelId,
+        councilMode ? 'ConvoiaAI Apex' : (selectedModel?.name || 'AI'),
       )
     }
     const councilOpts = councilMode ? { modelIds: councilModelIds } : undefined
     await sendMessage(
       content,
-      councilMode ? councilModelIds[0] : selectedModelId,
+      councilMode ? councilModelIds[0] : effectiveSelectedModelId,
       undefined,
       selectedAgent?.id,
       thinkingEnabled,
@@ -97,10 +117,10 @@ export function MobileChatPage() {
     )
   }
 
-  const handleSendWithContext = (text: string, systemContext: string | null, extras?: any) => {
+  const handleSendWithContext = (text: string, systemContext: string | null, extras?: MessageExtras) => {
     if (!activeConversationId) createConversation(
-      councilMode ? councilModelIds[0] : selectedModelId,
-      councilMode ? 'ConvoiaAI Council' : (selectedModel?.name || 'AI'),
+      councilMode ? councilModelIds[0] : effectiveSelectedModelId,
+      councilMode ? 'ConvoiaAI Apex' : (selectedModel?.name || 'AI'),
     )
     const messageExtras: Partial<Message> = {}
     if (extras?.fileAttachment) messageExtras.fileAttachment = extras.fileAttachment
@@ -109,7 +129,7 @@ export function MobileChatPage() {
     const councilOpts = councilMode ? { modelIds: councilModelIds } : undefined
     sendWithContext(
       text,
-      councilMode ? councilModelIds[0] : selectedModelId,
+      councilMode ? councilModelIds[0] : effectiveSelectedModelId,
       systemContext,
       messageExtras,
       undefined,
@@ -120,7 +140,7 @@ export function MobileChatPage() {
   }
 
   const handleImageGenerated = (data: { url: string; prompt: string }) => {
-    if (!activeConversationId) createConversation(selectedModelId, selectedModel?.name || 'AI')
+    if (!activeConversationId) createConversation(effectiveSelectedModelId, selectedModel?.name || 'AI')
     addMessages([
       { id: uuidv4(), role: 'user', content: `Generate image: ${data.prompt}`, timestamp: new Date().toISOString() },
       { id: uuidv4(), role: 'assistant', content: `Here's the generated image for: "${data.prompt}"`, imageUrl: data.url, imagePrompt: data.prompt, model: 'dall-e-3', provider: 'openai', timestamp: new Date().toISOString() },
@@ -130,7 +150,7 @@ export function MobileChatPage() {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column',
-      height: 'calc(100dvh - env(safe-area-inset-top, 0px) - 60px - env(safe-area-inset-bottom, 0px))',
+      flex: 1, minHeight: 0, overflow: 'hidden',
       background: 'var(--chat-bg)',
     }}>
       {/* Council picker — bottom sheet */}
@@ -143,7 +163,7 @@ export function MobileChatPage() {
             setCouncilModelIds(ids)
             setCouncilMode(true)
             setShowCouncilPicker(false)
-            toast.success(`Council activated — ${ids.length} models`)
+            toast.success(`Apex activated — ${ids.length} models`)
           }}
           onClose={() => setShowCouncilPicker(false)}
         />
@@ -153,7 +173,7 @@ export function MobileChatPage() {
       {showHistory && (
         <>
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 60 }} onClick={() => setShowHistory(false)} />
-          <div style={{ position: 'fixed', top: 0, bottom: 0, left: 0, width: 'min(300px, 80vw)', zIndex: 70, background: 'var(--color-surface)', display: 'flex', flexDirection: 'column', paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+          <div style={{ position: 'fixed', top: 0, bottom: 0, left: 0, width: 'min(300px, 82vw)', zIndex: 70, background: 'var(--color-surface)', display: 'flex', flexDirection: 'column', paddingTop: 'env(safe-area-inset-top, 0px)', boxShadow: '4px 0 32px rgba(0,0,0,0.18)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderBottom: '1px solid var(--color-border)' }}>
               <h2 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: 'var(--color-text-primary)' }}>History</h2>
               <button onClick={() => setShowHistory(false)} style={{ padding: '6px', borderRadius: '8px', border: 'none', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', cursor: 'pointer' }}>
@@ -163,7 +183,7 @@ export function MobileChatPage() {
             <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
               <button onClick={() => { setActiveConversation(null); setShowHistory(false) }}
                 style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px dashed var(--color-border)', background: 'transparent', color: 'var(--color-primary)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
-                <Plus size={16} /> New conversation
+                <Plus size={16} /> New Chat
               </button>
               {conversations.filter(c => (c.messages?.length > 0) || (c.title && c.title !== 'New Chat')).map(conv => (
                 <button key={conv.id} onClick={() => { setActiveConversation(conv.id); setShowHistory(false) }}
@@ -184,7 +204,7 @@ export function MobileChatPage() {
       {showModelPicker && (
         <>
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 80 }} onClick={() => setShowModelPicker(false)} />
-          <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 90, background: 'var(--color-surface)', borderRadius: '24px 24px 0 0', maxHeight: '60vh', display: 'flex', flexDirection: 'column', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+          <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 90, background: 'var(--color-surface)', borderRadius: '24px 24px 0 0', maxHeight: 'calc(var(--vh, 1dvh) * 62)', display: 'flex', flexDirection: 'column', paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 12px)' }}>
             <div style={{ padding: '16px 20px 12px', borderBottom: '1px solid var(--color-border)' }}>
               <div style={{ width: '40px', height: '4px', borderRadius: '2px', background: 'var(--color-border)', margin: '0 auto 12px' }} />
               <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: 'var(--color-text-primary)' }}>Select Model</h3>
@@ -195,14 +215,14 @@ export function MobileChatPage() {
                   style={{
                     width: '100%', padding: '14px 16px', borderRadius: '14px', border: 'none', textAlign: 'left',
                     cursor: 'pointer', marginBottom: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    background: selectedModelId === m.id ? 'var(--color-primary-light)' : 'transparent',
+                    background: effectiveSelectedModelId === m.id ? 'var(--color-primary-light)' : 'transparent',
                   }}>
                   <div>
                     <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)', margin: 0 }}>{m.name}</p>
                     <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: '2px 0 0' }}>{m.provider}</p>
                   </div>
-                  {selectedModelId === m.id && (
-                    <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#7C3AED', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {effectiveSelectedModelId === m.id && (
+                    <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'white' }} />
                     </div>
                   )}
@@ -217,7 +237,7 @@ export function MobileChatPage() {
       {showAgentPicker && (
         <>
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 80 }} onClick={() => setShowAgentPicker(false)} />
-          <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 90, background: 'var(--color-surface)', borderRadius: '24px 24px 0 0', maxHeight: '65vh', display: 'flex', flexDirection: 'column', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+          <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 90, background: 'var(--color-surface)', borderRadius: '24px 24px 0 0', maxHeight: 'calc(var(--vh, 1dvh) * 68)', display: 'flex', flexDirection: 'column', paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 12px)' }}>
             <div style={{ padding: '16px 20px 12px', borderBottom: '1px solid var(--color-border)' }}>
               <div style={{ width: '40px', height: '4px', borderRadius: '2px', background: 'var(--color-border)', margin: '0 auto 12px' }} />
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -251,7 +271,7 @@ export function MobileChatPage() {
                     </p>
                   </div>
                   {selectedAgent?.id === agent.id && (
-                    <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#7C3AED', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'white' }} />
                     </div>
                   )}
@@ -263,16 +283,28 @@ export function MobileChatPage() {
       )}
 
       {/* Top bar */}
-      <div style={{ flexShrink: 0, padding: '10px 12px 8px', borderBottom: '1px solid var(--color-border)' }}>
-        {/* Row 1: Menu, title, actions */}
+      <div style={{
+        flexShrink: 0,
+        padding: '12px 14px 10px',
+        background: 'var(--mobile-topbar-bg)',
+        borderBottom: '1px solid var(--mobile-topbar-border)',
+        boxShadow: '0 8px 24px rgba(26,26,46,0.05)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+      }}>
+        {/* Row 1: Back, menu, title, actions */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button onClick={() => setShowHistory(true)}
-              style={{ padding: '6px', borderRadius: '8px', border: 'none', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', cursor: 'pointer' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+            <button onClick={handleBack} aria-label="Back"
+              style={{ width: '38px', height: '38px', borderRadius: '14px', border: '1px solid var(--color-primary-light)', background: 'var(--color-surface-2)', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <ArrowLeft size={18} />
+            </button>
+            <button onClick={() => setShowHistory(true)} aria-label="Chat history"
+              style={{ width: '38px', height: '38px', borderRadius: '14px', border: '1px solid var(--color-primary-light)', background: 'var(--color-surface-2)', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <Menu size={18} />
             </button>
-            <h1 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '160px' }}>
-              {activeConversationId ? (conversations.find(c => c.id === activeConversationId)?.title || 'Intellect') : 'New chat'}
+            <h1 style={{ fontSize: '15px', fontWeight: 900, color: 'var(--color-text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '120px', letterSpacing: 0 }}>
+              {activeConversationId ? (conversations.find(c => c.id === activeConversationId)?.title || 'Chat') : 'New chat'}
             </h1>
           </div>
           <div style={{ display: 'flex', gap: '6px' }}>
@@ -281,13 +313,13 @@ export function MobileChatPage() {
                 setThinkingEnabled(next)
                 if (next) toast.warning('Thinking mode ON — uses 2x tokens per message')
               }}
-              style={{ padding: '5px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 600, border: 'none', cursor: 'pointer',
-                background: thinkingEnabled ? '#7C3AED' : 'var(--color-surface-2)', color: thinkingEnabled ? 'white' : 'var(--color-text-muted)' }}>
-              🧠
+              style={{ width: '38px', height: '38px', borderRadius: '14px', fontSize: '11px', fontWeight: 800, border: 'none', cursor: 'pointer',
+                background: thinkingEnabled ? 'var(--color-primary)' : 'var(--color-surface-2)', color: thinkingEnabled ? 'white' : 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Brain size={17} />
             </button>
             <button onClick={() => { setActiveConversation(null); setSelectedAgent(null); setAgentMode(false) }}
-              style={{ padding: '5px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 600, border: 'none', cursor: 'pointer', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Plus size={13} />
+              style={{ width: '38px', height: '38px', borderRadius: '14px', fontSize: '11px', fontWeight: 800, border: 'none', cursor: 'pointer', background: 'var(--mobile-newchat-bg)', color: 'var(--mobile-newchat-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Plus size={17} />
             </button>
           </div>
         </div>
@@ -309,11 +341,11 @@ export function MobileChatPage() {
               onClick={() => { setCouncilMode(false); setSelectedModelId('auto') }}
               style={{
                 padding: '6px 12px', borderRadius: '100px', fontSize: '11px', fontWeight: 700,
-                border: selectedModelId === 'auto' ? '1.5px solid #10B981' : '1px solid var(--color-border)',
-                background: selectedModelId === 'auto'
+                border: effectiveSelectedModelId === 'auto' ? '1.5px solid #10B981' : '1px solid var(--color-border)',
+                background: effectiveSelectedModelId === 'auto'
                   ? 'linear-gradient(135deg, #10B981, #059669)'
                   : 'var(--color-surface)',
-                color: selectedModelId === 'auto' ? 'white' : 'var(--color-text-muted)',
+                color: effectiveSelectedModelId === 'auto' ? 'white' : 'var(--color-text-muted)',
                 cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
                 display: 'flex', alignItems: 'center', gap: '4px',
               }}>
@@ -321,14 +353,14 @@ export function MobileChatPage() {
             </button>
 
             {activeModels.slice(0, 8).map(m => {
-              const isActive = !councilMode && selectedModelId === m.id
+              const isActive = !councilMode && effectiveSelectedModelId === m.id
               const shortName = m.name.replace('Claude ', '').replace('Gemini ', '').replace('GPT-', 'GPT ').replace(' (Groq)', '')
               return (
                 <button key={m.id} onClick={() => { setCouncilMode(false); setSelectedModelId(m.id) }}
                   style={{
                     padding: '6px 12px', borderRadius: '100px', fontSize: '11px', fontWeight: 600,
-                    border: isActive ? '1.5px solid #7C3AED' : '1px solid var(--color-border)',
-                    background: isActive ? '#7C3AED' : 'var(--color-surface)',
+                  border: isActive ? '1.5px solid var(--color-primary)' : '1px solid var(--color-primary-glow)',
+                    background: isActive ? 'var(--color-primary)' : 'var(--color-surface)',
                     color: isActive ? 'white' : 'var(--color-text-muted)',
                     cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
                   }}>
@@ -340,7 +372,7 @@ export function MobileChatPage() {
               <button onClick={() => setShowModelPicker(true)}
                 style={{
                   padding: '6px 12px', borderRadius: '100px', fontSize: '11px', fontWeight: 600,
-                  border: '1px solid var(--color-border)', background: 'var(--color-surface)',
+                  border: '1px solid var(--color-primary-glow)', background: 'var(--color-surface)',
                   color: 'var(--color-text-muted)', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
                 }}>
                 More...
@@ -352,8 +384,8 @@ export function MobileChatPage() {
           <button onClick={() => setShowAgentPicker(true)}
             style={{
               padding: '6px 10px', borderRadius: '100px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
-              border: selectedAgent ? '1.5px solid #7C3AED' : '1px solid var(--color-border)',
-              background: selectedAgent ? 'rgba(124,58,237,0.08)' : 'var(--color-surface)',
+              border: selectedAgent ? '1.5px solid var(--color-primary)' : '1px solid var(--color-primary-glow)',
+              background: selectedAgent ? 'var(--color-primary-light)' : 'var(--color-surface)',
               whiteSpace: 'nowrap', flexShrink: 0,
             }}>
             {selectedAgent ? (
@@ -361,7 +393,7 @@ export function MobileChatPage() {
             ) : (
               <Sparkles size={12} style={{ color: 'var(--color-text-muted)' }} />
             )}
-            <ChevronDown size={10} style={{ color: selectedAgent ? '#7C3AED' : 'var(--color-text-muted)' }} />
+            <ChevronDown size={10} style={{ color: selectedAgent ? 'var(--color-primary)' : 'var(--color-text-muted)' }} />
           </button>
         </div>
       </div>
@@ -370,17 +402,17 @@ export function MobileChatPage() {
       {selectedAgent && (
         <div style={{
           flexShrink: 0, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '10px',
-          background: 'rgba(124,58,237,0.06)', borderBottom: '1px solid rgba(124,58,237,0.12)',
+          background: 'var(--color-primary-light)', borderBottom: '1px solid var(--color-primary-glow)',
         }}>
           <span style={{ fontSize: '18px' }}>{selectedAgent.avatar}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: '12px', fontWeight: 700, color: '#7C3AED', margin: 0 }}>{selectedAgent.name}</p>
+            <p style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-primary)', margin: 0 }}>{selectedAgent.name}</p>
             <p style={{ fontSize: '10px', color: 'var(--color-text-muted)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {selectedAgent.role}
             </p>
           </div>
           <button onClick={() => handleAgentSelect(null)}
-            style={{ padding: '4px', borderRadius: '6px', border: 'none', background: 'rgba(124,58,237,0.1)', color: '#7C3AED', cursor: 'pointer' }}>
+            style={{ padding: '4px', borderRadius: '6px', border: 'none', background: 'var(--color-primary-light)', color: 'var(--color-primary)', cursor: 'pointer' }}>
             <X size={14} />
           </button>
         </div>
@@ -392,8 +424,8 @@ export function MobileChatPage() {
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '24px', textAlign: 'center', background: 'var(--chat-bg)' }}>
             <div style={{
               width: '48px', height: '48px', borderRadius: '14px', marginBottom: '16px',
-              background: 'linear-gradient(135deg, var(--color-primary-light), rgba(124,58,237,0.05))',
-              border: '1px solid rgba(124,58,237,0.15)',
+              background: 'linear-gradient(135deg, var(--color-primary-light), var(--color-primary-light))',
+              border: '1px solid var(--color-primary-glow)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: '22px', color: 'var(--color-primary)',
             }}>
@@ -412,8 +444,8 @@ export function MobileChatPage() {
           <MessageArea
             messages={messages}
             isLoading={isStreaming}
-            onRetry={() => retryLastMessage(selectedModelId, undefined, selectedAgent?.id)}
-            onEditMessage={(id, content) => editAndResend(id, content, selectedModelId, undefined, selectedAgent?.id)}
+            onRetry={() => retryLastMessage(effectiveSelectedModelId, undefined, selectedAgent?.id)}
+            onEditMessage={(id, content) => editAndResend(id, content, effectiveSelectedModelId, undefined, selectedAgent?.id)}
             onDeleteMessage={deleteMessage}
           />
         )}
@@ -426,14 +458,15 @@ export function MobileChatPage() {
         </div>
       )}
 
-      {/* Input */}
-      <div style={{ flexShrink: 0 }}>
+      {/* Input — tab bar is hidden on /chat, so we only pad for the home
+          indicator (env returns ~0 once the keyboard is up). */}
+      <div style={{ flexShrink: 0, paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         <MessageInput
           onSend={handleSend}
           isLoading={isStreaming}
           disabled={!hasTokens}
           onStop={stopStreaming}
-          selectedModelId={selectedModelId}
+          selectedModelId={effectiveSelectedModelId}
           onImageGenerated={handleImageGenerated}
           onSendWithContext={handleSendWithContext}
           onError={(msg) => toast.error(msg)}

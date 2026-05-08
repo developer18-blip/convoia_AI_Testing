@@ -60,13 +60,14 @@ export function MobileLoginPage() {
 
   return (
     <div className="mobile-app" style={{
-      minHeight: '100dvh', display: 'flex', flexDirection: 'column',
-      background: '#F8F7FF',
+      display: 'flex', flexDirection: 'column',
+      overflowY: 'auto', WebkitOverflowScrolling: 'touch' as const,
+      background: 'var(--color-background)',
       paddingTop: 'env(safe-area-inset-top, 0px)',
     }}>
       {/* Purple gradient hero */}
       <div style={{
-        background: 'linear-gradient(135deg, #7C3AED 0%, #5B21B6 50%, #4C1D95 100%)',
+        background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 50%, var(--color-primary-hover) 100%)',
         padding: '40px 24px 60px',
         position: 'relative', overflow: 'hidden',
         borderRadius: '0 0 32px 32px',
@@ -112,8 +113,9 @@ export function MobileLoginPage() {
         flex: 1, padding: '0 20px 32px', marginTop: '-28px', position: 'relative', zIndex: 1,
       }}>
         <div style={{
-          background: 'white', borderRadius: '24px', padding: '28px 24px',
-          boxShadow: '0 8px 40px rgba(124,58,237,0.12)',
+          background: 'var(--color-surface)', borderRadius: '24px', padding: '28px 24px',
+          boxShadow: '0 8px 40px var(--color-primary-glow)',
+          border: '1px solid var(--color-border)',
         }}>
           {/* Google OAuth — native Google Play Services first, system-browser fallback */}
           <div style={{ marginBottom: '20px' }}>
@@ -132,12 +134,12 @@ export function MobileLoginPage() {
                   // to browser redirect so the user can still sign in.
                   console.warn('Native Google sign-in failed, falling back to browser:', err?.message)
                 }
-                const baseUrl = import.meta.env.VITE_API_URL || 'https://intellect.convoia.com/api'
+                const baseUrl = import.meta.env.VITE_API_URL || 'https://convoia.ai/api'
                 window.open(`${baseUrl}/auth/google/mobile`, '_system')
               }}
               style={{
                 width: '100%', padding: '14px', borderRadius: '14px', fontSize: '15px', fontWeight: 600,
-                border: '1.5px solid #E8E5F0', background: 'white', color: '#1A1A2E',
+                border: '1.5px solid var(--color-border)', background: 'var(--color-surface-2)', color: 'var(--color-text-primary)',
                 cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
               }}>
               <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
@@ -147,32 +149,32 @@ export function MobileLoginPage() {
 
           {/* Divider */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '20px 0' }}>
-            <div style={{ flex: 1, height: '1px', background: '#E8E5F0' }} />
-            <span style={{ fontSize: '11px', color: '#8E8EA0', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>
+            <div style={{ flex: 1, height: '1px', background: 'var(--color-border)' }} />
+            <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>
               or sign in with email
             </span>
-            <div style={{ flex: 1, height: '1px', background: '#E8E5F0' }} />
+            <div style={{ flex: 1, height: '1px', background: 'var(--color-border)' }} />
           </div>
 
           <form onSubmit={handleSubmit}>
             {/* Email */}
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#4A4A6A', marginBottom: '6px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '6px' }}>
                 Email address
               </label>
               <div style={{ position: 'relative' }}>
-                <Mail size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#8E8EA0' }} />
+                <Mail size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
                 <input
                   type="email" value={email} placeholder="name@company.com"
                   onChange={e => { setEmail(e.target.value); setErrors(p => ({ ...p, email: '' })) }}
                   style={{
                     width: '100%', padding: '14px 14px 14px 42px', borderRadius: '14px', fontSize: '15px',
-                    border: errors.email ? '1.5px solid #EF4444' : '1.5px solid #E8E5F0',
-                    background: '#F8F7FF', color: '#1A1A2E', outline: 'none',
+                    border: errors.email ? '1.5px solid #EF4444' : '1.5px solid var(--color-border)',
+                    background: 'var(--color-surface-2)', color: 'var(--color-text-primary)', outline: 'none',
                     transition: 'border-color 200ms',
                   }}
-                  onFocus={e => { if (!errors.email) e.target.style.borderColor = '#7C3AED' }}
-                  onBlur={e => { if (!errors.email) e.target.style.borderColor = '#E8E5F0' }}
+                  onFocus={e => { if (!errors.email) e.target.style.borderColor = 'var(--color-primary)' }}
+                  onBlur={e => { if (!errors.email) e.target.style.borderColor = 'var(--color-border)' }}
                 />
               </div>
               {errors.email && <p style={{ fontSize: '12px', color: '#EF4444', margin: '4px 0 0 4px' }}>{errors.email}</p>}
@@ -180,25 +182,25 @@ export function MobileLoginPage() {
 
             {/* Password */}
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#4A4A6A', marginBottom: '6px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '6px' }}>
                 Password
               </label>
               <div style={{ position: 'relative' }}>
-                <Lock size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#8E8EA0' }} />
+                <Lock size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
                 <input
                   type={showPassword ? 'text' : 'password'} value={password} placeholder="Enter your password"
                   onChange={e => { setPassword(e.target.value); setErrors(p => ({ ...p, password: '' })) }}
                   style={{
                     width: '100%', padding: '14px 44px 14px 42px', borderRadius: '14px', fontSize: '15px',
-                    border: errors.password ? '1.5px solid #EF4444' : '1.5px solid #E8E5F0',
-                    background: '#F8F7FF', color: '#1A1A2E', outline: 'none',
+                    border: errors.password ? '1.5px solid #EF4444' : '1.5px solid var(--color-border)',
+                    background: 'var(--color-surface-2)', color: 'var(--color-text-primary)', outline: 'none',
                     transition: 'border-color 200ms',
                   }}
-                  onFocus={e => { if (!errors.password) e.target.style.borderColor = '#7C3AED' }}
-                  onBlur={e => { if (!errors.password) e.target.style.borderColor = '#E8E5F0' }}
+                  onFocus={e => { if (!errors.password) e.target.style.borderColor = 'var(--color-primary)' }}
+                  onBlur={e => { if (!errors.password) e.target.style.borderColor = 'var(--color-border)' }}
                 />
                 <button type="button" onClick={() => setShowPassword(!showPassword)}
-                  style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#8E8EA0', cursor: 'pointer', padding: '4px' }}>
+                  style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px' }}>
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
@@ -208,7 +210,7 @@ export function MobileLoginPage() {
             {/* Forgot password */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
               <button type="button" onClick={() => { setShowForgot(true); setForgotEmail(email); setForgotSent(false) }}
-                style={{ fontSize: '13px', fontWeight: 600, color: '#7C3AED', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                 Forgot password?
               </button>
             </div>
@@ -217,10 +219,10 @@ export function MobileLoginPage() {
             <button type="submit" disabled={isLoading}
               style={{
                 width: '100%', padding: '16px', borderRadius: '16px', border: 'none',
-                background: 'linear-gradient(135deg, #7C3AED, #5B21B6)',
+                background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-hover))',
                 color: 'white', fontSize: '16px', fontWeight: 700, cursor: isLoading ? 'wait' : 'pointer',
                 opacity: isLoading ? 0.7 : 1, transition: 'opacity 200ms',
-                boxShadow: '0 4px 20px rgba(124,58,237,0.35)',
+                boxShadow: '0 4px 20px var(--color-primary-glow)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
               }}>
               {isLoading ? (
@@ -236,9 +238,9 @@ export function MobileLoginPage() {
         </div>
 
         {/* Register link */}
-        <p style={{ textAlign: 'center', fontSize: '14px', color: '#8E8EA0', marginTop: '24px' }}>
+        <p style={{ textAlign: 'center', fontSize: '14px', color: 'var(--color-text-muted)', marginTop: '24px' }}>
           Don't have an account?{' '}
-          <Link to="/register" style={{ color: '#7C3AED', fontWeight: 700, textDecoration: 'none' }}>
+          <Link to="/register" style={{ color: 'var(--color-primary)', fontWeight: 700, textDecoration: 'none' }}>
             Create one free
           </Link>
         </p>
@@ -249,34 +251,35 @@ export function MobileLoginPage() {
         <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
           onClick={() => setShowForgot(false)}>
           <div style={{
-            background: 'white', borderRadius: '24px 24px 0 0', padding: '28px 24px', paddingBottom: 'calc(28px + env(safe-area-inset-bottom, 0px))',
+            background: 'var(--color-surface)', borderRadius: '24px 24px 0 0', padding: '28px 24px', paddingBottom: 'calc(28px + env(safe-area-inset-bottom, 0px))',
             width: '100%', maxWidth: '500px',
-            boxShadow: '0 -8px 40px rgba(0,0,0,0.15)',
+            boxShadow: '0 -8px 40px rgba(0,0,0,0.20)',
+            border: '1px solid var(--color-border)',
           }} onClick={e => e.stopPropagation()}>
             {/* Drag handle */}
-            <div style={{ width: '40px', height: '4px', borderRadius: '2px', background: '#E8E5F0', margin: '0 auto 20px' }} />
+            <div style={{ width: '40px', height: '4px', borderRadius: '2px', background: 'var(--color-border)', margin: '0 auto 20px' }} />
 
             {forgotSent ? (
               <div style={{ textAlign: 'center' }}>
                 <div style={{
                   width: '56px', height: '56px', borderRadius: '16px', margin: '0 auto 16px',
-                  background: 'rgba(124,58,237,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'var(--color-primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  <Mail size={28} color="#7C3AED" />
+                  <Mail size={28} color="var(--color-primary)" />
                 </div>
-                <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#1A1A2E', marginBottom: '8px' }}>Check your email</h3>
-                <p style={{ fontSize: '14px', color: '#8E8EA0', marginBottom: '24px', lineHeight: 1.5 }}>
-                  If an account exists for <strong style={{ color: '#4A4A6A' }}>{forgotEmail}</strong>, we've sent a password reset link.
+                <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: '8px' }}>Check your email</h3>
+                <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '24px', lineHeight: 1.5 }}>
+                  If an account exists for <strong style={{ color: 'var(--color-text-secondary)' }}>{forgotEmail}</strong>, we've sent a password reset link.
                 </p>
                 <button onClick={() => setShowForgot(false)}
-                  style={{ width: '100%', padding: '14px', borderRadius: '14px', border: 'none', background: '#7C3AED', color: 'white', fontSize: '15px', fontWeight: 700, cursor: 'pointer' }}>
+                  style={{ width: '100%', padding: '14px', borderRadius: '14px', border: 'none', background: 'var(--color-primary)', color: 'white', fontSize: '15px', fontWeight: 700, cursor: 'pointer' }}>
                   Got it
                 </button>
               </div>
             ) : (
               <>
-                <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#1A1A2E', marginBottom: '8px' }}>Forgot your password?</h3>
-                <p style={{ fontSize: '14px', color: '#8E8EA0', marginBottom: '20px', lineHeight: 1.5 }}>
+                <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: '8px' }}>Forgot your password?</h3>
+                <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '20px', lineHeight: 1.5 }}>
                   Enter your email and we'll send a reset link.
                 </p>
                 <form onSubmit={async (e) => {
@@ -293,23 +296,23 @@ export function MobileLoginPage() {
                   }
                 }}>
                   <div style={{ position: 'relative', marginBottom: '16px' }}>
-                    <Mail size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#8E8EA0' }} />
+                    <Mail size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
                     <input
                       type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)}
                       placeholder="Enter your email" autoFocus required
                       style={{
                         width: '100%', padding: '14px 14px 14px 42px', borderRadius: '14px', fontSize: '15px',
-                        border: '1.5px solid #E8E5F0', background: '#F8F7FF', color: '#1A1A2E', outline: 'none',
+                        border: '1.5px solid var(--color-border)', background: 'var(--color-surface-2)', color: 'var(--color-text-primary)', outline: 'none',
                       }}
                     />
                   </div>
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <button type="button" onClick={() => setShowForgot(false)}
-                      style={{ flex: 1, padding: '14px', borderRadius: '14px', border: '1.5px solid #E8E5F0', background: 'white', color: '#4A4A6A', fontSize: '15px', fontWeight: 600, cursor: 'pointer' }}>
+                      style={{ flex: 1, padding: '14px', borderRadius: '14px', border: '1.5px solid var(--color-border)', background: 'var(--color-surface-2)', color: 'var(--color-text-secondary)', fontSize: '15px', fontWeight: 600, cursor: 'pointer' }}>
                       Cancel
                     </button>
                     <button type="submit" disabled={forgotLoading}
-                      style={{ flex: 1, padding: '14px', borderRadius: '14px', border: 'none', background: '#7C3AED', color: 'white', fontSize: '15px', fontWeight: 700, cursor: forgotLoading ? 'wait' : 'pointer', opacity: forgotLoading ? 0.7 : 1 }}>
+                      style={{ flex: 1, padding: '14px', borderRadius: '14px', border: 'none', background: 'var(--color-primary)', color: 'white', fontSize: '15px', fontWeight: 700, cursor: forgotLoading ? 'wait' : 'pointer', opacity: forgotLoading ? 0.7 : 1 }}>
                       {forgotLoading ? 'Sending...' : 'Send link'}
                     </button>
                   </div>

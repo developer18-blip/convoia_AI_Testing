@@ -46,8 +46,11 @@ export function useDashboard() {
 
   const fetchDashboard = useCallback(async () => {
     if (!user) return
+    // Skip silent background polls when tab is hidden — saves API/battery
+    if (document.hidden) return
     try {
-      setIsLoading(true)
+      // Only show loading skeleton on first paint (covered by useState(true) on line 44).
+      // Background 60s polls run silently to avoid blinking the dashboard.
       setError(null)
 
       const results = await Promise.allSettled([

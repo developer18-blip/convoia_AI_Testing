@@ -48,9 +48,9 @@ function resolveMediaUrl(url: string): string {
   // Relative URL — prepend the API base
   const apiBase = import.meta.env.VITE_API_URL || ''
   if (apiBase.startsWith('http')) {
-    // apiBase is like https://intellect.convoia.com/api
+    // apiBase is like https://convoia.ai/api
     // URL is like /api/uploads/images/x.png
-    // We need https://intellect.convoia.com/api/uploads/images/x.png
+    // We need https://convoia.ai/api/uploads/images/x.png
     const origin = new URL(apiBase).origin
     return `${origin}${url}`
   }

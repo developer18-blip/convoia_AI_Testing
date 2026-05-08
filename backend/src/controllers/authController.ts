@@ -316,7 +316,7 @@ const mobileOAuthClient = new OAuth2Client(
   config.googleClientId,
   config.googleClientSecret,
   // Callback URL — must match Google Cloud Console redirect URI
-  `${process.env.BACKEND_URL || 'https://intellect.convoia.com'}/api/auth/google/callback`
+  `${process.env.BACKEND_URL || 'https://convoia.ai'}/api/auth/google/callback`
 );
 
 export const googleMobileRedirect = asyncHandler(async (_req: Request, res: Response) => {

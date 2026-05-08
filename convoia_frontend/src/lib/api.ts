@@ -2,7 +2,7 @@ import axios from 'axios'
 import { getTokenSync, setToken, setRefreshToken, getRefreshToken, clearAuth } from './storage'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: import.meta.env.VITE_API_URL || 'https://convoia.ai/api',
   timeout: 30000,
   headers: { 'Content-Type': 'application/json' },
 })
@@ -83,7 +83,7 @@ api.interceptors.response.use(
       if (!refresh) throw new Error('No refresh token')
 
       const res = await axios.post(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/auth/refresh`,
+        `${import.meta.env.VITE_API_URL || 'https://convoia.ai/api'}/auth/refresh`,
         { refreshToken: refresh }
       )
 

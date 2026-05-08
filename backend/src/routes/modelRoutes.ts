@@ -8,7 +8,10 @@ const router = Router();
 router.get('/', asyncHandler(async (_req: Request, res: Response) => {
   const models = await prisma.aIModel.findMany({
     where: { isActive: true },
-    orderBy: [{ provider: 'asc' }, { name: 'asc' }],
+    // Provider-grouped, newest first within each provider. createdAt is the
+    // proxy for release date (admins add models when they ship). Falls back
+    // to alphabetical name as final tiebreaker.
+    orderBy: [{ provider: 'asc' }, { createdAt: 'desc' }, { name: 'asc' }],
     select: {
       id: true,
       name: true,

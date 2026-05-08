@@ -23,6 +23,7 @@ import { Zap, PanelLeftClose, PanelLeft, MoreHorizontal, Trash2, Download, Menu,
 import { VoiceConversationMode } from '../components/VoiceConversationMode'
 import { CouncilChip } from '../components/council/CouncilChip'
 import { CouncilPicker } from '../components/council/CouncilPicker'
+import { useAccent } from '../contexts/AccentContext'
 
 export function ChatPage() {
   const { models } = useModels()
@@ -55,6 +56,20 @@ export function ChatPage() {
   const navigate = useNavigate()
   const [codeInterpreter, setCodeInterpreter] = useState<{ code: string; language: string } | null>(null)
   const [voiceModeOpen, setVoiceModeOpen] = useState(false)
+
+  // Sync the AccentContext with the active model so the app's accent color
+  // shifts to the provider's brand color (anthropic orange, openai green, etc).
+  // Defaults to the turquoise base when no model is selected yet.
+  const { setActiveModel, setCouncilModels } = useAccent()
+  useEffect(() => {
+    if (councilMode && councilModelIds.length > 0) {
+      setCouncilModels(councilModelIds)
+    } else {
+      setCouncilModels([])
+      const model = models.find((m) => m.id === selectedModelId)
+      setActiveModel(model?.modelId || selectedModelId || '')
+    }
+  }, [selectedModelId, councilMode, councilModelIds, models, setActiveModel, setCouncilModels])
 
   // Handle to the composer — lets DragDropOverlay push files into the staging area.
   const messageInputRef = useRef<MessageInputHandle>(null)

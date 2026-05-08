@@ -4,15 +4,18 @@ import {
   ChevronRight, LogOut, Camera, Lock, Eye, EyeOff,
   Users, Building2, DollarSign, BarChart3, Shield,
   Key, FileText, Activity, Briefcase, Coins, UserPlus,
+  Sun, Moon,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
+import { useTheme } from '../../hooks/useTheme'
 import { Avatar } from '../../components/ui/Avatar'
 import { passwordStrength } from '../../lib/utils'
 import api from '../../lib/api'
 
 export function MobileSettingsPage() {
   const { user, updateUser, logout } = useAuth()
+  const { theme, toggleTheme } = useTheme()
   const toast = useToast()
   const navigate = useNavigate()
 
@@ -75,8 +78,11 @@ export function MobileSettingsPage() {
       toast.success('Password changed')
       setShowPasswordSection(false)
       setCurrentPw(''); setNewPw(''); setConfirmPw('')
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to change password')
+    } catch (err: unknown) {
+      const message = err && typeof err === 'object' && 'response' in err
+        ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+        : undefined
+      toast.error(message || 'Failed to change password')
     } finally { setChangingPw(false) }
   }
 
@@ -85,11 +91,11 @@ export function MobileSettingsPage() {
   }
 
   return (
-    <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '100px' }}>
+    <div className="mobile-page" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
       {/* Profile Card */}
-      <div style={{
-        background: 'var(--color-surface)', borderRadius: '20px', padding: '24px',
-        border: '1px solid var(--color-border)', textAlign: 'center',
+      <div className="mobile-card" style={{
+        padding: '22px 20px',
+        textAlign: 'center',
       }}>
         {/* Avatar */}
         <div style={{ position: 'relative', display: 'inline-block', marginBottom: '16px' }}>
@@ -97,9 +103,9 @@ export function MobileSettingsPage() {
           <button onClick={() => fileInputRef.current?.click()} disabled={uploadingAvatar}
             style={{
               position: 'absolute', bottom: '-4px', right: '-4px', width: '32px', height: '32px',
-              borderRadius: '50%', background: '#7C3AED', border: '3px solid var(--color-surface)',
+              borderRadius: '50%', background: 'var(--color-primary)', border: '3px solid var(--color-surface)',
               color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer',
+              cursor: 'pointer', boxShadow: '0 8px 18px var(--color-primary-glow)',
             }}>
             <Camera size={14} />
           </button>
@@ -111,12 +117,12 @@ export function MobileSettingsPage() {
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center', marginBottom: '4px' }}>
             <input value={name} onChange={e => setName(e.target.value)} autoFocus
               style={{
-                padding: '8px 12px', borderRadius: '10px', border: '1.5px solid #7C3AED',
+                padding: '8px 12px', borderRadius: '10px', border: '1.5px solid var(--color-primary)',
                 background: 'var(--color-surface-2)', color: 'var(--color-text-primary)',
                 fontSize: '16px', fontWeight: 700, textAlign: 'center', width: '180px', outline: 'none',
               }} />
             <button onClick={handleSaveProfile} disabled={savingProfile}
-              style={{ padding: '8px 14px', borderRadius: '10px', border: 'none', background: '#7C3AED', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '8px 14px', borderRadius: '10px', border: 'none', background: 'var(--color-primary)', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               {savingProfile ? '...' : 'Save'}
             </button>
           </div>
@@ -126,14 +132,14 @@ export function MobileSettingsPage() {
             {user?.name || 'User'}
           </p>
         )}
-        <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '0 0 8px' }}>{user?.email}</p>
+        <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '0 0 10px', fontWeight: 600 }}>{user?.email}</p>
 
         {/* Role badge */}
         <span style={{
           display: 'inline-block', padding: '4px 12px', borderRadius: '10px', fontSize: '11px', fontWeight: 700,
           textTransform: 'uppercase', letterSpacing: '0.05em',
-          background: isAdmin ? 'rgba(239,68,68,0.1)' : isOwner ? 'rgba(124,58,237,0.1)' : isManager ? 'rgba(16,185,129,0.1)' : 'rgba(59,130,246,0.1)',
-          color: isAdmin ? '#EF4444' : isOwner ? '#7C3AED' : isManager ? '#10B981' : '#3B82F6',
+          background: isAdmin ? 'rgba(239,68,68,0.1)' : isOwner ? 'var(--color-primary-light)' : isManager ? 'rgba(16,185,129,0.1)' : 'rgba(59,130,246,0.1)',
+          color: isAdmin ? '#EF4444' : isOwner ? 'var(--color-primary)' : isManager ? '#10B981' : '#3B82F6',
         }}>
           {isAdmin ? 'Platform Admin' : isOwner ? 'Org Owner' : isManager ? 'Manager' : hasOrg ? 'Employee' : 'Personal'}
         </span>
@@ -156,7 +162,7 @@ export function MobileSettingsPage() {
       {isOwner && (
         <NavSection title="Organization">
           <NavItem icon={<Building2 size={18} />} label="Org Settings" sub="Name, industry, config" onClick={() => navigate('/org')} />
-          <NavItem icon={<DollarSign size={18} />} label="Billing" sub="Payments & invoices" onClick={() => navigate('/org/billing')} />
+          <NavItem icon={<DollarSign size={18} />} label="Billing" sub="Payments & invoices" onClick={() => navigate('/tokens/buy')} />
           <NavItem icon={<BarChart3 size={18} />} label="Org Analytics" sub="Usage analytics" onClick={() => navigate('/org/analytics')} />
           <NavItem icon={<Users size={18} />} label="Team" sub="Manage members" onClick={() => navigate('/team')} />
           <NavItem icon={<Briefcase size={18} />} label="Budgets" sub="Token budgets" onClick={() => navigate('/budgets')} last />
@@ -170,6 +176,50 @@ export function MobileSettingsPage() {
           <NavItem icon={<Briefcase size={18} />} label="Budgets" sub="Token allocations" onClick={() => navigate('/budgets')} last />
         </NavSection>
       )}
+
+      {/* ─── APPEARANCE ─── */}
+      <div>
+        <h2 className="mobile-section-title">Appearance</h2>
+        <div className="mobile-card" style={{ overflow: 'hidden' }}>
+          <button onClick={toggleTheme}
+            style={{
+              width: '100%', padding: '15px 16px', border: 'none', background: 'transparent',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px',
+            }}>
+            <div style={{
+              width: '42px', height: '42px', borderRadius: '14px',
+              background: 'var(--color-primary-light)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--color-primary)', flexShrink: 0,
+            }}>
+              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </div>
+            <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
+              <p style={{ fontSize: '15px', fontWeight: 800, color: 'var(--color-text-primary)', margin: 0 }}>
+                {theme === 'dark' ? 'Dark mode' : 'Light mode'}
+              </p>
+              <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '3px 0 0', fontWeight: 600 }}>
+                {theme === 'dark' ? 'Tap to switch to light' : 'Tap to switch to dark'}
+              </p>
+            </div>
+            {/* Toggle pill */}
+            <div style={{
+              width: '50px', height: '28px', borderRadius: '999px', flexShrink: 0,
+              background: theme === 'dark' ? 'var(--color-primary)' : 'var(--color-border)',
+              position: 'relative', transition: 'background 200ms',
+            }}>
+              <div style={{
+                position: 'absolute', top: '3px',
+                left: theme === 'dark' ? '25px' : '3px',
+                width: '22px', height: '22px', borderRadius: '50%',
+                background: '#FFFFFF',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.20)',
+                transition: 'left 200ms ease',
+              }} />
+            </div>
+          </button>
+        </div>
+      </div>
 
       {/* ─── GENERAL NAVIGATION — ALL ROLES ─── */}
       <NavSection title="Account">
@@ -212,7 +262,7 @@ export function MobileSettingsPage() {
           <button onClick={handleChangePassword} disabled={changingPw}
             style={{
               width: '100%', marginTop: '16px', padding: '14px', borderRadius: '14px', border: 'none',
-              background: '#7C3AED', color: 'white', fontSize: '14px', fontWeight: 700,
+              background: 'var(--color-primary)', color: 'white', fontSize: '14px', fontWeight: 700,
               cursor: changingPw ? 'wait' : 'pointer', opacity: changingPw ? 0.7 : 1,
             }}>
             {changingPw ? 'Changing...' : 'Update Password'}
@@ -239,10 +289,10 @@ export function MobileSettingsPage() {
 function NavSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h2 style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-muted)', margin: '0 0 10px', paddingLeft: '4px' }}>
+      <h2 className="mobile-section-title">
         {title}
       </h2>
-      <div style={{ background: 'var(--color-surface)', borderRadius: '16px', border: '1px solid var(--color-border)', overflow: 'hidden' }}>
+      <div className="mobile-card" style={{ overflow: 'hidden' }}>
         {children}
       </div>
     </div>
@@ -253,16 +303,16 @@ function NavItem({ icon, label, sub, onClick, last }: { icon: React.ReactNode; l
   return (
     <button onClick={onClick}
       style={{
-        width: '100%', padding: '14px 16px', border: 'none', background: 'transparent',
+        width: '100%', padding: '15px 16px', border: 'none', background: 'transparent',
         cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px',
         borderBottom: last ? 'none' : '1px solid var(--color-border)',
       }}>
-      <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--color-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)', flexShrink: 0 }}>
+      <div style={{ width: '42px', height: '42px', borderRadius: '14px', background: 'var(--color-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)', flexShrink: 0 }}>
         {icon}
       </div>
       <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
-        <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)', margin: 0 }}>{label}</p>
-        <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: '2px 0 0' }}>{sub}</p>
+        <p style={{ fontSize: '15px', fontWeight: 800, color: 'var(--color-text-primary)', margin: 0 }}>{label}</p>
+        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '3px 0 0', fontWeight: 600 }}>{sub}</p>
       </div>
       <ChevronRight size={16} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
     </button>

@@ -94,26 +94,27 @@ export function MobileRegisterPage() {
 
   const inputStyle = (hasError: boolean) => ({
     width: '100%', padding: '14px 14px 14px 42px', borderRadius: '14px', fontSize: '15px',
-    border: hasError ? '1.5px solid #EF4444' : '1.5px solid #E8E5F0',
-    background: '#F8F7FF', color: '#1A1A2E', outline: 'none',
+    border: hasError ? '1.5px solid #EF4444' : '1.5px solid var(--color-border)',
+    background: 'var(--color-surface-2)', color: 'var(--color-text-primary)', outline: 'none',
     transition: 'border-color 200ms',
   })
 
   const selectStyle = {
     width: '100%', padding: '14px 14px 14px 42px', borderRadius: '14px', fontSize: '15px',
-    border: '1.5px solid #E8E5F0', background: '#F8F7FF', color: '#1A1A2E', outline: 'none',
+    border: '1.5px solid var(--color-border)', background: 'var(--color-surface-2)', color: 'var(--color-text-primary)', outline: 'none',
     appearance: 'none' as const, WebkitAppearance: 'none' as const,
   }
 
   return (
     <div className="mobile-app" style={{
-      minHeight: '100dvh', display: 'flex', flexDirection: 'column',
-      background: '#F8F7FF',
+      display: 'flex', flexDirection: 'column',
+      overflowY: 'auto', WebkitOverflowScrolling: 'touch' as const,
+      background: 'var(--color-background)',
       paddingTop: 'env(safe-area-inset-top, 0px)',
     }}>
       {/* Purple gradient hero */}
       <div style={{
-        background: 'linear-gradient(160deg, #5B21B6 0%, #7C3AED 50%, #8B5CF6 100%)',
+        background: 'linear-gradient(160deg, var(--color-primary-hover) 0%, var(--color-primary) 50%, var(--color-primary) 100%)',
         padding: '36px 24px 56px',
         position: 'relative', overflow: 'hidden',
         borderRadius: '0 0 32px 32px',
@@ -151,14 +152,15 @@ export function MobileRegisterPage() {
         overflowY: 'auto',
       }}>
         <div style={{
-          background: 'white', borderRadius: '24px', padding: '28px 24px',
-          boxShadow: '0 8px 40px rgba(124,58,237,0.12)',
+          background: 'var(--color-surface)', borderRadius: '24px', padding: '28px 24px',
+          boxShadow: '0 8px 40px var(--color-primary-glow)',
+          border: '1px solid var(--color-border)',
         }}>
 
           {/* Step 1: Account Type */}
           {step === 1 && (
             <div>
-              <p style={{ fontSize: '14px', fontWeight: 600, color: '#4A4A6A', marginBottom: '16px' }}>
+              <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '16px' }}>
                 How will you use ConvoiaAI?
               </p>
 
@@ -166,19 +168,19 @@ export function MobileRegisterPage() {
                 {/* Individual */}
                 <button onClick={() => { setAccountType('individual'); setStep(2) }}
                   style={{
-                    padding: '20px 16px', borderRadius: '20px', border: '2px solid #E8E5F0',
-                    background: 'white', cursor: 'pointer', textAlign: 'left',
+                    padding: '20px 16px', borderRadius: '20px', border: '2px solid var(--color-border)',
+                    background: 'var(--color-surface-2)', cursor: 'pointer', textAlign: 'left',
                     transition: 'all 200ms',
                   }}>
                   <div style={{
                     width: '48px', height: '48px', borderRadius: '14px', marginBottom: '14px',
-                    background: 'linear-gradient(135deg, rgba(124,58,237,0.12), rgba(124,58,237,0.05))',
+                    background: 'linear-gradient(135deg, var(--color-primary-glow), var(--color-primary-light))',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
-                    <User size={24} color="#7C3AED" />
+                    <User size={24} color="var(--color-primary)" />
                   </div>
-                  <p style={{ fontSize: '14px', fontWeight: 700, color: '#1A1A2E', margin: '0 0 4px' }}>Individual</p>
-                  <p style={{ fontSize: '12px', color: '#8E8EA0', margin: 0, lineHeight: 1.4 }}>
+                  <p style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)', margin: '0 0 4px' }}>Individual</p>
+                  <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: 0, lineHeight: 1.4 }}>
                     Personal AI with pay-as-you-go
                   </p>
                 </button>
@@ -186,19 +188,19 @@ export function MobileRegisterPage() {
                 {/* Business */}
                 <button onClick={() => { setAccountType('business'); setStep(2) }}
                   style={{
-                    padding: '20px 16px', borderRadius: '20px', border: '2px solid #E8E5F0',
-                    background: 'white', cursor: 'pointer', textAlign: 'left',
+                    padding: '20px 16px', borderRadius: '20px', border: '2px solid var(--color-border)',
+                    background: 'var(--color-surface-2)', cursor: 'pointer', textAlign: 'left',
                     transition: 'all 200ms',
                   }}>
                   <div style={{
                     width: '48px', height: '48px', borderRadius: '14px', marginBottom: '14px',
-                    background: 'linear-gradient(135deg, rgba(124,58,237,0.12), rgba(124,58,237,0.05))',
+                    background: 'linear-gradient(135deg, var(--color-primary-glow), var(--color-primary-light))',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
-                    <Building2 size={24} color="#7C3AED" />
+                    <Building2 size={24} color="var(--color-primary)" />
                   </div>
-                  <p style={{ fontSize: '14px', fontWeight: 700, color: '#1A1A2E', margin: '0 0 4px' }}>Team / Business</p>
-                  <p style={{ fontSize: '12px', color: '#8E8EA0', margin: 0, lineHeight: 1.4 }}>
+                  <p style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)', margin: '0 0 4px' }}>Team / Business</p>
+                  <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: 0, lineHeight: 1.4 }}>
                     Manage AI for your org
                   </p>
                 </button>
@@ -206,11 +208,11 @@ export function MobileRegisterPage() {
 
               {/* Divider */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '24px 0' }}>
-                <div style={{ flex: 1, height: '1px', background: '#E8E5F0' }} />
-                <span style={{ fontSize: '11px', color: '#8E8EA0', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>
+                <div style={{ flex: 1, height: '1px', background: 'var(--color-border)' }} />
+                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>
                   or sign up instantly
                 </span>
-                <div style={{ flex: 1, height: '1px', background: '#E8E5F0' }} />
+                <div style={{ flex: 1, height: '1px', background: 'var(--color-border)' }} />
               </div>
 
               {/* Google — native Play Services first, system-browser fallback */}
@@ -226,12 +228,12 @@ export function MobileRegisterPage() {
                   } catch (err: any) {
                     console.warn('Native Google sign-in failed, falling back to browser:', err?.message)
                   }
-                  const baseUrl = import.meta.env.VITE_API_URL || 'https://intellect.convoia.com/api'
+                  const baseUrl = import.meta.env.VITE_API_URL || 'https://convoia.ai/api'
                   window.open(`${baseUrl}/auth/google/mobile`, '_system')
                 }}
                 style={{
                   width: '100%', padding: '14px', borderRadius: '14px', fontSize: '15px', fontWeight: 600,
-                  border: '1.5px solid #E8E5F0', background: 'white', color: '#1A1A2E',
+                  border: '1.5px solid var(--color-border)', background: 'var(--color-surface-2)', color: 'var(--color-text-primary)',
                   cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
                 }}>
                 <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
@@ -239,17 +241,17 @@ export function MobileRegisterPage() {
               </button>
 
               {/* Benefits */}
-              <div style={{ marginTop: '24px', padding: '16px', borderRadius: '16px', background: '#F8F7FF' }}>
+              <div style={{ marginTop: '24px', padding: '16px', borderRadius: '16px', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}>
                 {[
                   'Access 35+ AI models in one place',
                   'Image generation with DALL-E & Gemini',
                   'Team management with budgets',
                 ].map(b => (
                   <div key={b} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 0' }}>
-                    <div style={{ width: '20px', height: '20px', borderRadius: '6px', background: 'rgba(124,58,237,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Check size={12} color="#7C3AED" />
+                    <div style={{ width: '20px', height: '20px', borderRadius: '6px', background: 'var(--color-primary-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Check size={12} color="var(--color-primary)" />
                     </div>
-                    <span style={{ fontSize: '12px', color: '#4A4A6A', fontWeight: 500 }}>{b}</span>
+                    <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', fontWeight: 500 }}>{b}</span>
                   </div>
                 ))}
               </div>
@@ -262,7 +264,7 @@ export function MobileRegisterPage() {
               {/* Back button */}
               {!inviteToken && (
                 <button type="button" onClick={() => setStep(1)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 600, color: '#7C3AED', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: '16px' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 600, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: '16px' }}>
                   <ArrowLeft size={14} /> Change account type
                 </button>
               )}
@@ -270,28 +272,28 @@ export function MobileRegisterPage() {
               {/* Invite banner */}
               {inviteToken && inviteOrg && (
                 <div style={{
-                  background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)',
+                  background: 'var(--color-primary-light)', border: '1px solid var(--color-primary-glow)',
                   borderRadius: '14px', padding: '14px 16px', marginBottom: '16px',
                   display: 'flex', alignItems: 'center', gap: '12px',
                 }}>
                   <span style={{ fontSize: '20px' }}>🎉</span>
                   <div>
-                    <p style={{ fontSize: '13px', fontWeight: 700, color: '#1A1A2E', margin: 0 }}>Joining {decodeURIComponent(inviteOrg)}</p>
-                    <p style={{ fontSize: '11px', color: '#8E8EA0', margin: '2px 0 0' }}>You'll be added as {inviteRole}</p>
+                    <p style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>Joining {decodeURIComponent(inviteOrg)}</p>
+                    <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: '2px 0 0' }}>You'll be added as {inviteRole}</p>
                   </div>
                 </div>
               )}
 
               {/* Full name */}
               <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#4A4A6A', marginBottom: '6px' }}>Full name</label>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '6px' }}>Full name</label>
                 <div style={{ position: 'relative' }}>
-                  <User size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#8E8EA0' }} />
+                  <User size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
                   <input value={form.name} placeholder="John Doe"
                     onChange={e => updateField('name', e.target.value)}
                     style={inputStyle(!!errors.name)}
-                    onFocus={e => { if (!errors.name) e.target.style.borderColor = '#7C3AED' }}
-                    onBlur={e => { if (!errors.name) e.target.style.borderColor = '#E8E5F0' }}
+                    onFocus={e => { if (!errors.name) e.target.style.borderColor = 'var(--color-primary)' }}
+                    onBlur={e => { if (!errors.name) e.target.style.borderColor = 'var(--color-border)' }}
                   />
                 </div>
                 {errors.name && <p style={{ fontSize: '12px', color: '#EF4444', margin: '4px 0 0 4px' }}>{errors.name}</p>}
@@ -299,14 +301,14 @@ export function MobileRegisterPage() {
 
               {/* Email */}
               <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#4A4A6A', marginBottom: '6px' }}>Work email</label>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '6px' }}>Work email</label>
                 <div style={{ position: 'relative' }}>
-                  <Mail size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#8E8EA0' }} />
+                  <Mail size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
                   <input type="email" value={form.email} placeholder="name@company.com"
                     onChange={e => updateField('email', e.target.value)}
                     style={inputStyle(!!errors.email)}
-                    onFocus={e => { if (!errors.email) e.target.style.borderColor = '#7C3AED' }}
-                    onBlur={e => { if (!errors.email) e.target.style.borderColor = '#E8E5F0' }}
+                    onFocus={e => { if (!errors.email) e.target.style.borderColor = 'var(--color-primary)' }}
+                    onBlur={e => { if (!errors.email) e.target.style.borderColor = 'var(--color-border)' }}
                   />
                 </div>
                 {errors.email && <p style={{ fontSize: '12px', color: '#EF4444', margin: '4px 0 0 4px' }}>{errors.email}</p>}
@@ -314,17 +316,17 @@ export function MobileRegisterPage() {
 
               {/* Password */}
               <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#4A4A6A', marginBottom: '6px' }}>Password</label>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '6px' }}>Password</label>
                 <div style={{ position: 'relative' }}>
-                  <Lock size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#8E8EA0' }} />
+                  <Lock size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
                   <input type={showPassword ? 'text' : 'password'} value={form.password} placeholder="Min 8 characters"
                     onChange={e => updateField('password', e.target.value)}
                     style={{ ...inputStyle(!!errors.password), paddingRight: '44px' }}
-                    onFocus={e => { if (!errors.password) e.target.style.borderColor = '#7C3AED' }}
-                    onBlur={e => { if (!errors.password) e.target.style.borderColor = '#E8E5F0' }}
+                    onFocus={e => { if (!errors.password) e.target.style.borderColor = 'var(--color-primary)' }}
+                    onBlur={e => { if (!errors.password) e.target.style.borderColor = 'var(--color-border)' }}
                   />
                   <button type="button" onClick={() => setShowPassword(!showPassword)}
-                    style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#8E8EA0', cursor: 'pointer', padding: '4px' }}>
+                    style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px' }}>
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
@@ -334,7 +336,7 @@ export function MobileRegisterPage() {
                       {[1, 2, 3, 4, 5].map(i => (
                         <div key={i} style={{
                           flex: 1, height: '4px', borderRadius: '2px',
-                          background: i <= strength.score ? strengthColors[strength.score] : '#E8E5F0',
+                          background: i <= strength.score ? strengthColors[strength.score] : 'var(--color-border)',
                           transition: 'background 300ms',
                         }} />
                       ))}
@@ -349,17 +351,17 @@ export function MobileRegisterPage() {
 
               {/* Confirm Password */}
               <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#4A4A6A', marginBottom: '6px' }}>Confirm password</label>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '6px' }}>Confirm password</label>
                 <div style={{ position: 'relative' }}>
-                  <Lock size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#8E8EA0' }} />
+                  <Lock size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
                   <input type={showConfirm ? 'text' : 'password'} value={form.confirmPassword} placeholder="Confirm your password"
                     onChange={e => updateField('confirmPassword', e.target.value)}
                     style={{ ...inputStyle(!!errors.confirmPassword), paddingRight: '44px' }}
-                    onFocus={e => { if (!errors.confirmPassword) e.target.style.borderColor = '#7C3AED' }}
-                    onBlur={e => { if (!errors.confirmPassword) e.target.style.borderColor = '#E8E5F0' }}
+                    onFocus={e => { if (!errors.confirmPassword) e.target.style.borderColor = 'var(--color-primary)' }}
+                    onBlur={e => { if (!errors.confirmPassword) e.target.style.borderColor = 'var(--color-border)' }}
                   />
                   <button type="button" onClick={() => setShowConfirm(!showConfirm)}
-                    style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#8E8EA0', cursor: 'pointer', padding: '4px' }}>
+                    style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px' }}>
                     {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
@@ -370,23 +372,23 @@ export function MobileRegisterPage() {
               {accountType === 'business' && !inviteToken && (
                 <>
                   <div style={{ marginBottom: '14px' }}>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#4A4A6A', marginBottom: '6px' }}>Organization name</label>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '6px' }}>Organization name</label>
                     <div style={{ position: 'relative' }}>
-                      <Building2 size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#8E8EA0' }} />
+                      <Building2 size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
                       <input value={form.organizationName} placeholder="Acme Inc."
                         onChange={e => updateField('organizationName', e.target.value)}
                         style={inputStyle(!!errors.organizationName)}
-                        onFocus={e => { if (!errors.organizationName) e.target.style.borderColor = '#7C3AED' }}
-                        onBlur={e => { if (!errors.organizationName) e.target.style.borderColor = '#E8E5F0' }}
+                        onFocus={e => { if (!errors.organizationName) e.target.style.borderColor = 'var(--color-primary)' }}
+                        onBlur={e => { if (!errors.organizationName) e.target.style.borderColor = 'var(--color-border)' }}
                       />
                     </div>
                     {errors.organizationName && <p style={{ fontSize: '12px', color: '#EF4444', margin: '4px 0 0 4px' }}>{errors.organizationName}</p>}
                   </div>
 
                   <div style={{ marginBottom: '14px' }}>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#4A4A6A', marginBottom: '6px' }}>Industry</label>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '6px' }}>Industry</label>
                     <div style={{ position: 'relative' }}>
-                      <Building2 size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#8E8EA0', pointerEvents: 'none' }} />
+                      <Building2 size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)', pointerEvents: 'none' }} />
                       <select value={form.industry} onChange={e => updateField('industry', e.target.value)} style={selectStyle}>
                         {industries.map(ind => <option key={ind.value} value={ind.value}>{ind.label}</option>)}
                       </select>
@@ -394,9 +396,9 @@ export function MobileRegisterPage() {
                   </div>
 
                   <div style={{ marginBottom: '14px' }}>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#4A4A6A', marginBottom: '6px' }}>Your role</label>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '6px' }}>Your role</label>
                     <div style={{ position: 'relative' }}>
-                      <User size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#8E8EA0', pointerEvents: 'none' }} />
+                      <User size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)', pointerEvents: 'none' }} />
                       <select value={form.role} onChange={e => updateField('role', e.target.value)} style={selectStyle}>
                         {roleOptions.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                       </select>
@@ -410,18 +412,18 @@ export function MobileRegisterPage() {
                 <div onClick={(e) => { e.preventDefault(); setAgreed(!agreed); setErrors(p => ({ ...p, terms: '' })) }}
                   style={{
                     width: '22px', height: '22px', borderRadius: '7px', flexShrink: 0, marginTop: '1px',
-                    border: agreed ? 'none' : '1.5px solid #E8E5F0',
-                    background: agreed ? '#7C3AED' : 'white',
+                    border: agreed ? 'none' : '1.5px solid var(--color-border)',
+                    background: agreed ? 'var(--color-primary)' : 'var(--color-surface-2)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     cursor: 'pointer', transition: 'all 200ms',
                   }}>
                   {agreed && <Check size={14} color="white" strokeWidth={3} />}
                 </div>
-                <span style={{ fontSize: '13px', color: '#4A4A6A', lineHeight: 1.5 }}>
+                <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
                   I agree to the{' '}
-                  <Link to="/terms" target="_blank" style={{ color: '#7C3AED', fontWeight: 600, textDecoration: 'none' }}>Terms</Link>
+                  <Link to="/terms" target="_blank" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>Terms</Link>
                   {' '}and{' '}
-                  <Link to="/privacy" target="_blank" style={{ color: '#7C3AED', fontWeight: 600, textDecoration: 'none' }}>Privacy Policy</Link>
+                  <Link to="/privacy" target="_blank" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>Privacy Policy</Link>
                 </span>
               </label>
               {errors.terms && <p style={{ fontSize: '12px', color: '#EF4444', margin: '2px 0 0 32px' }}>{errors.terms}</p>}
@@ -430,10 +432,10 @@ export function MobileRegisterPage() {
               <button type="submit" disabled={isLoading}
                 style={{
                   width: '100%', padding: '16px', borderRadius: '16px', border: 'none', marginTop: '16px',
-                  background: 'linear-gradient(135deg, #7C3AED, #5B21B6)',
+                  background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-hover))',
                   color: 'white', fontSize: '16px', fontWeight: 700, cursor: isLoading ? 'wait' : 'pointer',
                   opacity: isLoading ? 0.7 : 1, transition: 'opacity 200ms',
-                  boxShadow: '0 4px 20px rgba(124,58,237,0.35)',
+                  boxShadow: '0 4px 20px var(--color-primary-glow)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                 }}>
                 {isLoading ? (
@@ -450,9 +452,9 @@ export function MobileRegisterPage() {
         </div>
 
         {/* Login link */}
-        <p style={{ textAlign: 'center', fontSize: '14px', color: '#8E8EA0', marginTop: '24px' }}>
+        <p style={{ textAlign: 'center', fontSize: '14px', color: 'var(--color-text-muted)', marginTop: '24px' }}>
           Already have an account?{' '}
-          <Link to="/login" style={{ color: '#7C3AED', fontWeight: 700, textDecoration: 'none' }}>
+          <Link to="/login" style={{ color: 'var(--color-primary)', fontWeight: 700, textDecoration: 'none' }}>
             Sign in
           </Link>
         </p>

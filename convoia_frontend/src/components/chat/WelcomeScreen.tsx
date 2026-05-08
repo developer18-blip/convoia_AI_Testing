@@ -121,7 +121,7 @@ export function WelcomeScreen({ onSuggestionClick }: WelcomeScreenProps) {
         </div>
 
         <div className="welcome-greeting">
-          <div className="welcome-eyebrow">Chat with Intellect AI</div>
+          <div className="welcome-eyebrow">Chat with Convoia AI</div>
           <h1 className="welcome-title">{main}</h1>
           <p className="welcome-subtitle">What would you like to explore today?</p>
         </div>

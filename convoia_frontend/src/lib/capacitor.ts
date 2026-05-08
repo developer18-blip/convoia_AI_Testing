@@ -77,11 +77,26 @@ export async function nativeGoogleSignIn(): Promise<{ idToken: string } | null> 
 export async function initNativeBridge() {
   if (!isNative) return
 
+  // ── Viewport height tracking ──
+  // With Keyboard.resize:'native', iOS shrinks the WKWebView when the keyboard
+  // appears, so window.innerHeight and 100dvh already reflect the available
+  // height above the keyboard. We mirror window.innerHeight into --vh so any
+  // component using calc(var(--vh,1dvh)*100) sees the same value. No manual
+  // keyboardHeight math is needed — the native shell handles it.
+  const setVH = () =>
+    document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`)
+  setVH()
+  document.documentElement.style.setProperty('--keyboard-height', '0px')
+
+  window.addEventListener('resize', setVH)
+
   // ── Status Bar ──
+  // Static Convoia turquoise — does NOT shift with active model. White icons
+  // (Style.Dark) for contrast on the turquoise background.
   try {
     const { StatusBar, Style } = await capImport('status-bar')
     await StatusBar.setStyle({ style: Style.Dark })
-    await StatusBar.setBackgroundColor({ color: '#0D0D0D' })
+    await StatusBar.setBackgroundColor({ color: '#14B8CD' })
     if (isAndroid) {
       await StatusBar.setOverlaysWebView({ overlay: false })
     }
@@ -90,11 +105,27 @@ export async function initNativeBridge() {
   // ── Keyboard ──
   try {
     const { Keyboard } = await capImport('keyboard')
-    Keyboard.addListener('keyboardWillShow', () => {
+    Keyboard.addListener('keyboardWillShow', (info: { keyboardHeight: number }) => {
       document.body.classList.add('keyboard-open')
+      document.documentElement.style.setProperty('--keyboard-height', `${info.keyboardHeight}px`)
+      // window.innerHeight has already been reduced by the native shell;
+      // refresh --vh so layouts depending on it pick up the new size.
+      setVH()
+      // Belt-and-suspenders: scroll focused input into view in case it sits
+      // inside a scrollable container (login/register, etc).
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const el = document.activeElement as HTMLElement | null
+          if (el && el.tagName !== 'BODY' && typeof el.scrollIntoView === 'function') {
+            el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+          }
+        })
+      })
     })
     Keyboard.addListener('keyboardWillHide', () => {
       document.body.classList.remove('keyboard-open')
+      document.documentElement.style.setProperty('--keyboard-height', '0px')
+      setVH()
     })
   } catch { /* not available */ }
 
@@ -158,13 +189,16 @@ export async function initNativeBridge() {
 }
 
 /**
- * Set status bar style based on theme.
+ * Status bar stays static Convoia turquoise — does not shift with theme or
+ * active model. The `isDark` param is preserved for API compatibility but
+ * unused. Icon style stays Dark (white icons) which reads on turquoise in
+ * both light and dark app themes.
  */
-export async function setStatusBarTheme(isDark: boolean) {
+export async function setStatusBarTheme(_isDark: boolean) {
   if (!isNative) return
   try {
     const { StatusBar, Style } = await capImport('status-bar')
-    await StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light })
-    await StatusBar.setBackgroundColor({ color: isDark ? '#0D0D0D' : '#FFFFFF' })
+    await StatusBar.setStyle({ style: Style.Dark })
+    await StatusBar.setBackgroundColor({ color: '#14B8CD' })
   } catch { /* silent */ }
 }

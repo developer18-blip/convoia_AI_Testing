@@ -2,6 +2,7 @@ import { createContext, useCallback, useEffect, useState, type ReactNode } from 
 import { useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 import { setToken as setStorageToken, setRefreshToken as setStorageRefresh, setUserProfile, clearAuth } from '../lib/storage'
+import { isNative } from '../lib/capacitor'
 import type { User } from '../types'
 
 interface AuthContextType {
@@ -101,9 +102,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(newToken)
       setUser(userData)
       setIsLoading(false)
-      // Intellect is the primary surface — every role lands there on
-      // sign-in. Admins can reach /admin via the sidebar if they want.
-      navigate('/chat')
+      // Mobile: land on /dashboard so the bottom-tab nav works correctly and
+      //   back from /chat returns to home (not login). Desktop: keep /chat as
+      //   the primary surface. replace:true so /login is removed from history.
+      navigate(isNative ? '/dashboard' : '/chat', { replace: true })
     }
 
     window.addEventListener('convoia:auth', handleDeepLinkAuth)
@@ -112,11 +114,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const redirectByRole = useCallback(
     (_role: string) => {
-      // Post-login / post-register every role lands on Intellect.
-      // Prior behaviour sent platform_admins to /admin and everyone
-      // else to /dashboard — the dashboard is no longer the home
-      // surface now that Intellect AI is the product.
-      navigate('/chat')
+      // Mobile lands on /dashboard (home with bottom tabs) so back from /chat
+      // returns home. Desktop keeps /chat as the primary post-auth surface.
+      navigate(isNative ? '/dashboard' : '/chat', { replace: true })
     },
     [navigate]
   )
@@ -192,7 +192,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearAuth() // Clear @capacitor/preferences on native
     setToken(null)
     setUser(null)
-    navigate('/login')
+    // Reset accent to Convoia turquoise default — no active model after logout.
+    window.dispatchEvent(new CustomEvent('convoia:logout'))
+    navigate('/login', { replace: true })
   }, [navigate])
 
   const updateUser = useCallback((updates: Partial<User>) => {

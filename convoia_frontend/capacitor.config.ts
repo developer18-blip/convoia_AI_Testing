@@ -32,12 +32,16 @@ const config: CapacitorConfig = {
       forceCodeForRefreshToken: true,
     },
     StatusBar: {
-      style: 'DARK',             // light text for dark background
-      backgroundColor: '#0D0D0D',
+      style: 'DARK',             // white icons for contrast on turquoise
+      backgroundColor: '#14B8CD', // static Convoia turquoise — never shifts
       overlaysWebView: false,
     },
     Keyboard: {
-      resize: 'body',            // resize viewport when keyboard opens (critical for chat input)
+      // 'native': iOS shrinks the WKWebView when the keyboard appears, so
+      // window.innerHeight (and 100dvh) reflect the available height above
+      // the keyboard with no JS coordination required. We mirror it into
+      // --vh on the resize event for any component using calc(var(--vh)*100).
+      resize: 'native',
       resizeOnFullScreen: true,
     },
     PushNotifications: {

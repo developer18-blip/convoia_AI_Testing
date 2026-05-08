@@ -492,7 +492,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const cappedHistory = fullHistory.length > MAX_HISTORY ? fullHistory.slice(-MAX_HISTORY) : fullHistory
       const allMsgs = cappedHistory.map((m) => ({ role: m.role, content: m.content }))
       const token = localStorage.getItem('convoia_token')
-      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+      const baseUrl = import.meta.env.VITE_API_URL || 'https://convoia.ai/api'
 
       // Find the most recent image from conversation including current message
       const lastImage = [...messages, userMsg].reverse().find((m) => m.imagePreview)?.imagePreview
@@ -751,7 +751,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       }
 
       const token = localStorage.getItem('convoia_token')
-      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+      const baseUrl = import.meta.env.VITE_API_URL || 'https://convoia.ai/api'
 
       // Collect ALL images from the current message (supports multiple image uploads)
       const currentMsg = userMsg
