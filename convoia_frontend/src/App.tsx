@@ -66,6 +66,7 @@ const PricingPage = lazy(() => import('./pages/public/PricingPage'))
 const ResetPasswordPage = lazy(() => import('./pages/public/ResetPasswordPage'))
 const ReviewPage = lazy(() => import('./pages/public/ReviewPage'))
 const DesignSystemPage = lazy(() => import('./pages/DesignSystemPage'))
+const AccountDeletionPage = lazy(() => import('./pages/public/AccountDeletionPage'))
 
 function ProtectedRoute() {
   const { isAuthenticated, isLoading } = useAuth()
@@ -166,6 +167,7 @@ function AppRoutes() {
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/review" element={<ReviewPage />} />
+        <Route path="/account-deletion" element={<AccountDeletionPage />} />
 
         {/* Protected */}
         <Route element={<ProtectedRoute />}>

@@ -114,7 +114,7 @@ export function PrivacyPolicyPage() {
             <section>
               <h2>4. Data Retention</h2>
               <ul>
-                <li><strong>Account Data:</strong> Retained as long as your account is active. Upon account deletion request, we delete your personal data within 30 days.</li>
+                <li><strong>Account Data:</strong> Retained as long as your account is active. Upon account deletion request, we delete your personal data within 30 days. <Link to="/account-deletion" className="text-primary hover:underline">Submit a deletion request →</Link></li>
                 <li><strong>AI Query Logs:</strong> Usage metadata (model used, token count, timestamps) is retained for up to 12 months for billing and analytics. Query content is not stored permanently.</li>
                 <li><strong>Payment Records:</strong> Transaction records are retained for 7 years to comply with U.S. tax and financial regulations.</li>
                 <li><strong>Server Logs:</strong> Automatically purged after 90 days.</li>
@@ -129,7 +129,7 @@ export function PrivacyPolicyPage() {
               <ul>
                 <li><strong>Access:</strong> Request a copy of your personal data.</li>
                 <li><strong>Correction:</strong> Update or correct inaccurate information via your account settings.</li>
-                <li><strong>Deletion:</strong> Request deletion of your account and associated data.</li>
+                <li><strong>Deletion:</strong> <Link to="/account-deletion" className="text-primary hover:underline">Request deletion of your account and associated data</Link>.</li>
                 <li><strong>Data Portability:</strong> Request your data in a machine-readable format.</li>
               </ul>
 
