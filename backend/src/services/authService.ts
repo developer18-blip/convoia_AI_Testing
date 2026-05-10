@@ -433,8 +433,13 @@ export class AuthService {
       // Send login notification (fire and forget)
       NotificationService.onLogin(user.id, user.name).catch(() => {});
 
-      // Honor "Remember me": 30d access token when checked, 24h otherwise.
-      const accessExpiry = rememberMe ? '30d' : '24h';
+      // Honor "Remember me": longer-lived tokens when checked.
+      // Refresh > Access by design — the access TTL bounds blast radius if
+      // a token leaks; the refresh TTL bounds how long a quiet user can be
+      // away before being forced to re-auth.
+      const accessExpiry  = rememberMe ? '30d' : '24h';
+      const refreshExpiry = rememberMe ? '90d' : '7d';
+
       const token = generateToken({
         userId: user.id,
         organizationId: user.organizationId || undefined,
@@ -445,7 +450,7 @@ export class AuthService {
         userId: user.id,
         organizationId: user.organizationId || undefined,
         role: user.role,
-      });
+      }, refreshExpiry);
 
       return {
         user: {

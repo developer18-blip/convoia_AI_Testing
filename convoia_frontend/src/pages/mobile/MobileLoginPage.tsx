@@ -16,6 +16,7 @@ export function MobileLoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [rememberMe, setRememberMe] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(false)
   const [showForgot, setShowForgot] = useState(false)
@@ -37,7 +38,7 @@ export function MobileLoginPage() {
     if (!validate()) return
     try {
       setIsLoading(true)
-      await login(email, password)
+      await login(email, password, rememberMe)
       if (inviteToken) {
         try {
           const res = await api.post('/team/accept-invite', { token: inviteToken })
@@ -205,8 +206,18 @@ export function MobileLoginPage() {
               {errors.password && <p style={{ fontSize: '12px', color: '#EF4444', margin: '4px 0 0 4px' }}>{errors.password}</p>}
             </div>
 
-            {/* Forgot password */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
+            {/* Remember me + Forgot password */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+                <input
+                  type="checkbox"
+                  name="rememberMe"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  style={{ width: '16px', height: '16px', accentColor: 'var(--color-primary)', cursor: 'pointer' }}
+                />
+                <span>Remember me</span>
+              </label>
               <button type="button" onClick={() => { setShowForgot(true); setForgotEmail(email); setForgotSent(false) }}
                 style={{ fontSize: '13px', fontWeight: 600, color: '#7C3AED', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                 Forgot password?

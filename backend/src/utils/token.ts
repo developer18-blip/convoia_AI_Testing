@@ -4,8 +4,8 @@ import { config } from '../config/env.js';
 import { JWTPayload } from '../middleware/authMiddleware.js';
 
 /**
- * Generate short-lived access token (config.jwtExpire by default).
- * Pass `expiresIn` to override — used by login to honor "Remember me".
+ * Generate short-lived access token. Defaults to config.jwtExpire (15m);
+ * pass `expiresIn` to override — used by login to honor "Remember me".
  */
 export const generateToken = (payload: JWTPayload, expiresIn?: string): string => {
   return jwt.sign(payload, config.jwtSecret, {
@@ -14,11 +14,13 @@ export const generateToken = (payload: JWTPayload, expiresIn?: string): string =
 };
 
 /**
- * Generate long-lived refresh token (7d default)
+ * Generate long-lived refresh token. Defaults to config.jwtRefreshExpire (7d);
+ * pass `expiresIn` to override — used by login to honor "Remember me" so the
+ * rolling session can survive multi-week gaps between visits.
  */
-export const generateRefreshToken = (payload: JWTPayload): string => {
+export const generateRefreshToken = (payload: JWTPayload, expiresIn?: string): string => {
   return jwt.sign(payload, config.jwtRefreshSecret, {
-    expiresIn: config.jwtRefreshExpire,
+    expiresIn: (expiresIn || config.jwtRefreshExpire) as any,
   });
 };
 
