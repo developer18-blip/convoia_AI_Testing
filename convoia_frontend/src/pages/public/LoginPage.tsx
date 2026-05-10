@@ -31,6 +31,7 @@ export function LoginPage() {
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(false)
   const [showForgot, setShowForgot] = useState(false)
@@ -52,7 +53,7 @@ export function LoginPage() {
     if (!validate()) return
     try {
       setIsLoading(true)
-      await login(email, password)
+      await login(email, password, rememberMe)
       if (inviteToken) {
         try {
           const res = await api.post('/team/accept-invite', { token: inviteToken })
@@ -145,7 +146,13 @@ export function LoginPage() {
 
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
-                <input type="checkbox" className="rounded border-border bg-surface text-primary focus:ring-primary w-4 h-4" />
+                <input
+                  type="checkbox"
+                  name="rememberMe"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="rounded border-border bg-surface text-primary focus:ring-primary w-4 h-4"
+                />
                 <span>Remember me</span>
               </label>
               <button type="button" onClick={() => { setShowForgot(true); setForgotEmail(email); setForgotSent(false) }} className="text-sm text-primary hover:text-primary-hover font-medium transition-colors">

@@ -10,7 +10,11 @@ interface AuthContextType {
   token: string | null
   isAuthenticated: boolean
   isLoading: boolean
-  login: (email: string, password: string) => Promise<void>
+  /** rememberMe (default false): backend issues 30d access + 90d refresh
+   *  instead of the standard 24h + 7d, so the user stays signed in for
+   *  ~3 months between sessions. Opt-in only — UI checkbox is unchecked
+   *  by default. */
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>
   googleLogin: (idToken: string) => Promise<void>
   register: (data: Record<string, string>) => Promise<void>
   logout: () => void
@@ -141,9 +145,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const login = useCallback(
-    async (email: string, password: string) => {
+    async (email: string, password: string, rememberMe = false) => {
       try {
-        const res = await api.post('/auth/login', { email, password })
+        const res = await api.post('/auth/login', { email, password, rememberMe })
         const { token: newToken, refreshToken, user: userData } = res.data.data
         localStorage.setItem('convoia_token', newToken)
         localStorage.setItem('convoia_refresh_token', refreshToken)
