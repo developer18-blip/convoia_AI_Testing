@@ -10,6 +10,13 @@ import { promisify } from 'util';
 import * as fs from 'fs';
 import * as path from 'path';
 import logger from '../config/logger.js';
+import {
+  executePython,
+  worstCaseWalletTokens,
+  acquireSlot,
+  releaseSlot,
+} from './sandboxService.js';
+import { TokenWalletService } from './tokenWalletService.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -363,7 +370,8 @@ export async function executeTool(
   input: Record<string, any>,
   userId: string,
   projectId: string,
-  apiKeys?: Record<string, string>
+  apiKeys?: Record<string, string>,
+  organizationId?: string,
 ): Promise<ToolResult> {
   logger.info(`Tool execution: ${toolName} by user ${userId}, project ${projectId}`);
 
@@ -390,9 +398,127 @@ export async function executeTool(
       return gitLog(userId, projectId, input.count || 10);
     case 'git_commit':
       return gitCommit(userId, projectId, input.message);
+    case 'execute_python':
+      return executePythonTool(userId, organizationId, input.code, {});
     default:
       return { success: false, output: null, error: `Unknown tool: ${toolName}`, durationMs: 0 };
   }
+}
+
+// ── execute_python handler ───────────────────────────────────────────
+//
+// Wraps sandboxService.executePython with: wallet pre-flight (worst-case
+// 30s ≈ 586 wallet tokens), service-level concurrency guard (single
+// inFlight per user across the API + agent tool paths), and the Day 1
+// billing rule (no charge on provision failure, charge for elapsed
+// seconds otherwise).
+//
+// Returns an orchestrator-shaped ToolResult — never throws. Errors
+// surface as { success: false, error: string } so the LLM can read
+// stderr and decide whether to retry.
+//
+// The `deps` parameter exists for tests — production code calls this
+// with an empty object and gets the real wallet / sandbox / slot
+// implementations. See agentTools.test.ts for the injection pattern.
+export interface ExecutePythonToolDeps {
+  getBalance?: (userId: string) => Promise<{ tokenBalance: number }>;
+  deductTokens?: (args: {
+    userId: string; tokens: number; reference: string;
+    description: string; organizationId?: string;
+  }) => Promise<number>;
+  runSandbox?: typeof executePython;
+  acquire?: typeof acquireSlot;
+  release?: typeof releaseSlot;
+}
+
+export async function executePythonTool(
+  userId: string,
+  organizationId: string | undefined,
+  code: unknown,
+  deps: ExecutePythonToolDeps = {},
+): Promise<ToolResult> {
+  const getBalance   = deps.getBalance   ?? TokenWalletService.getBalance.bind(TokenWalletService);
+  const deductTokens = deps.deductTokens ?? TokenWalletService.deductTokens.bind(TokenWalletService);
+  const runSandbox   = deps.runSandbox   ?? executePython;
+  const acquire      = deps.acquire      ?? acquireSlot;
+  const release      = deps.release      ?? releaseSlot;
+
+  const startedAt = Date.now();
+
+  if (typeof code !== 'string' || code.length === 0) {
+    return {
+      success: false,
+      output: null,
+      error: 'execute_python requires a "code" string parameter.',
+      durationMs: Date.now() - startedAt,
+    };
+  }
+
+  // 1. Wallet pre-flight (worst-case 30s cost)
+  const worstCase = worstCaseWalletTokens();
+  const balance = await getBalance(userId);
+  if (balance.tokenBalance < worstCase) {
+    return {
+      success: false,
+      output: null,
+      error: `Insufficient tokens — Code Interpreter needs ~${worstCase} tokens per run, you have ${balance.tokenBalance}. Tell the user to top up their wallet to use this tool.`,
+      durationMs: Date.now() - startedAt,
+    };
+  }
+
+  // 2. Concurrency guard — single inflight per user, shared with the
+  //    POST /api/sandbox/execute-python controller.
+  if (!acquire(userId)) {
+    return {
+      success: false,
+      output: null,
+      error: 'A previous sandbox run is still active. Wait for it to finish, then try again.',
+      durationMs: Date.now() - startedAt,
+    };
+  }
+
+  // 3. Execute
+  let result;
+  try {
+    result = await runSandbox(code);
+  } finally {
+    release(userId);
+  }
+
+  // 4. Bill (skip on provision failure — Day 1 rule).
+  if (result.walletTokensToDeduct > 0 && result.error?.kind !== 'provision') {
+    await deductTokens({
+      userId,
+      tokens: result.walletTokensToDeduct,
+      reference: `sandbox-py-${Date.now()}`,
+      description: `Python sandbox (${result.executionTimeSec.toFixed(2)}s, via execute_python)`,
+      organizationId,
+    });
+  }
+
+  // 5. Shape for the orchestrator. On success, output is a structured
+  //    object so JSON.stringify gives the LLM the field names. On
+  //    failure, error is a single string carrying kind + message +
+  //    traceback for the LLM's retry loop.
+  if (result.success) {
+    return {
+      success: true,
+      output: {
+        stdout: result.stdout,
+        stderr: result.stderr,
+        executionTimeSec: Number(result.executionTimeSec.toFixed(2)),
+      },
+      durationMs: Math.round(result.executionTimeSec * 1000),
+    };
+  }
+  return {
+    success: false,
+    output: null,
+    error: result.error
+      ? `[${result.error.kind}] ${result.error.message}${result.error.traceback ? '\n\nTraceback:\n' + result.error.traceback : ''}`
+      : 'Sandbox execution failed',
+    durationMs: Math.round(result.executionTimeSec * 1000),
+  };
 }
 
 // ── Tool Definitions (for LLM function calling) ──────────────────────
@@ -498,6 +624,48 @@ export const TOOL_DEFINITIONS = [
         message: { type: 'string', description: 'Commit message' },
       },
       required: ['message'],
+    },
+  },
+  {
+    name: 'execute_python',
+    description: `Execute Python 3 code in an isolated cloud sandbox. Use when running real code gives a more accurate answer than guessing.
+
+WHEN TO USE:
+- Numerical computation the user asks for (stats, formulas, regex on real input)
+- Data analysis on user-provided data (CSV, JSON, tables pasted in chat)
+- Plotting / charts / visualizations (matplotlib, seaborn)
+- Math problems requiring exact computation
+- Verifying an answer you'd otherwise estimate
+
+WHEN NOT TO USE:
+- General questions you already know the answer to ("what's 2+2", "explain X")
+- Opinion or recommendation requests
+- Code review or explanation (write markdown, don't run code)
+- Conversational replies
+
+EXECUTION MODEL — READ THIS:
+- Each call provisions a FRESH sandbox. Variables, imports, files from a previous call DO NOT EXIST.
+- Write self-contained code: imports + data setup + computation + print() — all in ONE call.
+- 30-second timeout. 10,000-character code limit. ~30s = ~586 wallet tokens worst case.
+- Pre-installed: numpy, pandas, matplotlib, seaborn, scipy, scikit-learn, statsmodels, requests, beautifulsoup4, pillow.
+
+ERROR HANDLING:
+- If success=false, read stderr / error.traceback, fix your code, call again. Try up to 2 retries (3 total attempts).
+- After 3 total attempts, stop retrying and explain to the user what went wrong in plain English.
+
+OUTPUT DISCIPLINE:
+- Use print() — final expressions are NOT auto-echoed.
+- Print only what the user needs. Summarize dataframes (head + shape + stats), don't dump full tables.
+- For plots: matplotlib -> savefig to BytesIO -> base64 -> print("PLOT_BASE64: " + b64). The system prompt explains how to embed it in your response.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        code: {
+          type: 'string',
+          description: 'Self-contained Python 3 code. IMPORTANT: each call runs in a fresh sandbox — variables, imports, and files from previous calls are NOT preserved. Include every import and data setup needed for this specific call.',
+        },
+      },
+      required: ['code'],
     },
   },
 ];

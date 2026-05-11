@@ -210,7 +210,8 @@ async function runNativeFunctionCallingLoop(
             toolCall.name,
             toolCall.arguments,
             userId, projectId,
-            { perplexity: config.apiKeys.perplexity || '' }
+            { perplexity: config.apiKeys.perplexity || '' },
+            organizationId,
           );
 
           callbacks.onToolResult({ name: toolCall.name, result: toolResult });
@@ -229,14 +230,18 @@ async function runNativeFunctionCallingLoop(
             },
           }).catch(e => logger.warn(`Tool execution log failed: ${e.message}`));
 
-          // Add tool result to conversation for next iteration
+          // Add tool result to conversation for next iteration.
+          // execute_python may emit base64 plots → bigger budget. Other
+          // tools keep the original 3K cap to avoid context-window bloat
+          // for established flows.
+          const truncationLimit = toolCall.name === 'execute_python' ? 100_000 : 3_000;
           conversationMessages.push({
             role: 'assistant',
             content: `[Tool: ${toolCall.name}] ${JSON.stringify(toolCall.arguments)}`,
           });
           conversationMessages.push({
             role: 'user',
-            content: `[Tool Result: ${toolCall.name}] ${toolResult.success ? JSON.stringify(toolResult.output).slice(0, 3000) : `Error: ${toolResult.error}`}`,
+            content: `[Tool Result: ${toolCall.name}] ${toolResult.success ? JSON.stringify(toolResult.output).slice(0, truncationLimit) : `Error: ${toolResult.error}`}`,
           });
         }
         // Continue loop — model may want to use more tools
@@ -351,7 +356,12 @@ async function runXMLFunctionCallingLoop(
     incrementToolCount(userId);
 
     callbacks.onToolUse({ name: toolCall.name, input: toolCall.arguments });
-    const result = await executeTool(toolCall.name, toolCall.arguments, userId, projectId);
+    const result = await executeTool(
+      toolCall.name, toolCall.arguments,
+      userId, projectId,
+      undefined,
+      organizationId,
+    );
     callbacks.onToolResult({ name: toolCall.name, result });
 
     await prisma.toolExecution.create({
