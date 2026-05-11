@@ -75,7 +75,11 @@ export const executePythonHandler = asyncHandler(async (req: Request, res: Respo
 
   let result;
   try {
-    result = await executePython(code);
+    // userId enables plot storage partitioning under
+    // uploads/sandbox-plots/<userId>/. Attachments live in the agent
+    // tool path only — the raw HTTP endpoint has no conversation
+    // context to resolve them from.
+    result = await executePython(code, { userId });
   } finally {
     releaseSlot(userId);
   }
@@ -134,6 +138,7 @@ export const executePythonHandler = asyncHandler(async (req: Request, res: Respo
       executionTimeSec: Number(result.executionTimeSec.toFixed(2)),
       tokensCharged,
       balanceAfter,
+      plots: result.plots ?? [],
     },
   });
 });

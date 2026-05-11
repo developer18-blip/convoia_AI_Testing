@@ -186,3 +186,81 @@ describe('sandboxService — executePython', () => {
     assert.match(result.error?.message || '', /sync boom/);
   });
 });
+
+// ── PLOT EXTRACTION (Day 3) ────────────────────────────────────────
+
+describe('sandboxService — plot extraction', () => {
+  const apiKey = 'test-key';
+
+  it('execution with no plots returns plots: undefined', async () => {
+    const factory: SandboxFactory = async () => ({
+      runCode: async () => ({ logs: { stdout: ['no plot here\n'], stderr: [] }, results: [] }),
+      kill: async () => {},
+    });
+    const writes: Array<{ userId: string; plotId: string; bytes: Buffer }> = [];
+    const result = await executePython('print(1)', {
+      factory, apiKey, userId: 'u1',
+      writePlotToDisk: (userId, plotId, bytes) => writes.push({ userId, plotId, bytes }),
+    });
+    assert.equal(result.success, true);
+    assert.equal(result.plots, undefined, 'no plots in execution → plots:undefined');
+    assert.equal(writes.length, 0, 'no disk writes');
+  });
+
+  it('execution with one PNG result returns one plot metadata entry', async () => {
+    // Tiny valid PNG (1x1 transparent) — base64 below is the real header
+    // of a 1x1 PNG. The bytes don't need to render; we just verify the
+    // pipeline writes them and produces a valid JWT-signed token.
+    const tinyPngB64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+    const factory: SandboxFactory = async () => ({
+      runCode: async () => ({
+        logs: { stdout: ['plot done\n'], stderr: [] },
+        results: [{ png: tinyPngB64 }],
+      }),
+      kill: async () => {},
+    });
+    const writes: Array<{ userId: string; plotId: string; bytes: Buffer }> = [];
+    const result = await executePython('plt.show()', {
+      factory, apiKey, userId: 'alice-uid',
+      writePlotToDisk: (userId, plotId, bytes) => writes.push({ userId, plotId, bytes }),
+    });
+    assert.equal(result.success, true);
+    assert.ok(result.plots);
+    assert.equal(result.plots!.length, 1);
+    assert.equal(result.plots![0].mimeType, 'image/png');
+    assert.equal(result.plots![0].filename, 'plot-1.png');
+    assert.ok(typeof result.plots![0].id === 'string' && result.plots![0].id.length > 0);
+    assert.ok(typeof result.plots![0].token === 'string' && result.plots![0].token.length > 0);
+    // Disk write happened for this user with the same plotId
+    assert.equal(writes.length, 1);
+    assert.equal(writes[0].userId, 'alice-uid');
+    assert.equal(writes[0].plotId, result.plots![0].id);
+    assert.ok(writes[0].bytes.length > 0, 'decoded PNG bytes should be non-empty');
+  });
+
+  it('execution with three PNG results returns three entries in order with sequential filenames', async () => {
+    const tiny = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+    const factory: SandboxFactory = async () => ({
+      runCode: async () => ({
+        logs: { stdout: [], stderr: [] },
+        results: [{ png: tiny }, { png: tiny }, { png: tiny }],
+      }),
+      kill: async () => {},
+    });
+    const writes: Array<{ userId: string; plotId: string }> = [];
+    const result = await executePython('three plots', {
+      factory, apiKey, userId: 'multi',
+      writePlotToDisk: (userId, plotId) => writes.push({ userId, plotId }),
+    });
+    assert.equal(result.success, true);
+    assert.equal(result.plots?.length, 3);
+    assert.deepEqual(
+      result.plots!.map(p => p.filename),
+      ['plot-1.png', 'plot-2.png', 'plot-3.png'],
+    );
+    assert.equal(writes.length, 3);
+    // All three IDs should be unique
+    const ids = new Set(result.plots!.map(p => p.id));
+    assert.equal(ids.size, 3, 'plot IDs must be unique across multi-plot turns');
+  });
+});

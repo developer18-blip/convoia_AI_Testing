@@ -1,6 +1,10 @@
 import { config } from '../config/env.js';
 import { TOKEN_BASE_RATE, costAdjustedTokens } from '../config/tokenPackages.js';
 import logger from '../config/logger.js';
+import jwt from 'jsonwebtoken';
+import * as fs from 'fs';
+import * as path from 'path';
+import crypto from 'crypto';
 
 // ── COST MODEL (E2B pricing as of 2026-05-11) ──────────────────────
 //
@@ -72,6 +76,65 @@ export function releaseSlot(userId: string): void {
   inFlightUsers.delete(userId);
 }
 
+// ── PLOT STORAGE + TOKEN HELPERS ────────────────────────────────────
+//
+// Plots produced by `plt.show()` are extracted from the E2B Execution
+// result, written to local disk under `uploads/sandbox-plots/<userId>/`,
+// and surfaced to the LLM via a small metadata array. The LLM emits
+// markdown `![](api/sandbox/plot/<id>?token=<token>)` — the chat UI's
+// existing <img> renderer fetches the bytes through a token-gated
+// endpoint that mirrors the file-download pattern in fileRoutes.ts.
+//
+// Tokens are dedicated to plots (signPlotToken / verifyPlotToken) so
+// the plot lifecycle (7d TTL, per-user directory) stays independent
+// from the file-generation flow. The cross-check rule from fileRoutes
+// (token's plotId must match the path's :plotId) is enforced inside
+// the plot controller.
+// ───────────────────────────────────────────────────────────────────
+
+const PLOT_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;  // 7 days
+const PLOT_STORAGE_ROOT = path.join(process.cwd(), 'uploads', 'sandbox-plots');
+
+export interface PlotTokenPayload {
+  plotId: string;
+  userId: string;
+}
+
+export interface PlotMetadata {
+  id: string;
+  token: string;
+  mimeType: 'image/png';
+  filename: string;
+}
+
+export function signPlotToken(plotId: string, userId: string): string {
+  return jwt.sign({ plotId, userId } as PlotTokenPayload, config.jwtSecret, {
+    expiresIn: PLOT_TOKEN_TTL_SECONDS,
+  });
+}
+
+export function verifyPlotToken(token: string): PlotTokenPayload | null {
+  try {
+    const decoded = jwt.verify(token, config.jwtSecret) as PlotTokenPayload & { iat?: number; exp?: number };
+    if (!decoded?.plotId || !decoded?.userId) return null;
+    return { plotId: decoded.plotId, userId: decoded.userId };
+  } catch {
+    return null;
+  }
+}
+
+/** Absolute path to a stored plot. Creating the parent directory is the writer's job. */
+export function plotStoragePath(userId: string, plotId: string): string {
+  return path.join(PLOT_STORAGE_ROOT, userId, `${plotId}.png`);
+}
+
+/** Default disk writer for plots. Tests can inject a stub via ExecutePythonOptions. */
+function defaultWritePlotToDisk(userId: string, plotId: string, bytes: Buffer): void {
+  const dest = plotStoragePath(userId, plotId);
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.writeFileSync(dest, bytes);
+}
+
 // ── RESULT TYPES ───────────────────────────────────────────────────
 
 export type SandboxErrorKind =
@@ -99,6 +162,8 @@ export interface SandboxResult {
   dollarCost: number;
   /** Wallet tokens we should deduct. 0 on provision failure. */
   walletTokensToDeduct: number;
+  /** PNG plots extracted from the execution's results[] (matplotlib plt.show()). Empty array if none. */
+  plots?: PlotMetadata[];
 }
 
 // ── DEPENDENCY INJECTION (for tests) ────────────────────────────────
@@ -109,14 +174,24 @@ export interface SandboxResult {
 // Sandbox-shaped results without any network calls.
 // ───────────────────────────────────────────────────────────────────
 
+/** Single result item from the E2B Execution. Day 3 only consumes `png`. */
+export interface ExecutionResultItem {
+  /** Base64-encoded PNG bytes when matplotlib plt.show() produced a figure. */
+  png?: string;
+}
+
 export interface ExecutionRecord {
   text?: string;
   logs?: { stdout?: string[]; stderr?: string[] };
   error?: { name?: string; value?: string; traceback?: string };
+  /** E2B `Execution.results` — matplotlib plots and other rich outputs. */
+  results?: ExecutionResultItem[];
 }
 
 export interface SandboxHandle {
   runCode(code: string, opts?: { timeoutMs?: number }): Promise<ExecutionRecord>;
+  /** Optional — used to stage user-uploaded attachments before runCode. Production wraps E2B's sbx.files.write. */
+  writeFile?(filePath: string, content: Uint8Array | string): Promise<void>;
   kill(): Promise<void>;
 }
 
@@ -138,7 +213,12 @@ const defaultSandboxFactory: SandboxFactory = async (apiKey) => {
         text: exec?.text,
         logs: exec?.logs,
         error: exec?.error,
+        results: exec?.results,
       };
+    },
+    writeFile: async (filePath, content) => {
+      // E2B SDK: sandbox.files.write(path, data). Accepts string or bytes.
+      await (sbx as any).files?.write?.(filePath, content);
     },
     kill: async () => { try { await sbx.kill(); } catch { /* idempotent */ } },
   };
@@ -146,11 +226,24 @@ const defaultSandboxFactory: SandboxFactory = async (apiKey) => {
 
 // ── PUBLIC: executePython ──────────────────────────────────────────
 
+/** Single user-uploaded attachment ready to stage into the sandbox at /sandbox/inputs/<fileName>. */
+export interface AttachmentInput {
+  fileName: string;
+  /** UTF-8 string OR raw bytes; the sandbox SDK accepts both. */
+  content: Uint8Array | string;
+}
+
 export interface ExecutePythonOptions {
+  /** Owner of this run — required for plot storage partitioning + audit logs. */
+  userId?: string;
+  /** Files to stage at /sandbox/inputs/<fileName> before user code runs. */
+  attachments?: AttachmentInput[];
   /** Override the sandbox factory in tests. */
   factory?: SandboxFactory;
   /** Override the API key (defaults to config.e2bApiKey). */
   apiKey?: string;
+  /** Override the disk writer for plots — tests inject a stub to avoid real fs writes. */
+  writePlotToDisk?: (userId: string, plotId: string, bytes: Buffer) => void;
 }
 
 /**
@@ -170,6 +263,9 @@ export async function executePython(
 ): Promise<SandboxResult> {
   const factory = options.factory ?? defaultSandboxFactory;
   const apiKey = options.apiKey ?? config.e2bApiKey;
+  const userId = options.userId;
+  const attachments = options.attachments ?? [];
+  const writePlotToDisk = options.writePlotToDisk ?? defaultWritePlotToDisk;
 
   if (!apiKey) {
     return {
@@ -234,6 +330,24 @@ export async function executePython(
   }
 
   try {
+    // Stage user-uploaded attachments at /sandbox/inputs/<fileName>
+    // BEFORE running user code. The system prompt teaches the LLM to
+    // read from this exact path, e.g. pd.read_csv('/sandbox/inputs/data.csv').
+    // Stateless reminder: every executePython call re-uploads — there is
+    // no session-scoped cache yet. Documented Day 4+ optimization.
+    if (attachments.length && sandbox.writeFile) {
+      for (const att of attachments) {
+        try {
+          await sandbox.writeFile(`/sandbox/inputs/${att.fileName}`, att.content);
+        } catch (uploadErr: any) {
+          // Upload failure shouldn't abort the run — log + continue so
+          // the LLM at least gets a clean stderr trace if its code
+          // tries to read the missing file.
+          logger.warn(`Sandbox attachment upload failed for ${att.fileName}: ${uploadErr?.message || uploadErr}`);
+        }
+      }
+    }
+
     startTime = Date.now();
     const exec = await sandbox.runCode(code, { timeoutMs });
     elapsedSec = (Date.now() - startTime) / 1000;
@@ -242,6 +356,34 @@ export async function executePython(
     const stderr = (exec?.logs?.stderr ?? []).join('');
     const dollarCost = computeSandboxDollarCost(elapsedSec);
     const walletTokensToDeduct = computeSandboxWalletTokens(elapsedSec);
+
+    // Extract PNG plots from Execution.results[]. plt.show() in the
+    // Jupyter kernel populates each Result.png with base64 PNG bytes.
+    // We write each to disk under uploads/sandbox-plots/<userId>/<id>.png
+    // and sign a 7-day token. Skipped silently when userId is missing —
+    // sandboxService callers without a userId (older tests) don't
+    // generate plots.
+    const plots: PlotMetadata[] = [];
+    if (userId && exec?.results?.length) {
+      let idx = 0;
+      for (const r of exec.results) {
+        if (!r?.png) continue;
+        idx++;
+        try {
+          const bytes = Buffer.from(r.png, 'base64');
+          const plotId = crypto.randomUUID();
+          writePlotToDisk(userId, plotId, bytes);
+          plots.push({
+            id: plotId,
+            token: signPlotToken(plotId, userId),
+            mimeType: 'image/png',
+            filename: `plot-${idx}.png`,
+          });
+        } catch (plotErr: any) {
+          logger.warn(`Plot extraction failed (idx=${idx}): ${plotErr?.message || plotErr}`);
+        }
+      }
+    }
 
     if (exec?.error) {
       const kind = classifyExecutionError(exec.error);
@@ -258,6 +400,7 @@ export async function executePython(
         executionTimeSec: elapsedSec,
         dollarCost,
         walletTokensToDeduct,
+        plots: plots.length ? plots : undefined,
       };
     }
 
@@ -268,6 +411,7 @@ export async function executePython(
       executionTimeSec: elapsedSec,
       dollarCost,
       walletTokensToDeduct,
+      plots: plots.length ? plots : undefined,
     };
   } catch (err: any) {
     elapsedSec = startTime > 0 ? (Date.now() - startTime) / 1000 : 0;

@@ -595,6 +595,39 @@ export const attachFile = asyncHandler(async (req: Request, res: Response): Prom
   let extractedText = ''
   let thumbnail: string | null = null
 
+  // ── Persist raw bytes for sandbox-loadable types (Day 3) ────────
+  // The Code Interpreter sandbox loads files via /sandbox/inputs/<filename>
+  // from these persisted bytes. Without this, large CSVs fall back to a
+  // 500-row JSON preview in extractedText — Day 4+ session-scoped sandboxes
+  // make this even more important. Skipped for:
+  //   - image: vision pipeline reads the existing thumbnail copy
+  //   - audio: extractedText IS the Whisper transcript; raw audio is huge
+  //            and not useful inside the sandbox
+  //
+  // Path layout: uploads/attachments/<userId>/<uuid>.<ext>
+  // Stored with forward slashes for cross-OS portability — Windows dev,
+  // Linux prod read the same string via path.resolve().
+  let localPath: string | null = null
+  let preGeneratedId: string | undefined = undefined
+  const PERSIST_TYPES = new Set(['csv', 'xlsx', 'pdf', 'docx', 'text', 'code'])
+  if (PERSIST_TYPES.has(fileType)) {
+    try {
+      preGeneratedId = crypto.randomUUID()
+      const ext = path.extname(file.originalname).toLowerCase()
+      const userDir = path.join(ATTACHMENTS_DIR, req.user.userId)
+      fs.mkdirSync(userDir, { recursive: true })
+      const destAbs = path.join(userDir, `${preGeneratedId}${ext}`)
+      fs.copyFileSync(file.path, destAbs)
+      localPath = path.relative(process.cwd(), destAbs).replace(/\\/g, '/')
+    } catch (persistErr: any) {
+      // Non-fatal — fall back to extractedText-only path. Log loudly so
+      // we notice if persistence is silently failing for a class of files.
+      logger.warn(`Raw bytes persistence failed for ${file.originalname}: ${persistErr?.message || persistErr}`)
+      preGeneratedId = undefined
+      localPath = null
+    }
+  }
+
   try {
     // ── Extract text by type ─────────────────────────────────────────
     if (fileType === 'pdf') {
@@ -704,6 +737,10 @@ export const attachFile = asyncHandler(async (req: Request, res: Response): Prom
 
     const attachment = await prisma.conversationAttachment.create({
       data: {
+        // Pre-generated UUID when raw bytes were persisted — keeps the
+        // row id aligned with the disk filename basename. Falls back to
+        // Prisma's @default(cuid()) when persistence was skipped/failed.
+        ...(preGeneratedId ? { id: preGeneratedId } : {}),
         conversationId,
         userId: req.user.userId,
         fileName: file.originalname,
@@ -712,6 +749,7 @@ export const attachFile = asyncHandler(async (req: Request, res: Response): Prom
         mimeType: file.mimetype,
         extractedText: capped || null,
         thumbnail,
+        ...(localPath ? { localPath } : {}),
       },
     })
 

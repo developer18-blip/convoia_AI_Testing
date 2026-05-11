@@ -1754,6 +1754,7 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
               messages: enrichedMessages,
               conversationId: undefined,
               industry: industry || user.organization?.industry || undefined,
+              attachmentIds,
             },
             {
               onChunk: (text: string) => {

@@ -15,8 +15,56 @@ import {
   worstCaseWalletTokens,
   acquireSlot,
   releaseSlot,
+  type AttachmentInput,
 } from './sandboxService.js';
 import { TokenWalletService } from './tokenWalletService.js';
+import prisma from '../config/db.js';
+
+// ── Attachment resolution helpers (Day 3 expansion) ─────────────────
+//
+// Each ConversationAttachment row has TWO possible sources of file
+// content:
+//   localPath      — relative disk path to original upload bytes
+//                    (uploads/attachments/<userId>/<uuid>.<ext>).
+//                    Set for new uploads of csv/xlsx/pdf/docx/text/code.
+//                    Null for legacy rows (uploaded before Day 3) AND
+//                    image/audio (intentionally not persisted).
+//   extractedText  — text content captured at upload time (raw for
+//                    small CSVs, JSON preview for large CSVs, OCR for
+//                    PDFs, etc.). Always populated for non-image rows.
+//
+// resolveAttachmentFromRow encodes the priority: prefer raw bytes from
+// localPath when present, fall back to extractedText otherwise. The
+// pure-function signature accepts fs.* injections for unit testing.
+
+export interface AttachmentRow {
+  fileName: string;
+  localPath: string | null;
+  extractedText: string | null;
+}
+
+export function resolveAttachmentFromRow(
+  row: AttachmentRow,
+  fsExists: (absPath: string) => boolean = fs.existsSync,
+  fsRead: (absPath: string) => Buffer = fs.readFileSync,
+): AttachmentInput | null {
+  if (row.localPath) {
+    const absPath = path.resolve(process.cwd(), row.localPath);
+    if (fsExists(absPath)) {
+      try {
+        return { fileName: row.fileName, content: fsRead(absPath) };
+      } catch (err: any) {
+        logger.warn(`Failed to read localPath ${absPath} for ${row.fileName}: ${err?.message || err} — falling back to extractedText`);
+      }
+    } else {
+      logger.warn(`localPath set but file missing on disk: ${absPath} — falling back to extractedText`);
+    }
+  }
+  if (typeof row.extractedText === 'string' && row.extractedText.length > 0) {
+    return { fileName: row.fileName, content: row.extractedText };
+  }
+  return null;
+}
 
 const execFileAsync = promisify(execFile);
 
@@ -372,6 +420,7 @@ export async function executeTool(
   projectId: string,
   apiKeys?: Record<string, string>,
   organizationId?: string,
+  attachmentIds?: string[],
 ): Promise<ToolResult> {
   logger.info(`Tool execution: ${toolName} by user ${userId}, project ${projectId}`);
 
@@ -399,7 +448,7 @@ export async function executeTool(
     case 'git_commit':
       return gitCommit(userId, projectId, input.message);
     case 'execute_python':
-      return executePythonTool(userId, organizationId, input.code, {});
+      return executePythonTool(userId, organizationId, input.code, { attachmentIds });
     default:
       return { success: false, output: null, error: `Unknown tool: ${toolName}`, durationMs: 0 };
   }
@@ -429,6 +478,31 @@ export interface ExecutePythonToolDeps {
   runSandbox?: typeof executePython;
   acquire?: typeof acquireSlot;
   release?: typeof releaseSlot;
+  /** Conversation-scoped uploads to stage into the sandbox at /sandbox/inputs/. Optional. */
+  attachmentIds?: string[];
+  /** Override the prisma attachment lookup in tests. */
+  resolveAttachments?: (userId: string, attachmentIds: string[]) => Promise<AttachmentInput[]>;
+}
+
+/**
+ * Resolves ConversationAttachment IDs to AttachmentInput records the
+ * sandbox can stage. Each row goes through resolveAttachmentFromRow,
+ * which prefers raw bytes from localPath (full fidelity, Day 3+ uploads)
+ * and falls back to extractedText for legacy attachments — and for the
+ * edge case where localPath is set but the file is gone from disk.
+ */
+async function defaultResolveAttachments(userId: string, attachmentIds: string[]): Promise<AttachmentInput[]> {
+  if (!attachmentIds.length) return [];
+  const rows = await prisma.conversationAttachment.findMany({
+    where: { id: { in: attachmentIds }, userId },
+    select: { fileName: true, localPath: true, extractedText: true },
+  });
+  const out: AttachmentInput[] = [];
+  for (const row of rows) {
+    const resolved = resolveAttachmentFromRow(row);
+    if (resolved) out.push(resolved);
+  }
+  return out;
 }
 
 export async function executePythonTool(
@@ -442,6 +516,7 @@ export async function executePythonTool(
   const runSandbox   = deps.runSandbox   ?? executePython;
   const acquire      = deps.acquire      ?? acquireSlot;
   const release      = deps.release      ?? releaseSlot;
+  const resolveAttachments = deps.resolveAttachments ?? defaultResolveAttachments;
 
   const startedAt = Date.now();
 
@@ -477,15 +552,24 @@ export async function executePythonTool(
     };
   }
 
-  // 3. Execute
+  // 3. Resolve attachments (best effort — never block execution).
+  let attachments: AttachmentInput[] = [];
+  try {
+    attachments = await resolveAttachments(userId, deps.attachmentIds ?? []);
+  } catch (resolveErr: any) {
+    // Log and proceed without attachments rather than failing the tool call.
+    logger.warn(`Attachment resolution failed for user ${userId}: ${resolveErr?.message || resolveErr}`);
+  }
+
+  // 4. Execute
   let result;
   try {
-    result = await runSandbox(code);
+    result = await runSandbox(code, { userId, attachments });
   } finally {
     release(userId);
   }
 
-  // 4. Bill (skip on provision failure — Day 1 rule).
+  // 5. Bill (skip on provision failure — Day 1 rule).
   if (result.walletTokensToDeduct > 0 && result.error?.kind !== 'provision') {
     await deductTokens({
       userId,
@@ -496,7 +580,7 @@ export async function executePythonTool(
     });
   }
 
-  // 5. Shape for the orchestrator. On success, output is a structured
+  // 6. Shape for the orchestrator. On success, output is a structured
   //    object so JSON.stringify gives the LLM the field names. On
   //    failure, error is a single string carrying kind + message +
   //    traceback for the LLM's retry loop.
@@ -507,6 +591,7 @@ export async function executePythonTool(
         stdout: result.stdout,
         stderr: result.stderr,
         executionTimeSec: Number(result.executionTimeSec.toFixed(2)),
+        plots: result.plots ?? [],
       },
       durationMs: Math.round(result.executionTimeSec * 1000),
     };
@@ -632,7 +717,7 @@ export const TOOL_DEFINITIONS = [
 
 WHEN TO USE:
 - Numerical computation the user asks for (stats, formulas, regex on real input)
-- Data analysis on user-provided data (CSV, JSON, tables pasted in chat)
+- Data analysis on user-provided data (CSV, JSON, tables pasted in chat or attached as files)
 - Plotting / charts / visualizations (matplotlib, seaborn)
 - Math problems requiring exact computation
 - Verifying an answer you'd otherwise estimate
@@ -649,14 +734,24 @@ EXECUTION MODEL — READ THIS:
 - 30-second timeout. 10,000-character code limit. ~30s = ~586 wallet tokens worst case.
 - Pre-installed: numpy, pandas, matplotlib, seaborn, scipy, scikit-learn, statsmodels, requests, beautifulsoup4, pillow.
 
+USER-UPLOADED FILES:
+- If the conversation has attachments, their filenames are listed in the orchestrator's system context.
+- Load them from /sandbox/inputs/<filename>, e.g. pd.read_csv('/sandbox/inputs/data.csv').
+
+PLOTS:
+- Write natural matplotlib/seaborn code and call plt.show() (or display the figure). PNG output is captured automatically — no base64 print() needed.
+- The tool result will include a "plots" array: [{ id, token, mimeType, filename }, ...]
+- For each plot, embed it in your reply as Markdown:
+    ![Short description](api/sandbox/plot/<id>?token=<token>)
+- Use descriptive alt text for accessibility. The image renders inline — alt is for screen readers, not visible caption text.
+
 ERROR HANDLING:
 - If success=false, read stderr / error.traceback, fix your code, call again. Try up to 2 retries (3 total attempts).
 - After 3 total attempts, stop retrying and explain to the user what went wrong in plain English.
 
 OUTPUT DISCIPLINE:
 - Use print() — final expressions are NOT auto-echoed.
-- Print only what the user needs. Summarize dataframes (head + shape + stats), don't dump full tables.
-- For plots: matplotlib -> savefig to BytesIO -> base64 -> print("PLOT_BASE64: " + b64). The system prompt explains how to embed it in your response.`,
+- Print only what the user needs. Summarize dataframes (head + shape + stats), don't dump full tables.`,
     parameters: {
       type: 'object',
       properties: {

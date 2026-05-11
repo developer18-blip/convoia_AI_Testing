@@ -609,6 +609,14 @@ model ConversationAttachment {
   mimeType       String
   extractedText  String?  @db.Text // Full extracted content (null for images where analysis hasn't run)
   s3Key          String? // Optional: original file kept in S3 for re-processing (Phase 2+)
+  // Relative path on local disk where the ORIGINAL upload bytes are persisted,
+  // e.g. "uploads/attachments/<userId>/<uuid>.csv". Stored with forward slashes
+  // for cross-OS portability. Null for legacy rows (uploaded before Day 3),
+  // image attachments (use thumbnail URL instead), and audio (transcript is
+  // the value). When set, the Code Interpreter sandbox loads raw bytes from
+  // here instead of falling back to extractedText (which truncates large CSVs
+  // to a 500-row JSON preview).
+  localPath      String?
   thumbnail      String?  @db.Text // Base64 data URL for image previews in chips
   createdAt      DateTime @default(now())
 
