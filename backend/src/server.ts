@@ -41,6 +41,7 @@ import agentToolRoutes from './routes/agentToolRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import publicChatbotRoutes from './routes/publicChatbotRoutes.js';
 import sandboxRoutes from './routes/sandboxRoutes.js';
+import sandboxPlotRoutes from './routes/sandboxPlotRoutes.js';
 import { startLocalCleanup as startFileGenCleanup } from './services/fileGenerationService.js';
 import { startFactExtractionJob } from './jobs/factExtractionJob.js';
 
@@ -282,6 +283,9 @@ app.use('/api/wallet', walletRoutes);
 app.use('/api/agent-tools', agentToolRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/public', publicChatbotRoutes);
+// Mount plot route BEFORE the broader /api/sandbox so jwtOrApiKey in
+// sandboxRoutes doesn't reject the query-token-authed GETs.
+app.use('/api/sandbox/plot', sandboxPlotRoutes);
 app.use('/api/sandbox', sandboxRoutes);
 
 // ============== 404 HANDLER ==============

@@ -34,6 +34,8 @@ interface OrchestratorParams {
   projectName?: string;
   conversationId?: string;
   industry?: string;
+  /** ConversationAttachment IDs to surface to execute_python via /sandbox/inputs/. */
+  attachmentIds?: string[];
 }
 
 interface StreamCallbacks {
@@ -77,6 +79,7 @@ export async function runAgentOrchestrator(
   callbacks: StreamCallbacks
 ): Promise<void> {
   const { userId, organizationId, agentId, modelId, messages, projectId, projectName, conversationId } = params;
+  const attachmentIds = params.attachmentIds ?? [];
 
   // Load agent config
   const agent = await prisma.agent.findUnique({ where: { id: agentId } });
@@ -106,7 +109,44 @@ export async function runAgentOrchestrator(
     ? `\n\n[AVAILABLE TOOLS]\nYou have access to these tools. Use them when needed to accomplish the user's task. You can chain multiple tools in sequence.\n${availableTools.map(t => `- ${t.name}: ${t.description}`).join('\n')}\n\nAfter using tools, always explain what you did and why.`
     : '';
 
-  const systemPrompt = agent.systemPrompt + memoryPrompt + toolPromptSection;
+  // Build the dynamic file-context section. Only present when attachments
+  // exist on this turn. The seed Code Interpreter prompt documents the
+  // /sandbox/inputs/ convention generally; this section lists the actual
+  // files for THIS turn so the LLM can pick the right read_csv() call
+  // without us baking filenames into the static prompt.
+  //
+  // TRUNCATED warning: only added for legacy attachments (no localPath)
+  // where the extractedText body has been truncated — CSVs over 100KB
+  // get a 500-row JSON preview at upload time (see fileController). New
+  // uploads with localPath get raw bytes and never need the warning.
+  let fileContextSection = '';
+  if (attachmentIds.length > 0) {
+    try {
+      const files = await prisma.conversationAttachment.findMany({
+        where: { id: { in: attachmentIds }, userId },
+        select: { fileName: true, fileType: true, fileSize: true, localPath: true },
+      });
+      if (files.length > 0) {
+        const fileLines = files.map(f => {
+          const sizeKB = (f.fileSize / 1024).toFixed(1);
+          const truncated =
+            !f.localPath && f.fileType === 'csv' && f.fileSize > 100_000;
+          const tag = truncated
+            ? ' — LEGACY UPLOAD, only first 500 rows available via /sandbox/inputs/; mention this to the user if it matters'
+            : '';
+          return `- ${f.fileName} (${f.fileType}, ${sizeKB} KB)${tag}`;
+        }).join('\n');
+        fileContextSection =
+          `\n\n[FILES AVAILABLE IN SANDBOX]\n` +
+          `The user attached the following files. Load them via /sandbox/inputs/<filename> when relevant:\n` +
+          `${fileLines}\n`;
+      }
+    } catch (err: any) {
+      logger.warn(`File context lookup failed for user ${userId}: ${err.message}`);
+    }
+  }
+
+  const systemPrompt = agent.systemPrompt + memoryPrompt + toolPromptSection + fileContextSection;
 
   // Check if provider supports native function calling
   const supportsNativeFunctionCalling = ['openai', 'anthropic', 'google'].includes(aiModel.provider);
@@ -115,12 +155,14 @@ export async function runAgentOrchestrator(
     await runNativeFunctionCallingLoop(
       aiModel, systemPrompt, messages, availableTools, maxCalls,
       userId, organizationId, agentId, projectId || 'default', conversationId || '',
+      attachmentIds,
       callbacks
     );
   } else {
     await runXMLFunctionCallingLoop(
       aiModel, systemPrompt, messages, availableTools, maxCalls,
       userId, organizationId, agentId, projectId || 'default', conversationId || '',
+      attachmentIds,
       callbacks
     );
   }
@@ -152,6 +194,7 @@ async function runNativeFunctionCallingLoop(
   maxCalls: number,
   userId: string, organizationId: string, agentId: string,
   projectId: string, conversationId: string,
+  attachmentIds: string[],
   callbacks: StreamCallbacks
 ): Promise<void> {
   const apiKey = config.apiKeys[aiModel.provider as keyof typeof config.apiKeys];
@@ -184,13 +227,18 @@ async function runNativeFunctionCallingLoop(
     }
 
     try {
-      // Non-streaming call to get tool decisions
+      // Non-streaming call to get tool decisions.
+      // 180s timeout: when execute_python returns a base64 plot, the LLM
+      // has to re-emit ~10-20 KB of base64 inside `![](data:image/png;
+      // base64,...)`. That can take 60-120s even on Opus. Day 3 will
+      // replace this with file URLs so plots don't traverse the LLM at
+      // all. For now: 180s is the budget.
       const response = await axios.post(
         getProviderEndpoint(aiModel.provider),
         buildProviderRequest(aiModel, conversationMessages, openAITools),
         {
           headers: getProviderHeaders(aiModel.provider, apiKey),
-          timeout: 60000,
+          timeout: 180_000,
         }
       );
 
@@ -212,6 +260,7 @@ async function runNativeFunctionCallingLoop(
             userId, projectId,
             { perplexity: config.apiKeys.perplexity || '' },
             organizationId,
+            attachmentIds,
           );
 
           callbacks.onToolResult({ name: toolCall.name, result: toolResult });
@@ -299,6 +348,7 @@ async function runXMLFunctionCallingLoop(
   maxCalls: number,
   userId: string, organizationId: string, agentId: string,
   projectId: string, conversationId: string,
+  attachmentIds: string[],
   callbacks: StreamCallbacks
 ): Promise<void> {
   // Build XML tool descriptions into the system prompt
@@ -405,6 +455,7 @@ async function runXMLFunctionCallingLoop(
       userId, projectId,
       undefined,
       organizationId,
+      attachmentIds,
     );
     callbacks.onToolResult({ name: toolCall.name, result });
 
