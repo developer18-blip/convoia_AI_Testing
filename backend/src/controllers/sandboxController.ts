@@ -6,14 +6,10 @@ import {
   executePython,
   worstCaseWalletTokens,
   SANDBOX_SPEC,
+  acquireSlot,
+  releaseSlot,
 } from '../services/sandboxService.js';
 import logger from '../config/logger.js';
-
-// Track in-flight executions per user. Day 1 cap: one concurrent
-// sandbox per user. In-process Set is fine because the API runs as
-// a single PM2 worker today; if we ever scale horizontally this
-// becomes Redis. (Documented in Phase 2 §2.4.)
-const inFlightUsers = new Set<string>();
 
 /**
  * POST /api/sandbox/execute-python
@@ -39,8 +35,10 @@ export const executePythonHandler = asyncHandler(async (req: Request, res: Respo
     );
   }
 
-  // Concurrency cap — one sandbox per user at a time.
-  if (inFlightUsers.has(userId)) {
+  // Concurrency cap — one sandbox per user at a time. Slot is held
+  // in sandboxService so the agent-orchestrator execute_python tool
+  // shares the same gate.
+  if (!acquireSlot(userId)) {
     return res.status(429).json({
       success: false,
       code: 'SANDBOX_BUSY',
@@ -54,10 +52,14 @@ export const executePythonHandler = asyncHandler(async (req: Request, res: Respo
     where: { id: userId },
     select: { id: true, role: true, organizationId: true },
   });
-  if (!user) throw new AppError('User not found', 404);
+  if (!user) {
+    releaseSlot(userId);
+    throw new AppError('User not found', 404);
+  }
 
   const balance = await TokenWalletService.getBalance(userId);
   if (balance.tokenBalance < worstCase) {
+    releaseSlot(userId);
     const isOrgMember = !!user.organizationId;
     return res.status(402).json({
       success: false,
@@ -71,12 +73,11 @@ export const executePythonHandler = asyncHandler(async (req: Request, res: Respo
     });
   }
 
-  inFlightUsers.add(userId);
   let result;
   try {
     result = await executePython(code);
   } finally {
-    inFlightUsers.delete(userId);
+    releaseSlot(userId);
   }
 
   // Billing rule:

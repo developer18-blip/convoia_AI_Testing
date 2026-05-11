@@ -9,6 +9,7 @@
     "build": "tsc",
     "start": "node dist/src/server.js",
     "seed": "tsx prisma/seed.ts",
+    "seed:code-interpreter": "tsx scripts/seed-code-interpreter-agent.ts",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",

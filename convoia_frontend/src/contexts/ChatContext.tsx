@@ -620,7 +620,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               ))
             } else if (parsed.type === 'tool_use') {
               // Agent is using a tool — show indicator
-              const toolIcon = parsed.name?.startsWith('file') ? '📄' : parsed.name?.startsWith('git') ? '🔀' : parsed.name === 'terminal_exec' ? '💻' : parsed.name === 'web_search' ? '🔍' : '🔧'
+              const toolIcon = parsed.name?.startsWith('file') ? '📄' : parsed.name?.startsWith('git') ? '🔀' : parsed.name === 'terminal_exec' ? '💻' : parsed.name === 'web_search' ? '🔍' : parsed.name === 'execute_python' ? '🐍' : '🔧'
               accumulated += `> ${toolIcon} **Using tool:** \`${parsed.name}\`\n>\n`
               setMessages((prev) => prev.map((m) =>
                 m.id === assistantId ? { ...m, content: accumulated, isLoading: true, statusText: `Running ${parsed.name}...` } : m
@@ -930,7 +930,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                 m.id === assistantId ? { ...m, content: accumulated, isLoading: true, statusText: 'Refining answer...' } : m
               ))
             } else if (parsed.type === 'tool_use') {
-              const toolIcon = parsed.name?.startsWith('file') ? '📄' : parsed.name?.startsWith('git') ? '🔀' : parsed.name === 'terminal_exec' ? '💻' : parsed.name === 'web_search' ? '🔍' : '🔧'
+              const toolIcon = parsed.name?.startsWith('file') ? '📄' : parsed.name?.startsWith('git') ? '🔀' : parsed.name === 'terminal_exec' ? '💻' : parsed.name === 'web_search' ? '🔍' : parsed.name === 'execute_python' ? '🐍' : '🔧'
               accumulated += `> ${toolIcon} **Using tool:** \`${parsed.name}\`\n>\n`
               setMessages((prev) => prev.map((m) =>
                 m.id === assistantId ? { ...m, content: accumulated, isLoading: true, statusText: `Running ${parsed.name}...` } : m

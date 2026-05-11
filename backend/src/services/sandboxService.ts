@@ -50,6 +50,28 @@ export function worstCaseWalletTokens(): number {
   return computeSandboxWalletTokens(SANDBOX_SPEC.timeoutSec);
 }
 
+// ── CONCURRENCY GUARD ───────────────────────────────────────────────
+//
+// One concurrent sandbox per user. Both POST /api/sandbox/execute-python
+// AND the agent-orchestrator execute_python tool route through this set,
+// so a user can't fire two simultaneous runs (one via API, one via chat)
+// and burn double the E2B budget. In-process Set is fine for single PM2
+// worker; becomes Redis if we scale horizontally.
+// ───────────────────────────────────────────────────────────────────
+const inFlightUsers = new Set<string>();
+
+/** Returns true if the slot was acquired; caller MUST call releaseSlot() in a finally block. */
+export function acquireSlot(userId: string): boolean {
+  if (inFlightUsers.has(userId)) return false;
+  inFlightUsers.add(userId);
+  return true;
+}
+
+/** Always safe to call — idempotent. */
+export function releaseSlot(userId: string): void {
+  inFlightUsers.delete(userId);
+}
+
 // ── RESULT TYPES ───────────────────────────────────────────────────
 
 export type SandboxErrorKind =
