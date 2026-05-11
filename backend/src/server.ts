@@ -40,6 +40,7 @@ import walletRoutes from './routes/walletRoutes.js';
 import agentToolRoutes from './routes/agentToolRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import publicChatbotRoutes from './routes/publicChatbotRoutes.js';
+import sandboxRoutes from './routes/sandboxRoutes.js';
 import { startLocalCleanup as startFileGenCleanup } from './services/fileGenerationService.js';
 import { startFactExtractionJob } from './jobs/factExtractionJob.js';
 
@@ -281,6 +282,8 @@ app.use('/api/wallet', walletRoutes);
 app.use('/api/agent-tools', agentToolRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/public', publicChatbotRoutes);
+app.use('/api/sandbox', sandboxRoutes);
+
 // ============== 404 HANDLER ==============
 app.use('*', (req: Request, res: Response) => {
   logger.warn(`Route not found: ${req.method} ${req.originalUrl}`);
