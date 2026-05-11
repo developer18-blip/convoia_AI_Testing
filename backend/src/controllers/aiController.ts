@@ -1827,6 +1827,71 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
       logger.info(`[orchestration] Task prompt applied: intent=${intent.intent}, temp=${intent.temperature}, maxTokens=${agentConfig.maxTokens}, model=${finalModelId}`);
     }
 
+    // ── PLAIN-CHAT TOOL ROUTING ─────────────────────────────
+    // No agent selected + not in think mode + Tier-1 model (native function
+    // calling) → expose execute_python. Anything else falls through to the
+    // standard streaming path. agentConfig.systemPrompt already includes
+    // task tuning + user memory (built at line 1818).
+    if (!agentId && !thinkingEnabled) {
+      const modelToolCheck = await prisma.aIModel.findUnique({
+        where: { id: finalModelId },
+        select: { provider: true, capabilities: true },
+      });
+      if (modelToolCheck) {
+        const { isPlainChatToolCapable, runPlainChatToolLoop } = await import('../services/agentOrchestrator.js');
+        if (isPlainChatToolCapable(modelToolCheck as any)) {
+          try {
+            await runPlainChatToolLoop(
+              {
+                userId: user.id, organizationId,
+                modelId: finalModelId,
+                messages: enrichedMessages,
+                systemPrompt: agentConfig!.systemPrompt,
+                conversationId,
+                industry: industry || user.organization?.industry || undefined,
+                attachmentIds,
+              },
+              {
+                onChunk: (text: string) => {
+                  if (!streamEnded && !res.writableEnded) {
+                    res.write(`data: ${JSON.stringify({ type: 'chunk', content: text })}\n\n`);
+                  }
+                },
+                onToolUse: (tool) => {
+                  if (!streamEnded && !res.writableEnded) {
+                    res.write(`data: ${JSON.stringify({ type: 'tool_use', name: tool.name, input: tool.input })}\n\n`);
+                  }
+                },
+                onToolResult: (tool) => {
+                  if (!streamEnded && !res.writableEnded) {
+                    res.write(`data: ${JSON.stringify({ type: 'tool_result', name: tool.name, success: tool.result.success, output: typeof tool.result.output === 'string' ? tool.result.output.slice(0, 2000) : JSON.stringify(tool.result.output).slice(0, 2000) })}\n\n`);
+                  }
+                },
+                onDone: (inputTokens, outputTokens) => {
+                  if (!streamEnded && !res.writableEnded) {
+                    res.write(`data: ${JSON.stringify({ type: 'done', tokens: { input: inputTokens, output: outputTokens, total: inputTokens + outputTokens } })}\n\n`);
+                    res.write('data: [DONE]\n\n');
+                    res.end();
+                  }
+                },
+                onError: (err) => {
+                  if (!streamEnded && !res.writableEnded) {
+                    res.write(`data: ${JSON.stringify({ type: 'error', content: err.message })}\n\n`);
+                    res.write('data: [DONE]\n\n');
+                    res.end();
+                  }
+                },
+              },
+            );
+            return;
+          } catch (plainChatErr: any) {
+            logger.error(`Plain-chat tool loop failed: ${plainChatErr.message}`);
+            // Fall through to sendMessageStream — best-effort degrade to plain text
+          }
+        }
+      }
+    }
+
     // ── STREAMING CALL (handles normal, clarification, and Pass 2 refinement) ──
     await AIGatewayService.sendMessageStream(
       {

@@ -580,7 +580,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             } else if (parsed.type === 'tool_result') {
               // Tool finished — show result summary
               const statusIcon = parsed.success ? '✅' : '❌'
-              const output = typeof parsed.output === 'string' ? parsed.output.slice(0, 200) : ''
+              const output = typeof parsed.output === 'string' ? parsed.output.slice(0, 500) : ''
               accumulated += `> ${statusIcon} ${parsed.name} ${parsed.success ? 'completed' : 'failed'}${output ? `: \`${output}\`` : ''}\n\n`
               setMessages((prev) => prev.map((m) =>
                 m.id === assistantId ? { ...m, content: accumulated, isLoading: true } : m
@@ -845,7 +845,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               ))
             } else if (parsed.type === 'tool_result') {
               const statusIcon = parsed.success ? '✅' : '❌'
-              const output = typeof parsed.output === 'string' ? parsed.output.slice(0, 200) : ''
+              const output = typeof parsed.output === 'string' ? parsed.output.slice(0, 500) : ''
               accumulated += `> ${statusIcon} ${parsed.name} ${parsed.success ? 'completed' : 'failed'}${output ? `: \`${output}\`` : ''}\n\n`
               setMessages((prev) => prev.map((m) =>
                 m.id === assistantId ? { ...m, content: accumulated, isLoading: true } : m
