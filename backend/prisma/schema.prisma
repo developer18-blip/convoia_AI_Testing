@@ -732,7 +732,9 @@ model AgentProject {
 model ToolExecution {
   id             String   @id @default(uuid())
   userId         String
-  agentId        String
+  // Nullable to support plain-chat tool invocations (no agent record). Agent
+  // flow continues to pass a real agentId; plain chat passes null.
+  agentId        String?
   conversationId String
   toolName       String
   toolInput      Json

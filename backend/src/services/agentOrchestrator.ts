@@ -1,87 +1,81 @@
 /**
- * Agent Orchestrator — The brain of the autonomous Dev agent
+ * Agent Orchestrator + plain-chat tool router.
  *
- * Handles the tool-use loop:
- * 1. Build tool-aware system prompt
- * 2. Send to LLM with tool definitions
- * 3. If LLM returns tool_call → execute tool → feed result back → repeat (max 10 loops)
- * 4. If LLM returns text → stream to user
- * 5. After response, extract and save memory updates
+ * Wraps the provider-agnostic core in toolCallLoops.ts with two flows:
+ *   - runAgentOrchestrator: agent.systemPrompt + memory + multi-tool. Bills
+ *     LLM tokens with the model's markupPercentage (default 1.25×). Tool
+ *     handlers (e.g., executePythonTool) bill their own runtime separately.
+ *   - runPlainChatToolLoop: task-tuned prompt + execute_python only,
+ *     maxCalls=3, no agent record. Bills LLM tokens with runtime markup
+ *     override — 1.3× when a tool was invoked, 1.25× otherwise.
  *
- * Supports native function calling (OpenAI, Anthropic, Gemini) and
- * XML-based fallback for providers without native support.
+ * isPlainChatToolCapable gates the plain-chat flow at the dispatch site
+ * (aiController.ts).
  */
 
-import axios from 'axios';
 import prisma from '../config/db.js';
 import { config } from '../config/env.js';
 import logger from '../config/logger.js';
-import { executeTool, TOOL_DEFINITIONS, type ToolResult } from './agentTools.js';
+import { TOOL_DEFINITIONS } from './agentTools.js';
 import { buildMemoryPrompt, extractMemoryFromTurn, mergeExtractedMemory } from './agentMemoryService.js';
-import AIGatewayService from './aiGatewayService.js';
 import { costAdjustedTokens } from '../config/tokenPackages.js';
 import { TokenWalletService } from './tokenWalletService.js';
+import {
+  runNativeFunctionCallingLoop,
+  runXMLFunctionCallingLoop,
+  type ToolLoopParams,
+  type StreamCallbacks,
+} from './toolCallLoops.js';
+
+// Re-export so callers (aiController) can keep their existing import.
+export type { StreamCallbacks } from './toolCallLoops.js';
 
 // ── Types ────────────────────────────────────────────────────────────
 
-interface OrchestratorParams {
+export interface OrchestratorParams {
   userId: string;
   organizationId: string;
   agentId: string;
-  modelId: string; // DB model ID
+  modelId: string;
   messages: Array<{ role: string; content: any }>;
   projectId?: string;
   projectName?: string;
   conversationId?: string;
   industry?: string;
-  /** ConversationAttachment IDs to surface to execute_python via /sandbox/inputs/. */
   attachmentIds?: string[];
 }
 
-interface StreamCallbacks {
-  onChunk: (text: string) => void;
-  onToolUse: (tool: { name: string; input: Record<string, any> }) => void;
-  onToolResult: (tool: { name: string; result: ToolResult }) => void;
-  onDone: (inputTokens: number, outputTokens: number) => void;
-  onError: (error: Error) => void;
+export interface PlainChatToolLoopParams {
+  userId: string;
+  organizationId: string;
+  modelId: string;
+  messages: Array<{ role: string; content: any }>;
+  /** Already task-tuned and memory-merged by the caller (aiController). */
+  systemPrompt: string;
+  projectId?: string;
+  conversationId?: string;
+  industry?: string;
+  attachmentIds?: string[];
 }
 
-interface ToolCall {
-  name: string;
-  arguments: Record<string, any>;
+/** DI seam for plain-chat tool-loop tests. Production callers omit `deps`. */
+export interface PlainChatToolLoopDeps {
+  loadAIModel?: (modelId: string) => Promise<any>;
+  runNativeLoop?: typeof runNativeFunctionCallingLoop;
+  deductTokens?: typeof TokenWalletService.deductTokens;
+  incrementBudget?: (userId: string, amount: number) => Promise<void>;
+  loadAttachments?: (ids: string[], userId: string) => Promise<Array<{ fileName: string; fileType: string; fileSize: number; localPath: string | null }>>;
 }
 
-// ── Rate Limiting ────────────────────────────────────────────────────
-
-const toolCallCounts = new Map<string, { count: number; resetAt: number }>();
-const TOOL_RATE_LIMIT = 50; // per hour per user
-const RATE_WINDOW_MS = 60 * 60 * 1000;
-
-function checkToolRateLimit(userId: string): boolean {
-  const now = Date.now();
-  const entry = toolCallCounts.get(userId);
-  if (!entry || now > entry.resetAt) {
-    toolCallCounts.set(userId, { count: 0, resetAt: now + RATE_WINDOW_MS });
-    return true;
-  }
-  return entry.count < TOOL_RATE_LIMIT;
-}
-
-function incrementToolCount(userId: string): void {
-  const entry = toolCallCounts.get(userId);
-  if (entry) entry.count++;
-}
-
-// ── Main Orchestrator ────────────────────────────────────────────────
+// ── Agent orchestrator (existing flow, behavior preserved) ──────────
 
 export async function runAgentOrchestrator(
   params: OrchestratorParams,
-  callbacks: StreamCallbacks
+  callbacks: StreamCallbacks,
 ): Promise<void> {
   const { userId, organizationId, agentId, modelId, messages, projectId, projectName, conversationId } = params;
   const attachmentIds = params.attachmentIds ?? [];
 
-  // Load agent config
   const agent = await prisma.agent.findUnique({ where: { id: agentId } });
   if (!agent) throw new Error('Agent not found');
   if (!agent.toolsEnabled) throw new Error('Agent does not have tools enabled');
@@ -92,469 +86,235 @@ export async function runAgentOrchestrator(
   const allowedTools = (agent.tools as string[]) || [];
   const maxCalls = agent.maxToolCalls || 10;
 
-  // Filter tool definitions to only allowed tools
   const availableTools = TOOL_DEFINITIONS.filter(t => {
-    const toolGroup = t.name.split('_')[0]; // file, terminal, web, git
+    const toolGroup = t.name.split('_')[0];
     return allowedTools.includes(t.name) || allowedTools.includes(`${toolGroup}_*`) ||
       (toolGroup === 'git' && allowedTools.includes('git_op')) ||
       (toolGroup === 'file' && allowedTools.includes('file_read')) ||
       allowedTools.includes(t.name);
   });
 
-  // Build memory context
   const memoryPrompt = await buildMemoryPrompt(userId, agentId, projectName);
 
-  // Build tool-aware system prompt
   const toolPromptSection = availableTools.length > 0
     ? `\n\n[AVAILABLE TOOLS]\nYou have access to these tools. Use them when needed to accomplish the user's task. You can chain multiple tools in sequence.\n${availableTools.map(t => `- ${t.name}: ${t.description}`).join('\n')}\n\nAfter using tools, always explain what you did and why.`
     : '';
 
-  // Build the dynamic file-context section. Only present when attachments
-  // exist on this turn. The seed Code Interpreter prompt documents the
-  // /sandbox/inputs/ convention generally; this section lists the actual
-  // files for THIS turn so the LLM can pick the right read_csv() call
-  // without us baking filenames into the static prompt.
-  //
-  // TRUNCATED warning: only added for legacy attachments (no localPath)
-  // where the extractedText body has been truncated — CSVs over 100KB
-  // get a 500-row JSON preview at upload time (see fileController). New
-  // uploads with localPath get raw bytes and never need the warning.
-  let fileContextSection = '';
-  if (attachmentIds.length > 0) {
-    try {
-      const files = await prisma.conversationAttachment.findMany({
-        where: { id: { in: attachmentIds }, userId },
-        select: { fileName: true, fileType: true, fileSize: true, localPath: true },
-      });
-      if (files.length > 0) {
-        const fileLines = files.map(f => {
-          const sizeKB = (f.fileSize / 1024).toFixed(1);
-          const truncated =
-            !f.localPath && f.fileType === 'csv' && f.fileSize > 100_000;
-          const tag = truncated
-            ? ' — LEGACY UPLOAD, only first 500 rows available via /sandbox/inputs/; mention this to the user if it matters'
-            : '';
-          return `- ${f.fileName} (${f.fileType}, ${sizeKB} KB)${tag}`;
-        }).join('\n');
-        fileContextSection =
-          `\n\n[FILES AVAILABLE IN SANDBOX]\n` +
-          `The user attached the following files. Load them via /sandbox/inputs/<filename> when relevant:\n` +
-          `${fileLines}\n`;
-      }
-    } catch (err: any) {
-      logger.warn(`File context lookup failed for user ${userId}: ${err.message}`);
-    }
-  }
+  const fileContextSection = await buildFileContextSection(attachmentIds, userId);
 
   const systemPrompt = agent.systemPrompt + memoryPrompt + toolPromptSection + fileContextSection;
 
-  // Check if provider supports native function calling
   const supportsNativeFunctionCalling = ['openai', 'anthropic', 'google'].includes(aiModel.provider);
 
-  if (supportsNativeFunctionCalling) {
-    await runNativeFunctionCallingLoop(
-      aiModel, systemPrompt, messages, availableTools, maxCalls,
-      userId, organizationId, agentId, projectId || 'default', conversationId || '',
-      attachmentIds,
-      callbacks
-    );
-  } else {
-    await runXMLFunctionCallingLoop(
-      aiModel, systemPrompt, messages, availableTools, maxCalls,
-      userId, organizationId, agentId, projectId || 'default', conversationId || '',
-      attachmentIds,
-      callbacks
-    );
+  const loopParams: ToolLoopParams = {
+    aiModel,
+    systemPrompt,
+    messages,
+    tools: availableTools,
+    maxCalls,
+    userId,
+    organizationId,
+    agentId,
+    projectId: projectId || 'default',
+    conversationId: conversationId || '',
+    attachmentIds,
+    callbacks,
+  };
+
+  const result = supportsNativeFunctionCalling
+    ? await runNativeFunctionCallingLoop(loopParams)
+    : await runXMLFunctionCallingLoop(loopParams);
+
+  // Bill only if loop completed normally AND we actually tracked tokens.
+  // XML path bills via sendMessageStream internally (totals=0 here);
+  // native path leaves billing to this wrapper.
+  if (result.success && (result.totalInputTokens + result.totalOutputTokens) > 0) {
+    const providerCost =
+      result.totalInputTokens * aiModel.inputTokenPrice +
+      result.totalOutputTokens * aiModel.outputTokenPrice;
+    const customerPrice = providerCost * (1 + aiModel.markupPercentage / 100);
+    const walletTokens = costAdjustedTokens(customerPrice, result.totalInputTokens + result.totalOutputTokens);
+
+    await TokenWalletService.deductTokens({
+      userId,
+      tokens: walletTokens,
+      reference: agentId,
+      description: `Agent: ${agent.name || 'Dev'} (${result.toolCallCount} tools)`,
+      organizationId,
+    });
+
+    try {
+      await prisma.budget.updateMany({
+        where: { userId },
+        data: { currentUsage: { increment: customerPrice } },
+      });
+    } catch { /* non-critical */ }
   }
 
-  // Background: extract and save memory after the turn
+  callbacks.onDone(result.totalInputTokens, result.totalOutputTokens);
+
+  logger.info(
+    `Agent orchestrator complete: user=${userId} agent=${agentId} tools=${result.toolCallCount} success=${result.success} tokens=${result.totalInputTokens + result.totalOutputTokens}`,
+  );
+
+  // Background memory extraction — unchanged
   const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
   if (lastUserMsg && config.apiKeys.openai) {
-    // Fire and forget — don't block the response
     extractMemoryFromTurn(
       typeof lastUserMsg.content === 'string' ? lastUserMsg.content : '',
       '[tool-assisted response]',
-      config.apiKeys.openai
+      config.apiKeys.openai,
     ).then(extracted => {
       if (extracted) {
         mergeExtractedMemory(userId, agentId, extracted, projectName).catch(e =>
-          logger.warn(`Memory merge failed: ${e.message}`)
+          logger.warn(`Memory merge failed: ${e.message}`),
         );
       }
     }).catch(() => { /* silent */ });
   }
 }
 
-// ── Native Function Calling (OpenAI format) ──────────────────────────
+// ── Plain-chat tool loop (new) ──────────────────────────────────────
 
-async function runNativeFunctionCallingLoop(
-  aiModel: any, systemPrompt: string,
-  messages: Array<{ role: string; content: any }>,
-  tools: typeof TOOL_DEFINITIONS,
-  maxCalls: number,
-  userId: string, organizationId: string, agentId: string,
-  projectId: string, conversationId: string,
-  attachmentIds: string[],
-  callbacks: StreamCallbacks
+export async function runPlainChatToolLoop(
+  params: PlainChatToolLoopParams,
+  callbacks: StreamCallbacks,
+  deps: PlainChatToolLoopDeps = {},
 ): Promise<void> {
-  const apiKey = config.apiKeys[aiModel.provider as keyof typeof config.apiKeys];
-  if (!apiKey) throw new Error(`No API key for ${aiModel.provider}`);
+  const { userId, organizationId, modelId, messages, systemPrompt, projectId, conversationId } = params;
+  const attachmentIds = params.attachmentIds ?? [];
 
-  // Build OpenAI-format tool definitions
-  const openAITools = tools.map(t => ({
-    type: 'function' as const,
-    function: {
-      name: t.name,
-      description: t.description,
-      parameters: t.parameters,
-    },
-  }));
-
-  let conversationMessages = [
-    { role: 'system', content: systemPrompt },
-    ...messages,
-  ];
-
-  let totalInputTokens = 0;
-  let totalOutputTokens = 0;
-  let toolCallCount = 0;
-
-  for (let i = 0; i < maxCalls; i++) {
-    // Rate limit check
-    if (!checkToolRateLimit(userId)) {
-      callbacks.onError(new Error('Tool execution rate limit reached (50/hour). Please wait.'));
-      return;
-    }
-
+  const loadAIModel = deps.loadAIModel ?? ((id: string) => prisma.aIModel.findUnique({ where: { id } }));
+  const runNativeLoop = deps.runNativeLoop ?? runNativeFunctionCallingLoop;
+  const deductTokens = deps.deductTokens ?? TokenWalletService.deductTokens.bind(TokenWalletService);
+  const incrementBudget = deps.incrementBudget ?? (async (uid: string, amt: number) => {
     try {
-      // Non-streaming call to get tool decisions.
-      // 180s timeout: when execute_python returns a base64 plot, the LLM
-      // has to re-emit ~10-20 KB of base64 inside `![](data:image/png;
-      // base64,...)`. That can take 60-120s even on Opus. Day 3 will
-      // replace this with file URLs so plots don't traverse the LLM at
-      // all. For now: 180s is the budget.
-      const response = await axios.post(
-        getProviderEndpoint(aiModel.provider),
-        buildProviderRequest(aiModel, conversationMessages, openAITools),
-        {
-          headers: getProviderHeaders(aiModel.provider, apiKey),
-          timeout: 180_000,
-        }
-      );
-
-      const result = parseProviderResponse(aiModel.provider, response.data);
-      totalInputTokens += result.inputTokens;
-      totalOutputTokens += result.outputTokens;
-
-      // Check if model wants to use a tool
-      if (result.toolCalls && result.toolCalls.length > 0) {
-        for (const toolCall of result.toolCalls) {
-          toolCallCount++;
-          incrementToolCount(userId);
-
-          callbacks.onToolUse({ name: toolCall.name, input: toolCall.arguments });
-
-          const toolResult = await executeTool(
-            toolCall.name,
-            toolCall.arguments,
-            userId, projectId,
-            { perplexity: config.apiKeys.perplexity || '' },
-            organizationId,
-            attachmentIds,
-          );
-
-          callbacks.onToolResult({ name: toolCall.name, result: toolResult });
-
-          // Log tool execution
-          await prisma.toolExecution.create({
-            data: {
-              userId, agentId, conversationId,
-              toolName: toolCall.name,
-              toolInput: toolCall.arguments,
-              toolOutput: typeof toolResult.output === 'string'
-                ? { text: toolResult.output.slice(0, 5000) }
-                : toolResult.output ? JSON.parse(JSON.stringify(toolResult.output)) : {},
-              durationMs: toolResult.durationMs,
-              success: toolResult.success,
-            },
-          }).catch(e => logger.warn(`Tool execution log failed: ${e.message}`));
-
-          // Add tool result to conversation for next iteration.
-          // execute_python may emit base64 plots → bigger budget. Other
-          // tools keep the original 3K cap to avoid context-window bloat
-          // for established flows.
-          const truncationLimit = toolCall.name === 'execute_python' ? 100_000 : 3_000;
-          conversationMessages.push({
-            role: 'assistant',
-            content: `[Tool: ${toolCall.name}] ${JSON.stringify(toolCall.arguments)}`,
-          });
-          conversationMessages.push({
-            role: 'user',
-            content: `[Tool Result: ${toolCall.name}] ${toolResult.success ? JSON.stringify(toolResult.output).slice(0, truncationLimit) : `Error: ${toolResult.error}`}`,
-          });
-        }
-        // Continue loop — model may want to use more tools
-        continue;
-      }
-
-      // Model returned text — stream it to user
-      if (result.text) {
-        callbacks.onChunk(result.text);
-      }
-
-      callbacks.onDone(totalInputTokens, totalOutputTokens);
-
-      // Bill for all LLM iterations
-      const providerCost = totalInputTokens * aiModel.inputTokenPrice + totalOutputTokens * aiModel.outputTokenPrice;
-      const customerPrice = providerCost * (1 + aiModel.markupPercentage / 100);
-      const walletTokens = costAdjustedTokens(customerPrice, totalInputTokens + totalOutputTokens);
-
-      await TokenWalletService.deductTokens({
-        userId, tokens: walletTokens,
-        reference: agentId,
-        description: `Agent: ${(await prisma.agent.findUnique({ where: { id: agentId }, select: { name: true } }))?.name || 'Dev'} (${toolCallCount} tools)`,
-        organizationId,
-      });
-
-      // Budget increment
-      try {
-        await prisma.budget.updateMany({
-          where: { userId },
-          data: { currentUsage: { increment: customerPrice } },
-        });
-      } catch { /* non-critical */ }
-
-      logger.info(`Agent orchestrator complete: user=${userId} agent=${agentId} tools=${toolCallCount} iterations=${i + 1} tokens=${totalInputTokens + totalOutputTokens}`);
-      return;
-
-    } catch (err: any) {
-      logger.error(`Agent orchestrator error on iteration ${i + 1}: ${err.message}`);
-      callbacks.onError(err);
-      return;
-    }
-  }
-
-  // Max iterations reached
-  callbacks.onChunk('\n\n> **Note:** Reached maximum tool execution limit. Here is what I have so far.');
-  callbacks.onDone(totalInputTokens, totalOutputTokens);
-}
-
-// ── XML Function Calling (for DeepSeek, Mistral, Groq, etc.) ────────
-
-async function runXMLFunctionCallingLoop(
-  aiModel: any, systemPrompt: string,
-  messages: Array<{ role: string; content: any }>,
-  tools: typeof TOOL_DEFINITIONS,
-  maxCalls: number,
-  userId: string, organizationId: string, agentId: string,
-  projectId: string, conversationId: string,
-  attachmentIds: string[],
-  callbacks: StreamCallbacks
-): Promise<void> {
-  // Build XML tool descriptions into the system prompt
-  const xmlToolSection = tools.map(t =>
-    `<tool name="${t.name}">\n  <description>${t.description}</description>\n  <parameters>${JSON.stringify(t.parameters.properties || {})}</parameters>\n</tool>`
-  ).join('\n');
-
-  const xmlSystemPrompt = systemPrompt + `\n\n[TOOL USE FORMAT]\nTo use a tool, output EXACTLY this XML format:\n<tool_call>\n{"name": "tool_name", "arguments": {"param": "value"}}\n</tool_call>\n\nAvailable tools:\n${xmlToolSection}\n\nAfter receiving tool results, continue your response. Only use tools when necessary.`;
-
-  // Captures token usage from the single LLM call inside this XML loop.
-  // Previously discarded — see fix(billing): bill XML tool-call loop.
-  let capturedInputTokens = 0;
-  let capturedOutputTokens = 0;
-
-  // For XML-based providers, use the standard sendMessage flow but parse for tool_call tags
-  const fullResponse = await new Promise<string>(async (resolve) => {
-    let accumulated = '';
-    await AIGatewayService.sendMessageStream(
-      {
-        userId, organizationId, modelId: aiModel.id,
-        messages,
-        agentConfig: {
-          systemPrompt: xmlSystemPrompt,
-          temperature: 0.2,
-          maxTokens: 16384,
-          topP: 0.95,
-          name: 'Dev',
-        },
-      },
-      {
-        onChunk: (text) => { accumulated += text; },
-        onDone: (inTok: number, outTok: number) => {
-          capturedInputTokens = inTok || 0;
-          capturedOutputTokens = outTok || 0;
-          resolve(accumulated);
-        },
-        onError: (err) => { callbacks.onError(err); resolve(''); },
-      }
-    );
+      await prisma.budget.updateMany({ where: { userId: uid }, data: { currentUsage: { increment: amt } } });
+    } catch { /* non-critical */ }
   });
 
-  // Bills the LLM call once. Mirrors native-path billing (lines ~250-260).
-  const billLLMCall = async (toolCallCount: number) => {
-    if (capturedInputTokens + capturedOutputTokens === 0) return;
-    const providerCost = capturedInputTokens * aiModel.inputTokenPrice + capturedOutputTokens * aiModel.outputTokenPrice;
-    const customerPrice = providerCost * (1 + aiModel.markupPercentage / 100);
-    const walletTokens = costAdjustedTokens(customerPrice, capturedInputTokens + capturedOutputTokens);
-    await TokenWalletService.deductTokens({
+  const aiModel = await loadAIModel(modelId);
+  if (!aiModel) throw new Error('AI Model not found');
+
+  const executePythonTool = TOOL_DEFINITIONS.find(t => t.name === 'execute_python');
+  if (!executePythonTool) throw new Error('execute_python tool definition missing');
+  const tools = [executePythonTool];
+
+  const fileContextSection = await buildFileContextSection(attachmentIds, userId, deps.loadAttachments);
+
+  // Caller-supplied systemPrompt already contains the task-tuned prompt plus
+  // user memory (built in aiController.ts as systemPromptWithMemory). We
+  // append the tool advertisement and file context here so the inner loop
+  // doesn't have to know anything plain-chat-specific.
+  const toolPromptSection =
+    `\n\n[AVAILABLE TOOLS]\n` +
+    `You have access to the execute_python tool. Use it when the user's request would benefit from running Python code (calculations, data analysis, plotting, file processing). For general questions, conversation, or knowledge queries, answer directly without invoking the tool.\n` +
+    `- ${executePythonTool.name}: ${executePythonTool.description}`;
+
+  const fullSystemPrompt = systemPrompt + toolPromptSection + fileContextSection;
+
+  const loopParams: ToolLoopParams = {
+    aiModel,
+    systemPrompt: fullSystemPrompt,
+    messages,
+    tools,
+    maxCalls: 3,                  // Lower than agent's 8 — plain chat is not opt-in to heavy tool use.
+    userId,
+    organizationId,
+    agentId: null,                // Plain chat has no agent record.
+    projectId: projectId || 'default',
+    conversationId: conversationId || '',
+    attachmentIds,
+    callbacks,
+  };
+
+  // Plain chat is gated to Tier-1 providers (native function calling) at the
+  // dispatch site (isPlainChatToolCapable). XML loop is never reached here.
+  const result = await runNativeLoop(loopParams);
+
+  if (result.success && (result.totalInputTokens + result.totalOutputTokens) > 0) {
+    const providerCost =
+      result.totalInputTokens * aiModel.inputTokenPrice +
+      result.totalOutputTokens * aiModel.outputTokenPrice;
+
+    // Runtime markup override: 1.3× if a tool fired, 1.25× otherwise.
+    // Bills the LLM portion only — sandbox seconds are billed separately by
+    // executePythonTool (Day 2 behavior, unchanged).
+    const effectiveMarkup = result.toolCallCount > 0 ? 1.3 : 1.25;
+    const customerPrice = providerCost * effectiveMarkup;
+    const tokens = costAdjustedTokens(customerPrice, result.totalInputTokens + result.totalOutputTokens);
+
+    await deductTokens({
       userId,
-      tokens: walletTokens,
-      reference: agentId,
-      description: `[TOOL_CALL] ${aiModel.name} via XML loop (${toolCallCount} tool(s))`,
+      tokens,
+      reference: `plain-chat-${conversationId ?? 'no-conv'}`,
+      description: result.toolCallCount > 0
+        ? `Plain chat (${result.toolCallCount} tool${result.toolCallCount === 1 ? '' : 's'})`
+        : `Plain chat`,
       organizationId,
     });
-    try {
-      await prisma.usageLog.create({
-        data: {
-          userId,
-          organizationId,
-          modelId: aiModel.id,
-          prompt: `[TOOL_CALL] ${toolCallCount} tool(s) requested via XML loop`,
-          response: fullResponse.substring(0, 500),
-          tokensInput: capturedInputTokens,
-          tokensOutput: capturedOutputTokens,
-          totalTokens: capturedInputTokens + capturedOutputTokens,
-          providerCost,
-          markupPercentage: aiModel.markupPercentage,
-          customerPrice,
-          status: 'completed',
-        },
-      });
-    } catch { /* non-fatal */ }
-    logger.info(`[TOOL_CALL] billed: user=${userId} model=${aiModel.name} tokens=${capturedInputTokens}/${capturedOutputTokens} cost=$${customerPrice.toFixed(6)}`);
-  };
 
-  // Parse for <tool_call> tags
-  const toolCallRegex = /<tool_call>\s*({[\s\S]*?})\s*<\/tool_call>/g;
-  let match;
-  const toolCalls: ToolCall[] = [];
-
-  while ((match = toolCallRegex.exec(fullResponse)) !== null) {
-    try {
-      const parsed = JSON.parse(match[1]);
-      toolCalls.push({ name: parsed.name, arguments: parsed.arguments || {} });
-    } catch { /* skip malformed tool calls */ }
+    await incrementBudget(userId, customerPrice);
   }
 
-  if (toolCalls.length === 0) {
-    // No tool calls — just stream the response
-    callbacks.onChunk(fullResponse);
-    await billLLMCall(0);
-    callbacks.onDone(capturedInputTokens, capturedOutputTokens);
-    return;
-  }
+  callbacks.onDone(result.totalInputTokens, result.totalOutputTokens);
 
-  // Execute tool calls and build follow-up
-  for (const toolCall of toolCalls.slice(0, maxCalls)) {
-    if (!checkToolRateLimit(userId)) break;
-    incrementToolCount(userId);
+  logger.info(
+    `Plain-chat tool loop complete: user=${userId} tools=${result.toolCallCount} success=${result.success} markup=${result.toolCallCount > 0 ? '1.3x' : '1.25x'} tokens=${result.totalInputTokens + result.totalOutputTokens}`,
+  );
+}
 
-    callbacks.onToolUse({ name: toolCall.name, input: toolCall.arguments });
-    const result = await executeTool(
-      toolCall.name, toolCall.arguments,
-      userId, projectId,
-      undefined,
-      organizationId,
-      attachmentIds,
+// ── Tier-1 capability detection ────────────────────────────────────
+
+const TIER_1_TOOL_PROVIDERS = ['anthropic', 'openai', 'google'];
+
+/**
+ * Is this model eligible for plain-chat tool use?
+ * MVP: Tier-1 providers (native function calling) with function_calling capability.
+ * Tier-2 providers (XML fallback) are deferred.
+ */
+export function isPlainChatToolCapable(aiModel: {
+  provider: string;
+  capabilities: string[] | null;
+}): boolean {
+  return (
+    TIER_1_TOOL_PROVIDERS.includes(aiModel.provider) &&
+    Array.isArray(aiModel.capabilities) &&
+    aiModel.capabilities.includes('function_calling')
+  );
+}
+
+// ── Shared file-context builder ────────────────────────────────────
+
+async function buildFileContextSection(
+  attachmentIds: string[],
+  userId: string,
+  loadAttachments?: (ids: string[], userId: string) => Promise<Array<{ fileName: string; fileType: string; fileSize: number; localPath: string | null }>>,
+): Promise<string> {
+  if (attachmentIds.length === 0) return '';
+  try {
+    const files = loadAttachments
+      ? await loadAttachments(attachmentIds, userId)
+      : await prisma.conversationAttachment.findMany({
+          where: { id: { in: attachmentIds }, userId },
+          select: { fileName: true, fileType: true, fileSize: true, localPath: true },
+        });
+    if (files.length === 0) return '';
+    const fileLines = files.map(f => {
+      const sizeKB = (f.fileSize / 1024).toFixed(1);
+      const truncated = !f.localPath && f.fileType === 'csv' && f.fileSize > 100_000;
+      const tag = truncated
+        ? ' — LEGACY UPLOAD, only first 500 rows available via /sandbox/inputs/; mention this to the user if it matters'
+        : '';
+      return `- ${f.fileName} (${f.fileType}, ${sizeKB} KB)${tag}`;
+    }).join('\n');
+    return (
+      `\n\n[FILES AVAILABLE IN SANDBOX]\n` +
+      `The user attached the following files. Load them via /sandbox/inputs/<filename> when relevant:\n` +
+      `${fileLines}\n`
     );
-    callbacks.onToolResult({ name: toolCall.name, result });
-
-    await prisma.toolExecution.create({
-      data: {
-        userId, agentId, conversationId,
-        toolName: toolCall.name,
-        toolInput: toolCall.arguments,
-        toolOutput: typeof result.output === 'string' ? { text: result.output.slice(0, 5000) } : result.output || {},
-        durationMs: result.durationMs,
-        success: result.success,
-      },
-    }).catch(() => { /* non-critical */ });
+  } catch (err: any) {
+    logger.warn(`File context lookup failed for user ${userId}: ${err.message}`);
+    return '';
   }
-
-  // Send text parts (removing tool_call tags)
-  const cleanText = fullResponse.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '').trim();
-  if (cleanText) callbacks.onChunk(cleanText);
-  await billLLMCall(toolCalls.length);
-  callbacks.onDone(capturedInputTokens, capturedOutputTokens);
-}
-
-// ── Provider-specific helpers ────────────────────────────────────────
-
-function getProviderEndpoint(provider: string): string {
-  switch (provider) {
-    case 'openai': return 'https://api.openai.com/v1/chat/completions';
-    case 'anthropic': return 'https://api.anthropic.com/v1/messages';
-    case 'google': return ''; // Handled separately
-    default: return 'https://api.openai.com/v1/chat/completions';
-  }
-}
-
-function getProviderHeaders(provider: string, apiKey: string): Record<string, string> {
-  switch (provider) {
-    case 'anthropic':
-      return { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' };
-    default:
-      return { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' };
-  }
-}
-
-function buildProviderRequest(aiModel: any, messages: any[], tools: any[]): any {
-  if (aiModel.provider === 'anthropic') {
-    const systemMsg = messages.find(m => m.role === 'system');
-    const otherMsgs = messages.filter(m => m.role !== 'system');
-    return {
-      model: aiModel.modelId,
-      max_tokens: 16384,
-      system: systemMsg?.content || '',
-      messages: otherMsgs,
-      tools: tools.map(t => ({
-        name: t.function.name,
-        description: t.function.description,
-        input_schema: t.function.parameters,
-      })),
-    };
-  }
-
-  // OpenAI format (default)
-  return {
-    model: aiModel.modelId,
-    messages,
-    tools: tools.length > 0 ? tools : undefined,
-    max_tokens: 16384,
-    temperature: 0.2,
-  };
-}
-
-function parseProviderResponse(provider: string, data: any): {
-  text: string;
-  toolCalls: ToolCall[] | null;
-  inputTokens: number;
-  outputTokens: number;
-} {
-  if (provider === 'anthropic') {
-    const textBlocks = data.content?.filter((c: any) => c.type === 'text') || [];
-    const toolBlocks = data.content?.filter((c: any) => c.type === 'tool_use') || [];
-    return {
-      text: textBlocks.map((b: any) => b.text).join(''),
-      toolCalls: toolBlocks.length > 0
-        ? toolBlocks.map((b: any) => ({ name: b.name, arguments: b.input }))
-        : null,
-      inputTokens: data.usage?.input_tokens || 0,
-      outputTokens: data.usage?.output_tokens || 0,
-    };
-  }
-
-  // OpenAI format
-  const choice = data.choices?.[0];
-  const toolCalls = choice?.message?.tool_calls?.map((tc: any) => ({
-    name: tc.function.name,
-    arguments: JSON.parse(tc.function.arguments || '{}'),
-  })) || null;
-
-  return {
-    text: choice?.message?.content || '',
-    toolCalls: toolCalls && toolCalls.length > 0 ? toolCalls : null,
-    inputTokens: data.usage?.prompt_tokens || 0,
-    outputTokens: data.usage?.completion_tokens || 0,
-  };
 }
