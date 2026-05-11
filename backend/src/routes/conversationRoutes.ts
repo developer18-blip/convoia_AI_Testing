@@ -220,9 +220,22 @@ router.post('/:id/messages', asyncHandler(async (req: Request, res: Response) =>
           webSearchData: msg.webSearchData ? JSON.stringify(msg.webSearchData) : null,
         },
         update: {
-          // Update if video/image URL was added after initial save
+          // Refresh content + metadata on every sync. The frontend syncs
+          // partial state during streaming; the first sync CREATEs with
+          // partial content, later syncs UPDATE with the full content
+          // once streaming completes. Without this, multi-iteration
+          // turns (tool use → prose) lose the prose because the first
+          // sync wins and later updates are skipped.
+          content: msg.content || '',
+          model: msg.model,
+          provider: msg.provider,
+          tokensInput: msg.tokensInput || null,
+          tokensOutput: msg.tokensOutput || null,
+          cost: msg.cost || null,
           ...(msg.videoUrl ? { videoUrl: msg.videoUrl } : {}),
           ...(msg.imageUrl ? { imageUrl: msg.imageUrl } : {}),
+          ...(msg.imagePrompt ? { imagePrompt: msg.imagePrompt } : {}),
+          ...(msg.webSearchData ? { webSearchData: JSON.stringify(msg.webSearchData) } : {}),
         },
       })
     )
