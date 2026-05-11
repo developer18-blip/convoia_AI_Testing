@@ -560,22 +560,28 @@ export function ChatPage() {
 
         {/* Messages */}
         <div style={{ flex: 1, minHeight: 0, backgroundColor: 'var(--chat-bg)', position: 'relative' }}>
-          {/* Model badge — permanently visible in corner after a response */}
-          {lastResponseModel && (
-            <div
-              className="animate-fade-in"
-              style={{
-                position: 'absolute', bottom: '12px', right: '16px', zIndex: 10,
-                padding: '4px 10px', borderRadius: '20px',
-                backgroundColor: 'var(--chat-surface)', border: '1px solid var(--chat-border)',
-                fontSize: '11px', color: 'var(--color-text-muted)',
-                fontFamily: 'monospace', letterSpacing: '0.02em',
-                pointerEvents: 'none', backdropFilter: 'blur(8px)',
-              }}
-            >
-              model · {lastResponseModel}
-            </div>
-          )}
+          {/* Model badge — permanently visible in corner after a response.
+              Resolves the raw model id (UUID or provider model-id) against the
+              loaded models list so users see the friendly name instead. */}
+          {lastResponseModel && (() => {
+            const matched = models.find((m) => m.id === lastResponseModel || m.modelId === lastResponseModel)
+            const displayName = matched?.name ?? lastResponseModel
+            return (
+              <div
+                className="animate-fade-in"
+                style={{
+                  position: 'absolute', bottom: '12px', right: '16px', zIndex: 10,
+                  padding: '4px 10px', borderRadius: '20px',
+                  backgroundColor: 'var(--chat-surface)', border: '1px solid var(--chat-border)',
+                  fontSize: '11px', color: 'var(--color-text-muted)',
+                  letterSpacing: '0.02em',
+                  pointerEvents: 'none', backdropFilter: 'blur(8px)',
+                }}
+              >
+                {displayName}
+              </div>
+            )
+          })()}
           <MessageArea
             messages={messages}
             isLoading={isStreaming}

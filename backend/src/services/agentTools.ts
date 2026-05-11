@@ -741,8 +741,8 @@ USER-UPLOADED FILES:
 PLOTS:
 - Write natural matplotlib/seaborn code and call plt.show() (or display the figure). PNG output is captured automatically — no base64 print() needed.
 - The tool result will include a "plots" array: [{ id, token, mimeType, filename }, ...]
-- For each plot, embed it in your reply as Markdown:
-    ![Short description](api/sandbox/plot/<id>?token=<token>)
+- For each plot, embed it in your reply as Markdown using an absolute path (leading slash is required so the chat renders it from the API root, not the current page):
+    ![Short description](/api/sandbox/plot/<id>?token=<token>)
 - Use descriptive alt text for accessibility. The image renders inline — alt is for screen readers, not visible caption text.
 
 ERROR HANDLING:
