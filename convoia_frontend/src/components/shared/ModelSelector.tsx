@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Search, Check, ChevronDown, ImageIcon, Sparkles, Code2 } from 'lucide-react'
+import { Search, Check, ChevronDown, ImageIcon, Sparkles } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import type { AIModel } from '../../types'
 
@@ -28,16 +28,6 @@ function getProviderColor(provider: string): string {
 const IMAGE_CAPABILITIES = ['image_generation']
 function isImageModel(model: AIModel): boolean {
   return model.capabilities?.some((c: string) => IMAGE_CAPABILITIES.includes(c)) ?? false
-}
-
-// Mirrors backend TIER_1_TOOL_PROVIDERS in agentOrchestrator.ts. Used to
-// badge models that get execute_python in plain chat.
-const PLAIN_CHAT_TOOL_PROVIDERS = ['anthropic', 'openai', 'google']
-function hasPlainChatTools(model: AIModel): boolean {
-  return (
-    PLAIN_CHAT_TOOL_PROVIDERS.includes(model.provider.toLowerCase()) &&
-    (model.capabilities?.includes('function_calling') ?? false)
-  )
 }
 
 export function ModelSelector({ models, selectedId, onChange, className }: ModelSelectorProps) {
@@ -255,11 +245,6 @@ function ModelOption({ model, isSelected, onSelect, isImage }: {
               backgroundColor: '#F59E0B20', color: '#F59E0B', textTransform: 'uppercase',
             }}>
               IMG
-            </span>
-          )}
-          {!isImage && hasPlainChatTools(model) && (
-            <span title="Can run Python code" style={{ display: 'inline-flex', alignItems: 'center' }}>
-              <Code2 size={12} style={{ color: 'var(--chat-text-muted)' }} />
             </span>
           )}
         </div>
