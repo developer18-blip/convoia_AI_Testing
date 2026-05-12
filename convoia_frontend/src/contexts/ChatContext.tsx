@@ -628,8 +628,30 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             } else if (parsed.type === 'tool_result') {
               // Tool finished — show result summary
               const statusIcon = parsed.success ? '✅' : '❌'
-              const output = typeof parsed.output === 'string' ? parsed.output.slice(0, 500) : ''
-              accumulated += `> ${statusIcon} ${parsed.name} ${parsed.success ? 'completed' : 'failed'}${output ? `: \`${output}\`` : ''}\n\n`
+              // execute_python: replace the raw JSON blob (id, token, mimeType, filename — debug noise)
+              // with a concise summary. The plot image + prose appear below; the JSON is non-actionable for end users.
+              let resultLine: string
+              if (parsed.name === 'execute_python' && parsed.success && typeof parsed.output === 'string') {
+                let summary = ''
+                try {
+                  const o = JSON.parse(parsed.output)
+                  const parts: string[] = []
+                  if (typeof o.executionTimeSec === 'number') parts.push(`${o.executionTimeSec.toFixed(2)}s`)
+                  if (Array.isArray(o.plots) && o.plots.length > 0) {
+                    parts.push(`${o.plots.length} plot${o.plots.length === 1 ? '' : 's'}`)
+                  }
+                  if (typeof o.stdout === 'string' && o.stdout.trim().length > 0) {
+                    const preview = o.stdout.trim().slice(0, 80).replace(/\n/g, ' ')
+                    parts.push(`stdout: ${preview}${o.stdout.length > 80 ? '…' : ''}`)
+                  }
+                  summary = parts.length > 0 ? ` (${parts.join(', ')})` : ''
+                } catch { /* truncated JSON — fall through, leave bare "completed" */ }
+                resultLine = `> ${statusIcon} ${parsed.name} completed${summary}\n\n`
+              } else {
+                const output = typeof parsed.output === 'string' ? parsed.output.slice(0, 500) : ''
+                resultLine = `> ${statusIcon} ${parsed.name} ${parsed.success ? 'completed' : 'failed'}${output ? `: \`${output}\`` : ''}\n\n`
+              }
+              accumulated += resultLine
               setMessages((prev) => prev.map((m) =>
                 m.id === assistantId ? { ...m, content: accumulated, isLoading: true } : m
               ))
@@ -937,8 +959,30 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               ))
             } else if (parsed.type === 'tool_result') {
               const statusIcon = parsed.success ? '✅' : '❌'
-              const output = typeof parsed.output === 'string' ? parsed.output.slice(0, 500) : ''
-              accumulated += `> ${statusIcon} ${parsed.name} ${parsed.success ? 'completed' : 'failed'}${output ? `: \`${output}\`` : ''}\n\n`
+              // execute_python: replace the raw JSON blob (id, token, mimeType, filename — debug noise)
+              // with a concise summary. The plot image + prose appear below; the JSON is non-actionable for end users.
+              let resultLine: string
+              if (parsed.name === 'execute_python' && parsed.success && typeof parsed.output === 'string') {
+                let summary = ''
+                try {
+                  const o = JSON.parse(parsed.output)
+                  const parts: string[] = []
+                  if (typeof o.executionTimeSec === 'number') parts.push(`${o.executionTimeSec.toFixed(2)}s`)
+                  if (Array.isArray(o.plots) && o.plots.length > 0) {
+                    parts.push(`${o.plots.length} plot${o.plots.length === 1 ? '' : 's'}`)
+                  }
+                  if (typeof o.stdout === 'string' && o.stdout.trim().length > 0) {
+                    const preview = o.stdout.trim().slice(0, 80).replace(/\n/g, ' ')
+                    parts.push(`stdout: ${preview}${o.stdout.length > 80 ? '…' : ''}`)
+                  }
+                  summary = parts.length > 0 ? ` (${parts.join(', ')})` : ''
+                } catch { /* truncated JSON — fall through, leave bare "completed" */ }
+                resultLine = `> ${statusIcon} ${parsed.name} completed${summary}\n\n`
+              } else {
+                const output = typeof parsed.output === 'string' ? parsed.output.slice(0, 500) : ''
+                resultLine = `> ${statusIcon} ${parsed.name} ${parsed.success ? 'completed' : 'failed'}${output ? `: \`${output}\`` : ''}\n\n`
+              }
+              accumulated += resultLine
               setMessages((prev) => prev.map((m) =>
                 m.id === assistantId ? { ...m, content: accumulated, isLoading: true } : m
               ))
