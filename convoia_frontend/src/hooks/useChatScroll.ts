@@ -75,6 +75,13 @@ export function useChatScroll(
   const rafIdRef = useRef<number | null>(null)
   const lastScrollAtRef = useRef(0)
 
+  // Track previous scrollTop so we can distinguish a user up-scroll from
+  // the programmatic down-scroll mid-animation. Programmatic auto-scroll
+  // only ever increases scrollTop, so a decreasing value is unambiguously
+  // a user gesture (wheel / touch / keyboard) and must be respected even
+  // during the post-scrollTo() flag window.
+  const lastScrollTopRef = useRef(0)
+
   // Scroll-to-bottom — single source of truth. Sets the programmatic flag,
   // schedules a flag-clear after the smooth animation should be done,
   // and uses the container's own scrollTo() (NOT scrollIntoView) so we
@@ -114,8 +121,15 @@ export function useChatScroll(
     if (!el) return
 
     const onScroll = () => {
-      // Bail on our own scroll calls — auto-scroll must never trigger detach.
-      if (programmaticScrollRef.current) return
+      const currentScrollTop = el.scrollTop
+      const scrolledUp = currentScrollTop < lastScrollTopRef.current
+      lastScrollTopRef.current = currentScrollTop
+
+      // Bail on our own scroll calls — EXCEPT when scrollTop decreased,
+      // which only happens via user gesture. Without this carve-out, the
+      // user can't detach mid-stream: the programmatic flag is held true
+      // by back-to-back auto-scrolls and every up-scroll gets filtered.
+      if (programmaticScrollRef.current && !scrolledUp) return
 
       const distance = el.scrollHeight - el.scrollTop - el.clientHeight
       const wasAtBottom = isAtBottomRef.current
@@ -171,12 +185,17 @@ export function useChatScroll(
         if (rafIdRef.current !== null) return
         rafIdRef.current = requestAnimationFrame(() => {
           rafIdRef.current = null
+          // Re-check state — the user may have detached between schedule
+          // and fire. Without this guard, a queued rAF would call
+          // scrollToBottom and yank them right back down.
+          if (stateRef.current !== 'BOTTOM_PINNED') return
           const now = Date.now()
           if (now - lastScrollAtRef.current < scrollThrottleMs) return
           lastScrollAtRef.current = now
-          // Smooth feels right for token bursts; instant on viewport
-          // shrink (keyboard) so the input stays anchored.
-          scrollToBottom(grew ? 'smooth' : 'instant' as ScrollBehavior)
+          // Always 'instant' for stream-driven auto-scroll: at 100ms
+          // cadence consecutive 'smooth' animations queue and interrupt
+          // each other, which reads to the user as "words jumping".
+          scrollToBottom('instant' as ScrollBehavior)
         })
       } else if (grew) {
         // Detached + content grew → bump the new-content counter so the
