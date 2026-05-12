@@ -41,8 +41,14 @@ api.interceptors.response.use(
     // Only attempt refresh for 401 errors, and not for auth endpoints themselves
     const isAuthEndpoint = original?.url?.includes('/auth/refresh') || original?.url?.includes('/auth/login')
     if (error.response?.status !== 401 || original._retry || isAuthEndpoint) {
-      // Retry on 429 (rate limit) with exponential backoff
+      // Retry on 429 (rate limit) with exponential backoff —
+      // except SANDBOX_BUSY (concurrency guard, not rate limit), which won't
+      // resolve by retrying; reject immediately so the caller can surface
+      // "previous run still in progress".
       if (error.response?.status === 429) {
+        if (error.response.data?.code === 'SANDBOX_BUSY') {
+          return Promise.reject(error)
+        }
         original._retryCount = (original._retryCount || 0) + 1
         if (original._retryCount <= 3) {
           const delay = Math.pow(2, original._retryCount) * 1000
