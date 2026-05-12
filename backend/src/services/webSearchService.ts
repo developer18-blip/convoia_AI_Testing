@@ -640,6 +640,10 @@ function scoreResults(query: string, results: SearchResult[]): { results: Search
 export interface WebSearchContext {
   userId?: string;
   email?: string;
+  /** Original user message — used for relevance scoring when the search
+   *  query was reformulated by the classifier. Without this, scoring
+   *  measures results against the (potentially broken) reformulation. */
+  originalQuery?: string;
 }
 
 // Return shape now includes the usage metadata so the caller
@@ -850,7 +854,13 @@ export async function searchWeb(
   }
 
   // 4. Score whatever we have
-  let { results: scored, confidence } = scoreResults(query, results);
+  // Score against the ORIGINAL user query when available — the reformulated
+  // `query` may have dropped the user's named entity (the very failure mode
+  // the classifier's PRESERVE NAMED ENTITIES rule guards against). Falling
+  // back to `query` preserves existing behaviour for callers that don't
+  // supply an original (e.g. urlFetchService).
+  const scoreQuery = ctx?.originalQuery ?? query;
+  let { results: scored, confidence } = scoreResults(scoreQuery, results);
 
   // 5. Tavily last-resort — only if we still have nothing good
   if (confidence < CONFIDENCE_THRESHOLD || scored.length < 2) {
@@ -858,7 +868,7 @@ export async function searchWeb(
     const tavilyResults = await searchTavily(query, maxResults);
     if (tavilyResults.length > 0) {
       const enrichedTavily = await enrichResults(tavilyResults);
-      const tavilyScored = scoreResults(query, enrichedTavily);
+      const tavilyScored = scoreResults(scoreQuery, enrichedTavily);
       if (tavilyScored.confidence > confidence) {
         scored = tavilyScored.results;
         confidence = tavilyScored.confidence;

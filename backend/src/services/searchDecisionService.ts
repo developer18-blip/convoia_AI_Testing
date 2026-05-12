@@ -158,6 +158,8 @@ Return needs_search=false for:
 
 If search IS needed, return a concise 2–6 word search_query — the CONCEPT, not the user's full sentence. Strip quotes, code, and filler.
 
+PRESERVE NAMED ENTITIES — non-negotiable: When the user names a specific person, place, event, organization, disease, product, company, or other named thing, the search_query MUST include that exact named entity. The "concept" includes the subject — never strip the named entity as filler. Examples: "Hantavirus news" not "news popularity"; "Elon Musk latest" not "latest news"; "GPT-5.5 reviews" not "AI model reviews".
+
 USER MESSAGE:
 ${userMessage}
 

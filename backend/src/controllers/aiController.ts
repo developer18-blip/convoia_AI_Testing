@@ -1486,7 +1486,7 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
         // Prefer the AI-refined concept query over the raw user sentence —
         // "what happened in the stock market today?" → "stock market today"
         const queryForSearch = searchDecision.searchQuery || userQuery;
-        const searchResult = await searchWeb(queryForSearch, 5, { userId: user.id, email: user.email });
+        const searchResult = await searchWeb(queryForSearch, 5, { userId: user.id, email: user.email, originalQuery: userQuery });
         if (searchResult.searched && searchResult.results.length > 0) {
           webSearched = true;
           webSearchSource = searchResult.source;
