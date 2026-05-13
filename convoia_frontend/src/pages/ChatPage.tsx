@@ -6,7 +6,6 @@ import { MessageInput, type MessageInputHandle } from '../components/chat/Messag
 import { DragDropOverlay } from '../components/chat/DragDropOverlay'
 import { CodeInterpreter } from '../components/chat/CodeInterpreter'
 import { CanvasPanel } from '../components/chat/CanvasPanel'
-import { CostEstimator } from '../components/chat/CostEstimator'
 import { ModelSelector } from '../components/shared/ModelSelector'
 import { AgentSelector } from '../components/shared/AgentSelector'
 import { useAccent } from '../contexts/AccentContext'
@@ -620,18 +619,6 @@ export function ChatPage() {
               ? 'You have no tokens assigned. Contact your admin or manager for tokens.'
               : <>No tokens remaining. <button onClick={() => navigate('/tokens/buy')} style={{ color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, textDecoration: 'underline' }}>Buy tokens</button> to continue.</>
             }
-          </div>
-        )}
-
-        {/* Cost preview — only after the conversation starts. On the empty
-            welcome screen the chip is clutter (wallet pill is already in the
-            header), so we suppress both the chip AND its 18px strip. */}
-        {messages.length > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '4px 16px 0', minHeight: 18 }}>
-            <CostEstimator
-              model={councilMode ? null : selectedModel}
-              councilModels={councilMode ? models.filter((m) => councilModelIds.includes(m.id)) : undefined}
-            />
           </div>
         )}
 
