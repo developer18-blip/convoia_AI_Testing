@@ -1475,7 +1475,18 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
 
     let webSearchSource: string | null = null;
     const searchDecision = userQuery
-      ? await decideWebSearch(userQuery, { hasDocumentContext: hasDocContext })
+      ? await decideWebSearch(userQuery, {
+          hasDocumentContext: hasDocContext,
+          // Pass the 4 messages preceding the current user message (which is
+          // at index -1 of cappedMessages). Lets the classifier resolve
+          // conversational references like "the ship" by carrying named
+          // entities forward from history. .slice(-5, -1) returns whatever's
+          // available for shorter conversations.
+          recentMessages: cappedMessages.slice(-5, -1).map((m: any) => ({
+            role: m.role,
+            content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content).slice(0, 400),
+          })),
+        })
       : null;
     if (searchDecision?.needsSearch) {
       logger.info(

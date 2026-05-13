@@ -27,7 +27,12 @@ import logger from '../config/logger.js';
 import { needsWebSearch as rulesBasedNeedsWebSearch } from './webSearchService.js';
 
 const DEFAULT_DECISION_MODEL = process.env.SEARCH_DECISION_MODEL || 'gpt-5.4-nano';
-const DECISION_TIMEOUT_MS = 1500;
+// Bumped 1500→3000ms after observing ~10-15% timeout rate in prod logs.
+// Even with the faster Haiku 4.5 model, conversational-history prompts run
+// 200-700ms typical, and tail latency on either provider can spike past 1500.
+const DECISION_TIMEOUT_MS = 3000;
+const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+const ANTHROPIC_VERSION = '2023-06-01';
 
 export interface SearchDecision {
   needsSearch: boolean;
@@ -39,6 +44,11 @@ export interface SearchDecision {
 
 export interface DecideOptions {
   hasDocumentContext?: boolean;
+  /** Last N user/assistant turns before the current message — lets the
+   *  classifier resolve conversational references ("the ship", "that one",
+   *  "what we discussed"). Without this, follow-up questions get stripped
+   *  to abstract queries like "cruise ship name" with no subject. */
+  recentMessages?: Array<{ role: string; content: string }>;
 }
 
 // ── Layer 1: hard overrides ────────────────────────────────────────────
@@ -136,7 +146,7 @@ interface RawAIDecision {
   reason: string;
 }
 
-const DECISION_PROMPT_TEMPLATE = (userMessage: string) => `You are a search-decision engine for an AI chat assistant.
+const DECISION_PROMPT_TEMPLATE = (userMessage: string, historyBlock: string) => `You are a search-decision engine for an AI chat assistant.
 
 DECIDE whether the user's message requires a live web search to answer well.
 
@@ -160,42 +170,92 @@ If search IS needed, return a concise 2–6 word search_query — the CONCEPT, n
 
 PRESERVE NAMED ENTITIES — non-negotiable: When the user names a specific person, place, event, organization, disease, product, company, or other named thing, the search_query MUST include that exact named entity. The "concept" includes the subject — never strip the named entity as filler. Examples: "Hantavirus news" not "news popularity"; "Elon Musk latest" not "latest news"; "GPT-5.5 reviews" not "AI model reviews".
 
-USER MESSAGE:
+RESOLVE CONVERSATIONAL REFERENCES: If RECENT CONVERSATION is provided below, use it to resolve pronouns/references in the current USER MESSAGE. Example: prior turn discussed "MV Hondius cruise ship outbreak" → current message "what was the ship name" → search_query should be "MV Hondius cruise ship" (carry the named entity forward from history).${historyBlock}
+
+USER MESSAGE (decide on this one):
 ${userMessage}
 
 Respond with ONLY valid JSON, no prose, no code fence:
 {"needs_search": true|false, "search_query": "…" or null, "reason": "short sentence"}`;
 
-async function aiDecide(userMessage: string): Promise<SearchDecision | null> {
-  const apiKey = config.apiKeys.openai;
+async function aiDecide(
+  userMessage: string,
+  recentMessages?: Array<{ role: string; content: string }>,
+): Promise<SearchDecision | null> {
+  // Branch on model name: Anthropic (claude-*) gets the Messages API,
+  // everything else falls through to OpenAI Chat Completions. Anthropic
+  // is the recommended path — Haiku 4.5 is faster and more reliable at
+  // JSON-mode classification than gpt-4o-mini under timeout pressure.
+  const useAnthropic = DEFAULT_DECISION_MODEL.startsWith('claude-');
+  const apiKey = useAnthropic ? config.apiKeys.anthropic : config.apiKeys.openai;
   if (!apiKey) return null;
 
+  const historyBlock = recentMessages && recentMessages.length > 0
+    ? `\n\nRECENT CONVERSATION (use this to resolve references like "the ship", "that one", "what we discussed"):\n` +
+      recentMessages.map(m => `[${m.role}]: ${(m.content || '').slice(0, 400)}`).join('\n')
+    : '';
+
+  const prompt = DECISION_PROMPT_TEMPLATE(userMessage, historyBlock);
+
   try {
-    const response = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        model: DEFAULT_DECISION_MODEL,
-        messages: [{ role: 'user', content: DECISION_PROMPT_TEMPLATE(userMessage) }],
-        max_tokens: 120,
-        temperature: 0,
-        response_format: { type: 'json_object' },
-      },
-      {
-        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        timeout: DECISION_TIMEOUT_MS,
-      },
-    );
+    if (useAnthropic) {
+      const response = await axios.post(
+        ANTHROPIC_API_URL,
+        {
+          model: DEFAULT_DECISION_MODEL,
+          max_tokens: 200,
+          temperature: 0,
+          system: 'Respond with ONLY valid JSON matching the requested schema. No prose, no code fence.',
+          messages: [{ role: 'user', content: prompt }],
+        },
+        {
+          headers: {
+            'x-api-key': apiKey,
+            'anthropic-version': ANTHROPIC_VERSION,
+            'Content-Type': 'application/json',
+          },
+          timeout: DECISION_TIMEOUT_MS,
+        },
+      );
+      const text = response.data?.content?.[0]?.text;
+      if (!text) return null;
+      // Anthropic doesn't natively guarantee JSON; strip an optional code
+      // fence so a stray ```json wrapper doesn't break parsing.
+      const jsonText = text.replace(/^```(?:json)?\s*|\s*```$/g, '').trim();
+      const parsed = JSON.parse(jsonText) as Partial<RawAIDecision>;
+      return {
+        needsSearch: !!parsed.needs_search,
+        searchQuery: parsed.search_query || null,
+        reason: parsed.reason || 'ai_decision',
+        source: 'ai',
+      };
+    } else {
+      const response = await axios.post(
+        'https://api.openai.com/v1/chat/completions',
+        {
+          model: DEFAULT_DECISION_MODEL,
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 120,
+          temperature: 0,
+          response_format: { type: 'json_object' },
+        },
+        {
+          headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+          timeout: DECISION_TIMEOUT_MS,
+        },
+      );
 
-    const text = response.data?.choices?.[0]?.message?.content;
-    if (!text) return null;
+      const text = response.data?.choices?.[0]?.message?.content;
+      if (!text) return null;
 
-    const parsed = JSON.parse(text) as Partial<RawAIDecision>;
-    return {
-      needsSearch: !!parsed.needs_search,
-      searchQuery: parsed.search_query || null,
-      reason: parsed.reason || 'ai_decision',
-      source: 'ai',
-    };
+      const parsed = JSON.parse(text) as Partial<RawAIDecision>;
+      return {
+        needsSearch: !!parsed.needs_search,
+        searchQuery: parsed.search_query || null,
+        reason: parsed.reason || 'ai_decision',
+        source: 'ai',
+      };
+    }
   } catch (err: any) {
     logger.warn(`Search decision AI call failed: ${err?.message || err}`);
     return null;
@@ -244,7 +304,7 @@ export async function decideWebSearch(
   }
 
   // Layer 2 — AI decision
-  const aiResult = await aiDecide(msg);
+  const aiResult = await aiDecide(msg, opts.recentMessages);
   if (aiResult) return aiResult;
 
   // Layer 3 — rules fallback (preserves prior behaviour if AI is down)

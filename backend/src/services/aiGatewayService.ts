@@ -298,7 +298,7 @@ export function getSystemPrompt(
 
   // TIER 2 — search (~60-100 tokens)
   if (mode === 'search') {
-    return `${providerPersonality}${modelOverride}${PLATFORM_CAPABILITIES} You have fresh web search data — cite sources inline ("According to **Source**..."), bold key facts, be accurate and thorough. If the search results are clearly off-topic (unrelated subject matter), ignore them and answer from your own knowledge — do not apologize for the search results. If results are partially relevant or related to the broader topic, use them as supporting context alongside your own knowledge.${industryCtx}`;
+    return `${providerPersonality}${modelOverride}${PLATFORM_CAPABILITIES} You have fresh web search data — use it to inform your answer. Write in natural flowing prose. Avoid ## headers, "Short Answer" sections, and section dividers unless the user specifically asks for structured output. Cite a source by name only when you draw a specific fact directly from it (e.g., "According to CNN..."); don't force a citation on every sentence. If your own training has a more specific, factual answer that the search results lack, lead with that. For genuinely current information (elections, breaking news, recent events), defer to search results. Search supplements your knowledge for stable facts; it provides authoritative truth for current events. If the search results are clearly off-topic (unrelated subject matter), ignore them and answer from your own knowledge — do not apologize for the search results. If results are partially relevant or related to the broader topic, use them as supporting context alongside your own knowledge.${industryCtx}`;
   }
 
   // TIER 3 — think mode (~100-160 tokens)
