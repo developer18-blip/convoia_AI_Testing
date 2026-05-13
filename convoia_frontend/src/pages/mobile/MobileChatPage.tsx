@@ -430,12 +430,14 @@ export function MobileChatPage() {
 
       {/* Input */}
       <div style={{ flexShrink: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '4px 12px 0', minHeight: 18 }}>
-          <CostEstimator
-            model={councilMode ? null : selectedModel}
-            councilModels={councilMode ? models.filter((m) => councilModelIds.includes(m.id)) : undefined}
-          />
-        </div>
+        {messages.length > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '4px 12px 0', minHeight: 18 }}>
+            <CostEstimator
+              model={councilMode ? null : selectedModel}
+              councilModels={councilMode ? models.filter((m) => councilModelIds.includes(m.id)) : undefined}
+            />
+          </div>
+        )}
         <MessageInput
           onSend={handleSend}
           isLoading={isStreaming}

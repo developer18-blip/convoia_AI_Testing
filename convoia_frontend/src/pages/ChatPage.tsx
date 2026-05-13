@@ -623,13 +623,17 @@ export function ChatPage() {
           </div>
         )}
 
-        {/* Cost preview — shown above input when a model is selected (single) or 2+ models for council */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '4px 16px 0', minHeight: 18 }}>
-          <CostEstimator
-            model={councilMode ? null : selectedModel}
-            councilModels={councilMode ? models.filter((m) => councilModelIds.includes(m.id)) : undefined}
-          />
-        </div>
+        {/* Cost preview — only after the conversation starts. On the empty
+            welcome screen the chip is clutter (wallet pill is already in the
+            header), so we suppress both the chip AND its 18px strip. */}
+        {messages.length > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '4px 16px 0', minHeight: 18 }}>
+            <CostEstimator
+              model={councilMode ? null : selectedModel}
+              councilModels={councilMode ? models.filter((m) => councilModelIds.includes(m.id)) : undefined}
+            />
+          </div>
+        )}
 
         {/* Input */}
         <MessageInput
