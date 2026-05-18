@@ -259,10 +259,13 @@ export const getTeamMembers = asyncHandler(async (req: Request, res: Response) =
     whereClause.managerId = user.id;
   }
 
-  const startOfMonth = new Date();
-  startOfMonth.setDate(1);
-  startOfMonth.setHours(0, 0, 0, 0);
-
+  // Headline Queries / Tokens / Cost on the team list are ALL-TIME so all
+  // three columns describe the same time window. Previously the count was
+  // all-time but tokens+cost were month-only (via `where: createdAt >=
+  // startOfMonth`), so any member inactive this month appeared as
+  // "21 queries / 0 tokens / $0 cost" — looked like billing was broken.
+  // The response fields are still named monthlyTokens / monthlyCost for
+  // frontend backward-compat; rename + UI labelling is a follow-up.
   const members = await prisma.user.findMany({
     where: whereClause,
     select: {
@@ -280,7 +283,6 @@ export const getTeamMembers = asyncHandler(async (req: Request, res: Response) =
         take: 1,
       },
       usageLogs: {
-        where: { createdAt: { gte: startOfMonth } },
         select: {
           tokensInput: true,
           tokensOutput: true,
