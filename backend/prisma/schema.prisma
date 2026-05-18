@@ -107,6 +107,7 @@ model User {
   tokenTransactions        TokenTransaction[]
   reviews                  Review[]
   conversations            Conversation[]
+  folders                  Folder[]
   conversationAttachments  ConversationAttachment[]
   memories                 UserMemory[]
   facts                    UserFact[]
@@ -615,6 +616,7 @@ model Conversation {
   industry    String?
   isPinned    Boolean                  @default(false)
   folderId    String?
+  folder      Folder?                  @relation(fields: [folderId], references: [id], onDelete: SetNull)
   totalCost   Float                    @default(0)
   totalTokens Int                      @default(0)
   createdAt   DateTime                 @default(now())
@@ -625,6 +627,21 @@ model Conversation {
   @@index([userId])
   @@index([userId, updatedAt])
   @@index([createdAt])
+}
+
+model Folder {
+  id            String         @id @default(uuid())
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String         @db.VarChar(80)
+  color         String?
+  sortOrder     Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  conversations Conversation[]
+
+  @@index([userId])
+  @@index([userId, sortOrder])
 }
 
 model ConversationAttachment {
