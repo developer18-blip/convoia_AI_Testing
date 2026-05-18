@@ -257,6 +257,10 @@ export interface CouncilState {
 export interface ChatFolder {
   id: string
   name: string
+  color?: string | null
+  sortOrder?: number
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface Conversation {

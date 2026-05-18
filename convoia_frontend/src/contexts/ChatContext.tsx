@@ -1,7 +1,9 @@
 import { createContext, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { useAuth } from '../hooks/useAuth'
+import { useToast } from '../hooks/useToast'
 import api from '../lib/api'
+import { fetchFolders, createFolderApi, deleteFolderApi } from '../lib/folderApi'
 import type { Agent, Conversation, Message, ChatFolder, CouncilState } from '../types'
 
 export type CouncilOpts = { modelIds: string[] }
@@ -122,6 +124,7 @@ const MAX_MESSAGES_PER_CONV = 50
 
 function storageKey(userId: string) { return `convoia_chats_${userId}` }
 function foldersKey(userId: string) { return `convoia_folders_${userId}` }
+function foldersMigratedKey(userId: string) { return `convoia_folders_migrated_${userId}` }
 
 function trimForStorage(convs: Conversation[]): Conversation[] {
   return convs
@@ -237,9 +240,9 @@ export interface ChatContextType {
   setActiveConversation: (id: string | null) => void
   renameConversation: (id: string, title: string) => void
   togglePin: (id: string) => void
-  moveToFolder: (convId: string, folderId: string | undefined) => void
-  createFolder: (name: string) => void
-  deleteFolder: (id: string) => void
+  moveToFolder: (convId: string, folderId: string | undefined) => Promise<void>
+  createFolder: (name: string) => Promise<void>
+  deleteFolder: (id: string) => Promise<void>
   sendMessage: (content: string, modelId: string, industry?: string, agentId?: string, thinkingEnabled?: boolean, councilOpts?: CouncilOpts) => Promise<void>
   sendWithContext: (content: string, modelId: string, systemContext: string | null, messageExtras?: Partial<Message>, industry?: string, agentId?: string, thinkingEnabled?: boolean, councilOpts?: CouncilOpts) => Promise<void>
   editAndResend: (messageId: string, newContent: string, modelId: string, industry?: string, agentId?: string) => Promise<void>
@@ -254,6 +257,7 @@ export const ChatContext = createContext<ChatContextType | null>(null)
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
+  const toast = useToast()
   const userId = user?.id
 
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -345,6 +349,68 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setConversations(all)
       }
     })
+
+    // Folder reconciliation + one-time bootstrap from localStorage. Three branches:
+    //   • backend empty + local non-empty + not yet migrated → POST each local folder,
+    //     remap conversation.folderId to the new backend IDs, mark flag, refetch.
+    //   • otherwise → backend is source of truth, overwrite local state + cache.
+    //   • network failure → keep localStorage state silently (still functional locally).
+    fetchFolders().then(async (backend) => {
+      const localFolders = loadFolders(userId)
+      const migratedKey = foldersMigratedKey(userId)
+      const alreadyMigrated = (() => {
+        try { return localStorage.getItem(migratedKey) === 'true' } catch { return false }
+      })()
+
+      if (backend.length === 0 && localFolders.length > 0 && !alreadyMigrated) {
+        const idMap = new Map<string, string>()
+        let okCount = 0, failCount = 0
+        for (let i = 0; i < localFolders.length; i++) {
+          const lf = localFolders[i]
+          try {
+            const real = await createFolderApi({ name: lf.name, sortOrder: i })
+            idMap.set(lf.id, real.id)
+            okCount += 1
+          } catch {
+            failCount += 1
+          }
+        }
+        if (idMap.size > 0) {
+          // Re-assign conversations whose folderId pointed at old local UUIDs
+          const remaps: Array<{ convId: string; newFolderId: string }> = []
+          setConversations(prev => prev.map(c => {
+            if (c.folderId && idMap.has(c.folderId)) {
+              const newId = idMap.get(c.folderId)!
+              remaps.push({ convId: c.id, newFolderId: newId })
+              return { ...c, folderId: newId }
+            }
+            return c
+          }))
+          // Persist remaps to backend (best-effort, silent failure — local state is right
+          // for this session and next reload will reflect whatever made it through)
+          for (const r of remaps) {
+            try { await api.put(`/conversations/${r.convId}`, { folderId: r.newFolderId }) } catch { /* silent */ }
+          }
+        }
+        try { localStorage.setItem(migratedKey, 'true') } catch { /* silent */ }
+        // Refresh from backend so state has real IDs + timestamps from the just-created rows
+        const refreshed = await fetchFolders().catch(() => [] as ChatFolder[])
+        if (refreshed.length > 0) {
+          setFolders(refreshed)
+          try { localStorage.setItem(foldersKey(userId), JSON.stringify(refreshed)) } catch { /* silent */ }
+        }
+        if (failCount > 0) {
+          toast.warning(`${okCount} folders synced, ${failCount} failed — please refresh`)
+        }
+      } else {
+        // Normal path — backend wins, update cache
+        setFolders(backend)
+        try { localStorage.setItem(foldersKey(userId), JSON.stringify(backend)) } catch { /* silent */ }
+      }
+    }).catch(() => { /* network blip — keep localStorage state, no toast */ })
+    // toast is stable (useCallback'd inside ToastContext), but ESLint can't see that
+    // through the useContext indirection. Same pattern as other effects in this file.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
 
   // Persist conversations to user-namespaced key
@@ -495,17 +561,63 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setConversations((prev) => prev.map((c) => c.id === id ? { ...c, isPinned: !c.isPinned } : c))
   }, [])
 
-  const moveToFolder = useCallback((convId: string, folderId: string | undefined) => {
-    setConversations((prev) => prev.map((c) => c.id === convId ? { ...c, folderId } : c))
+  // Optimistic UI + sync to backend. Each callback:
+  //   1. Snapshots prior state (for rollback)
+  //   2. Mutates local state immediately (so UI doesn't wait on the network)
+  //   3. Calls the API; on failure restores the snapshot + toast
+  // Returning Promise<void> lets callers await when they need to — fire-and-forget
+  // call sites continue to work because the prior return type was also unhandled.
+
+  const moveToFolder = useCallback(async (convId: string, folderId: string | undefined) => {
+    let snapshot: Conversation[] = []
+    setConversations((prev) => {
+      snapshot = prev
+      return prev.map((c) => c.id === convId ? { ...c, folderId } : c)
+    })
+    try {
+      await api.put(`/conversations/${convId}`, { folderId: folderId ?? null })
+    } catch {
+      setConversations(snapshot)
+      toast.error("Couldn't move chat — check connection")
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const createFolder = useCallback((name: string) => {
-    setFolders((prev) => [...prev, { id: uuidv4(), name }])
+  const createFolder = useCallback(async (name: string) => {
+    const tempId = uuidv4()
+    setFolders((prev) => [...prev, { id: tempId, name }])
+    try {
+      const real = await createFolderApi({ name })
+      setFolders((prev) => prev.map((f) => f.id === tempId ? real : f))
+    } catch {
+      setFolders((prev) => prev.filter((f) => f.id !== tempId))
+      toast.error("Couldn't create folder — check connection")
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const deleteFolder = useCallback((id: string) => {
-    setFolders((prev) => prev.filter((f) => f.id !== id))
-    setConversations((prev) => prev.map((c) => c.folderId === id ? { ...c, folderId: undefined } : c))
+  const deleteFolder = useCallback(async (id: string) => {
+    let foldersSnapshot: ChatFolder[] = []
+    let convsSnapshot: Conversation[] = []
+    setFolders((prev) => {
+      foldersSnapshot = prev
+      return prev.filter((f) => f.id !== id)
+    })
+    setConversations((prev) => {
+      convsSnapshot = prev
+      return prev.map((c) => c.folderId === id ? { ...c, folderId: undefined } : c)
+    })
+    try {
+      await deleteFolderApi(id)
+    } catch (err: unknown) {
+      // 404 means the backend already lost it — keep the optimistic delete.
+      const status = (err as { response?: { status?: number } })?.response?.status
+      if (status === 404) return
+      setFolders(foldersSnapshot)
+      setConversations(convsSnapshot)
+      toast.error("Couldn't delete folder — check connection")
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const sendMessage = useCallback(async (content: string, modelId: string, industry?: string, agentId?: string, thinkingEnabled?: boolean, councilOpts?: CouncilOpts) => {
