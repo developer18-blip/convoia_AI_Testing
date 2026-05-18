@@ -67,6 +67,11 @@ export function ConversationList({
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [contextMenu, setContextMenu] = useState<{ id: string; x: number; y: number } | null>(null)
+  // Lookups for the active right-clicked chat — used to gate folder-related
+  // menu items (don't show "Remove from folder" on an unfoldered chat, and
+  // don't list the current folder in the "Move to ..." options).
+  const contextConv = contextMenu ? conversations.find((c) => c.id === contextMenu.id) : null
+  const contextFolderId = contextConv?.folderId
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [showNewFolder, setShowNewFolder] = useState(false)
@@ -370,10 +375,12 @@ export function ConversationList({
           {folders.length > 0 && (
             <>
               <div style={{ borderTop: '1px solid var(--chat-border)', margin: '4px 0' }} />
-              {folders.map((f) => (
+              {folders.filter((f) => f.id !== contextFolderId).map((f) => (
                 <ContextMenuItem key={f.id} icon={<Folder size={14} />} label={`Move to ${f.name}`} onClick={() => { onMoveToFolder(contextMenu.id, f.id); setContextMenu(null) }} />
               ))}
-              <ContextMenuItem icon={<Folder size={14} />} label="Remove from folder" onClick={() => { onMoveToFolder(contextMenu.id, undefined); setContextMenu(null) }} />
+              {contextFolderId && (
+                <ContextMenuItem icon={<Folder size={14} />} label="Remove from folder" onClick={() => { onMoveToFolder(contextMenu.id, undefined); setContextMenu(null) }} />
+              )}
             </>
           )}
           <div style={{ borderTop: '1px solid var(--chat-border)', margin: '4px 0' }} />
