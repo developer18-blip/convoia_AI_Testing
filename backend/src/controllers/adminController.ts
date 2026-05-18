@@ -1093,36 +1093,46 @@ export const adminSendTokens = asyncHandler(async (req: Request, res: Response) 
     const org = await prisma.organization.findUnique({ where: { id: targetOrgId } });
     if (!org) throw new AppError('Organization not found', 404);
 
-    const members = await prisma.user.findMany({
-      where: { organizationId: targetOrgId },
-      select: { id: true },
+    // Send-to-org routes to the org_owner ONLY. Prior behavior (full grant
+    // to every member) silently inflated token supply by memberCount× —
+    // a 10M refill of a 27-member org created 270M tokens. Fixed 2026-05-19.
+    const owners = await prisma.user.findMany({
+      where: { organizationId: targetOrgId, role: 'org_owner', isActive: true },
+      select: { id: true, email: true },
     });
 
-    // Each member receives the FULL parsedTokens (not split).
-    // Total tokens created = parsedTokens × memberCount.
-    // Log clearly so admins can audit token creation volume.
-    const totalCreated = parsedTokens * members.length;
-    logger.info(
-      `Admin org grant: org=${org.name} members=${members.length} ` +
-      `perMember=${parsedTokens} totalCreated=${totalCreated} by=${req.user!.userId}`
-    );
-
-    const grantRef = `admin_org_grant_${Date.now()}`;
-    for (const member of members) {
-      await TokenWalletService.addTokens({
-        userId: member.id,
-        tokens: parsedTokens,
-        reference: grantRef,
-        description: reason || `Admin org token grant to ${org.name}`,
-      });
+    if (owners.length === 0) {
+      throw new AppError(
+        `Organization "${org.name}" has no active org_owner. Send tokens to a specific user instead.`,
+        400
+      );
+    }
+    if (owners.length > 1) {
+      throw new AppError(
+        `Organization "${org.name}" has ${owners.length} org_owners. Send tokens to a specific user instead.`,
+        400
+      );
     }
 
-    logger.info(`Admin sent ${parsedTokens} tokens to ${members.length} members of ${org.name}`);
+    const owner = owners[0];
+    const grantRef = `admin_grant_${Date.now()}`;
+    await TokenWalletService.addTokens({
+      userId: owner.id,
+      tokens: parsedTokens,
+      reference: grantRef,
+      description: reason || `Admin grant to ${org.name} owner (${owner.email})`,
+    });
+
+    logger.info(
+      `Admin org grant: org=${org.name} owner=${owner.email} ` +
+      `tokens=${parsedTokens} by=${req.user!.userId}`
+    );
+    const balance = await TokenWalletService.getBalance(owner.id);
 
     res.json({
       success: true,
-      message: `${parsedTokens.toLocaleString()} tokens sent to each of ${members.length} members of ${org.name} (${totalCreated.toLocaleString()} tokens total created)`,
-      data: { orgName: org.name, memberCount: members.length, tokensPerMember: parsedTokens, totalTokensCreated: totalCreated },
+      message: `${parsedTokens.toLocaleString()} tokens sent to ${org.name} owner: ${owner.email}`,
+      data: { orgName: org.name, ownerEmail: owner.email, tokensSent: parsedTokens, newBalance: balance.tokenBalance },
       timestamp: new Date().toISOString(),
     });
   }

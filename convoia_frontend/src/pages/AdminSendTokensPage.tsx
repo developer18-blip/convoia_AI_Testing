@@ -92,7 +92,7 @@ export function AdminSendTokensPage() {
                   <div>
                     <p className="text-sm font-semibold text-text-primary">{target.name}</p>
                     <p className="text-xs text-text-muted">
-                      {target.type === 'user' ? (target as any).email : `Organization · ${(target as any).memberCount || '?'} members`}
+                      {target.type === 'user' ? (target as any).email : `Organization · tokens go to org owner only`}
                     </p>
                   </div>
                   <Badge size="sm" variant={target.type === 'user' ? 'primary' : 'success'}>{target.type}</Badge>
