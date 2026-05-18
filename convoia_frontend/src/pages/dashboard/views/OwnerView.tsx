@@ -58,13 +58,12 @@ export function OwnerView({ stats, userName, orgName }: OwnerViewProps) {
     }).finally(() => setIsLoading(false))
   }, [])
 
-  // All-time spend so this card matches the all-time Cost shown on
-  // member-profile and team-list pages (fa07ae7 + d47ba0d). No trend
-  // arrow — comparing all-time totals to a single month's slice produces
-  // nonsense ratios (e.g. +1247% "vs last month") that look alarming but
-  // mean nothing. Other cards keep their trends because their values
-  // are time-windowed.
-  const totalSpend = Number(stats?.allTime?.cost ?? 0) || 0
+  // Sum across members so this card matches the all-time Total Spend on the
+  // Team page. Previously used stats.allTime.cost which is the OWNER's
+  // personal spend (per-user endpoint /api/usage/dashboard filters by
+  // req.user.userId) — that produced a misleading "Total Org Spend" value
+  // equal to the owner's individual usage, not org-wide aggregate.
+  const totalSpend = members.reduce((s, m) => s + (Number(m.cost) || 0), 0)
   const activeMembers = members.length
 
   // poolAvailable kept for assign modal max check

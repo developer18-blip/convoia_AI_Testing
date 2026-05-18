@@ -120,18 +120,15 @@ export const getOrgTeam = asyncHandler(async (req: Request, res: Response) => {
     orderBy: { name: 'asc' },
   });
 
-  // Get usage stats for each user from last 30 days
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
+  // Per-member usage stats (all-time, matching member-profile + team-list pages).
+  // Previously filtered to last 30 days, causing inactive members to show
+  // "0 cost" on the org dashboard even with real lifetime usage history.
+  // Sister bugs fixed in fa07ae7 (member profile) and d47ba0d (team list).
   const userIds = users.map((u) => u.id);
 
   const usageByUser = await prisma.usageLog.groupBy({
     by: ['userId'],
-    where: {
-      userId: { in: userIds },
-      createdAt: { gte: thirtyDaysAgo },
-    },
+    where: { userId: { in: userIds } },
     _count: { id: true },
     _sum: { customerPrice: true, tokensInput: true, tokensOutput: true },
   });

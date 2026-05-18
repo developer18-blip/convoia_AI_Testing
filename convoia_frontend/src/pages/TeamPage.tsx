@@ -323,8 +323,8 @@ export function TeamPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard title="Total Members" value={String(members.length)} icon={<Users size={20} />} />
           <StatCard title="Active Today" value={String(activeToday)} icon={<Activity size={20} />} />
-          <StatCard title="Total Spend" value={formatCurrency(totalSpend)} subtitle="this month" icon={<DollarSign size={20} />} />
-          <StatCard title="Avg / Member" value={formatCurrency(members.length ? totalSpend / members.length : 0)} subtitle="this month" icon={<DollarSign size={20} />} />
+          <StatCard title="Total Spend" value={formatCurrency(totalSpend)} subtitle="all time" icon={<DollarSign size={20} />} />
+          <StatCard title="Avg / Member" value={formatCurrency(members.length ? totalSpend / members.length : 0)} subtitle="all time" icon={<DollarSign size={20} />} />
         </div>
       )}
 
