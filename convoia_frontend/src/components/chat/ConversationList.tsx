@@ -196,27 +196,36 @@ export function ConversationList({
       <div style={{ padding: '12px 12px 10px', flexShrink: 0 }}>
         <div className="flex items-center justify-between" style={{ marginBottom: '10px' }}>
           <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)' }}>ConvoiaAI</span>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setShowNewFolder(true)}
-              title="New Folder"
-              style={{ padding: '5px', color: 'var(--color-text-dim)', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '6px', transition: 'color 150ms' }}
-              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-text-primary)'}
-              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-dim)'}
-            >
-              <FolderPlus size={14} />
-            </button>
-            <button
-              onClick={onNew}
-              title="New chat"
-              style={{ padding: '5px', color: 'var(--color-text-dim)', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '6px', transition: 'color 150ms' }}
-              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-text-primary)'}
-              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-dim)'}
-            >
-              <Plus size={16} />
-            </button>
-          </div>
+          <button
+            onClick={() => setShowNewFolder(true)}
+            title="New folder"
+            style={{ padding: '5px', color: 'var(--color-text-dim)', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '6px', transition: 'color 150ms' }}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-text-primary)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-dim)'}
+          >
+            <FolderPlus size={14} />
+          </button>
         </div>
+        {/* Prominent New Chat — users were missing the icon-only button.
+            Full-width labeled button, accent color, can't be overlooked. */}
+        <button
+          onClick={onNew}
+          title="New chat (Ctrl+N)"
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+            padding: '9px 12px', marginBottom: '10px',
+            background: 'var(--color-primary)', color: 'var(--color-on-primary, #fff)',
+            border: '1px solid var(--color-primary)', borderRadius: '10px',
+            fontSize: '13.5px', fontWeight: 600, cursor: 'pointer',
+            transition: 'transform 120ms, box-shadow 120ms, filter 120ms',
+            boxShadow: '0 2px 8px var(--color-primary-glow, rgba(99,102,241,0.18))',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.filter = 'brightness(1.08)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.filter = 'brightness(1)' }}
+        >
+          <Plus size={16} />
+          <span>New chat</span>
+        </button>
         {/* Search */}
         <div className="relative">
           <Search size={13} className="absolute top-1/2 -translate-y-1/2" style={{ left: '10px', color: 'var(--color-text-dim)' }} />
