@@ -436,8 +436,13 @@ export const getUserDetails = asyncHandler(async (req: Request, res: Response) =
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
   const [usageAgg, budget, dailyLogs, tokenWallet] = await Promise.all([
+    // Headline Queries + Cost are ALL-TIME to match TokenWallet's all-time
+    // totalUsed shown on the same page. Filtering this to 30 days while the
+    // wallet stays all-time produced the "1.19M tokens / 0 queries / $0 cost"
+    // discrepancy that looked like a billing bug but was a display bug.
+    // (`dailyLogs` below stays 30-day — it powers the 30-element daily chart.)
     prisma.usageLog.aggregate({
-      where: { userId, createdAt: { gte: thirtyDaysAgo } },
+      where: { userId },
       _count: { id: true },
       _sum: { customerPrice: true, tokensInput: true, tokensOutput: true },
     }),
