@@ -130,6 +130,19 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   if (conv.userId !== req.user!.userId) throw new AppError('Unauthorized', 403);
 
   const { title, isPinned, folderId } = req.body;
+
+  // Validate folder ownership BEFORE the update — prevents the data integrity
+  // bug where a user could PUT a chat into another user's folder UUID. The
+  // FK accepts it (folder exists), but the cross-user pointer creates weird
+  // state. Returns 404 (not 403) to avoid leaking folder existence across users.
+  if (folderId !== undefined && folderId !== null) {
+    const ownsFolder = await prisma.folder.findFirst({
+      where: { id: folderId, userId: req.user!.userId },
+      select: { id: true },
+    });
+    if (!ownsFolder) throw new AppError('Folder not found', 404);
+  }
+
   const updated = await prisma.conversation.update({
     where: { id: req.params.id },
     data: {

@@ -78,10 +78,13 @@ export function ConversationList({
     c.messages.some((m) => m.content.toLowerCase().includes(search.toLowerCase()))
   ), [conversations, search])
 
-  const pinned = useMemo(() => filtered.filter((c) => c.isPinned), [filtered])
+  // Pinned chats with a folderId live in their folder, NOT in the global Pinned
+  // section. Matches ChatGPT/Claude — a chat appears in exactly one place.
+  const pinned = useMemo(() => filtered.filter((c) => c.isPinned && !c.folderId), [filtered])
   const foldered = useMemo(() => folders.map((f) => ({
     folder: f,
-    convs: filtered.filter((c) => c.folderId === f.id && !c.isPinned),
+    // Include pinned chats — they belong to the folder, not the global Pinned strip.
+    convs: filtered.filter((c) => c.folderId === f.id),
   })), [filtered, folders])
   const grouped = useMemo(() => {
     const unfolderedUnpinned = filtered.filter((c) => !c.isPinned && !c.folderId)
@@ -276,8 +279,9 @@ export function ConversationList({
               </div>
             )}
 
-            {/* Folders */}
-            {foldered.map(({ folder, convs }) => convs.length > 0 && (
+            {/* Folders — render even when empty so a freshly-created folder is
+                visible immediately (otherwise it vanishes until first chat moved in). */}
+            {foldered.map(({ folder, convs }) => (
               <div key={folder.id} style={{ marginBottom: '4px' }}>
                 <button
                   onClick={() => toggleFolder(folder.id)}
