@@ -379,10 +379,22 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const activeConversation = conversations.find((c) => c.id === activeId) || null
 
-  // Sync messages to conversation (local + backend)
+  // Sync messages to conversation (local + backend).
+  //
+  // During streaming, setMessages fires ~60 times/sec (one per rAF frame).
+  // Without throttling, this effect was rebuilding `conversations` and
+  // re-writing localStorage on every chunk — a 50KB+ JSON write 60×/sec
+  // that blocks the main thread, fans out new context value references
+  // to every useChat consumer, and amplifies any render-loop pressure
+  // into the React nested-update tracker. Throttle to ~250ms during
+  // streaming; sync immediately when idle so the final message persists
+  // without delay.
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const localSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
-    if (activeId && messages.length > 0) {
+    if (!activeId || messages.length === 0) return
+
+    const doLocalSync = () => {
       setConversations((prev) =>
         prev.map((c) => {
           if (c.id !== activeId) return c
@@ -390,23 +402,38 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           const totalTokens = messages.reduce((s, m) => s + (m.tokensInput || 0) + (m.tokensOutput || 0), 0)
           const firstUserMsg = messages.find((m) => m.role === 'user')
           const title = c.title !== 'New Chat' ? c.title : (firstUserMsg ? firstUserMsg.content.slice(0, 50) : 'New Chat')
-          // If this was a draft, mark it as synced now that it has messages
           const wasDraft = c._draft
           const updated = { ...c, messages, totalCost, totalTokens, title, updatedAt: new Date().toISOString(), _draft: undefined }
-          // Sync draft conversation to backend on first message
           if (wasDraft) syncConversationToBackend(updated)
           return updated
         })
       )
-
-      // Debounced sync to backend (don't send on every keystroke/chunk)
-      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current)
-      syncTimeoutRef.current = setTimeout(() => {
-        const activeConv = conversations.find((c) => c.id === activeId)
-        if (activeConv) syncMessagesToBackend(activeConv, messages)
-      }, 2000)
     }
-  }, [messages, activeId])
+
+    if (isStreaming) {
+      // Coalesce mid-stream updates — last write wins for any 250ms window.
+      if (localSyncTimerRef.current) clearTimeout(localSyncTimerRef.current)
+      localSyncTimerRef.current = setTimeout(() => {
+        localSyncTimerRef.current = null
+        doLocalSync()
+      }, 250)
+    } else {
+      // Stream done / not started — flush immediately so the conversation
+      // sidebar + localStorage reflect the final message without lag.
+      if (localSyncTimerRef.current) {
+        clearTimeout(localSyncTimerRef.current)
+        localSyncTimerRef.current = null
+      }
+      doLocalSync()
+    }
+
+    // Debounced sync to backend (don't send on every keystroke/chunk)
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current)
+    syncTimeoutRef.current = setTimeout(() => {
+      const activeConv = conversations.find((c) => c.id === activeId)
+      if (activeConv) syncMessagesToBackend(activeConv, messages)
+    }, 2000)
+  }, [messages, activeId, isStreaming])
 
   const setActiveConversation = useCallback((id: string | null) => {
     setActiveId(id)
