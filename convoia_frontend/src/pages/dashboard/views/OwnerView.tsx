@@ -58,9 +58,13 @@ export function OwnerView({ stats, userName, orgName }: OwnerViewProps) {
     }).finally(() => setIsLoading(false))
   }, [])
 
-  const totalSpend = Number(stats?.thisMonth?.cost ?? 0) || 0
-  const lastMonthCost = Number(stats?.lastMonth?.cost ?? 0) || 0
-  const costTrend = lastMonthCost > 0 ? ((totalSpend - lastMonthCost) / lastMonthCost) * 100 : 0
+  // All-time spend so this card matches the all-time Cost shown on
+  // member-profile and team-list pages (fa07ae7 + d47ba0d). No trend
+  // arrow — comparing all-time totals to a single month's slice produces
+  // nonsense ratios (e.g. +1247% "vs last month") that look alarming but
+  // mean nothing. Other cards keep their trends because their values
+  // are time-windowed.
+  const totalSpend = Number(stats?.allTime?.cost ?? 0) || 0
   const activeMembers = members.length
 
   // poolAvailable kept for assign modal max check
@@ -114,9 +118,8 @@ export function OwnerView({ stats, userName, orgName }: OwnerViewProps) {
         <StatCard
           title="Total Org Spend"
           value={formatCurrency(totalSpend)}
-          subtitle="this month"
+          subtitle="all time"
           icon={<DollarSign size={20} />}
-          trend={costTrend}
           to="/org/analytics"
         />
         <StatCard
