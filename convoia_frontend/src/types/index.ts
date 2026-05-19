@@ -252,6 +252,12 @@ export interface CouncilState {
   crossExamDurationMs: number
   meta: CouncilMeta | null
   errorMessage?: string
+  // Apollo v2 panel: stable timestamps captured at phase transitions so the
+  // panel's elapsed/footer reads aren't dependent on Date.now() at render time.
+  /** ms — set when the first council_crossexam_start event arrives. */
+  synthesisStartedAt?: number | null
+  /** ms — set on terminal phase ('complete' or 'error'). Stops the footer ticker. */
+  turnFinishedAt?: number | null
 }
 
 export interface ChatFolder {

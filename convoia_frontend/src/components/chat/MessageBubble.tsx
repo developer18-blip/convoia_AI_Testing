@@ -16,7 +16,8 @@ import { isDocumentWorthy } from '../../lib/documentDetector'
 import { formatCurrency, formatTokens } from '../../lib/utils'
 import type { Message } from '../../types'
 import type { ComponentPropsWithoutRef } from 'react'
-import { CouncilMessage } from '../council/CouncilMessage'
+import { VerdictBox } from '../council/VerdictBox'
+import { ReducedCouncilView } from '../council/ReducedCouncilView'
 import { ConvoiaMark } from '../brand/ConvoiaMark'
 import { ComputationLine } from '../primitives/ComputationLine'
 import { useAccent } from '../../contexts/AccentContext'
@@ -115,9 +116,31 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
     ? PROVIDER_THEMES[getProviderFromModelId(message.model)]
     : activeTheme
 
-  // Council messages render via a dedicated component — bypasses the normal
-  // assistant-message pipeline. User messages still render normally.
+  // Apollo (council) messages — main column shows only the verdict / final
+  // answer; all reasoning UI (model cards, cross-exam, response drill-down)
+  // lives in the ApolloPanel side panel for the LIVE turn only. Past turns
+  // in scroll history show ONLY the verdict + footer, no panel.
   if (message.role === 'assistant' && message.council) {
+    const council = message.council
+    const isReducedCouncil = council.phase === 'error' && council.modelResponses.length === 1
+    const isFullError = council.phase === 'error' && !isReducedCouncil
+    const isVerdictStreaming = council.phase === 'verdict'
+    const isDone = council.phase === 'complete'
+    const showThinking = council.phase === 'executing' || council.phase === 'crossexam' || council.phase === 'crossexam_done'
+
+    // Degraded note for done state when some models errored.
+    const completedCount = council.models.filter((m) => m.status === 'complete').length
+    const errorCount = council.models.filter((m) => m.status === 'error').length
+    const failedNames = council.models.filter((m) => m.status === 'error').map((m) => m.modelName)
+    const degradedNote = isDone && errorCount > 0
+      ? `${completedCount} of ${council.models.length} models${failedNames.length > 0 ? ` (${failedNames.join(', ')} failed)` : ''}`
+      : undefined
+
+    const thinkingDotColor = council.phase === 'executing' ? '#f59e0b' : '#7F77DD'
+    const thinkingLabel = council.phase === 'executing'
+      ? 'Apollo is consulting models…'
+      : 'Apollo is cross-examining responses…'
+
     return (
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '28px' }}>
         <div style={{
@@ -129,7 +152,71 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
           <ConvoiaMark size={20} state="council" />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <CouncilMessage council={message.council} />
+          {showThinking && (
+            <div
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '12px 14px', borderRadius: 12,
+                background: 'rgba(255,255,255,0.025)',
+                border: '0.5px solid rgba(255,255,255,0.06)',
+                fontSize: 13, color: 'var(--council-text-dim)',
+              }}
+              aria-live="polite"
+            >
+              <span
+                style={{
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: thinkingDotColor,
+                  boxShadow: `0 0 6px ${thinkingDotColor}`,
+                  animation: 'apollo-pulse 1.4s ease-in-out infinite',
+                }}
+                aria-hidden
+              />
+              <span>{thinkingLabel}</span>
+            </div>
+          )}
+
+          {isFullError && (
+            <div style={{
+              padding: '10px 12px', borderRadius: 10,
+              background: 'var(--council-red-bg)', border: '0.5px solid var(--council-red-border)',
+              display: 'flex', alignItems: 'center', gap: 10,
+              color: 'var(--council-red)', fontSize: 13,
+            }}>
+              <AlertCircle size={16} />
+              <span>{council.errorMessage || 'Apollo failed — edit your message above and try again.'}</span>
+            </div>
+          )}
+
+          {/* Constraint 1: ReducedCouncilView preserved as one-release safety net.
+              Verdict pathway with degraded badge will own this case once a real
+              v2 degraded run validates the new layout. */}
+          {isReducedCouncil && (
+            <ReducedCouncilView
+              singleResponse={council.modelResponses[0]}
+              totalAttempted={council.models.length}
+              errorMessage={council.errorMessage}
+            />
+          )}
+
+          {(isVerdictStreaming || isDone) && council.verdict && (
+            <VerdictBox
+              verdict={council.verdict}
+              isStreaming={isVerdictStreaming}
+              phase2Status={council.meta?.phase2Status}
+              degradedNote={degradedNote}
+            />
+          )}
+
+          {isDone && council.meta && (
+            <div className="council-footer">
+              <span className="council-footer-stats">
+                {council.meta.totalTokens.toLocaleString()} tokens · ${Number(council.meta.totalCost).toFixed(4)}
+                {council.meta.totalDurationMs ? ` · ${(council.meta.totalDurationMs / 1000).toFixed(1)}s` : ''}
+              </span>
+              <span className="council-footer-mod">Moderated by ConvoiaAI</span>
+            </div>
+          )}
         </div>
       </div>
     )

@@ -18,6 +18,8 @@ function emptyCouncilState(userQuery: string): CouncilState {
     crossExamStatus: '',
     crossExamDurationMs: 0,
     meta: null,
+    synthesisStartedAt: null,
+    turnFinishedAt: null,
   }
 }
 
@@ -100,7 +102,13 @@ function applyCouncilEvent(
       }))
       return true
     case 'council_crossexam_start':
-      patch((c) => ({ ...c, phase: 'crossexam', crossExamStatus: parsed.status || 'Cross-examining...' }))
+      patch((c) => ({
+        ...c,
+        phase: 'crossexam',
+        crossExamStatus: parsed.status || 'Cross-examining...',
+        // Stable timestamp for the v2 panel's synthesis-card elapsed display.
+        synthesisStartedAt: c.synthesisStartedAt ?? Date.now(),
+      }))
       return true
     case 'council_crossexam_complete':
       patch((c) => ({ ...c, phase: 'crossexam_done', crossExamDurationMs: parsed.durationMs }))
@@ -117,6 +125,101 @@ function applyCouncilEvent(
     default:
       return false
   }
+}
+
+/**
+ * Final-state baker for an assistant message once its stream has ended.
+ * Shared by sendMessage + sendWithContext so the two paths can't drift.
+ * Returns a setMessages updater (curried for direct passing into setMessages).
+ *
+ * Council path: collapses council.phase to 'complete', bakes councilMeta.
+ * Normal path: bakes content/tokens/cost/imageUrl/videoUrl/fileGeneration.
+ */
+function bakeFinalAssistantState(
+  assistantId: string,
+  modelId: string,
+  metadata: {
+    model?: string
+    provider?: string
+    tokens?: { input: number; output: number }
+    cost?: { charged: string }
+    imageUrl?: string
+    videoUrl?: string
+    videoGenerated?: boolean
+    imageGenerated?: boolean
+    council?: boolean
+    councilMeta?: any
+  },
+  accumulated: string,
+) {
+  return (prev: Message[]) => prev.map((m) => {
+    if (m.id !== assistantId) return m
+    if (m.council && metadata.council) {
+      return {
+        ...m,
+        content: m.council.verdict || accumulated,
+        isLoading: false,
+        tokensInput: metadata.tokens?.input || 0,
+        tokensOutput: metadata.tokens?.output || 0,
+        cost: Number(metadata.cost?.charged || 0) || 0,
+        model: metadata.model || 'ConvoiaAI Apollo',
+        provider: metadata.provider || 'council',
+        council: {
+          ...m.council,
+          phase: 'complete' as const,
+          turnFinishedAt: m.council.turnFinishedAt ?? Date.now(),
+          meta: {
+            totalTokens: (metadata.tokens?.input || 0) + (metadata.tokens?.output || 0) || ((metadata.tokens as any)?.total || 0),
+            totalCost: metadata.cost?.charged || '0',
+            totalDurationMs: metadata.councilMeta?.totalDurationMs || 0,
+            crossExamDurationMs: metadata.councilMeta?.crossExamDurationMs || 0,
+            verdictDurationMs: metadata.councilMeta?.verdictDurationMs || 0,
+            modelsUsed: metadata.councilMeta?.modelsUsed || m.council.models.length,
+            phase2Status: metadata.councilMeta?.phase2Status,
+          },
+        },
+      }
+    }
+    return {
+      ...m,
+      content: accumulated,
+      isLoading: false,
+      tokensInput: metadata.tokens?.input || 0,
+      tokensOutput: metadata.tokens?.output || 0,
+      cost: Number(metadata.cost?.charged || 0) || 0,
+      model: metadata.model || modelId,
+      provider: metadata.provider,
+      ...(metadata.imageUrl ? { imageUrl: metadata.imageUrl } : {}),
+      ...(metadata.videoUrl ? { videoUrl: metadata.videoUrl } : {}),
+      ...(m.fileGeneration ? { fileGeneration: m.fileGeneration } : {}),
+      statusText: undefined,
+    }
+  })
+}
+
+/**
+ * Error-state baker for a streaming assistant message. Council messages get
+ * phase:'error' + errorMessage so the panel can render the failure inline;
+ * plain messages get the error text put into content.
+ */
+function bakeAssistantError(assistantId: string, errorMsg: string) {
+  return (prev: Message[]) => prev.map((m) =>
+    m.id === assistantId
+      ? (m.council
+          ? {
+              ...m,
+              isLoading: false,
+              error: errorMsg,
+              council: {
+                ...m.council,
+                phase: 'error' as const,
+                errorMessage: errorMsg,
+                turnFinishedAt: m.council.turnFinishedAt ?? Date.now(),
+              },
+            }
+          : { ...m, isLoading: false, error: errorMsg, content: errorMsg })
+      : m
+  )
 }
 
 const MAX_CONVERSATIONS = 30
@@ -251,6 +354,14 @@ export interface ChatContextType {
   retryLastMessage: (modelId: string, industry?: string, agentId?: string) => void
   addMessages: (msgs: Message[]) => void
   latestCompletedResponse: string
+  /**
+   * Assistant-message id of the current Apollo turn (or null if no Apollo
+   * turn is active in this session). The ApolloPanel renders ONLY when this
+   * resolves to a message with a `council` field — i.e. the live or
+   * just-completed turn. Cleared inline on the next send (any modality)
+   * so reload-time and stale-turn renders never bring the panel back.
+   */
+  currentApolloTurnId: string | null
 }
 
 export const ChatContext = createContext<ChatContextType | null>(null)
@@ -277,6 +388,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [latestCompletedResponse, setLatestCompletedResponse] = useState('')
   const [agentMode, setAgentMode] = useState(false)
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
+  // Apollo v2 side panel: id of the assistant message owning the live or
+  // most-recent Apollo turn. Cleared inline at the START of every send so a
+  // pending useEffect cannot race the next-turn assignment.
+  const [currentApolloTurnId, setCurrentApolloTurnId] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   // Mirror of `messages` so closure-bound callers (sendMessage, sendWithContext,
   // editAndResend) always read the latest list. Without this, an editAndResend
@@ -309,6 +424,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       setMessages([])
       setConversations([])
       setFolders([])
+      setCurrentApolloTurnId(null)
       return
     }
 
@@ -502,6 +618,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, [messages, activeId, isStreaming])
 
   const setActiveConversation = useCallback((id: string | null) => {
+    // Switching conversations always drops the panel — Q2(c) hybrid: the panel
+    // is for live/most-recent-in-session, not for past turns on other threads.
+    setCurrentApolloTurnId(null)
     setActiveId(id)
     if (id && userId) {
       // Try local first (instant)
@@ -543,6 +662,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setConversations((prev) => [conv, ...prev])
     setActiveId(conv.id)
     setMessages([])
+    setCurrentApolloTurnId(null)
     // DO NOT sync to backend here — deferred until first message is sent
     return conv
   }, [])
@@ -550,7 +670,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const deleteConversation = useCallback((id: string) => {
     setConversations((prev) => prev.filter((c) => c.id !== id))
     api.delete(`/conversations/${id}`).catch(() => {})
-    if (activeId === id) { setActiveId(null); setMessages([]) }
+    if (activeId === id) { setActiveId(null); setMessages([]); setCurrentApolloTurnId(null) }
   }, [activeId])
 
   const renameConversation = useCallback((id: string, title: string) => {
@@ -623,6 +743,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const sendMessage = useCallback(async (content: string, modelId: string, industry?: string, agentId?: string, thinkingEnabled?: boolean, councilOpts?: CouncilOpts) => {
     const userMsg: Message = { id: uuidv4(), role: 'user', content, timestamp: new Date().toISOString() }
     const assistantId = uuidv4()
+    // Apollo turn-id reset (constraint 2): clear the previous turn synchronously
+    // BEFORE the new id is assigned. setState updaters batched in the same
+    // microtask resolve in call order; a useEffect cleanup would race the
+    // next-turn assignment if the user fires sends in quick succession.
+    setCurrentApolloTurnId(councilOpts ? assistantId : null)
     const streamingMsg: Message = {
       id: assistantId, role: 'assistant', content: '', timestamp: new Date().toISOString(), isLoading: true, isStreaming: true,
       ...(councilOpts ? { council: emptyCouncilState(content) } : {}),
@@ -845,51 +970,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       // hasn't fired yet doesn't overwrite the metadata (videoUrl/imageUrl/etc)
       // we're about to bake in.
       drainAnim()
-      setMessages((prev) => prev.map((m) => {
-        if (m.id !== assistantId) return m
-        // Council mode: bake final phase + meta into council state; content becomes the verdict text
-        if (m.council && metadata.council) {
-          return {
-            ...m,
-            content: m.council.verdict || accumulated,
-            isLoading: false,
-            tokensInput: metadata.tokens?.input || 0,
-            tokensOutput: metadata.tokens?.output || 0,
-            cost: Number(metadata.cost?.charged || 0) || 0,
-            model: metadata.model || 'ConvoiaAI Apollo',
-            provider: metadata.provider || 'council',
-            council: {
-              ...m.council,
-              phase: 'complete',
-              meta: {
-                totalTokens: metadata.tokens?.input && metadata.tokens?.output
-                  ? metadata.tokens.input + metadata.tokens.output
-                  : (metadata.tokens as any)?.total || 0,
-                totalCost: metadata.cost?.charged || '0',
-                totalDurationMs: metadata.councilMeta?.totalDurationMs || 0,
-                crossExamDurationMs: metadata.councilMeta?.crossExamDurationMs || 0,
-                verdictDurationMs: metadata.councilMeta?.verdictDurationMs || 0,
-                modelsUsed: metadata.councilMeta?.modelsUsed || m.council.models.length,
-                phase2Status: metadata.councilMeta?.phase2Status,
-              },
-            },
-          }
-        }
-        return {
-          ...m,
-          content: accumulated,
-          isLoading: false,
-          tokensInput: metadata.tokens?.input || 0,
-          tokensOutput: metadata.tokens?.output || 0,
-          cost: Number(metadata.cost?.charged || 0) || 0,
-          model: metadata.model || modelId,
-          provider: metadata.provider,
-          ...(metadata.imageUrl ? { imageUrl: metadata.imageUrl } : {}),
-          ...(metadata.videoUrl ? { videoUrl: metadata.videoUrl } : {}),
-          ...(m.fileGeneration ? { fileGeneration: m.fileGeneration } : {}),
-          statusText: undefined,
-        }
-      }))
+      setMessages(bakeFinalAssistantState(assistantId, modelId, metadata, accumulated))
 
       // Refresh wallet balance after tokens were used
       window.dispatchEvent(new Event('tokens:refresh'))
@@ -904,13 +985,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setMessages((prev) => prev.map((m) => m.id === assistantId && m.isLoading ? { ...m, isLoading: false } : m))
       } else {
         const errorMsg = err instanceof Error ? err.message : 'Failed to get response'
-        setMessages((prev) => prev.map((m) =>
-          m.id === assistantId
-            ? (m.council
-                ? { ...m, isLoading: false, error: errorMsg, council: { ...m.council, phase: 'error', errorMessage: errorMsg } }
-                : { ...m, isLoading: false, error: errorMsg, content: errorMsg })
-            : m
-        ))
+        setMessages(bakeAssistantError(assistantId, errorMsg))
       }
     } finally {
       abortRef.current = null
@@ -936,6 +1011,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     // turns in the same conversation.
     const attachmentIdsForRequest = messageExtras?.attachmentIds || userMsg.attachmentIds
     const assistantId = uuidv4()
+    // Apollo turn-id reset (constraint 2): same inline-clear-then-set as
+    // sendMessage. Either points the panel at the new turn (council) or
+    // clears it (non-council send between two Apollo turns).
+    setCurrentApolloTurnId(councilOpts ? assistantId : null)
     const streamingMsg: Message = {
       id: assistantId, role: 'assistant', content: '', timestamp: new Date().toISOString(), isLoading: true, isStreaming: true,
       ...(councilOpts ? { council: emptyCouncilState(content) } : {}),
@@ -1176,48 +1255,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       // hasn't fired yet doesn't overwrite the metadata (videoUrl/imageUrl/etc)
       // we're about to bake in.
       drainAnim()
-      setMessages((prev) => prev.map((m) => {
-        if (m.id !== assistantId) return m
-        if (m.council && metadata.council) {
-          return {
-            ...m,
-            content: m.council.verdict || accumulated,
-            isLoading: false,
-            tokensInput: metadata.tokens?.input || 0,
-            tokensOutput: metadata.tokens?.output || 0,
-            cost: Number(metadata.cost?.charged || 0) || 0,
-            model: metadata.model || 'ConvoiaAI Apollo',
-            provider: metadata.provider || 'council',
-            council: {
-              ...m.council,
-              phase: 'complete',
-              meta: {
-                totalTokens: (metadata.tokens?.input || 0) + (metadata.tokens?.output || 0) || ((metadata.tokens as any)?.total || 0),
-                totalCost: metadata.cost?.charged || '0',
-                totalDurationMs: metadata.councilMeta?.totalDurationMs || 0,
-                crossExamDurationMs: metadata.councilMeta?.crossExamDurationMs || 0,
-                verdictDurationMs: metadata.councilMeta?.verdictDurationMs || 0,
-                modelsUsed: metadata.councilMeta?.modelsUsed || m.council.models.length,
-                phase2Status: metadata.councilMeta?.phase2Status,
-              },
-            },
-          }
-        }
-        return {
-          ...m,
-          content: accumulated,
-          isLoading: false,
-          tokensInput: metadata.tokens?.input || 0,
-          tokensOutput: metadata.tokens?.output || 0,
-          cost: Number(metadata.cost?.charged || 0) || 0,
-          model: metadata.model || modelId,
-          provider: metadata.provider,
-          ...(metadata.imageUrl ? { imageUrl: metadata.imageUrl } : {}),
-          ...(metadata.videoUrl ? { videoUrl: metadata.videoUrl } : {}),
-          ...(m.fileGeneration ? { fileGeneration: m.fileGeneration } : {}),
-          statusText: undefined,
-        }
-      }))
+      setMessages(bakeFinalAssistantState(assistantId, modelId, metadata, accumulated))
 
       // Refresh wallet balance after tokens were used
       window.dispatchEvent(new Event('tokens:refresh'))
@@ -1232,13 +1270,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setMessages((prev) => prev.map((m) => m.id === assistantId && m.isLoading ? { ...m, isLoading: false } : m))
       } else {
         const errorMsg = err instanceof Error ? err.message : 'Failed to get response'
-        setMessages((prev) => prev.map((m) =>
-          m.id === assistantId
-            ? (m.council
-                ? { ...m, isLoading: false, error: errorMsg, council: { ...m.council, phase: 'error', errorMessage: errorMsg } }
-                : { ...m, isLoading: false, error: errorMsg, content: errorMsg })
-            : m
-        ))
+        setMessages(bakeAssistantError(assistantId, errorMsg))
       }
     } finally {
       abortRef.current = null
@@ -1310,7 +1342,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setMessages((prev) => prev.filter((m) => m.id !== messageId))
   }, [])
 
-  const clearMessages = useCallback(() => { setMessages([]) }, [])
+  const clearMessages = useCallback(() => { setMessages([]); setCurrentApolloTurnId(null) }, [])
 
   const addMessages = useCallback((msgs: Message[]) => {
     setMessages((prev) => [...prev, ...msgs])
@@ -1354,6 +1386,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       createFolder, deleteFolder,
       sendMessage, sendWithContext, editAndResend, deleteMessage, clearMessages, retryLastMessage, addMessages,
       latestCompletedResponse,
+      currentApolloTurnId,
     }}>
       {children}
     </ChatContext.Provider>

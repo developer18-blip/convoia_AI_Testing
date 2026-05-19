@@ -56,6 +56,24 @@ export function providerBadgeClass(provider: string | undefined): string {
 }
 
 /**
+ * Best-effort provider inference from a model's display name. The council SSE
+ * stream only carries display names (e.g. "Claude Opus 4.7"), not model IDs,
+ * so the Apollo v2 panel uses this to map to brand-color keys.
+ */
+export function inferProvider(modelName: string): string {
+  const n = modelName.toLowerCase()
+  if (n.includes('claude')) return 'anthropic'
+  if (n.includes('gpt') || n.startsWith('o3') || n.startsWith('o4')) return 'openai'
+  if (n.includes('gemini')) return 'google'
+  if (n.includes('deepseek')) return 'deepseek'
+  if (n.includes('sonar') || n.includes('perplexity')) return 'perplexity'
+  if (n.includes('grok')) return 'xai'
+  if (n.includes('mistral') || n.includes('codestral')) return 'mistral'
+  if (n.includes('llama') || n.includes('mixtral') || n.includes('groq')) return 'meta'
+  return 'default'
+}
+
+/**
  * Group a model list into category sections. Uncategorized models go to
  * the end under "Other models". Only returns categories that have at
  * least one matching model from the active list.

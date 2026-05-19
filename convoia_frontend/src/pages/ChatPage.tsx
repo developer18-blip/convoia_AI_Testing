@@ -22,6 +22,7 @@ import { Zap, PanelLeftClose, PanelLeft, MoreHorizontal, Trash2, Download, Headp
 import { VoiceConversationMode } from '../components/VoiceConversationMode'
 import { CouncilChip } from '../components/council/CouncilChip'
 import { CouncilPicker } from '../components/council/CouncilPicker'
+import { ApolloPanelHost } from '../components/council/ApolloPanelHost'
 
 export function ChatPage() {
   const { models } = useModels()
@@ -557,41 +558,45 @@ export function ChatPage() {
           </div>
         </div>
 
-        {/* Messages */}
-        <div style={{ flex: 1, minHeight: 0, backgroundColor: 'var(--chat-bg)', position: 'relative' }}>
-          {/* Model badge — permanently visible in corner after a response.
-              Resolves the raw model id (UUID or provider model-id) against the
-              loaded models list so users see the friendly name instead. */}
-          {lastResponseModel && (() => {
-            const matched = models.find((m) => m.id === lastResponseModel || m.modelId === lastResponseModel)
-            const displayName = matched?.name ?? lastResponseModel
-            return (
-              <div
-                className="animate-fade-in"
-                style={{
-                  position: 'absolute', bottom: '12px', right: '16px', zIndex: 10,
-                  padding: '4px 10px', borderRadius: '20px',
-                  backgroundColor: 'var(--chat-surface)', border: '1px solid var(--chat-border)',
-                  fontSize: '11px', color: 'var(--color-text-muted)',
-                  letterSpacing: '0.02em',
-                  pointerEvents: 'none', backdropFilter: 'blur(8px)',
-                }}
-              >
-                {displayName}
-              </div>
-            )
-          })()}
-          <MessageArea
-            messages={messages}
-            isLoading={isStreaming}
-            conversationId={activeConversationId}
-            onRetry={() => retryLastMessage(selectedModelId, industry || undefined, selectedAgent?.id)}
-            onSuggestedPrompt={(prompt) => messageInputRef.current?.setInputText(prompt)}
-            onEditMessage={handleEditMessage}
-            onDeleteMessage={deleteMessage}
-            onRunCode={handleRunCode}
-            onOpenInCanvas={handleOpenInCanvas}
-          />
+        {/* Messages + Apollo side panel */}
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', backgroundColor: 'var(--chat-bg)' }}>
+          {/* Apollo panel — renders null when no Apollo turn is active in this session. */}
+          <ApolloPanelHost />
+          <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+            {/* Model badge — permanently visible in corner after a response.
+                Resolves the raw model id (UUID or provider model-id) against the
+                loaded models list so users see the friendly name instead. */}
+            {lastResponseModel && (() => {
+              const matched = models.find((m) => m.id === lastResponseModel || m.modelId === lastResponseModel)
+              const displayName = matched?.name ?? lastResponseModel
+              return (
+                <div
+                  className="animate-fade-in"
+                  style={{
+                    position: 'absolute', bottom: '12px', right: '16px', zIndex: 10,
+                    padding: '4px 10px', borderRadius: '20px',
+                    backgroundColor: 'var(--chat-surface)', border: '1px solid var(--chat-border)',
+                    fontSize: '11px', color: 'var(--color-text-muted)',
+                    letterSpacing: '0.02em',
+                    pointerEvents: 'none', backdropFilter: 'blur(8px)',
+                  }}
+                >
+                  {displayName}
+                </div>
+              )
+            })()}
+            <MessageArea
+              messages={messages}
+              isLoading={isStreaming}
+              conversationId={activeConversationId}
+              onRetry={() => retryLastMessage(selectedModelId, industry || undefined, selectedAgent?.id)}
+              onSuggestedPrompt={(prompt) => messageInputRef.current?.setInputText(prompt)}
+              onEditMessage={handleEditMessage}
+              onDeleteMessage={deleteMessage}
+              onRunCode={handleRunCode}
+              onOpenInCanvas={handleOpenInCanvas}
+            />
+          </div>
         </div>
 
         {/* Code Interpreter */}
