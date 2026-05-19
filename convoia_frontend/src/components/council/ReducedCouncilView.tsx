@@ -1,3 +1,8 @@
+// TODO: delete after first observed degraded-path run on Apollo v2 panel —
+// see apollo_ui_v2_side_panel_2026_05_20 memory entry. The verdict pathway
+// with "N of M models" badge will own this case once a real v2 degraded run
+// validates the new layout. Kept as safety net for one release per the
+// user's Commit-2 constraint 1.
 import { AlertTriangle } from 'lucide-react'
 import type { CouncilModelResponse } from '../../types'
 import { ResponsePanel } from './ResponsePanel'

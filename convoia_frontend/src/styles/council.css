@@ -65,21 +65,9 @@ html.light {
   --council-modal-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
 }
 
-/* Extra light-mode polish — stronger borders + shadows where transparent
-   surfaces disappear against the white chat background. */
-html.light .council-exec-card {
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-}
-html.light .council-exec-card--complete {
-  border-color: #a7f3d0;
-}
-html.light .council-exec-card--error {
-  border-color: #fecaca;
-}
-html.light .council-exec-icon--thinking { background: #fef3c7; }
-html.light .council-exec-icon--complete { background: #d1fae5; }
-html.light .council-exec-icon--error    { background: #fee2e2; }
+/* Extra light-mode polish — kept for the remaining components (verdict,
+   response panel, picker). The exec-card / crossexam-card overrides
+   were removed in Apollo v2 — see end-of-component-section note. */
 
 html.light .council-verdict-card {
   background: #faf8ff;
@@ -124,38 +112,8 @@ html.light .council-verdict-badge--mixed {
   border: 1px solid #fcd34d;
 }
 
-html.light .council-crossexam-card--active {
-  background: #f5f3ff;
-  border: 1px solid #c4b5fd;
-}
-html.light .council-crossexam-card--complete {
-  background: #ecfdf5;
-  border: 1px solid #a7f3d0;
-}
-html.light .council-crossexam-name--active   { color: #6d28d9; }
-html.light .council-crossexam-name--complete { color: #047857; }
-
-html.light .council-badge--executing,
-html.light .council-badge--selecting {
-  background: #fef3c7;
-  color: #b45309;
-  border: 1px solid #fcd34d;
-}
-html.light .council-badge--synthesizing {
-  background: #f5f3ff;
-  color: #6d28d9;
-  border: 1px solid #c4b5fd;
-}
-html.light .council-badge--complete {
-  background: #ecfdf5;
-  color: #047857;
-  border: 1px solid #a7f3d0;
-}
-html.light .council-badge--error {
-  background: #fee2e2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
-}
+/* Apollo v2: .council-crossexam-* and .council-badge--* light-mode overrides
+   removed (those components are gone — panel owns running/cross-exam state). */
 
 html.light .council-response-panel {
   border: 1px solid #e2e8f0;
@@ -181,19 +139,8 @@ html.light .council-footer { border-top-color: #e2e8f0; }
 html.light .council-footer-stats,
 html.light .council-footer-mod { color: #64748b; }
 
-html.light .council-progress-track { background: #e2e8f0; }
-html.light .council-progress-label { color: #64748b; }
-
-html.light .council-spinner {
-  border-color: #e2e8f0;
-  border-top-color: #d97706;
-}
-html.light .council-spinner--purple {
-  border-color: #e2e8f0;
-  border-top-color: #7c3aed;
-}
-html.light .council-check { background: #d1fae5; color: #047857; }
-html.light .council-error-icon { background: #fee2e2; color: #dc2626; }
+/* Apollo v2: .council-progress-*, .council-spinner, .council-check,
+   .council-error-icon light-mode overrides removed — owning components gone. */
 
 html.light .council-picker-modal,
 html.light .council-picker-sheet {
@@ -242,39 +189,8 @@ html.light .council-picker-confirm--disabled {
 }
 
 /* ── Header badge (state-aware) ───────────────────────────────────────── */
-.council-badge {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 4px 12px;
-  border-radius: 20px;
-  letter-spacing: 0.3px;
-  transition: all 0.3s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  white-space: nowrap;
-}
-.council-badge--selecting,
-.council-badge--executing {
-  background: linear-gradient(135deg, var(--council-amber-bg), rgba(217, 119, 6, 0.15));
-  color: var(--council-amber);
-  border: 0.5px solid var(--council-amber-border);
-}
-.council-badge--synthesizing {
-  background: var(--council-purple-bg);
-  color: var(--council-purple-light);
-  border: 0.5px solid var(--council-purple-border);
-}
-.council-badge--complete {
-  background: var(--council-green-bg);
-  color: var(--council-green);
-  border: 0.5px solid var(--council-green-border);
-}
-.council-badge--error {
-  background: var(--council-red-bg);
-  color: var(--council-red);
-  border: 0.5px solid var(--council-red-border);
-}
+/* Apollo v2: .council-badge--* dark-mode rules removed — see light-mode note
+   above. Inline running/cross-exam state pills live inside ApolloPanel now. */
 
 /* ── Picker modal ─────────────────────────────────────────────────────── */
 .council-picker-overlay {
@@ -539,135 +455,11 @@ html.light .council-picker-confirm--disabled {
   box-shadow: none;
 }
 
-/* ── Execution cards ──────────────────────────────────────────────────── */
-.council-exec-card {
-  margin: 6px 0;
-  padding: 10px 14px;
-  border-radius: 12px;
-  border: 0.5px solid var(--council-border);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: var(--council-surface);
-  transition: all 0.3s ease;
-}
-.council-exec-card--complete { border-color: var(--council-green-border); }
-.council-exec-card--error { border-color: var(--council-red-border); }
-.council-exec-card--dimmed {
-  opacity: 0.4;
-  transform: scale(0.985);
-}
-.council-exec-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.council-exec-icon--thinking { background: var(--council-amber-bg); }
-.council-exec-icon--complete { background: var(--council-green-bg); }
-.council-exec-icon--error { background: var(--council-red-bg); }
-
-.council-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--council-border);
-  border-top-color: var(--council-amber);
-  border-radius: 50%;
-  animation: council-spin 0.7s linear infinite;
-}
-.council-spinner--purple { border-top-color: var(--council-purple); }
-@keyframes council-spin { to { transform: rotate(360deg); } }
-
-.council-check,
-.council-error-icon {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  font-weight: 700;
-}
-.council-check { background: var(--council-green); color: #fff; }
-.council-error-icon { background: var(--council-red); color: #fff; }
-
-.council-exec-body { flex: 1; min-width: 0; }
-.council-exec-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--council-text);
-}
-.council-exec-status {
-  font-size: 11px;
-  margin-top: 2px;
-  transition: color 0.2s;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.council-exec-status--thinking { color: var(--council-amber); }
-.council-exec-status--complete { color: var(--council-green); }
-.council-exec-status--error { color: var(--council-red); }
-.council-exec-time {
-  font-size: 10px;
-  color: var(--council-text-faint);
-  flex-shrink: 0;
-  font-variant-numeric: tabular-nums;
-  min-width: 52px;
-  text-align: right;
-}
-.council-exec-time--complete { color: var(--council-green); }
-
-/* Progress bar */
-.council-progress { margin: 10px 0 6px; }
-.council-progress-track {
-  height: 3px;
-  border-radius: 2px;
-  background: var(--council-surface);
-  overflow: hidden;
-}
-.council-progress-fill {
-  height: 100%;
-  border-radius: 2px;
-  transition: width 0.5s ease, background 0.3s ease;
-}
-.council-progress-fill--active { background: var(--council-amber); }
-.council-progress-fill--complete { background: var(--council-green); }
-.council-progress-label {
-  font-size: 10px;
-  color: var(--council-text-faint);
-  margin-top: 5px;
-  text-align: center;
-}
-
-/* ── Cross-exam card ─────────────────────────────────────────────────── */
-.council-crossexam-card {
-  margin: 10px 0 6px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  transition: all 0.3s ease;
-}
-.council-crossexam-card--active {
-  background: var(--council-purple-bg);
-  border: 0.5px solid var(--council-purple-border);
-}
-.council-crossexam-card--complete {
-  background: var(--council-green-bg);
-  border: 0.5px solid var(--council-green-border);
-}
-.council-crossexam-name {
-  font-size: 13px;
-  font-weight: 700;
-}
-.council-crossexam-name--active { color: var(--council-purple-light); }
-.council-crossexam-name--complete { color: var(--council-green); }
+/* Apollo v2: .council-exec-*, .council-spinner, .council-check,
+   .council-error-icon, .council-progress*, .council-crossexam-* removed.
+   Components that owned these classes (ModelStatusCard, CrossExamCard,
+   CouncilMessage progress bar) were deleted; their roles moved into
+   ApolloPanel and live inside its scoped <style> block. */
 
 /* ── Verdict box ─────────────────────────────────────────────────────── */
 .council-verdict-card {

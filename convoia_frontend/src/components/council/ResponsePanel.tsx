@@ -1,3 +1,8 @@
+// Kept as a transitive dependency of ReducedCouncilView (which is itself
+// kept for one release per Apollo v2 constraint 1). Both can be deleted
+// together after a real v2 degraded run validates the new verdict-pathway
+// "N of M models" badge. Otherwise unused — drill-down inside the new
+// panel is deferred to v2.1.
 import { useEffect, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
