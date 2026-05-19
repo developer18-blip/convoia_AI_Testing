@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, ChevronDown, Circle, GitMerge, Sparkles, X } from 'lucide-react'
+import { Check, ChevronDown, Circle, Copy, GitMerge, Sparkles, X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
@@ -69,17 +69,17 @@ export interface ApolloPanelProps {
 }
 
 // ── Provider brand colors (mirrors src/config/providers.ts) ─────────────────
-const PROVIDER_COLOR: Record<ApolloProvider, { primary: string; onAccent: string }> = {
-  anthropic: { primary: '#D97757', onAccent: '#FFFFFF' },
-  openai:    { primary: '#10A37F', onAccent: '#FFFFFF' },
-  google:    { primary: '#4285F4', onAccent: '#FFFFFF' },
-  xai:       { primary: '#A1A1AA', onAccent: '#FFFFFF' },
-  deepseek:  { primary: '#4D6BFE', onAccent: '#FFFFFF' },
-  mistral:   { primary: '#FA520F', onAccent: '#FFFFFF' },
-  meta:      { primary: '#0064E0', onAccent: '#FFFFFF' },
-  cohere:    { primary: '#FF7759', onAccent: '#FFFFFF' },
-  perplexity:{ primary: '#1FB8CD', onAccent: '#0A0A0F' },
-  default:   { primary: '#14B8CD', onAccent: '#0A0A0F' },
+const PROVIDER_COLOR: Record<ApolloProvider, { primary: string; onAccent: string; soft: string }> = {
+  anthropic: { primary: '#D97757', onAccent: '#FFFFFF', soft: 'rgba(217,119,87,0.08)' },
+  openai:    { primary: '#10A37F', onAccent: '#FFFFFF', soft: 'rgba(16,163,127,0.08)' },
+  google:    { primary: '#4285F4', onAccent: '#FFFFFF', soft: 'rgba(66,133,244,0.08)' },
+  xai:       { primary: '#A1A1AA', onAccent: '#FFFFFF', soft: 'rgba(161,161,170,0.10)' },
+  deepseek:  { primary: '#4D6BFE', onAccent: '#FFFFFF', soft: 'rgba(77,107,254,0.08)' },
+  mistral:   { primary: '#FA520F', onAccent: '#FFFFFF', soft: 'rgba(250,82,15,0.08)' },
+  meta:      { primary: '#0064E0', onAccent: '#FFFFFF', soft: 'rgba(0,100,224,0.08)' },
+  cohere:    { primary: '#FF7759', onAccent: '#FFFFFF', soft: 'rgba(255,119,89,0.08)' },
+  perplexity:{ primary: '#1FB8CD', onAccent: '#0A0A0F', soft: 'rgba(31,184,205,0.08)' },
+  default:   { primary: '#14B8CD', onAccent: '#0A0A0F', soft: 'rgba(20,184,205,0.08)' },
 }
 
 function providerInitial(provider: ApolloProvider): string {
@@ -238,7 +238,16 @@ interface ModelCardProps {
 
 function ModelCard({ model, activePhaseIndex, elapsedMs, dimmed, showResponse }: ModelCardProps) {
   const [responseOpen, setResponseOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
   const color = PROVIDER_COLOR[model.provider] || PROVIDER_COLOR.default
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!model.response) return
+    navigator.clipboard?.writeText(model.response).catch(() => {})
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
   const isDone = model.status === 'done'
   const isError = model.status === 'error'
   const isRunning = model.status === 'running'
@@ -293,23 +302,44 @@ function ModelCard({ model, activePhaseIndex, elapsedMs, dimmed, showResponse }:
       )}
 
       {hasResponse && (
-        <div className="ml-7 mt-1.5">
+        <div className="ml-7 mt-2">
           <button
             type="button"
             onClick={() => setResponseOpen((v) => !v)}
             aria-expanded={responseOpen}
             className="apollo-response-toggle"
+            style={{ ['--accent' as string]: color.primary } as React.CSSProperties}
           >
             <ChevronDown
-              size={12}
-              style={{ transition: 'transform 150ms ease', transform: responseOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+              size={13}
+              style={{ transition: 'transform 200ms ease', transform: responseOpen ? 'rotate(180deg)' : 'rotate(0deg)', color: color.primary, flexShrink: 0 }}
             />
-            <span>{responseOpen ? 'Hide response' : 'View response'}</span>
-            {model.tokens ? <span style={{ marginLeft: 'auto', fontVariantNumeric: 'tabular-nums', color: '#52525b' }}>{fmtTokens(model.tokens)} tok</span> : null}
+            <span>{responseOpen ? 'Hide answer' : 'Read full answer'}</span>
+            {model.tokens ? <span className="apollo-response-tok">{fmtTokens(model.tokens)} tok</span> : null}
           </button>
           {responseOpen && (
-            <div className="apollo-response-body">
-              <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{model.response!}</ReactMarkdown>
+            <div
+              className="apollo-response-card"
+              style={{ ['--accent' as string]: color.primary, ['--accent-bg' as string]: color.soft } as React.CSSProperties}
+            >
+              <div className="apollo-response-card-head">
+                <div
+                  className="apollo-card-icon"
+                  style={{ width: 16, height: 16, borderRadius: 5, background: color.primary, color: color.onAccent, fontSize: 9 }}
+                  aria-hidden
+                >
+                  {providerInitial(model.provider)}
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 600, color: '#e4e4e7', flex: 1, minWidth: 0 }} className="truncate">
+                  {model.displayName}
+                </span>
+                <button type="button" className="apollo-copy-btn" onClick={handleCopy} title={copied ? 'Copied' : 'Copy answer'} aria-label="Copy answer">
+                  {copied ? <Check size={12} style={{ color: '#1D9E75' }} /> : <Copy size={12} />}
+                </button>
+              </div>
+              <div className="apollo-response-card-body">
+                <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{model.response!}</ReactMarkdown>
+              </div>
             </div>
           )}
         </div>
@@ -535,44 +565,93 @@ export function ApolloPanel(props: ApolloPanelProps) {
         .apollo-response-toggle {
           display: flex;
           align-items: center;
-          gap: 5px;
+          gap: 6px;
           width: 100%;
-          padding: 4px 0;
-          background: transparent;
-          border: none;
+          padding: 6px 10px;
+          background: rgba(255,255,255,0.03);
+          border: 0.5px solid rgba(255,255,255,0.08);
+          border-radius: 8px;
           cursor: pointer;
           font-size: 11px;
           font-weight: 500;
-          color: #8b8f99;
-          transition: color 150ms;
+          color: #b4b8c0;
+          transition: background 150ms, border-color 150ms, color 150ms;
         }
-        .apollo-response-toggle:hover { color: #c4c8d0; }
-        .apollo-response-body {
-          margin-top: 6px;
+        .apollo-response-toggle:hover {
+          background: color-mix(in srgb, var(--accent) 10%, transparent);
+          border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+          color: #e8eaee;
+        }
+        .apollo-response-tok {
+          margin-left: auto;
+          font-variant-numeric: tabular-nums;
+          font-size: 10px;
+          color: #52525b;
+          flex-shrink: 0;
+        }
+        @keyframes apollo-response-reveal {
+          from { opacity: 0; transform: translateY(-4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .apollo-response-card {
+          margin-top: 8px;
+          border-radius: 10px;
+          border: 0.5px solid color-mix(in srgb, var(--accent) 30%, transparent);
+          border-left: 2.5px solid var(--accent);
+          background: var(--accent-bg);
+          overflow: hidden;
+          animation: apollo-response-reveal 200ms ease;
+        }
+        .apollo-response-card-head {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          padding: 7px 10px;
+          border-bottom: 0.5px solid rgba(255,255,255,0.07);
+        }
+        .apollo-copy-btn {
+          display: flex; align-items: center; justify-content: center;
+          width: 22px; height: 22px;
+          border-radius: 6px;
+          background: transparent;
+          border: none;
+          color: #6b7079;
+          cursor: pointer;
+          flex-shrink: 0;
+          transition: background 150ms, color 150ms;
+        }
+        .apollo-copy-btn:hover { background: rgba(255,255,255,0.08); color: #e4e4e7; }
+        .apollo-response-card-body {
           padding: 10px 12px;
-          border-radius: 8px;
-          background: rgba(255,255,255,0.02);
-          border: 0.5px solid rgba(255,255,255,0.06);
           font-size: 12px;
-          line-height: 1.55;
-          color: #c4c8d0;
-          max-height: 360px;
+          line-height: 1.6;
+          color: #c8ccd4;
+          max-height: 380px;
           overflow-y: auto;
+          scrollbar-width: thin;
+          scrollbar-color: rgba(255,255,255,0.12) transparent;
         }
-        .apollo-response-body p { margin: 0 0 8px; }
-        .apollo-response-body p:last-child { margin-bottom: 0; }
-        .apollo-response-body strong { color: #e4e4e7; font-weight: 600; }
-        .apollo-response-body code {
-          background: rgba(255,255,255,0.06);
+        .apollo-response-card-body p { margin: 0 0 8px; }
+        .apollo-response-card-body p:last-child { margin-bottom: 0; }
+        .apollo-response-card-body strong { color: #e4e4e7; font-weight: 600; }
+        .apollo-response-card-body h1, .apollo-response-card-body h2, .apollo-response-card-body h3 {
+          font-size: 12.5px; font-weight: 600; color: #e8eaee; margin: 10px 0 5px;
+        }
+        .apollo-response-card-body code {
+          background: rgba(255,255,255,0.07);
           padding: 1px 4px; border-radius: 4px;
           font-size: 11px;
+          font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         }
-        .apollo-response-body pre {
-          background: rgba(0,0,0,0.3);
-          padding: 8px; border-radius: 6px;
-          overflow-x: auto; margin: 6px 0;
+        .apollo-response-card-body pre {
+          background: rgba(0,0,0,0.32);
+          padding: 9px 10px; border-radius: 7px;
+          overflow-x: auto; margin: 7px 0;
         }
-        .apollo-response-body ul, .apollo-response-body ol { margin: 4px 0; padding-left: 18px; }
+        .apollo-response-card-body pre code { background: transparent; padding: 0; }
+        .apollo-response-card-body ul, .apollo-response-card-body ol { margin: 5px 0; padding-left: 18px; }
+        .apollo-response-card-body li { margin: 2px 0; }
+        .apollo-response-card-body a { color: var(--accent); text-decoration: underline; }
         .apollo-mobile-grabber { display: none; }
         @media (prefers-reduced-motion: reduce) {
           .apollo-active-dot { animation: none; }
