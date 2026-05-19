@@ -126,8 +126,10 @@ export async function runAgentOrchestrator(
     : await runXMLFunctionCallingLoop(loopParams);
 
   // Bill only if loop completed normally AND we actually tracked tokens.
-  // XML path bills via sendMessageStream internally (totals=0 here);
-  // native path leaves billing to this wrapper.
+  // Both native and XML paths return real token counts from the inner loop;
+  // the wrapper bills uniformly. (Earlier comment claimed XML billed via
+  // sendMessageStream internally — that was never true and caused 5
+  // tier-2 providers to go unbilled until restored 2026-05-20.)
   if (result.success && (result.totalInputTokens + result.totalOutputTokens) > 0) {
     const providerCost =
       result.totalInputTokens * aiModel.inputTokenPrice +

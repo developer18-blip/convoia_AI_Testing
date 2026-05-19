@@ -335,6 +335,14 @@ export async function runXMLFunctionCallingLoop(
   const xmlSystemPrompt = p.systemPrompt + `\n\n[TOOL USE FORMAT]\nTo use a tool, output EXACTLY this XML format:\n<tool_call>\n{"name": "tool_name", "arguments": {"param": "value"}}\n</tool_call>\n\nAvailable tools:\n${xmlToolSection}\n\nAfter receiving tool results, continue your response. Only use tools when necessary.`;
 
   let streamErrored = false;
+  // Capture token usage from the single LLM call. Previously discarded —
+  // sendMessageStream does NOT bill internally (no deductTokens / usageLog
+  // anywhere in aiGatewayService.ts), so the outer wrapper needs these to
+  // bill tier-2 providers (DeepSeek/Mistral/Groq/xAI/Perplexity). Restores
+  // billing fix originally shipped as 62e45e2, dropped during May 13 deploy
+  // cherry-pick when the loops were refactored into this file.
+  let capturedInputTokens = 0;
+  let capturedOutputTokens = 0;
 
   const fullResponse = await new Promise<string>(async (resolve) => {
     let accumulated = '';
@@ -352,7 +360,11 @@ export async function runXMLFunctionCallingLoop(
       },
       {
         onChunk: (text) => { accumulated += text; },
-        onDone: () => { resolve(accumulated); },
+        onDone: (inTok?: number, outTok?: number) => {
+          capturedInputTokens = inTok || 0;
+          capturedOutputTokens = outTok || 0;
+          resolve(accumulated);
+        },
         onError: (err) => { streamErrored = true; p.callbacks.onError(err); resolve(''); },
       }
     );
@@ -375,9 +387,7 @@ export async function runXMLFunctionCallingLoop(
 
   if (toolCalls.length === 0) {
     p.callbacks.onChunk(fullResponse);
-    // XML loop bills via sendMessageStream internally — totals are 0 here so
-    // the outer wrapper's billing math naturally short-circuits.
-    return { toolCallCount: 0, totalInputTokens: 0, totalOutputTokens: 0, success: true };
+    return { toolCallCount: 0, totalInputTokens: capturedInputTokens, totalOutputTokens: capturedOutputTokens, success: true };
   }
 
   let toolCallCount = 0;
@@ -421,5 +431,5 @@ export async function runXMLFunctionCallingLoop(
       '\n\n_Code execution sandbox is currently unavailable — falling back to text-only explanation._'
     );
   }
-  return { toolCallCount, totalInputTokens: 0, totalOutputTokens: 0, success: true };
+  return { toolCallCount, totalInputTokens: capturedInputTokens, totalOutputTokens: capturedOutputTokens, success: true };
 }
