@@ -558,9 +558,11 @@ export function ChatPage() {
           </div>
         </div>
 
-        {/* Messages + Apollo side panel (panel docks on the RIGHT) */}
+        {/* Chat area (left: messages + input) + Apollo panel (right, full height) */}
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', backgroundColor: 'var(--chat-bg)' }}>
-          <div style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative' }}>
+          {/* LEFT sub-column — messages, code interpreter, banner, input, voice */}
+          <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
             {/* Model badge — permanently visible in corner after a response.
                 Resolves the raw model id (UUID or provider model-id) against the
                 loaded models list so users see the friendly name instead. */}
@@ -595,10 +597,6 @@ export function ChatPage() {
               onOpenInCanvas={handleOpenInCanvas}
             />
           </div>
-          {/* Apollo panel — renders null when no Apollo turn is active in this session.
-              Desktop: docks on the right. Mobile (<768px): bottom sheet (handled in component). */}
-          <ApolloPanelHost />
-        </div>
 
         {/* Code Interpreter */}
         {codeInterpreter && (
@@ -666,6 +664,11 @@ export function ChatPage() {
             <Headphones size={14} />
             <span>Voice mode</span>
           </button>
+        </div>
+          </div>
+          {/* RIGHT: Apollo panel — full height of the chat area. Renders null when
+              no Apollo turn is active. Desktop: right rail; mobile (<768px): bottom sheet. */}
+          <ApolloPanelHost />
         </div>
 
         {/* Voice conversation overlay */}
