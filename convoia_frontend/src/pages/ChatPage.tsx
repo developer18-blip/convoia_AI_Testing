@@ -558,11 +558,9 @@ export function ChatPage() {
           </div>
         </div>
 
-        {/* Messages + Apollo side panel */}
+        {/* Messages + Apollo side panel (panel docks on the RIGHT) */}
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', backgroundColor: 'var(--chat-bg)' }}>
-          {/* Apollo panel — renders null when no Apollo turn is active in this session. */}
-          <ApolloPanelHost />
-          <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+          <div style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative' }}>
             {/* Model badge — permanently visible in corner after a response.
                 Resolves the raw model id (UUID or provider model-id) against the
                 loaded models list so users see the friendly name instead. */}
@@ -597,6 +595,9 @@ export function ChatPage() {
               onOpenInCanvas={handleOpenInCanvas}
             />
           </div>
+          {/* Apollo panel — renders null when no Apollo turn is active in this session.
+              Desktop: docks on the right. Mobile (<768px): bottom sheet (handled in component). */}
+          <ApolloPanelHost />
         </div>
 
         {/* Code Interpreter */}

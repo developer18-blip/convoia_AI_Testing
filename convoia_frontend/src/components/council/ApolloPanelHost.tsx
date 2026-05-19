@@ -56,6 +56,14 @@ function expectedMsFor(provider: string): number {
 }
 
 function deriveModels(council: CouncilState): ApolloPanelModel[] {
+  // Index full response bodies by model display-name (council_responses SSE
+  // delivers {name, response, ...} once the turn completes). Used to populate
+  // the per-model "View response" drill-down.
+  const responseByName = new Map<string, string>()
+  for (const r of council.modelResponses) {
+    if (r?.name) responseByName.set(r.name, r.response || '')
+  }
+
   return council.models
     .slice()
     .sort((a, b) => a.modelIndex - b.modelIndex)
@@ -78,6 +86,7 @@ function deriveModels(council: CouncilState): ApolloPanelModel[] {
         expectedMs: expectedMsFor(provider),
         tokens: m.tokenCount || 0,
         errorMessage: m.error,
+        response: responseByName.get(m.modelName),
       }
     })
 }

@@ -60,11 +60,14 @@ function buildPreviews(now: number): Record<PreviewName, ApolloPanelProps> {
       state: 'done',
       models: [
         { id: 'm1', provider: 'anthropic', displayName: 'Claude Opus 4.7', status: 'done',
-          startTime: now - 48400, finishedAt: now - 31000, expectedMs: PHASE_TIMING.claude, tokens: 4123 },
+          startTime: now - 48400, finishedAt: now - 31000, expectedMs: PHASE_TIMING.claude, tokens: 4123,
+          response: "**Claude's take:** A modular monolith is the right call for a 50-engineer org.\n\n- Operational simplicity: one deploy pipeline, one observability surface\n- Refactor boundaries with module ownership before extracting services\n- Microservices' coordination tax (schema versioning, distributed tracing) outweighs benefits until ~100+ engineers\n\nExtract a service only when a team's deploy cadence genuinely diverges." },
         { id: 'm2', provider: 'openai', displayName: 'GPT-5.5', status: 'done',
-          startTime: now - 48400, finishedAt: now - 38600, expectedMs: PHASE_TIMING.gpt, tokens: 3812 },
+          startTime: now - 48400, finishedAt: now - 38600, expectedMs: PHASE_TIMING.gpt, tokens: 3812,
+          response: "**GPT-5.5:** Start monolith-first. Key reasons:\n\n1. Lower cognitive overhead for a team this size\n2. Faster iteration without network boundaries\n3. Defer the distributed-systems complexity until scale demands it\n\nUse clear internal module APIs so extraction is cheap later." },
         { id: 'm3', provider: 'google', displayName: 'Gemini 2.5 Pro', status: 'done',
-          startTime: now - 48400, finishedAt: now - 27300, expectedMs: PHASE_TIMING.gemini, tokens: 4267 },
+          startTime: now - 48400, finishedAt: now - 27300, expectedMs: PHASE_TIMING.gemini, tokens: 4267,
+          response: "**Gemini 2.5 Pro:** Agree on modular monolith, with one caveat — if you already have a clearly independent workload (e.g. a heavy ML inference path), carve that out early as the single exception. Everything else stays in the monolith." },
       ],
       synthesisStartTime: now - 27300,
       synthesisFinishedAt: now - 17600,
@@ -157,13 +160,11 @@ export function ApolloPreviewPage() {
         ))}
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 10.5, color: '#52525B', fontFamily: 'ui-monospace, monospace' }}>
-          /apollo-preview — Commit 2 visual shell (live=false)
+          /apollo-preview — v2.1 right-dock + response drill-downs (live=false)
         </span>
       </div>
 
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        <ApolloPanel {...data} />
-
         <main
           style={{
             flex: 1,
@@ -299,6 +300,8 @@ export function ApolloPreviewPage() {
             )}
           </div>
         </main>
+
+        <ApolloPanel {...data} />
       </div>
     </div>
   )

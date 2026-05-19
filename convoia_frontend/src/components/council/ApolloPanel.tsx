@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, Circle, GitMerge, Sparkles } from 'lucide-react'
+import { Check, ChevronDown, Circle, GitMerge, Sparkles } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import remarkBreaks from 'remark-breaks'
 
 // ── Static phase-timing config ──────────────────────────────────────────────
 // TODO Day-4+: replace with rolling avg from last 5 Apollo runs in
@@ -41,6 +44,10 @@ export interface ApolloPanelModel {
   expectedMs: number
   tokens?: number
   errorMessage?: string
+  /** Full model response text (markdown). Present only after the turn completes
+   *  and the council_responses SSE event has populated it. Drives the per-model
+   *  "View response" drill-down. */
+  response?: string
 }
 
 export type ApolloPanelState = 'running' | 'cross-examining' | 'done' | 'error'
@@ -48,23 +55,14 @@ export type ApolloPanelState = 'running' | 'cross-examining' | 'done' | 'error'
 export interface ApolloPanelProps {
   state: ApolloPanelState
   models: ApolloPanelModel[]
-  /** ms timestamp when cross-examining began. null when not yet. */
   synthesisStartTime?: number | null
-  /** ms timestamp when synthesis completed. null while running. */
   synthesisFinishedAt?: number | null
   synthesisExpectedMs?: number
-  /** Running sum from completed-only models during run; full total at done. */
   totalTokens: number
   totalCost: number
-  /** ms timestamp when the Apollo turn began (for footer elapsed display). */
   turnStartTime: number | null
-  /** ms timestamp when the entire turn completed (for footer elapsed when done). */
   turnFinishedAt?: number | null
-  /**
-   * When true, panel runs an internal rAF loop (~200ms cadence) to advance
-   * phase progression. When false, phases are computed once from current
-   * timestamps — used by the preview page and any non-live render.
-   */
+  /** rAF loop runs only when live && !prefers-reduced-motion. */
   live: boolean
 }
 
@@ -121,18 +119,6 @@ function fmtCost(usd: number): string {
   return `$${usd.toFixed(4)}`
 }
 
-/**
- * Compute active phase 0–4 from timestamps and current clock.
- *
- * Returns:
- *   undefined  — model hasn't started yet (startTime is null)
- *   4          — model finished (finishedAt is non-null); all phases done
- *   0–3        — quartile of elapsed/expected. Holds on 3 past expectedMs to
- *                avoid lying about progress when a model overshoots.
- *
- * `reducedMotion` collapses progression: still-running models show phase 0
- * statically; phase advancement only happens when SSE flips finishedAt.
- */
 function computeActivePhase(
   startTime: number | null,
   finishedAt: number | null,
@@ -160,7 +146,6 @@ function usePrefersReducedMotion(): boolean {
     if (typeof window === 'undefined' || !window.matchMedia) return
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
     const handler = (e: MediaQueryListEvent) => setReduced(e.matches)
-    // Older browsers only support addListener; modern: addEventListener
     if (mq.addEventListener) mq.addEventListener('change', handler)
     else mq.addListener(handler)
     return () => {
@@ -171,11 +156,26 @@ function usePrefersReducedMotion(): boolean {
   return reduced
 }
 
-/**
- * Single rAF loop per mounted panel, throttled to ~200ms. Only runs when
- * `live` is true AND prefers-reduced-motion is off. Returns the current
- * timestamp (re-rendered on each tick) for downstream phase computation.
- */
+function useIsMobile(): boolean {
+  const [mobile, setMobile] = useState<boolean>(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return false
+    return window.matchMedia('(max-width: 767px)').matches
+  })
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return
+    const mq = window.matchMedia('(max-width: 767px)')
+    const handler = (e: MediaQueryListEvent) => setMobile(e.matches)
+    if (mq.addEventListener) mq.addEventListener('change', handler)
+    else mq.addListener(handler)
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', handler)
+      else mq.removeListener(handler)
+    }
+  }, [])
+  return mobile
+}
+
+/** Single rAF loop per mounted panel, throttled to ~200ms. */
 function useThrottledNow(live: boolean, reducedMotion: boolean): number {
   const [now, setNow] = useState<number>(() => Date.now())
   const rafRef = useRef<number | null>(null)
@@ -218,13 +218,7 @@ function PhaseRow({ label, state }: PhaseRowProps) {
       aria-current={state === 'active' ? 'step' : undefined}
     >
       {state === 'done' && <Check size={11} strokeWidth={3} style={{ color: iconColor }} />}
-      {state === 'active' && (
-        <span
-          className="apollo-active-dot"
-          style={{ background: iconColor }}
-          aria-hidden
-        />
-      )}
+      {state === 'active' && <span className="apollo-active-dot" style={{ background: iconColor }} aria-hidden />}
       {state === 'pending' && <Circle size={11} strokeWidth={2} style={{ color: iconColor, opacity: 0.6 }} />}
       <span style={{ fontWeight: state === 'active' ? 500 : 400 }}>{label}</span>
     </div>
@@ -236,9 +230,12 @@ interface ModelCardProps {
   activePhaseIndex: number | undefined
   elapsedMs: number
   dimmed?: boolean
+  /** Show the per-model response drill-down (only after the turn completes). */
+  showResponse: boolean
 }
 
-function ModelCard({ model, activePhaseIndex, elapsedMs, dimmed }: ModelCardProps) {
+function ModelCard({ model, activePhaseIndex, elapsedMs, dimmed, showResponse }: ModelCardProps) {
+  const [responseOpen, setResponseOpen] = useState(false)
   const color = PROVIDER_COLOR[model.provider] || PROVIDER_COLOR.default
   const isDone = model.status === 'done'
   const isError = model.status === 'error'
@@ -257,20 +254,12 @@ function ModelCard({ model, activePhaseIndex, elapsedMs, dimmed }: ModelCardProp
   const iconBg = isDone ? 'rgba(29,158,117,0.18)' : isError ? 'rgba(248,113,113,0.18)' : color.primary
   const iconFg = isDone ? '#1D9E75' : isError ? '#f87171' : color.onAccent
 
+  const hasResponse = showResponse && !!model.response && model.response.trim().length > 0
+
   return (
-    <div
-      className="apollo-card"
-      style={{
-        opacity: dimmed ? 0.55 : 1,
-        transition: 'opacity 200ms ease',
-      }}
-    >
+    <div className="apollo-card" style={{ opacity: dimmed ? 0.55 : 1, transition: 'opacity 200ms ease' }}>
       <div className="flex items-center gap-2.5 mb-1">
-        <div
-          className="apollo-card-icon"
-          style={{ background: iconBg, color: iconFg }}
-          aria-hidden
-        >
+        <div className="apollo-card-icon" style={{ background: iconBg, color: iconFg }} aria-hidden>
           {isDone ? <Check size={11} strokeWidth={3} /> : isError ? '×' : <span style={{ fontSize: 10, fontWeight: 700 }}>{providerInitial(model.provider)}</span>}
         </div>
         <div className="flex-1 min-w-0 truncate" style={{ fontSize: 12, fontWeight: 500, color: '#e4e4e7' }}>
@@ -294,14 +283,33 @@ function ModelCard({ model, activePhaseIndex, elapsedMs, dimmed }: ModelCardProp
             const phaseState: 'done' | 'active' | 'pending' = isDone
               ? 'done'
               : activePhaseIndex !== undefined
-                ? idx < activePhaseIndex
-                  ? 'done'
-                  : idx === activePhaseIndex
-                    ? 'active'
-                    : 'pending'
+                ? idx < activePhaseIndex ? 'done' : idx === activePhaseIndex ? 'active' : 'pending'
                 : 'pending'
             return <PhaseRow key={phase} label={phase} state={phaseState} />
           })}
+        </div>
+      )}
+
+      {hasResponse && (
+        <div className="ml-7 mt-1.5">
+          <button
+            type="button"
+            onClick={() => setResponseOpen((v) => !v)}
+            aria-expanded={responseOpen}
+            className="apollo-response-toggle"
+          >
+            <ChevronDown
+              size={12}
+              style={{ transition: 'transform 150ms ease', transform: responseOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+            />
+            <span>{responseOpen ? 'Hide response' : 'View response'}</span>
+            {model.tokens ? <span style={{ marginLeft: 'auto', fontVariantNumeric: 'tabular-nums', color: '#52525b' }}>{fmtTokens(model.tokens)} tok</span> : null}
+          </button>
+          {responseOpen && (
+            <div className="apollo-response-body">
+              <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{model.response!}</ReactMarkdown>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -322,14 +330,10 @@ function SynthesisCard({ state, activePhaseIndex, elapsedMs }: SynthesisCardProp
   const border = isDone ? 'rgba(29,158,117,0.22)' : 'rgba(127,119,221,0.24)'
   const iconColor = isDone ? '#1D9E75' : '#7F77DD'
   const titleColor = isDone ? '#1D9E75' : '#a39be8'
-
   const title = isDone ? 'Synthesis complete' : 'Synthesis'
 
   return (
-    <div
-      className="apollo-synthesis-card"
-      style={{ background: tint, borderColor: border }}
-    >
+    <div className="apollo-synthesis-card" style={{ background: tint, borderColor: border }}>
       <div className="flex items-center gap-2.5 mb-1">
         <div className="apollo-card-icon" style={{ background: 'rgba(127,119,221,0.18)', color: iconColor }} aria-hidden>
           {isDone ? <Check size={11} strokeWidth={3} /> : <GitMerge size={11} />}
@@ -348,11 +352,7 @@ function SynthesisCard({ state, activePhaseIndex, elapsedMs }: SynthesisCardProp
           const phaseState: 'done' | 'active' | 'pending' = isDone
             ? 'done'
             : isRunning && activePhaseIndex !== undefined
-              ? idx < activePhaseIndex
-                ? 'done'
-                : idx === activePhaseIndex
-                  ? 'active'
-                  : 'pending'
+              ? idx < activePhaseIndex ? 'done' : idx === activePhaseIndex ? 'active' : 'pending'
               : 'pending'
           return <PhaseRow key={phase} label={phase} state={phaseState} />
         })}
@@ -373,16 +373,21 @@ export function ApolloPanel(props: ApolloPanelProps) {
   } = props
 
   const reducedMotion = usePrefersReducedMotion()
-  // Single rAF loop per mounted panel — drives all phase progression. Static
-  // when !live (preview/past-turn) or under prefers-reduced-motion.
+  const isMobile = useIsMobile()
   const now = useThrottledNow(live, reducedMotion)
+  // Mobile bottom-sheet expand state. Auto-expand once the turn completes so the
+  // user sees the result + response drill-downs without an extra tap.
+  const [mobileExpanded, setMobileExpanded] = useState(false)
+  useEffect(() => {
+    if (isMobile && state === 'done') setMobileExpanded(true)
+  }, [isMobile, state])
 
   const stateColor = STATE_COLOR[state]
   const modelsDim = state === 'cross-examining' || state === 'done'
   const showSynthesis = state === 'cross-examining' || state === 'done'
   const synthesisVisualState: 'pending' | 'running' | 'done' = state === 'done' ? 'done' : 'running'
+  const showResponses = state === 'done'
 
-  // Per-model live elapsed + active phase (computed once per render from `now`)
   const modelRows = models.map((m) => {
     const elapsedMs = m.startTime === null
       ? 0
@@ -393,53 +398,49 @@ export function ApolloPanel(props: ApolloPanelProps) {
     return { m, elapsedMs, activePhaseIndex }
   })
 
-  // Synthesis live elapsed + phase
-  const synthElapsedMs = synthesisStartTime === null || synthesisStartTime === undefined
+  const synthElapsedMs = synthesisStartTime == null
     ? 0
-    : synthesisFinishedAt !== null && synthesisFinishedAt !== undefined
+    : synthesisFinishedAt != null
       ? synthesisFinishedAt - synthesisStartTime
       : Math.max(0, now - synthesisStartTime)
-  const synthActivePhase = computeActivePhase(
-    synthesisStartTime ?? null,
-    synthesisFinishedAt ?? null,
-    synthesisExpectedMs,
-    now,
-    reducedMotion,
-  )
+  const synthActivePhase = computeActivePhase(synthesisStartTime ?? null, synthesisFinishedAt ?? null, synthesisExpectedMs, now, reducedMotion)
 
-  // Turn elapsed for footer
   const turnElapsedMs = turnStartTime === null
     ? 0
-    : turnFinishedAt !== null && turnFinishedAt !== undefined
+    : turnFinishedAt != null
       ? turnFinishedAt - turnStartTime
       : Math.max(0, now - turnStartTime)
 
+  const panelClass = [
+    'apollo-panel',
+    isMobile ? (mobileExpanded ? 'apollo-panel--expanded' : 'apollo-panel--collapsed') : '',
+  ].filter(Boolean).join(' ')
+
+  const onHeaderClick = () => { if (isMobile) setMobileExpanded((v) => !v) }
+
   return (
-    <aside
-      className="apollo-panel"
-      aria-label="Apollo reasoning panel"
-      role="complementary"
-    >
+    <aside className={panelClass} aria-label="Apollo reasoning panel" role="complementary">
       <style>{`
         @keyframes apollo-pulse {
           0%, 100% { opacity: 1; transform: scale(1); }
           50% { opacity: 0.55; transform: scale(0.85); }
         }
         @keyframes apollo-slide-in {
-          from { opacity: 0; transform: translateX(-12px); }
+          from { opacity: 0; transform: translateX(12px); }
           to { opacity: 1; transform: translateX(0); }
         }
+        /* Desktop: right-docked, responsive width. */
         .apollo-panel {
-          width: 300px;
+          width: clamp(360px, 32vw, 460px);
           flex-shrink: 0;
           display: flex;
           flex-direction: column;
           background: #0e1014;
-          border-right: 0.5px solid rgba(255,255,255,0.08);
+          border-left: 0.5px solid rgba(255,255,255,0.08);
           color: #e4e4e7;
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
           height: 100%;
-          min-height: 480px;
+          min-height: 0;
           animation: apollo-slide-in 200ms ease;
         }
         .apollo-panel-header {
@@ -490,19 +491,13 @@ export function ApolloPanel(props: ApolloPanelProps) {
           border: 0.5px solid rgba(127,119,221,0.24);
         }
         .apollo-card-icon {
-          width: 20px;
-          height: 20px;
+          width: 20px; height: 20px;
           border-radius: 6px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-          font-size: 11px;
-          font-weight: 700;
+          display: flex; align-items: center; justify-content: center;
+          flex-shrink: 0; font-size: 11px; font-weight: 700;
         }
         .apollo-active-dot {
-          width: 7px;
-          height: 7px;
+          width: 7px; height: 7px;
           border-radius: 50%;
           display: inline-block;
           animation: apollo-pulse 1.4s ease-in-out infinite;
@@ -517,48 +512,104 @@ export function ApolloPanel(props: ApolloPanelProps) {
           font-variant-numeric: tabular-nums;
         }
         .apollo-status-dot {
-          width: 8px;
-          height: 8px;
+          width: 8px; height: 8px;
           border-radius: 50%;
           flex-shrink: 0;
         }
+        .apollo-response-toggle {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          width: 100%;
+          padding: 4px 0;
+          background: transparent;
+          border: none;
+          cursor: pointer;
+          font-size: 11px;
+          font-weight: 500;
+          color: #8b8f99;
+          transition: color 150ms;
+        }
+        .apollo-response-toggle:hover { color: #c4c8d0; }
+        .apollo-response-body {
+          margin-top: 6px;
+          padding: 10px 12px;
+          border-radius: 8px;
+          background: rgba(255,255,255,0.02);
+          border: 0.5px solid rgba(255,255,255,0.06);
+          font-size: 12px;
+          line-height: 1.55;
+          color: #c4c8d0;
+          max-height: 360px;
+          overflow-y: auto;
+        }
+        .apollo-response-body p { margin: 0 0 8px; }
+        .apollo-response-body p:last-child { margin-bottom: 0; }
+        .apollo-response-body strong { color: #e4e4e7; font-weight: 600; }
+        .apollo-response-body code {
+          background: rgba(255,255,255,0.06);
+          padding: 1px 4px; border-radius: 4px;
+          font-size: 11px;
+        }
+        .apollo-response-body pre {
+          background: rgba(0,0,0,0.3);
+          padding: 8px; border-radius: 6px;
+          overflow-x: auto; margin: 6px 0;
+        }
+        .apollo-response-body ul, .apollo-response-body ol { margin: 4px 0; padding-left: 18px; }
+        .apollo-mobile-grabber { display: none; }
         @media (prefers-reduced-motion: reduce) {
           .apollo-active-dot { animation: none; }
           .apollo-panel { animation: none; }
         }
-        /* Mobile stopgap (Commit 3 will replace with bottom-sheet): hide panel
-           entirely <768px so phone-browser users see the old single-column
-           layout (verdict + thinking indicator in main column). MobileChatPage
-           (native iOS/Android shell) is a separate route — not affected. */
+        /* Mobile: bottom sheet. Collapsed = header bar only; expanded = up to 78vh. */
         @media (max-width: 767px) {
-          .apollo-panel { display: none; }
+          .apollo-panel {
+            position: fixed;
+            left: 0; right: 0; bottom: 0;
+            width: 100%;
+            height: auto;
+            border-left: none;
+            border-top: 0.5px solid rgba(255,255,255,0.1);
+            border-radius: 16px 16px 0 0;
+            box-shadow: 0 -8px 32px rgba(0,0,0,0.45);
+            z-index: 50;
+            animation: none;
+          }
+          .apollo-panel-header { cursor: pointer; position: relative; padding-top: 16px; }
+          .apollo-mobile-grabber {
+            display: block;
+            position: absolute;
+            top: 6px; left: 50%;
+            transform: translateX(-50%);
+            width: 32px; height: 4px;
+            border-radius: 2px;
+            background: rgba(255,255,255,0.2);
+          }
+          .apollo-panel--collapsed .apollo-panel-body,
+          .apollo-panel--collapsed .apollo-panel-footer { display: none; }
+          .apollo-panel--expanded .apollo-panel-body { max-height: 70vh; }
         }
       `}</style>
 
-      <header className="apollo-panel-header">
-        <span
-          className="apollo-status-dot"
-          style={{ background: stateColor.primary, boxShadow: `0 0 6px ${stateColor.primary}` }}
-          aria-hidden
-        />
+      <header className="apollo-panel-header" onClick={onHeaderClick}>
+        <span className="apollo-mobile-grabber" aria-hidden />
+        <span className="apollo-status-dot" style={{ background: stateColor.primary, boxShadow: `0 0 6px ${stateColor.primary}` }} aria-hidden />
         <span style={{ fontSize: 13, fontWeight: 500, color: '#e4e4e7' }}>Apollo</span>
-        <span
-          className="apollo-state-pill"
-          style={{ background: stateColor.tint, color: stateColor.primary }}
-        >
+        <span className="apollo-state-pill" style={{ background: stateColor.tint, color: stateColor.primary }}>
           {stateColor.label}
         </span>
         <div className="flex-1" />
-        <span
-          style={{
-            fontSize: 11,
-            color: '#6b7079',
-            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-            fontVariantNumeric: 'tabular-nums',
-          }}
-        >
+        <span style={{ fontSize: 11, color: '#6b7079', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontVariantNumeric: 'tabular-nums' }}>
           {fmtCost(totalCost)}
         </span>
+        {isMobile && (
+          <ChevronDown
+            size={16}
+            style={{ color: '#6b7079', transition: 'transform 200ms ease', transform: mobileExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+            aria-hidden
+          />
+        )}
       </header>
 
       <div className="apollo-panel-body">
@@ -567,15 +618,11 @@ export function ApolloPanel(props: ApolloPanelProps) {
           MODELS ({models.length})
         </div>
         {modelRows.map(({ m, elapsedMs, activePhaseIndex }) => (
-          <ModelCard key={m.id} model={m} activePhaseIndex={activePhaseIndex} elapsedMs={elapsedMs} dimmed={modelsDim} />
+          <ModelCard key={m.id} model={m} activePhaseIndex={activePhaseIndex} elapsedMs={elapsedMs} dimmed={modelsDim} showResponse={showResponses} />
         ))}
 
         {showSynthesis && (
-          <SynthesisCard
-            state={synthesisVisualState}
-            activePhaseIndex={synthActivePhase}
-            elapsedMs={synthElapsedMs}
-          />
+          <SynthesisCard state={synthesisVisualState} activePhaseIndex={synthActivePhase} elapsedMs={synthElapsedMs} />
         )}
       </div>
 
