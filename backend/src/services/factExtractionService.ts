@@ -24,17 +24,50 @@ export interface ExtractionOutcome {
 
 const TOP_OF_MIND_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
-const MIN_CONFIDENCE = 0.5;
+const MIN_CONFIDENCE = 0.7;
 const MAX_CONTENT_LEN = 500;
 const CODE_PATTERN = /^(root@|sudo |journalctl|pm2 |\$ |\/[a-z]|\.sh\b|\.log\b|cd \/|ls -|systemctl|grep |find )/i;
 
-const SYSTEM_PROMPT = `You are a memory extractor for a chat assistant. Your job is to read a conversation and identify PERSISTENT facts about the user — things that will still be true a month from now.
+const SYSTEM_PROMPT = `You are a memory extractor for a chat assistant. Your job is to read a conversation and identify PERSISTENT facts the USER stated about themselves — things that will still be true a month from now.
 
-CRITICAL DISTINCTION:
-- PERSISTENT FACT: "User builds AI platforms" / "User prefers TypeScript" / "User is based in Seattle"
-- TRANSIENT TASK: "User wants a blog post about tummy tucks" / "User is debugging an OOM error" / "User asked about TCP"
+CRITICAL — facts must be SELF-DISCLOSED, not inferred from the topic the user is asking about.
 
-Transient tasks must NOT be extracted as facts. They are temporary requests, not enduring properties of the user.
+ACCEPTABLE (first-person self-attribution):
+- "I'm a marketing consultant"           → WORK: "Marketing consultant"
+- "my team uses Postgres"                → WORK: "Team's stack includes Postgres"
+- "I prefer brevity"                     → PERSONAL: "Prefers concise responses"
+- "I live in Seattle"                    → PERSONAL: "Based in Seattle"
+
+UNACCEPTABLE (user is researching or generating content about a topic, NOT telling you about themselves):
+- "How does mastectomy reconstruction work?" → do NOT store "User has mastectomy"
+- "Walk me through nginx OIDC config"        → do NOT store "User uses OIDC"
+- "Write a blog post about tummy tucks"      → do NOT store "User performs tummy tucks"
+- "What's arbitration waiver?"               → do NOT store "User is in arbitration"
+
+If the conversation is dominated by research, lookup, how-to, or content-generation queries (i.e. the user is using the assistant to learn about or produce content for a topic rather than discussing their own situation), return ZERO facts: {"facts": [], "summary": "..."}.
+
+CRITICAL — facts must be about the USER, not about third parties they mention.
+
+UNACCEPTABLE (third-party content framed as user fact):
+- "My client Sarah runs a clinic, write her copy"            → do NOT store "User runs a clinic"
+- "My friend is allergic to penicillin, what should they do" → do NOT store "User is allergic to penicillin"
+- "Help me draft a memo from my boss to the team"            → do NOT store boss's role as user fact
+
+ACCEPTABLE (user self-discloses while mentioning a third party):
+- "I'm a marketing consultant; my client Sarah runs a clinic" → WORK: "Marketing consultant" (Sarah's clinic is NOT a fact about user)
+
+When in doubt about who a "we"/"my"/"our" refers to, return zero facts.
+
+UNACCEPTABLE (writing content FROM a specific perspective doesn't make the user that perspective):
+- "Write a provider administrative appeal to BCBS denying X" → do NOT store "User is a provider" or "User handles insurance appeals"
+- "Draft a resignation email from a manager to HR"           → do NOT store "User is a manager"
+- "Help me write a press release authored by CEO Sarah"      → do NOT store anything about Sarah OR the user
+
+The user is writing content that ADOPTS a perspective. The adopted perspective is not the user's identity.
+
+When ambiguous, return zero facts. The retrieval system handles empty results safely; bad facts pollute every future query the user runs.
+
+OUTPUT FORMAT — return ONLY the JSON object. No markdown fences, no rationale paragraph, no explanation, no preamble. The JSON object must be the entire response. Any text outside the JSON will be rejected by the parser.
 
 Output strict JSON:
 {
@@ -50,18 +83,54 @@ Output strict JSON:
 }
 
 Categories:
-- WORK: role, projects, tech stack, collaborators, tools, business context
-- PERSONAL: location, language preference, communication style
-- TOP_OF_MIND: current focus, active project (auto-expires in 14 days)
-- HISTORY: past projects, previous companies, completed work
+- WORK: only extract if the fact matches ONE of these shapes:
+    (a) Role/title + employer: "I'm a [role] at [company]" → "Marketing consultant" or "Marketing consultant at AcmeCorp"
+    (b) Stable tech stack / tools used by the user's team: "We use Postgres and Node" → "Stack: Postgres and Node"
+
+  Do NOT extract:
+  - Current clients or projects ("Writing for X", "Working with Dr. Y") — these change month to month
+  - Active deliverables ("Creating a blog post about Z") — these are tasks, not facts
+  - Industry or domain knowledge inferred from topic — see SELF-DISCLOSURE rules above
+
+  If a fact about work doesn't match shape (a) or (b), return zero. WORK is the most over-extracted category — be strict.
+- PERSONAL: location, language preference, communication style — only when SELF-disclosed
+- TOP_OF_MIND: user's OWN explicit upcoming event or scheduled milestone (auto-expires in 14 days).
+    NEVER for ongoing implementation, debugging, or general project work — see CRITICAL section below.
+    ACCEPTABLE: "I'm preparing for a board meeting next week" → "Preparing for upcoming board meeting"
+    UNACCEPTABLE: "How do board meetings usually run?" → do NOT store anything
+    UNACCEPTABLE: "I'm planning to implement OIDC across our sites" → do NOT store anything (this is ongoing work, not a scheduled event)
+- HISTORY: user's OWN past projects, previous companies, completed work
+
+CRITICAL — first-person framing about active or in-progress work is NOT a persistent fact.
+
+TOP_OF_MIND is reserved for explicit upcoming events or scheduled milestones the user mentions in passing. It is NOT for ongoing implementation work, debugging sessions, or "what I'm working on right now."
+
+UNACCEPTABLE (first-person but transient activity):
+- "I'm trying to set up X"               → do NOT store
+- "I'm planning to implement Y"          → do NOT store
+- "I have been planning to implement Y across our sites" → do NOT store (multi-site scope doesn't make it stable)
+- "I've been working on Z this week"     → do NOT store
+- "We're debugging an issue with W"      → do NOT store
+- "I'm building a feature for V"         → do NOT store
+
+ACCEPTABLE (stable identity / role / tool / preference / scheduled milestone):
+- "I'm a backend engineer at AcmeCorp"             → WORK: "Backend engineer at AcmeCorp"
+- "Our stack is TypeScript and Postgres"           → WORK: "Stack: TypeScript and Postgres"
+- "I always prefer brevity"                        → PERSONAL: "Prefers concise responses"
+- "I'm based in Seattle"                           → PERSONAL: "Based in Seattle"
+- "I'm preparing for my Series A pitch next month" → TOP_OF_MIND: "Preparing for Series A pitch (next month)"
+- "I have a wedding in June"                       → TOP_OF_MIND: "Wedding in June"
+
+SELF-CHECK: if your summary describes the user with any present-participle verb form ("-ing" verbs: planning, trying, working, implementing, building, creating, drafting, debugging, setting up, etc.) followed by a project, task, or deliverable — return zero facts. Present-participle verbs describe activity, not identity. The ONLY exceptions are stable role statements like "working AS a marketing consultant" (role) or "based IN Seattle" (location). If the -ing verb describes what the user IS DOING rather than what they ARE, return zero facts.
+
+Test for TOP_OF_MIND: is there a specific upcoming event or deadline (board meeting, pitch, launch date, trip, ceremony)? If yes, eligible. If it's general "I'm working on..." chatter, NO.
 
 Confidence guide:
-- 0.9+: User stated directly
-- 0.7-0.9: Strongly implied by repeated context
-- 0.5-0.7: Inferred from one mention
-- <0.5: Don't include — too speculative
+- 0.9+: User stated directly in first-person with explicit verb of being or doing ("I am a writer", "I work at X", "I prefer Y")
+- 0.7-0.9: User self-attributed across multiple turns with consistent first-person framing
+- <0.7: Don't include — ambiguous "we"/"my" references frequently belong to research framing, not self-disclosure
 
-If no facts can be extracted, return: {"facts": [], "summary": "Brief description"}`;
+If no facts qualify, return: {"facts": [], "summary": "Brief description of the conversation topic"}`;
 
 export async function extractFactsFromConversation(
   userId: string,
@@ -234,11 +303,35 @@ async function callHaikuForExtraction(systemPrompt: string, userPrompt: string):
 function parseExtractionResponse(raw: string): ExtractionResult | null {
   try {
     let cleaned = raw.trim();
-    if (cleaned.startsWith('```')) {
-      cleaned = cleaned.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
-    }
+    // Strip leading ```json or ``` fence if present
+    cleaned = cleaned.replace(/^```(?:json)?\n?/, '');
 
-    const parsed = JSON.parse(cleaned);
+    // Find the first balanced JSON object; ignore any trailing prose
+    // (rationale paragraphs, closing fences, etc.) so the parser doesn't
+    // break when the model adds commentary outside the JSON. Tracks string
+    // state so braces inside string literals don't throw off the depth count.
+    const firstBrace = cleaned.indexOf('{');
+    if (firstBrace === -1) return null;
+
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    let endIdx = -1;
+    for (let i = firstBrace; i < cleaned.length; i++) {
+      const ch = cleaned[i];
+      if (escape) { escape = false; continue; }
+      if (ch === '\\') { escape = true; continue; }
+      if (ch === '"') { inString = !inString; continue; }
+      if (inString) continue;
+      if (ch === '{') depth++;
+      else if (ch === '}') {
+        depth--;
+        if (depth === 0) { endIdx = i; break; }
+      }
+    }
+    if (endIdx === -1) return null;
+
+    const parsed = JSON.parse(cleaned.slice(firstBrace, endIdx + 1));
     if (!parsed || typeof parsed !== 'object') return null;
     if (!Array.isArray(parsed.facts)) return null;
     if (typeof parsed.summary !== 'string') return null;
