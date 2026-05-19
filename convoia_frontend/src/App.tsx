@@ -67,6 +67,7 @@ const ResetPasswordPage = lazy(() => import('./pages/public/ResetPasswordPage'))
 const ReviewPage = lazy(() => import('./pages/public/ReviewPage'))
 const DesignSystemPage = lazy(() => import('./pages/DesignSystemPage'))
 const AccountDeletionPage = lazy(() => import('./pages/public/AccountDeletionPage'))
+const ApolloPreviewPage = lazy(() => import('./pages/ApolloPreviewPage'))
 
 function ProtectedRoute() {
   const { isAuthenticated, isLoading } = useAuth()
@@ -168,6 +169,7 @@ function AppRoutes() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/review" element={<ReviewPage />} />
         <Route path="/account-deletion" element={<AccountDeletionPage />} />
+        <Route path="/apollo-preview" element={<ApolloPreviewPage />} />
 
         {/* Protected */}
         <Route element={<ProtectedRoute />}>
