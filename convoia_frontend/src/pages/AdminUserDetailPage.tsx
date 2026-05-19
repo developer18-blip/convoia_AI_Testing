@@ -168,7 +168,14 @@ export function AdminUserDetailPage() {
       {/* Recent Usage Table */}
       <Card padding="none">
         <div className="px-5 py-4 border-b border-border">
-          <h3 className="text-sm font-semibold text-text-primary">Daily Breakdown</h3>
+          <h3 className="text-sm font-semibold text-text-primary">
+            Daily Breakdown
+            {stats.dailyBreakdown.length > 30 && (
+              <span className="ml-2 text-xs font-normal text-text-muted">
+                (last 30 of {stats.dailyBreakdown.length} active days)
+              </span>
+            )}
+          </h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
