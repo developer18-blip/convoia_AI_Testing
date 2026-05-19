@@ -362,6 +362,11 @@ export interface ChatContextType {
    * so reload-time and stale-turn renders never bring the panel back.
    */
   currentApolloTurnId: string | null
+  /**
+   * Manually point the panel at a turn, or close it (null). Used by the
+   * panel's X button (close) and by tapping a past Apollo answer (reopen).
+   */
+  setCurrentApolloTurnId: (id: string | null) => void
 }
 
 export const ChatContext = createContext<ChatContextType | null>(null)
@@ -1386,7 +1391,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       createFolder, deleteFolder,
       sendMessage, sendWithContext, editAndResend, deleteMessage, clearMessages, retryLastMessage, addMessages,
       latestCompletedResponse,
-      currentApolloTurnId,
+      currentApolloTurnId, setCurrentApolloTurnId,
     }}>
       {children}
     </ChatContext.Provider>

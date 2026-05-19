@@ -21,6 +21,7 @@ import { ReducedCouncilView } from '../council/ReducedCouncilView'
 import { ConvoiaMark } from '../brand/ConvoiaMark'
 import { ComputationLine } from '../primitives/ComputationLine'
 import { useAccent } from '../../contexts/AccentContext'
+import { useChat } from '../../hooks/useChat'
 import { PROVIDER_THEMES, getProviderFromModelId } from '../../config/providers'
 
 // Stable module-level reference — ReactMarkdown does a shallow compare
@@ -112,6 +113,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
   // replies keep their original accent even if the user has since switched
   // the active model. Fall back to the currently-active accent.
   const { theme: activeTheme } = useAccent()
+  const { currentApolloTurnId, setCurrentApolloTurnId } = useChat()
   const providerTheme = message.model
     ? PROVIDER_THEMES[getProviderFromModelId(message.model)]
     : activeTheme
@@ -141,8 +143,23 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
       ? 'Apollo is consulting models…'
       : 'Apollo is cross-examining responses…'
 
+    // Reopen-on-tap: when the panel isn't currently showing THIS turn, tapping
+    // the answer re-points the panel at it. Guarded so it doesn't fire while the
+    // user is selecting text to copy.
+    const panelOpenForThis = currentApolloTurnId === message.id
+    const reopenPanel = () => {
+      if (panelOpenForThis) return
+      const sel = typeof window !== 'undefined' ? window.getSelection?.() : null
+      if (sel && sel.toString().length > 0) return
+      setCurrentApolloTurnId(message.id)
+    }
+
     return (
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '28px' }}>
+      <div
+        style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '28px', cursor: panelOpenForThis ? 'default' : 'pointer' }}
+        onClick={reopenPanel}
+        title={panelOpenForThis ? undefined : 'Show Apollo reasoning panel'}
+      >
         <div style={{
           width: 32, height: 32, borderRadius: '10px', flexShrink: 0,
           background: 'var(--surface-1, var(--chat-surface))',
@@ -216,6 +233,25 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
               </span>
               <span className="council-footer-mod">Moderated by ConvoiaAI</span>
             </div>
+          )}
+
+          {/* Reopen affordance — only when the panel isn't currently showing this turn. */}
+          {!panelOpenForThis && (council.phase === 'complete' || council.phase === 'error') && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setCurrentApolloTurnId(message.id) }}
+              style={{
+                marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '4px 10px', borderRadius: 8, cursor: 'pointer',
+                background: 'transparent', border: '0.5px solid var(--chat-border)',
+                fontSize: 11, fontWeight: 500, color: 'var(--council-text-dim)',
+                transition: 'all 150ms',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--chat-surface)'; e.currentTarget.style.color = 'var(--council-text)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--council-text-dim)' }}
+            >
+              <PanelRight size={12} /> Show Apollo reasoning
+            </button>
           )}
         </div>
       </div>

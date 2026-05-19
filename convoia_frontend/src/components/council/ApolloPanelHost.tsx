@@ -137,7 +137,7 @@ export function buildApolloPanelProps(message: Message): ApolloPanelProps | null
 }
 
 export function ApolloPanelHost() {
-  const { currentApolloTurnId, messages } = useChat()
+  const { currentApolloTurnId, setCurrentApolloTurnId, messages } = useChat()
   if (!currentApolloTurnId) return null
   const msg = messages.find((m) => m.id === currentApolloTurnId)
   if (!msg || !msg.council) return null
@@ -145,5 +145,5 @@ export function ApolloPanelHost() {
   const props = buildApolloPanelProps(msg)
   if (!props) return null
 
-  return <ApolloPanel {...props} />
+  return <ApolloPanel {...props} onClose={() => setCurrentApolloTurnId(null)} />
 }

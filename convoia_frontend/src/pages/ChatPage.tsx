@@ -447,7 +447,15 @@ export function ChatPage() {
               <CouncilChip
                 active={councilMode}
                 count={councilModelIds.length}
-                onClick={() => setShowCouncilPicker((v) => !v)}
+                onClick={() => {
+                  // Active → toggle Apollo off. Inactive → open the model picker.
+                  if (councilMode) {
+                    setCouncilMode(false)
+                    setShowCouncilPicker(false)
+                  } else {
+                    setShowCouncilPicker((v) => !v)
+                  }
+                }}
                 variant="desktop"
               />
               {showCouncilPicker && (

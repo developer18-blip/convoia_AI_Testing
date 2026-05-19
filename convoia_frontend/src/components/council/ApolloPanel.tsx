@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, ChevronDown, Circle, GitMerge, Sparkles } from 'lucide-react'
+import { Check, ChevronDown, Circle, GitMerge, Sparkles, X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
@@ -64,6 +64,8 @@ export interface ApolloPanelProps {
   turnFinishedAt?: number | null
   /** rAF loop runs only when live && !prefers-reduced-motion. */
   live: boolean
+  /** Dismiss the panel (X button). When omitted, the close button is hidden. */
+  onClose?: () => void
 }
 
 // ── Provider brand colors (mirrors src/config/providers.ts) ─────────────────
@@ -369,7 +371,7 @@ export function ApolloPanel(props: ApolloPanelProps) {
     synthesisStartTime, synthesisFinishedAt, synthesisExpectedMs = PHASE_TIMING.synthesis,
     totalTokens, totalCost,
     turnStartTime, turnFinishedAt,
-    live,
+    live, onClose,
   } = props
 
   const reducedMotion = usePrefersReducedMotion()
@@ -516,6 +518,20 @@ export function ApolloPanel(props: ApolloPanelProps) {
           border-radius: 50%;
           flex-shrink: 0;
         }
+        .apollo-close-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 24px; height: 24px;
+          border-radius: 6px;
+          background: transparent;
+          border: none;
+          color: #6b7079;
+          cursor: pointer;
+          flex-shrink: 0;
+          transition: background 150ms, color 150ms;
+        }
+        .apollo-close-btn:hover { background: rgba(255,255,255,0.08); color: #e4e4e7; }
         .apollo-response-toggle {
           display: flex;
           align-items: center;
@@ -609,6 +625,17 @@ export function ApolloPanel(props: ApolloPanelProps) {
             style={{ color: '#6b7079', transition: 'transform 200ms ease', transform: mobileExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
             aria-hidden
           />
+        )}
+        {onClose && (
+          <button
+            type="button"
+            className="apollo-close-btn"
+            aria-label="Close Apollo panel"
+            title="Close panel"
+            onClick={(e) => { e.stopPropagation(); onClose() }}
+          >
+            <X size={14} />
+          </button>
         )}
       </header>
 
