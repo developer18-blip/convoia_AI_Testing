@@ -121,7 +121,7 @@ export function MobileSettingsPage() {
           <button onClick={() => fileInputRef.current?.click()} disabled={uploadingAvatar}
             style={{
               position: 'absolute', bottom: '-4px', right: '-4px', width: '32px', height: '32px',
-              borderRadius: '50%', background: '#14B8CD', border: '3px solid var(--color-surface)',
+              borderRadius: '50%', background: 'var(--color-primary)', border: '3px solid var(--color-surface)',
               color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer',
             }}>
@@ -135,12 +135,12 @@ export function MobileSettingsPage() {
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center', marginBottom: '4px' }}>
             <input value={name} onChange={e => setName(e.target.value)} autoFocus
               style={{
-                padding: '8px 12px', borderRadius: '10px', border: '1.5px solid #14B8CD',
+                padding: '8px 12px', borderRadius: '10px', border: '1.5px solid var(--color-primary)',
                 background: 'var(--color-surface-2)', color: 'var(--color-text-primary)',
                 fontSize: '16px', fontWeight: 700, textAlign: 'center', width: '180px', outline: 'none',
               }} />
             <button onClick={handleSaveProfile} disabled={savingProfile}
-              style={{ padding: '8px 14px', borderRadius: '10px', border: 'none', background: '#14B8CD', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '8px 14px', borderRadius: '10px', border: 'none', background: 'var(--color-primary)', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               {savingProfile ? '...' : 'Save'}
             </button>
           </div>
@@ -271,7 +271,7 @@ export function MobileSettingsPage() {
           <button onClick={handleChangePassword} disabled={changingPw}
             style={{
               width: '100%', marginTop: '16px', padding: '14px', borderRadius: '14px', border: 'none',
-              background: '#14B8CD', color: 'white', fontSize: '14px', fontWeight: 700,
+              background: 'var(--color-primary)', color: 'white', fontSize: '14px', fontWeight: 700,
               cursor: changingPw ? 'wait' : 'pointer', opacity: changingPw ? 0.7 : 1,
             }}>
             {changingPw ? 'Changing...' : 'Update Password'}
@@ -299,7 +299,7 @@ export function MobileSettingsPage() {
           {isOwner ? (
             <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: 0, lineHeight: 1.5 }}>
               As the organization owner, you can't delete your account from here. Transfer ownership to another member or contact{' '}
-              <a href="mailto:support@convoia.com" style={{ color: '#14B8CD', fontWeight: 600 }}>support@convoia.com</a> first.
+              <a href="mailto:support@convoia.com" style={{ color: 'var(--color-primary)', fontWeight: 600 }}>support@convoia.com</a> first.
             </p>
           ) : !showDeleteConfirm ? (
             <>

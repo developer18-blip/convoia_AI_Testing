@@ -77,9 +77,12 @@ export function MobileChatPage() {
     }
   }, [selectedModel, councilMode, councilModelIds, models, setActiveModel, setCouncilModels])
 
-  // Leaving chat resets the accent to brand turquoise (Home/Settings shouldn't
-  // keep the last model's color).
-  useEffect(() => () => { setActiveModel(''); setCouncilModels([]) }, [setActiveModel, setCouncilModels])
+  // Web-parity: the active model's accent PERSISTS across the app (Home, Wallet,
+  // Settings, tab bar all wear the model's color) until another model is picked
+  // or the user logs out (AuthContext resets to '' → brand turquoise; a fresh
+  // launch with no model is turquoise too). Council is a chat-only multi-model
+  // blend, so only that is cleared on leave — the single-model accent stays.
+  useEffect(() => () => { setCouncilModels([]) }, [setCouncilModels])
 
   const handleAgentSelect = (agent: Agent | null) => {
     setSelectedAgent(agent)
@@ -222,7 +225,7 @@ export function MobileChatPage() {
                     <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: '2px 0 0' }}>{m.provider}</p>
                   </div>
                   {selectedModelId === m.id && (
-                    <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#14B8CD', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'white' }} />
                     </div>
                   )}
@@ -271,7 +274,7 @@ export function MobileChatPage() {
                     </p>
                   </div>
                   {selectedAgent?.id === agent.id && (
-                    <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#14B8CD', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'white' }} />
                     </div>
                   )}
@@ -302,7 +305,7 @@ export function MobileChatPage() {
                 if (next) toast.warning('Thinking mode ON — uses 2x tokens per message')
               }}
               style={{ padding: '5px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 600, border: 'none', cursor: 'pointer',
-                background: thinkingEnabled ? '#14B8CD' : 'var(--color-surface-2)', color: thinkingEnabled ? 'white' : 'var(--color-text-muted)' }}>
+                background: thinkingEnabled ? 'var(--color-primary)' : 'var(--color-surface-2)', color: thinkingEnabled ? 'white' : 'var(--color-text-muted)' }}>
               🧠
             </button>
             <button onClick={() => { setActiveConversation(null); setSelectedAgent(null); setAgentMode(false) }}
@@ -374,8 +377,8 @@ export function MobileChatPage() {
           <button onClick={() => setShowAgentPicker(true)}
             style={{
               padding: '6px 10px', borderRadius: '100px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
-              border: selectedAgent ? '1.5px solid #14B8CD' : '1px solid var(--color-border)',
-              background: selectedAgent ? 'rgba(20, 184, 205,0.08)' : 'var(--color-surface)',
+              border: selectedAgent ? '1.5px solid var(--color-primary)' : '1px solid var(--color-border)',
+              background: selectedAgent ? 'var(--color-primary-light)' : 'var(--color-surface)',
               whiteSpace: 'nowrap', flexShrink: 0,
             }}>
             {selectedAgent ? (
@@ -383,7 +386,7 @@ export function MobileChatPage() {
             ) : (
               <Sparkles size={12} style={{ color: 'var(--color-text-muted)' }} />
             )}
-            <ChevronDown size={10} style={{ color: selectedAgent ? '#14B8CD' : 'var(--color-text-muted)' }} />
+            <ChevronDown size={10} style={{ color: selectedAgent ? 'var(--color-primary)' : 'var(--color-text-muted)' }} />
           </button>
         </div>
       </div>
@@ -392,17 +395,17 @@ export function MobileChatPage() {
       {selectedAgent && (
         <div style={{
           flexShrink: 0, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '10px',
-          background: 'rgba(20, 184, 205,0.06)', borderBottom: '1px solid rgba(20, 184, 205,0.12)',
+          background: 'var(--color-primary-light)', borderBottom: '1px solid var(--color-primary-light)',
         }}>
           <span style={{ fontSize: '18px' }}>{selectedAgent.avatar}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: '12px', fontWeight: 700, color: '#14B8CD', margin: 0 }}>{selectedAgent.name}</p>
+            <p style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-primary)', margin: 0 }}>{selectedAgent.name}</p>
             <p style={{ fontSize: '10px', color: 'var(--color-text-muted)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {selectedAgent.role}
             </p>
           </div>
           <button onClick={() => handleAgentSelect(null)}
-            style={{ padding: '4px', borderRadius: '6px', border: 'none', background: 'rgba(20, 184, 205,0.1)', color: '#14B8CD', cursor: 'pointer' }}>
+            style={{ padding: '4px', borderRadius: '6px', border: 'none', background: 'var(--color-primary-light)', color: 'var(--color-primary)', cursor: 'pointer' }}>
             <X size={14} />
           </button>
         </div>
@@ -414,8 +417,8 @@ export function MobileChatPage() {
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '24px', textAlign: 'center', background: 'var(--chat-bg)' }}>
             <div style={{
               width: '48px', height: '48px', borderRadius: '14px', marginBottom: '16px',
-              background: 'linear-gradient(135deg, var(--color-primary-light), rgba(20, 184, 205,0.05))',
-              border: '1px solid rgba(20, 184, 205,0.15)',
+              background: 'linear-gradient(135deg, var(--color-primary-light), var(--color-primary-glow))',
+              border: '1px solid var(--color-primary-light)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: '22px', color: 'var(--color-primary)',
             }}>

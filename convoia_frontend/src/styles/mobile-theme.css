@@ -42,7 +42,7 @@
   /* ── Borders ── */
   --color-border: #E8E5F0 !important;
   --color-border-subtle: #F0EDF8 !important;
-  --color-border-hover: #C4B5FD !important;
+  --color-border-hover: var(--color-primary) !important;
 
   /* ── Text: dark on light ── */
   --color-text-primary: #1A1A2E !important;
@@ -71,7 +71,7 @@
 
   /* ── Glass ── */
   --color-glass: rgba(255, 255, 255, 0.92) !important;
-  --color-glass-border: rgba(20, 184, 205, 0.08) !important;
+  --color-glass-border: var(--color-primary-light) !important;
 
   /* ── Force light color scheme ── */
   color-scheme: light !important;
@@ -152,7 +152,7 @@
   overflow: hidden;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.88));
-  border: 1px solid rgba(20, 184, 205, 0.12);
+  border: 1px solid var(--color-primary-light);
   border-radius: 28px;
   box-shadow:
     0 20px 48px rgba(26, 26, 46, 0.16),
@@ -183,8 +183,8 @@
 }
 
 .mobile-tab-bar__item.is-active {
-  color: #0891B2;
-  background: rgba(20, 184, 205, 0.10);
+  color: var(--color-primary);
+  background: var(--color-primary-light);
 }
 
 .mobile-tab-bar__icon {
@@ -297,7 +297,7 @@ body.keyboard-open .mobile-tab-bar {
 .mobile-page-back {
   width: 40px;
   height: 40px;
-  border: 1px solid rgba(20, 184, 205, 0.14);
+  border: 1px solid var(--color-primary-light);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.88);
   color: var(--color-text-primary);
@@ -335,7 +335,7 @@ body.keyboard-open .mobile-tab-bar {
 
 .mobile-card {
   background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(20, 184, 205, 0.10);
+  border: 1px solid var(--color-primary-light);
   border-radius: 22px;
   box-shadow: 0 14px 36px rgba(26, 26, 46, 0.06);
 }
@@ -379,7 +379,7 @@ body.keyboard-open .mobile-page {
 /* ── CSS variable for chat top bar (overridden in dark mode) ── */
 .mobile-app {
   --mobile-topbar-bg: rgba(255, 255, 255, 0.94);
-  --mobile-topbar-border: rgba(20, 184, 205, 0.10);
+  --mobile-topbar-border: var(--color-primary-light);
   --mobile-btn-neutral-bg: var(--color-surface-2);
   --mobile-newchat-bg: #111827;
   --mobile-newchat-color: #ffffff;
@@ -404,7 +404,7 @@ body.keyboard-open .mobile-page {
   /* ── Dark borders ── */
   --color-border: #2C2C42 !important;
   --color-border-subtle: #1F1F30 !important;
-  --color-border-hover: #0891B2 !important;
+  --color-border-hover: var(--color-primary) !important;
 
   /* ── Light text on dark ── */
   --color-text-primary: #EEEEFF !important;
@@ -431,11 +431,11 @@ body.keyboard-open .mobile-page {
 
   /* ── Dark glass ── */
   --color-glass: rgba(20, 20, 31, 0.94) !important;
-  --color-glass-border: rgba(34, 211, 238, 0.14) !important;
+  --color-glass-border: var(--color-primary-light) !important;
 
   /* ── Dark topbar ── */
   --mobile-topbar-bg: rgba(13, 13, 22, 0.96);
-  --mobile-topbar-border: rgba(34, 211, 238, 0.14);
+  --mobile-topbar-border: var(--color-primary-light);
   --mobile-btn-neutral-bg: #1C1C2C;
   --mobile-newchat-bg: #232336;
   --mobile-newchat-color: #EEEEFF;
@@ -469,7 +469,7 @@ body.keyboard-open .mobile-page {
 .dark .mobile-tab-bar {
   background:
     linear-gradient(180deg, rgba(20, 20, 31, 0.97), rgba(13, 13, 22, 0.92));
-  border: 1px solid rgba(34, 211, 238, 0.18);
+  border: 1px solid var(--color-primary-light);
   box-shadow:
     0 20px 48px rgba(0, 0, 0, 0.40),
     0 2px 8px rgba(0, 0, 0, 0.24),
@@ -479,20 +479,20 @@ body.keyboard-open .mobile-page {
   color: #4A4A64;
 }
 .dark .mobile-tab-bar__item.is-active {
-  color: #67E8F9;
-  background: rgba(34, 211, 238, 0.16);
+  color: var(--color-primary);
+  background: var(--color-primary-light);
 }
 
 /* ── Dark page-back button ── */
 .dark .mobile-page-back {
   background: rgba(20, 20, 31, 0.90);
-  border-color: rgba(34, 211, 238, 0.18);
+  border-color: var(--color-primary-light);
 }
 
 /* ── Dark mobile-card ── */
 .dark .mobile-card {
   background: rgba(20, 20, 31, 0.96);
-  border: 1px solid rgba(34, 211, 238, 0.12);
+  border: 1px solid var(--color-primary-light);
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.28);
 }
 

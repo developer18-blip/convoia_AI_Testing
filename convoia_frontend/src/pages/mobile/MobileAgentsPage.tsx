@@ -73,7 +73,7 @@ export function MobileAgentsPage() {
             style={{
               padding: '7px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: 600,
               border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-              background: category === cat ? '#14B8CD' : 'var(--color-surface-2)',
+              background: category === cat ? 'var(--color-primary)' : 'var(--color-surface-2)',
               color: category === cat ? 'white' : 'var(--color-text-secondary)',
               transition: 'all 150ms',
             }}>

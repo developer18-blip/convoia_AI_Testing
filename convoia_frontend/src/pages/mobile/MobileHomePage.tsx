@@ -71,9 +71,9 @@ export function MobileHomePage() {
 
       {/* Token Balance Hero Card */}
       <div style={{
-        background: 'linear-gradient(135deg, #14B8CD, #0891B2, #0E7490)',
+        background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-hover))',
         borderRadius: '20px', padding: '24px', color: 'white',
-        boxShadow: '0 8px 32px rgba(20, 184, 205, 0.3)',
+        boxShadow: '0 8px 32px var(--color-primary-glow)',
       }}>
         <p style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.8, margin: '0 0 8px' }}>
           {isEmployee ? 'Your Token Budget' : 'Available Tokens'}

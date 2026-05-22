@@ -87,9 +87,9 @@ export function MobileWalletPage() {
     <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Token Balance Hero */}
       <div style={{
-        background: 'linear-gradient(135deg, #14B8CD, #0E7490)',
+        background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-hover))',
         borderRadius: '20px', padding: '28px 24px', color: 'white',
-        boxShadow: '0 8px 32px rgba(20, 184, 205, 0.3)',
+        boxShadow: '0 8px 32px var(--color-primary-glow)',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.6, margin: 0 }}>
@@ -109,12 +109,12 @@ export function MobileWalletPage() {
         <div style={{ display: 'flex', gap: '10px' }}>
           {canBuy && (
             <button onClick={() => handleBuy(packages.find(p => p.popular) || packages[0])}
-              style={{ flex: 1, padding: '12px', borderRadius: '12px', background: 'white', border: 'none', color: '#14B8CD', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
+              style={{ flex: 1, padding: '12px', borderRadius: '12px', background: 'white', border: 'none', color: 'var(--color-primary)', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
               + Buy Tokens
             </button>
           )}
           <button onClick={() => navigate('/usage')}
-            style={{ flex: 1, padding: '12px', borderRadius: '12px', background: canBuy ? 'rgba(255,255,255,0.15)' : 'white', border: '1px solid rgba(255,255,255,0.25)', color: canBuy ? 'white' : '#14B8CD', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
+            style={{ flex: 1, padding: '12px', borderRadius: '12px', background: canBuy ? 'rgba(255,255,255,0.15)' : 'white', border: '1px solid rgba(255,255,255,0.25)', color: canBuy ? 'white' : 'var(--color-primary)', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
             Usage Stats
           </button>
         </div>
@@ -128,9 +128,9 @@ export function MobileWalletPage() {
             <div key={pkg.id} onClick={() => handleBuy(pkg)}
               style={{
                 padding: '16px 12px', borderRadius: '16px', cursor: 'pointer',
-                background: pkg.popular ? 'linear-gradient(135deg, #14B8CD, #0891B2)' : 'white',
+                background: pkg.popular ? 'linear-gradient(135deg, var(--color-primary), var(--color-primary-hover))' : 'white',
                 border: pkg.popular ? 'none' : '0.5px solid rgba(0,0,0,0.08)',
-                boxShadow: pkg.popular ? '0 4px 20px rgba(20, 184, 205,0.3)' : '0 1px 4px rgba(0,0,0,0.04)',
+                boxShadow: pkg.popular ? '0 4px 20px var(--color-primary-glow)' : '0 1px 4px rgba(0,0,0,0.04)',
                 position: 'relative', textAlign: 'center',
               }}>
               {pkg.popular && (
@@ -147,7 +147,7 @@ export function MobileWalletPage() {
                 {formatTokens(pkg.tokens)}
               </p>
               <p style={{ fontSize: '10px', color: pkg.popular ? 'rgba(255,255,255,0.7)' : '#8E8EA0', margin: '0 0 10px', fontWeight: 500 }}>tokens</p>
-              <p style={{ fontSize: '22px', fontWeight: 800, color: pkg.popular ? 'white' : '#14B8CD', margin: 0, letterSpacing: '-0.5px' }}>
+              <p style={{ fontSize: '22px', fontWeight: 800, color: pkg.popular ? 'white' : 'var(--color-primary)', margin: 0, letterSpacing: '-0.5px' }}>
                 ${pkg.price}
               </p>
               {pkg.savings && (
