@@ -64,7 +64,10 @@
   --chat-code-bg: #F5F3FF !important;
   --chat-code-header: #EBE5FF !important;
   --chat-input-bg: #FFFFFF !important;
-  --chat-user-bubble: #14B8CD !important;
+  /* Provider-aware: the user's bubbles re-theme with the active model, exactly
+     like --color-primary above. Defaults to turquoise because
+     PROVIDER_THEMES.default.primary === #14B8CD, so empty/new chats stay brand. */
+  --chat-user-bubble: var(--provider-primary, #14B8CD) !important;
 
   /* ── Glass ── */
   --color-glass: rgba(255, 255, 255, 0.92) !important;
@@ -423,7 +426,8 @@ body.keyboard-open .mobile-page {
   --chat-code-bg: #1C1C2C !important;
   --chat-code-header: #232336 !important;
   --chat-input-bg: #14141F !important;
-  --chat-user-bubble: #14B8CD !important;
+  /* Provider-aware (see light-mode note above) — turquoise default, model color on chat. */
+  --chat-user-bubble: var(--provider-primary, #14B8CD) !important;
 
   /* ── Dark glass ── */
   --color-glass: rgba(20, 20, 31, 0.94) !important;
