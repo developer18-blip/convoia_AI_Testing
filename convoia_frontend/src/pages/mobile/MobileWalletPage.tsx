@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
-import { ArrowDownRight, ArrowUpRight, RefreshCw } from 'lucide-react'
+import { useState, useEffect, type ReactNode } from 'react'
+import { ArrowDownRight, ArrowUpRight, BarChart3, CreditCard, RefreshCw, ShieldCheck, Sparkles, Wallet } from 'lucide-react'
 import { useTokens } from '../../contexts/TokenContext'
 import { useAuth } from '../../hooks/useAuth'
 import { useNavigate } from 'react-router-dom'
@@ -15,6 +15,12 @@ interface Transaction {
   id: string; type: string; tokens: number; balanceAfter: number; description: string; createdAt: string
 }
 
+function formatTokens(n: number) {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 1 : 2).replace(/\.0+$/, '')}M`
+  if (n >= 1_000) return `${Math.round(n / 1_000)}k`
+  return n.toLocaleString()
+}
+
 export function MobileWalletPage() {
   const { tokenBalance, refresh: refreshTokens } = useTokens()
   const { user } = useAuth()
@@ -27,6 +33,10 @@ export function MobileWalletPage() {
   const isEmployee = !!user?.organizationId && user?.role !== 'org_owner' && user?.role !== 'platform_admin'
   const canBuy = !isEmployee
 
+  const popularPackage = packages.find(p => p.popular) || packages[0]
+  const usedThisList = transactions.filter(tx => tx.tokens < 0).reduce((s, tx) => s + Math.abs(tx.tokens), 0)
+  const addedThisList = transactions.filter(tx => tx.tokens > 0).reduce((s, tx) => s + tx.tokens, 0)
+
   const loadData = async () => {
     try {
       const [pkgRes, txRes] = await Promise.all([
@@ -37,8 +47,7 @@ export function MobileWalletPage() {
       setTransactions(txRes.data?.data?.transactions || [])
     } catch {
       toast.error('Failed to load wallet data. Pull down to retry.')
-    }
-    finally { setIsLoading(false) }
+    } finally { setIsLoading(false) }
   }
 
   useEffect(() => { loadData() }, [])
@@ -54,191 +63,193 @@ export function MobileWalletPage() {
     if (!pkg) { toast.error('No packages available'); return }
     try {
       const res = await api.post('/stripe/purchase-tokens', { packageId: pkg.id })
-      if (res.data?.data?.checkoutUrl) {
-        window.open(res.data.data.checkoutUrl, '_system')
-      }
+      if (res.data?.data?.checkoutUrl) window.open(res.data.data.checkoutUrl, '_system')
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Purchase failed')
     }
   }
 
-  const formatTokens = (n: number) => {
-    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
-    if (n >= 1_000) return `${(n / 1_000).toFixed(0)}k`
-    return n.toLocaleString()
-  }
-
-  const getTypeIcon = (type: string, tokens: number) => {
-    if (type === 'purchase' || tokens > 0) return { icon: <ArrowDownRight size={16} />, color: '#10B981', bg: 'rgba(16,185,129,0.1)' }
-    return { icon: <ArrowUpRight size={16} />, color: '#14B8CD', bg: 'rgba(20, 184, 205,0.1)' }
-  }
-
   if (isLoading) {
     return (
-      <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        {[1, 2, 3].map(i => (
-          <div key={i} style={{ height: i === 1 ? '180px' : '80px', borderRadius: '16px', background: '#F0EDF8', animation: 'pulse 1.5s ease-in-out infinite' }} />
+      <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {[1, 2, 3, 4].map(i => (
+          <div key={i} className="mobile-card" style={{ height: i === 1 ? 190 : 92, animation: 'pulse 1.5s ease-in-out infinite' }} />
         ))}
       </div>
     )
   }
 
   return (
-    <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Token Balance Hero */}
-      <div style={{
-        background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-hover))',
-        borderRadius: '20px', padding: '28px 24px', color: 'white',
-        boxShadow: '0 8px 32px var(--color-primary-glow)',
+    <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <header style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14 }}>
+        <div>
+          <p style={{ margin: 0, color: 'var(--color-primary)', fontSize: 14, fontWeight: 900 }}>Balance and billing</p>
+          <h1 style={{ margin: '4px 0 0', color: 'var(--color-text-primary)', fontSize: 32, lineHeight: 1.03, fontWeight: 900 }}>Wallet</h1>
+        </div>
+        <button onClick={handleRefresh} disabled={isRefreshing}
+          style={{ width: 42, height: 42, borderRadius: 15, border: '1px solid var(--color-border)', background: 'var(--color-surface)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 24px rgba(26,26,46,0.05)' }}
+          aria-label="Refresh wallet">
+          <RefreshCw size={18} style={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }} />
+        </button>
+      </header>
+
+      {/* ── Premium hero — brand/provider accent gradient ── */}
+      <section style={{
+        position: 'relative', overflow: 'hidden',
+        background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%)',
+        borderRadius: 28, padding: 22, color: 'white',
+        boxShadow: '0 18px 46px var(--color-primary-glow)',
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.6, margin: 0 }}>
-            Token Wallet
+        <div style={{ position: 'absolute', right: -46, top: -48, width: 150, height: 150, borderRadius: '50%', background: 'rgba(255,255,255,0.12)' }} />
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div>
+              <p style={{ margin: 0, fontSize: 11, fontWeight: 900, opacity: 0.78, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Available tokens</p>
+              <p style={{ margin: '10px 0 0', fontSize: 45, lineHeight: 0.95, fontWeight: 900 }}>{formatTokens(tokenBalance)}</p>
+            </div>
+            <div style={{ width: 50, height: 50, borderRadius: 18, background: 'rgba(255,255,255,0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(6px)' }}>
+              <Wallet size={24} />
+            </div>
+          </div>
+          <p style={{ margin: '12px 0 0', fontSize: 13, opacity: 0.82, fontWeight: 650 }}>
+            {user?.organizationId ? 'Organization wallet' : 'Personal plan'} · secure checkout
           </p>
-          <button onClick={handleRefresh} disabled={isRefreshing}
-            style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '8px', padding: '6px', cursor: 'pointer', color: 'white' }}>
-            <RefreshCw size={14} style={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }} />
-          </button>
-        </div>
-        <p style={{ fontSize: '44px', fontWeight: 800, margin: '8px 0 4px', letterSpacing: '-1.5px', lineHeight: 1 }}>
-          <AnimatedNumber value={tokenBalance} />
-        </p>
-        <p style={{ fontSize: '13px', opacity: 0.6, margin: '0 0 20px' }}>
-          tokens available · {user?.organizationId ? 'Organization' : 'Personal plan'}
-        </p>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          {canBuy && (
-            <button onClick={() => handleBuy(packages.find(p => p.popular) || packages[0])}
-              style={{ flex: 1, padding: '12px', borderRadius: '12px', background: 'white', border: 'none', color: 'var(--color-primary)', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
-              + Buy Tokens
+          <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+            {canBuy && (
+              <button onClick={() => handleBuy(popularPackage)} style={heroBtn(false)}>
+                <CreditCard size={16} /> Buy tokens
+              </button>
+            )}
+            <button onClick={() => navigate('/usage')} style={heroBtn(canBuy)}>
+              <BarChart3 size={16} /> Usage
             </button>
-          )}
-          <button onClick={() => navigate('/usage')}
-            style={{ flex: 1, padding: '12px', borderRadius: '12px', background: canBuy ? 'rgba(255,255,255,0.15)' : 'white', border: '1px solid rgba(255,255,255,0.25)', color: canBuy ? 'white' : 'var(--color-primary)', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
-            Usage Stats
-          </button>
+          </div>
         </div>
+      </section>
+
+      {/* ── Metric pills ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+        <WalletMetric label="Added" value={formatTokens(addedThisList)} icon={<ArrowDownRight size={15} />} color="#10B981" bg="rgba(16,185,129,0.12)" />
+        <WalletMetric label="Used" value={formatTokens(usedThisList)} icon={<ArrowUpRight size={15} />} color="var(--color-primary)" bg="var(--color-primary-light)" />
+        <WalletMetric label="Status" value={canBuy ? 'Ready' : 'Managed'} icon={<ShieldCheck size={15} />} color="var(--color-primary)" bg="var(--color-primary-light)" />
       </div>
 
-      {/* Token Packages — hidden for employees */}
-      {canBuy && <div>
-        <h2 style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#8E8EA0', margin: '0 0 12px' }}>Token Packages</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-          {packages.slice(0, 6).map(pkg => (
-            <div key={pkg.id} onClick={() => handleBuy(pkg)}
-              style={{
-                padding: '16px 12px', borderRadius: '16px', cursor: 'pointer',
-                background: pkg.popular ? 'linear-gradient(135deg, var(--color-primary), var(--color-primary-hover))' : 'white',
-                border: pkg.popular ? 'none' : '0.5px solid rgba(0,0,0,0.08)',
-                boxShadow: pkg.popular ? '0 4px 20px var(--color-primary-glow)' : '0 1px 4px rgba(0,0,0,0.04)',
-                position: 'relative', textAlign: 'center',
-              }}>
-              {pkg.popular && (
-                <span style={{
-                  position: 'absolute', top: '-9px', left: '50%', transform: 'translateX(-50%)',
-                  fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', padding: '3px 10px',
-                  borderRadius: '100px', background: '#10B981', color: 'white', letterSpacing: '0.04em',
-                  whiteSpace: 'nowrap',
-                }}>
-                  Best Value
-                </span>
-              )}
-              <p style={{ fontSize: '18px', fontWeight: 800, color: pkg.popular ? 'white' : '#1A1A2E', margin: '0 0 2px', letterSpacing: '-0.5px' }}>
-                {formatTokens(pkg.tokens)}
-              </p>
-              <p style={{ fontSize: '10px', color: pkg.popular ? 'rgba(255,255,255,0.7)' : '#8E8EA0', margin: '0 0 10px', fontWeight: 500 }}>tokens</p>
-              <p style={{ fontSize: '22px', fontWeight: 800, color: pkg.popular ? 'white' : 'var(--color-primary)', margin: 0, letterSpacing: '-0.5px' }}>
-                ${pkg.price}
-              </p>
-              {pkg.savings && (
-                <p style={{ fontSize: '10px', color: pkg.popular ? 'rgba(255,255,255,0.8)' : '#10B981', fontWeight: 700, margin: '4px 0 0' }}>
-                  {pkg.savings}
-                </p>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>}
+      {/* ── Token packages ── */}
+      {canBuy && (
+        <section>
+          <h2 className="mobile-section-title">Token packages</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+            {packages.slice(0, 6).map(pkg => (
+              <PackageCard key={pkg.id} pkg={pkg} onClick={() => handleBuy(pkg)} />
+            ))}
+          </div>
+        </section>
+      )}
 
-      {/* Transaction History */}
-      <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 12px' }}>
-          <h2 style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#8E8EA0', margin: 0 }}>Transactions</h2>
-          <span style={{ fontSize: '11px', color: '#8E8EA0' }}>{transactions.length} total</span>
+      {/* ── Transactions ── */}
+      <section>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <h2 className="mobile-section-title" style={{ margin: 0 }}>Transactions</h2>
+          <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 800 }}>{transactions.length} total</span>
         </div>
         {transactions.length === 0 ? (
-          <div style={{ padding: '40px 20px', textAlign: 'center', background: 'white', borderRadius: '16px', border: '0.5px solid rgba(0,0,0,0.08)' }}>
-            <p style={{ fontSize: '28px', margin: '0 0 8px' }}>📭</p>
-            <p style={{ fontSize: '14px', fontWeight: 600, color: '#1A1A2E', margin: '0 0 4px' }}>No transactions yet</p>
-            <p style={{ fontSize: '12px', color: '#8E8EA0', margin: 0 }}>Buy tokens or start chatting to see history</p>
+          <div className="mobile-card" style={{ padding: '34px 20px', textAlign: 'center' }}>
+            <div style={{ width: 52, height: 52, borderRadius: 18, background: 'var(--color-primary-light)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+              <Sparkles size={22} />
+            </div>
+            <p style={{ fontSize: 15, fontWeight: 900, color: 'var(--color-text-primary)', margin: 0 }}>No transactions yet</p>
+            <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '6px 0 0' }}>Activity appears here after buying tokens or chatting.</p>
           </div>
         ) : (
-          <div style={{ background: 'white', borderRadius: '16px', border: '0.5px solid rgba(0,0,0,0.08)', overflow: 'hidden' }}>
-            {transactions.map((tx, i) => {
-              const { icon, color, bg } = getTypeIcon(tx.type, tx.tokens)
-              return (
-                <div key={tx.id} style={{
-                  display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px',
-                  borderBottom: i < transactions.length - 1 ? '0.5px solid rgba(0,0,0,0.06)' : 'none',
-                }}>
-                  <div style={{
-                    width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: bg, color,
-                  }}>
-                    {icon}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: '13px', fontWeight: 600, color: '#1A1A2E', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {tx.description}
-                    </p>
-                    <p style={{ fontSize: '11px', color: '#8E8EA0', margin: '2px 0 0' }}>
-                      {new Date(tx.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      {' · '}
-                      {tx.type === 'purchase' ? 'Purchase' : tx.type === 'usage' ? 'Usage' : tx.type === 'allocation_received' ? 'Received' : tx.type === 'allocation_given' ? 'Sent' : tx.type}
-                    </p>
-                  </div>
-                  <span style={{
-                    fontSize: '14px', fontWeight: 700, fontFamily: 'monospace',
-                    color: tx.tokens > 0 ? '#10B981' : '#8E8EA0',
-                  }}>
-                    {tx.tokens > 0 ? '+' : ''}{formatTokens(Math.abs(tx.tokens))}
-                  </span>
-                </div>
-              )
-            })}
+          <div className="mobile-card" style={{ overflow: 'hidden', padding: 0 }}>
+            {transactions.map((tx, index) => (
+              <TransactionRow key={tx.id} tx={tx} last={index === transactions.length - 1} />
+            ))}
           </div>
         )}
-      </div>
+      </section>
 
-      {/* Spin animation for refresh icon */}
       <style>{`@keyframes spin { to { transform: rotate(360deg) } } @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.5 } }`}</style>
     </div>
   )
 }
 
-/** Animated count-up number display */
-function AnimatedNumber({ value }: { value: number }) {
-  const [display, setDisplay] = useState(0)
-  const prevValue = useRef(0)
+function heroBtn(split: boolean): React.CSSProperties {
+  return {
+    flex: 1, minHeight: 46, borderRadius: 16,
+    border: split ? '1px solid rgba(255,255,255,0.28)' : 'none',
+    background: split ? 'rgba(255,255,255,0.16)' : 'white',
+    color: split ? 'white' : 'var(--color-primary)',
+    fontSize: 14, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+    cursor: 'pointer',
+  }
+}
 
-  useEffect(() => {
-    const from = prevValue.current
-    const to = value
-    prevValue.current = value
-    if (from === to) { setDisplay(to); return }
+function WalletMetric({ icon, label, value, color, bg }: { icon: ReactNode; label: string; value: string; color: string; bg: string }) {
+  return (
+    <div className="mobile-card" style={{ padding: '12px 10px' }}>
+      <div style={{ width: 28, height: 28, borderRadius: 10, background: bg, color, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+        {icon}
+      </div>
+      <p style={{ margin: 0, color: 'var(--color-text-primary)', fontSize: 15, lineHeight: 1.1, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</p>
+      <p style={{ margin: '4px 0 0', color: 'var(--color-text-muted)', fontSize: 10, fontWeight: 800 }}>{label}</p>
+    </div>
+  )
+}
 
-    const duration = 600
-    const start = performance.now()
-    const step = (now: number) => {
-      const progress = Math.min((now - start) / duration, 1)
-      const eased = 1 - Math.pow(1 - progress, 3)
-      setDisplay(Math.round(from + (to - from) * eased))
-      if (progress < 1) requestAnimationFrame(step)
-    }
-    requestAnimationFrame(step)
-  }, [value])
+function PackageCard({ pkg, onClick }: { pkg: TokenPackage; onClick: () => void }) {
+  return (
+    <button onClick={onClick} style={{
+      position: 'relative', minHeight: 132, padding: '16px 9px 13px', borderRadius: 20, cursor: 'pointer',
+      background: pkg.popular ? 'linear-gradient(135deg, var(--color-primary), var(--color-primary-hover))' : 'var(--color-surface)',
+      boxShadow: pkg.popular ? '0 16px 34px var(--color-primary-glow)' : '0 6px 18px rgba(26,26,46,0.05)',
+      border: pkg.popular ? 'none' : '1px solid var(--color-border)',
+      textAlign: 'center', color: pkg.popular ? 'white' : 'var(--color-text-primary)',
+    }}>
+      {pkg.popular && (
+        <span style={{ position: 'absolute', top: -8, left: '50%', transform: 'translateX(-50%)', fontSize: 9, fontWeight: 900, textTransform: 'uppercase', padding: '4px 8px', borderRadius: 999, background: '#10B981', color: 'white', whiteSpace: 'nowrap' }}>
+          Best
+        </span>
+      )}
+      <p style={{ fontSize: 19, fontWeight: 900, margin: '0 0 2px' }}>{formatTokens(pkg.tokens)}</p>
+      <p style={{ fontSize: 10, color: pkg.popular ? 'rgba(255,255,255,0.74)' : 'var(--color-text-muted)', margin: '0 0 11px', fontWeight: 750 }}>tokens</p>
+      <p style={{ fontSize: 23, fontWeight: 900, color: pkg.popular ? 'white' : 'var(--color-primary)', margin: 0 }}>${pkg.price}</p>
+      {pkg.savings && (
+        <p style={{ fontSize: 10, color: pkg.popular ? 'rgba(255,255,255,0.82)' : '#10B981', fontWeight: 900, margin: '4px 0 0' }}>{pkg.savings}</p>
+      )}
+    </button>
+  )
+}
 
-  return <>{display.toLocaleString()}</>
+function TransactionRow({ tx, last }: { tx: Transaction; last: boolean }) {
+  const positive = tx.type === 'purchase' || tx.tokens > 0
+  const color = positive ? '#10B981' : 'var(--color-primary)'
+  const bg = positive ? 'rgba(16,185,129,0.12)' : 'var(--color-primary-light)'
+  const Icon = positive ? ArrowDownRight : ArrowUpRight
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 15px', borderBottom: last ? 'none' : '1px solid var(--color-border)' }}>
+      <div style={{ width: 40, height: 40, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', background: bg, color, flexShrink: 0 }}>
+        <Icon size={17} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontSize: 13, fontWeight: 850, color: 'var(--color-text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx.description}</p>
+        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '3px 0 0', fontWeight: 650 }}>
+          {new Date(tx.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {labelTransaction(tx.type)}
+        </p>
+      </div>
+      <span style={{ fontSize: 14, fontWeight: 900, fontFamily: 'monospace', color }}>
+        {tx.tokens > 0 ? '+' : ''}{formatTokens(Math.abs(tx.tokens))}
+      </span>
+    </div>
+  )
+}
+
+function labelTransaction(type: string) {
+  if (type === 'purchase') return 'Purchase'
+  if (type === 'usage') return 'Usage'
+  if (type === 'allocation_received') return 'Received'
+  if (type === 'allocation_given') return 'Sent'
+  return type
 }
 
 export default MobileWalletPage
