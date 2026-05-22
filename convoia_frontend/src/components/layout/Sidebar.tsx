@@ -76,6 +76,7 @@ function getNavItems(role: string, hasOrg: boolean): NavItem[] {
     return [
       ...base,
       { icon: <Users size={20} />, label: 'Team', path: '/team' },
+      { icon: <Target size={20} />, label: 'Budgets', path: '/budgets' },
       { icon: <Coins size={20} />, label: 'Token Pools', path: '/tokens' },
       { icon: <BarChart3 size={20} />, label: 'Analytics', path: '/org/analytics' },
       { icon: <Coins size={20} />, label: 'Buy Tokens', path: '/tokens/buy' },
