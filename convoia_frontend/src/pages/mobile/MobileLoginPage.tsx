@@ -65,9 +65,9 @@ export function MobileLoginPage() {
       background: '#F8F7FF',
       paddingTop: 'env(safe-area-inset-top, 0px)',
     }}>
-      {/* Purple gradient hero */}
+      {/* Brand turquoise gradient hero */}
       <div style={{
-        background: 'linear-gradient(135deg, #14B8CD 0%, #0E7490 50%, #4C1D95 100%)',
+        background: 'linear-gradient(135deg, #22D3EE 0%, #14B8CD 45%, #0E7490 100%)',
         padding: '40px 24px 60px',
         position: 'relative', overflow: 'hidden',
         borderRadius: '0 0 32px 32px',

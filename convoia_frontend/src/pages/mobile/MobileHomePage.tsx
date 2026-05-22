@@ -6,7 +6,7 @@ import { usePullToRefresh } from '../../hooks/usePullToRefresh'
 import {
   Zap, MessageSquare, Coins, Clock, Users, Building2,
   TrendingUp, ChevronRight, Shield, BarChart3, DollarSign,
-  Target, CheckSquare, Receipt, Key,
+  Target, CheckSquare, Receipt, Key, Wallet,
 } from 'lucide-react'
 import { Avatar } from '../../components/ui/Avatar'
 
@@ -71,26 +71,38 @@ export function MobileHomePage() {
 
       {/* Token Balance Hero Card */}
       <div style={{
+        position: 'relative', overflow: 'hidden',
         background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-hover))',
-        borderRadius: '20px', padding: '24px', color: 'white',
-        boxShadow: '0 8px 32px var(--color-primary-glow)',
+        borderRadius: '24px', padding: '22px 24px', color: 'white',
+        boxShadow: '0 18px 44px var(--color-primary-glow)',
       }}>
-        <p style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.8, margin: '0 0 8px' }}>
-          {isEmployee ? 'Your Token Budget' : 'Available Tokens'}
-        </p>
-        <p style={{ fontSize: '40px', fontWeight: 800, margin: '0 0 6px', letterSpacing: '-1px', lineHeight: 1 }}>
-          {(tokenBalance ?? 0).toLocaleString()}
-        </p>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
-          <p style={{ fontSize: '12px', opacity: 0.7, margin: 0 }}>
-            {(totalUsed ?? 0) > 0 ? `${(totalUsed ?? 0).toLocaleString()} used total` : 'Ready to use'}
-          </p>
-          {!isEmployee && (
-            <button onClick={() => navigate('/tokens/buy')}
-              style={{ padding: '6px 16px', borderRadius: '20px', background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)', color: 'white', fontSize: '12px', fontWeight: 600, cursor: 'pointer', backdropFilter: 'blur(8px)' }}>
-              Buy more →
-            </button>
-          )}
+        <div style={{ position: 'absolute', right: -40, top: -44, width: 140, height: 140, borderRadius: '50%', background: 'rgba(255,255,255,0.12)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', right: 30, bottom: -50, width: 96, height: 96, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', pointerEvents: 'none' }} />
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+            <div>
+              <p style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em', opacity: 0.82, margin: '0 0 8px' }}>
+                {isEmployee ? 'Your Token Budget' : 'Available Tokens'}
+              </p>
+              <p style={{ fontSize: '40px', fontWeight: 800, margin: 0, letterSpacing: '-1px', lineHeight: 1 }}>
+                {(tokenBalance ?? 0).toLocaleString()}
+              </p>
+            </div>
+            <div style={{ width: 46, height: 46, borderRadius: 16, background: 'rgba(255,255,255,0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(6px)', flexShrink: 0 }}>
+              <Wallet size={22} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
+            <p style={{ fontSize: '12px', opacity: 0.78, margin: 0, fontWeight: 600 }}>
+              {(totalUsed ?? 0) > 0 ? `${(totalUsed ?? 0).toLocaleString()} used total` : 'Ready to use'}
+            </p>
+            {!isEmployee && (
+              <button onClick={() => navigate('/tokens/buy')}
+                style={{ padding: '7px 16px', borderRadius: '20px', background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.32)', color: 'white', fontSize: '12px', fontWeight: 800, cursor: 'pointer', backdropFilter: 'blur(8px)' }}>
+                Buy more →
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -235,7 +247,7 @@ const sectionTitle: React.CSSProperties = { fontSize: '14px', fontWeight: 700, t
 
 function StatCard({ icon, iconColor, iconBg, value, label, sub }: { icon: React.ReactNode; iconColor: string; iconBg: string; value: string; label: string; sub?: string }) {
   return (
-    <div style={{ background: 'var(--color-surface)', borderRadius: '16px', padding: '16px', border: '1px solid var(--color-border)' }}>
+    <div className="mobile-card" style={{ padding: '16px' }}>
       <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: iconBg, color: iconColor, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '12px' }}>
         {icon}
       </div>
@@ -248,9 +260,8 @@ function StatCard({ icon, iconColor, iconBg, value, label, sub }: { icon: React.
 
 function QuickAction({ icon, label, sub, color, onClick }: { icon: React.ReactNode; label: string; sub: string; color: string; onClick: () => void }) {
   return (
-    <button onClick={onClick} style={{
-      background: 'var(--color-surface)', borderRadius: '16px', padding: '16px', border: '1px solid var(--color-border)',
-      cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '12px',
+    <button onClick={onClick} className="mobile-card" style={{
+      padding: '16px', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '12px',
     }}>
       <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: `${color}15`, color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
         {icon}

@@ -111,10 +111,7 @@ export function MobileSettingsPage() {
   return (
     <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '100px' }}>
       {/* Profile Card */}
-      <div style={{
-        background: 'var(--color-surface)', borderRadius: '20px', padding: '24px',
-        border: '1px solid var(--color-border)', textAlign: 'center',
-      }}>
+      <div className="mobile-card" style={{ padding: '24px', textAlign: 'center' }}>
         {/* Avatar */}
         <div style={{ position: 'relative', display: 'inline-block', marginBottom: '16px' }}>
           <Avatar name={user?.name || 'User'} src={user?.avatar} size="lg" />
@@ -246,7 +243,7 @@ export function MobileSettingsPage() {
       </NavSection>
 
       {showPasswordSection && (
-        <div style={{ background: 'var(--color-surface)', borderRadius: '16px', padding: '20px', border: '1px solid var(--color-border)' }}>
+        <div className="mobile-card" style={{ padding: '20px' }}>
           <InputField label="Current password" type="password" value={currentPw} onChange={setCurrentPw} placeholder="Enter current password" />
           <div style={{ marginTop: '12px', position: 'relative' }}>
             <InputField label="New password" type={showNewPw ? 'text' : 'password'} value={newPw} onChange={setNewPw} placeholder="Min 8 characters" />
@@ -295,7 +292,7 @@ export function MobileSettingsPage() {
         <h2 style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#EF4444', margin: '0 0 10px', paddingLeft: '4px' }}>
           Danger Zone
         </h2>
-        <div style={{ background: 'var(--color-surface)', borderRadius: '16px', border: '1px solid rgba(239,68,68,0.25)', padding: '16px' }}>
+        <div className="mobile-card" style={{ border: '1px solid rgba(239,68,68,0.25)', padding: '16px' }}>
           {isOwner ? (
             <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: 0, lineHeight: 1.5 }}>
               As the organization owner, you can't delete your account from here. Transfer ownership to another member or contact{' '}
@@ -345,7 +342,7 @@ function NavSection({ title, children }: { title: string; children: React.ReactN
       <h2 style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-muted)', margin: '0 0 10px', paddingLeft: '4px' }}>
         {title}
       </h2>
-      <div style={{ background: 'var(--color-surface)', borderRadius: '16px', border: '1px solid var(--color-border)', overflow: 'hidden' }}>
+      <div className="mobile-card" style={{ overflow: 'hidden' }}>
         {children}
       </div>
     </div>
