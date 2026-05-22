@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import {
   ChevronRight, LogOut, Camera, Lock, Eye, EyeOff,
   Users, Building2, DollarSign, BarChart3, Shield,
-  Key, FileText, Activity, Briefcase, Coins, UserPlus,
+  Key, FileText, Activity, Briefcase, Coins, UserPlus, Sun, Moon,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
+import { useTheme } from '../../hooks/useTheme'
 import { Avatar } from '../../components/ui/Avatar'
 import { passwordStrength } from '../../lib/utils'
 import api from '../../lib/api'
@@ -15,6 +16,8 @@ export function MobileSettingsPage() {
   const { user, updateUser, logout } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
+  const { resolvedTheme, toggleTheme } = useTheme()
+  const isDark = resolvedTheme === 'dark'
 
   const role = user?.role || 'employee'
   const hasOrg = !!user?.organizationId
@@ -199,6 +202,41 @@ export function MobileSettingsPage() {
         {!hasOrg && <NavItem icon={<FileText size={18} />} label="API Docs" sub="Documentation" onClick={() => navigate('/api-docs')} />}
         {hasOrg && <NavItem icon={<Briefcase size={18} />} label="My Budget" sub="Your token budget" onClick={() => navigate('/budget')} />}
         <NavItem icon={<FileText size={18} />} label="Tasks" sub="Your tasks" onClick={() => navigate('/tasks')} last />
+      </NavSection>
+
+      {/* ─── APPEARANCE — dark / light toggle ─── */}
+      <NavSection title="Appearance">
+        <button onClick={toggleTheme}
+          style={{
+            width: '100%', padding: '14px 16px', border: 'none', background: 'transparent',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px',
+          }}>
+          <div style={{
+            width: '36px', height: '36px', borderRadius: '10px', background: 'var(--color-surface-2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-primary)', flexShrink: 0,
+          }}>
+            {isDark ? <Sun size={18} /> : <Moon size={18} />}
+          </div>
+          <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
+            <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)', margin: 0 }}>
+              {isDark ? 'Dark mode' : 'Light mode'}
+            </p>
+            <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: '2px 0 0' }}>
+              {isDark ? 'Tap to switch to light' : 'Tap to switch to dark'}
+            </p>
+          </div>
+          <div style={{
+            width: '46px', height: '26px', borderRadius: '999px', flexShrink: 0,
+            background: isDark ? 'var(--color-primary)' : 'var(--color-border)',
+            position: 'relative', transition: 'background 200ms',
+          }}>
+            <div style={{
+              position: 'absolute', top: '3px', left: isDark ? '23px' : '3px',
+              width: '20px', height: '20px', borderRadius: '50%', background: '#FFFFFF',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.20)', transition: 'left 200ms ease',
+            }} />
+          </div>
+        </button>
       </NavSection>
 
       {/* ─── SECURITY ─── */}

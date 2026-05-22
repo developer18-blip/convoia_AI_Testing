@@ -5,7 +5,22 @@
    Desktop website is COMPLETELY UNAFFECTED.
    ═══════════════════════════════════════════════════════ */
 
+:root {
+  --vh: 1dvh;
+  --keyboard-height: 0px;
+}
+
 .mobile-app {
+  /* height must live here, NOT in an inline React style — iOS WKWebView caches
+     calc(var(--x)) at style-set time for inline styles and does not recompute
+     when --x changes, so the keyboard-driven --vh update has no effect. A CSS
+     class rule with var() IS reactive and reflows when --vh changes. */
+  height: calc(var(--vh, 1dvh) * 100);
+  overflow: hidden;
+
+  --mobile-tabbar-base-height: 72px;
+  --mobile-tabbar-reserved: calc(98px + env(safe-area-inset-bottom, 0px));
+
   /* ── Primary: Purple ── */
   --color-primary: #7C3AED !important;
   --color-primary-hover: #6D28D9 !important;
@@ -17,9 +32,9 @@
   --color-accent-end: #A78BFA !important;
 
   /* ── Light background ── */
-  --color-background: #F8F7FF !important;
+  --color-background: #F7F6FC !important;
   --color-surface: #FFFFFF !important;
-  --color-surface-2: #F3F0FF !important;
+  --color-surface-2: #F1EEFB !important;
   --color-surface-3: #EBE5FF !important;
 
   /* ── Borders ── */
@@ -55,8 +70,16 @@
 
   /* ── Force light color scheme ── */
   color-scheme: light !important;
-  background-color: #F8F7FF !important;
+  background-color: #F7F6FC !important;
   color: #1A1A2E !important;
+}
+
+.mobile-app button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-app button:active {
+  transform: scale(0.985);
 }
 
 /* ── Mobile user bubble: white text on purple ── */
@@ -111,7 +134,82 @@
 
 /* ── Mobile bottom tab safe area ── */
 .mobile-tab-bar {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  position: fixed;
+  right: 12px;
+  bottom: max(10px, env(safe-area-inset-bottom, 0px));
+  left: 12px;
+  z-index: 50;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: stretch;
+  min-height: var(--mobile-tabbar-base-height);
+  padding: 8px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.88));
+  border: 1px solid rgba(124, 58, 237, 0.12);
+  border-radius: 28px;
+  box-shadow:
+    0 20px 48px rgba(26, 26, 46, 0.16),
+    0 2px 8px rgba(26, 26, 46, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(24px) saturate(1.35);
+  -webkit-backdrop-filter: blur(24px) saturate(1.35);
+}
+
+.mobile-tab-bar__item {
+  min-width: 0;
+  min-height: 56px;
+  border: 0;
+  border-radius: 22px;
+  background: transparent;
+  color: #9290A3;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 6px 2px 5px;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.mobile-tab-bar__item.is-active {
+  color: #6D28D9;
+  background: rgba(124, 58, 237, 0.10);
+}
+
+.mobile-tab-bar__icon {
+  width: 28px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-tab-bar__label {
+  max-width: 100%;
+  overflow: hidden;
+  color: inherit;
+  font-size: 10.5px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-tab-bar__item.is-active .mobile-tab-bar__label {
+  font-weight: 800;
+}
+
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .mobile-tab-bar {
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 /* ── Hide tab bar when keyboard opens ── */
@@ -121,5 +219,283 @@ body.keyboard-open .mobile-tab-bar {
 
 /* ── Mobile main content: account for tab bar height ── */
 .mobile-app-content {
-  padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: var(--mobile-tabbar-reserved);
+}
+
+.mobile-page {
+  min-height: 100%;
+  padding: 16px 16px var(--mobile-tabbar-reserved);
+}
+
+.mobile-route-frame {
+  min-height: 100%;
+  padding: 14px 16px var(--mobile-tabbar-reserved);
+}
+
+.mobile-route-body {
+  overflow: hidden;
+}
+
+.mobile-route-body > .mobile-page {
+  padding: 0;
+}
+
+.mobile-route-body > .space-y-6 {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mobile-route-body h2.text-2xl,
+.mobile-route-body h2.text-3xl,
+.mobile-route-body h1 {
+  display: none;
+}
+
+.mobile-route-body .grid {
+  grid-template-columns: 1fr !important;
+}
+
+.mobile-route-body .sm\:grid-cols-2,
+.mobile-route-body .lg\:grid-cols-2,
+.mobile-route-body .lg\:grid-cols-3,
+.mobile-route-body .lg\:grid-cols-4,
+.mobile-route-body .xl\:grid-cols-5 {
+  grid-template-columns: 1fr !important;
+}
+
+.mobile-route-body .rounded-2xl,
+.mobile-route-body .rounded-xl,
+.mobile-route-body .bg-surface,
+.mobile-route-body [class*="bg-gradient"] {
+  border-radius: 22px !important;
+  box-shadow: 0 14px 36px rgba(26, 26, 46, 0.06);
+}
+
+.mobile-route-body table {
+  min-width: 620px;
+}
+
+.mobile-route-body .overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+.mobile-page-header {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  min-height: 44px;
+}
+
+.mobile-page-back {
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(124, 58, 237, 0.14);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 20px rgba(26, 26, 46, 0.05);
+}
+
+.mobile-page-title-wrap {
+  min-width: 0;
+  text-align: center;
+}
+
+.mobile-page-title-wrap h1 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: 20px;
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.mobile-page-title-wrap p {
+  margin: 4px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.mobile-page-action {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.mobile-card {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(124, 58, 237, 0.10);
+  border-radius: 22px;
+  box-shadow: 0 14px 36px rgba(26, 26, 46, 0.06);
+}
+
+.mobile-section-title {
+  margin: 0 0 10px;
+  padding-left: 2px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+/* ── CSS variable for tabbar-aware height calculations ──
+   Switches to 0 when keyboard is open so chat/page heights
+   use the full available viewport above the keyboard.       */
+.mobile-app {
+  --tabbar-kb-offset: var(--mobile-tabbar-reserved, 98px);
+}
+
+body.keyboard-open .mobile-app {
+  --tabbar-kb-offset: 0px;
+}
+
+/* Remove bottom padding reserved for tab bar when keyboard is open
+   so non-chat pages can scroll their full content into view.        */
+body.keyboard-open .mobile-app-content {
+  padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+}
+
+body.keyboard-open .mobile-page {
+  padding-bottom: env(safe-area-inset-bottom, 16px) !important;
+}
+
+/* Prevent overscroll/rubber-band pull-to-refresh on scrollable content */
+.mobile-app-content {
+  overscroll-behavior: none;
+}
+
+/* ── CSS variable for chat top bar (overridden in dark mode) ── */
+.mobile-app {
+  --mobile-topbar-bg: rgba(255, 255, 255, 0.94);
+  --mobile-topbar-border: rgba(124, 58, 237, 0.10);
+  --mobile-btn-neutral-bg: var(--color-surface-2);
+  --mobile-newchat-bg: #111827;
+  --mobile-newchat-color: #ffffff;
+}
+
+/* ════════════════════════════════════════════════════════
+   DARK MODE — applies when html.dark is set by ThemeContext
+   ════════════════════════════════════════════════════════ */
+.dark .mobile-app {
+  /* ── Primary stays purple ── */
+  --color-primary: #8B5CF6 !important;
+  --color-primary-hover: #7C3AED !important;
+  --color-primary-light: rgba(139, 92, 246, 0.14) !important;
+  --color-primary-glow: rgba(139, 92, 246, 0.08) !important;
+
+  /* ── Dark backgrounds ── */
+  --color-background: #0D0D16 !important;
+  --color-surface: #14141F !important;
+  --color-surface-2: #1C1C2C !important;
+  --color-surface-3: #232336 !important;
+
+  /* ── Dark borders ── */
+  --color-border: #2C2C42 !important;
+  --color-border-subtle: #1F1F30 !important;
+  --color-border-hover: #6D28D9 !important;
+
+  /* ── Light text on dark ── */
+  --color-text-primary: #EEEEFF !important;
+  --color-text-secondary: #9898B8 !important;
+  --color-text-muted: #65658A !important;
+  --color-text-meta: #65658A !important;
+  --color-text-dim: #44445C !important;
+
+  /* ── Dark chat ── */
+  --chat-bg: #0D0D16 !important;
+  --chat-sidebar-bg: #14141F !important;
+  --chat-surface: #1C1C2C !important;
+  --chat-hover: #232336 !important;
+  --chat-border: #2C2C42 !important;
+  --chat-text: #EEEEFF !important;
+  --chat-text-secondary: #9898B8 !important;
+  --chat-text-muted: #65658A !important;
+  --chat-text-dim: #44445C !important;
+  --chat-code-bg: #1C1C2C !important;
+  --chat-code-header: #232336 !important;
+  --chat-input-bg: #14141F !important;
+  --chat-user-bubble: #7C3AED !important;
+
+  /* ── Dark glass ── */
+  --color-glass: rgba(20, 20, 31, 0.94) !important;
+  --color-glass-border: rgba(139, 92, 246, 0.14) !important;
+
+  /* ── Dark topbar ── */
+  --mobile-topbar-bg: rgba(13, 13, 22, 0.96);
+  --mobile-topbar-border: rgba(139, 92, 246, 0.14);
+  --mobile-btn-neutral-bg: #1C1C2C;
+  --mobile-newchat-bg: #232336;
+  --mobile-newchat-color: #EEEEFF;
+
+  color-scheme: dark !important;
+  background-color: #0D0D16 !important;
+  color: #EEEEFF !important;
+}
+
+/* ── Dark inputs ── */
+.dark .mobile-app input,
+.dark .mobile-app textarea,
+.dark .mobile-app select {
+  color-scheme: dark;
+  color: #EEEEFF;
+  background-color: var(--color-surface-2);
+}
+.dark .mobile-app input::placeholder,
+.dark .mobile-app textarea::placeholder {
+  color: #44445C;
+}
+
+/* ── Dark code blocks ── */
+.dark .mobile-app code:not(pre code) {
+  background: #1C1C2C !important;
+  color: #A78BFA !important;
+  border: 1px solid #2C2C42 !important;
+}
+
+/* ── Dark tab bar ── */
+.dark .mobile-tab-bar {
+  background:
+    linear-gradient(180deg, rgba(20, 20, 31, 0.97), rgba(13, 13, 22, 0.92));
+  border: 1px solid rgba(139, 92, 246, 0.18);
+  box-shadow:
+    0 20px 48px rgba(0, 0, 0, 0.40),
+    0 2px 8px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(139, 92, 246, 0.10);
+}
+.dark .mobile-tab-bar__item {
+  color: #4A4A64;
+}
+.dark .mobile-tab-bar__item.is-active {
+  color: #A78BFA;
+  background: rgba(139, 92, 246, 0.16);
+}
+
+/* ── Dark page-back button ── */
+.dark .mobile-page-back {
+  background: rgba(20, 20, 31, 0.90);
+  border-color: rgba(139, 92, 246, 0.18);
+}
+
+/* ── Dark mobile-card ── */
+.dark .mobile-card {
+  background: rgba(20, 20, 31, 0.96);
+  border: 1px solid rgba(139, 92, 246, 0.12);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.28);
+}
+
+/* ── Dark user bubble ── */
+.dark .mobile-app .user-msg-container {
+  color: #FFFFFF;
+}
+
+/* ── Dark body background to prevent white flash on scroll edges ── */
+.dark body {
+  background-color: #0D0D16;
 }
