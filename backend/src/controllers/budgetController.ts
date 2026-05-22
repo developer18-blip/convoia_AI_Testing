@@ -10,18 +10,38 @@ export const setBudget = asyncHandler(async (req: Request, res: Response) => {
     throw new AppError('Unauthorized', 401);
   }
 
-  const userId = req.params.userId || req.user.userId;
-  const { monthlyCap, alertThreshold = 80, autoDowngrade = true, fallbackModelId } = req.body as SetBudgetRequest & {
+  // Target user may be supplied via the path (POST /set/:userId) or the request
+  // body (PUT/POST /set), falling back to the caller's own id for self-service.
+  const { monthlyCap, alertThreshold = 80, autoDowngrade = true, fallbackModelId, userId: bodyUserId } = req.body as SetBudgetRequest & {
     orgId?: string;
+    userId?: string;
   };
+  const userId = req.params.userId || bodyUserId || req.user.userId;
 
   if (!isValidUUID(userId)) {
     throw new AppError('Invalid user ID format', 400);
   }
 
-  // Check authorization
-  if (userId !== req.user.userId && req.user.role !== 'admin' && req.user.role !== 'platform_admin') {
-    throw new AppError('Unauthorized to set budget for this user', 403);
+  // Authorization: a user may set their own budget; platform staff may set
+  // anyone's; org owners/managers may set budgets only for members of their
+  // own organization.
+  if (userId !== req.user.userId) {
+    const isPlatformStaff = req.user.role === 'admin' || req.user.role === 'platform_admin';
+    const isOrgManager = req.user.role === 'org_owner' || req.user.role === 'manager';
+
+    if (!isPlatformStaff && !isOrgManager) {
+      throw new AppError('Unauthorized to set budget for this user', 403);
+    }
+
+    if (isOrgManager && !isPlatformStaff) {
+      const target = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { organizationId: true },
+      });
+      if (!target || !req.user.organizationId || target.organizationId !== req.user.organizationId) {
+        throw new AppError('Unauthorized to set budget for this user', 403);
+      }
+    }
   }
 
   if (!monthlyCap || monthlyCap <= 0) {
