@@ -22,6 +22,7 @@ import { ConvoiaMark } from '../brand/ConvoiaMark'
 import { ComputationLine } from '../primitives/ComputationLine'
 import { useAccent } from '../../contexts/AccentContext'
 import { useChat } from '../../hooks/useChat'
+import { isNative } from '../../lib/capacitor'
 import { PROVIDER_THEMES, getProviderFromModelId } from '../../config/providers'
 
 // Stable module-level reference — ReactMarkdown does a shallow compare
@@ -146,19 +147,26 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
     // Reopen-on-tap: when the panel isn't currently showing THIS turn, tapping
     // the answer re-points the panel at it. Guarded so it doesn't fire while the
     // user is selecting text to copy.
+    // canShowPanel: ApolloPanelHost is only mounted on the web ChatPage, NOT in
+    // MobileChatPage (native). Until the mobile panel ships (v1.2.0), the reopen
+    // affordances would be dead on native — so gate them off there. isNative is
+    // the proxy for "panel host present"; remove this guard when the mobile
+    // sprint wires ApolloPanelHost into the native shell.
+    const canShowPanel = !isNative
     const panelOpenForThis = currentApolloTurnId === message.id
     const reopenPanel = () => {
-      if (panelOpenForThis) return
+      if (!canShowPanel || panelOpenForThis) return
       const sel = typeof window !== 'undefined' ? window.getSelection?.() : null
       if (sel && sel.toString().length > 0) return
       setCurrentApolloTurnId(message.id)
     }
+    const showReopenAffordance = canShowPanel && !panelOpenForThis
 
     return (
       <div
-        style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '28px', cursor: panelOpenForThis ? 'default' : 'pointer' }}
-        onClick={reopenPanel}
-        title={panelOpenForThis ? undefined : 'Show Apollo reasoning panel'}
+        style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '28px', cursor: showReopenAffordance ? 'pointer' : 'default' }}
+        onClick={canShowPanel ? reopenPanel : undefined}
+        title={showReopenAffordance ? 'Show Apollo reasoning panel' : undefined}
       >
         <div style={{
           width: 32, height: 32, borderRadius: '10px', flexShrink: 0,
@@ -235,8 +243,9 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
             </div>
           )}
 
-          {/* Reopen affordance — only when the panel isn't currently showing this turn. */}
-          {!panelOpenForThis && (council.phase === 'complete' || council.phase === 'error') && (
+          {/* Reopen affordance — only when the panel isn't currently showing this
+              turn AND a panel host exists in this route (web only for now). */}
+          {showReopenAffordance && (council.phase === 'complete' || council.phase === 'error') && (
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setCurrentApolloTurnId(message.id) }}
