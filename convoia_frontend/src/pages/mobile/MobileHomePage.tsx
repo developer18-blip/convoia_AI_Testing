@@ -6,6 +6,7 @@ import { usePullToRefresh } from '../../hooks/usePullToRefresh'
 import {
   Zap, MessageSquare, Coins, Clock, Users, Building2,
   TrendingUp, ChevronRight, Shield, BarChart3, DollarSign,
+  Target, CheckSquare, Receipt, Key,
 } from 'lucide-react'
 import { Avatar } from '../../components/ui/Avatar'
 
@@ -127,15 +128,37 @@ export function MobileHomePage() {
         })()
       )}
 
-      {/* ─── MANAGER / ORG OWNER: Quick Actions ─── */}
-      {(isManager || isOwner) && (
+      {/* ─── Quick Actions (role-aware) — every feature reachable on mobile ─── */}
+      {!isAdmin && (
         <div>
           <h2 style={sectionTitle}>Quick Actions</h2>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            <QuickAction icon={<Users size={20} />} label="Team" sub="Manage members" color="#7C3AED" onClick={() => navigate('/team')} />
-            {isOwner && <QuickAction icon={<Building2 size={20} />} label="Organization" sub="Settings & billing" color="#3B82F6" onClick={() => navigate('/org')} />}
-            {isOwner && <QuickAction icon={<DollarSign size={20} />} label="Billing" sub="Payments & invoices" color="#10B981" onClick={() => navigate('/org/billing')} />}
-            <QuickAction icon={<BarChart3 size={20} />} label="Analytics" sub={isOwner ? 'Org analytics' : 'Usage stats'} color="#F59E0B" onClick={() => navigate(isOwner ? '/org/analytics' : '/usage')} />
+            {(isManager || isOwner) && (
+              <QuickAction icon={<Users size={20} />} label="Team" sub="Manage members" color="#3B82F6" onClick={() => navigate('/team')} />
+            )}
+            {(isManager || isOwner) && (
+              <QuickAction icon={<Target size={20} />} label="Budgets" sub="Team caps & limits" color="#7C3AED" onClick={() => navigate('/budgets')} />
+            )}
+            {isEmployee && (
+              <QuickAction icon={<Target size={20} />} label="My Budget" sub="Spend & limit" color="#7C3AED" onClick={() => navigate('/budget')} />
+            )}
+            {isOwner && (
+              <QuickAction icon={<Building2 size={20} />} label="Organization" sub="Settings" color="#8B5CF6" onClick={() => navigate('/org')} />
+            )}
+            {isOwner && (
+              <QuickAction icon={<DollarSign size={20} />} label="Billing" sub="Payments & invoices" color="#10B981" onClick={() => navigate('/org/billing')} />
+            )}
+            <QuickAction icon={<BarChart3 size={20} />} label={isEmployee ? 'My Usage' : 'Analytics'} sub="Usage & stats" color="#F59E0B" onClick={() => navigate(isOwner ? '/org/analytics' : '/usage')} />
+            {hasOrg && (
+              <QuickAction icon={<CheckSquare size={20} />} label="Tasks" sub="Your tasks" color="#06B6D4" onClick={() => navigate('/tasks')} />
+            )}
+            <QuickAction icon={<Receipt size={20} />} label="Transactions" sub="Billing history" color="#EC4899" onClick={() => navigate('/transactions')} />
+            {!isEmployee && (
+              <QuickAction icon={<Coins size={20} />} label="Buy Tokens" sub="Top up balance" color="#A855F7" onClick={() => navigate('/tokens/buy')} />
+            )}
+            {!hasOrg && (
+              <QuickAction icon={<Key size={20} />} label="API Keys" sub="Developer access" color="#0EA5E9" onClick={() => navigate('/api-keys')} />
+            )}
           </div>
         </div>
       )}

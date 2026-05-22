@@ -11,8 +11,13 @@ import { ScreenErrorBoundary } from '../shared/ErrorBoundary'
  */
 export function MobileAppShell() {
   const location = useLocation()
-  // Chat page manages its own full-bleed layout
+  // Chat manages its own full-bleed layout. The other mobile-native pages
+  // (Home/Agents/Settings/Wallet) already supply their own padding; everything
+  // else is a desktop page rendered in the webview and needs gutters so its
+  // content doesn't run into the screen edges.
   const isChat = location.pathname === '/chat'
+  const MOBILE_NATIVE = ['/dashboard', '/admin', '/models', '/settings', '/tokens/buy']
+  const needsGutter = !isChat && !MOBILE_NATIVE.includes(location.pathname)
 
   // Strip rich formatting on copy — prevents background colors / boxes from
   // ending up in the clipboard when the user copies text from styled bubbles.
@@ -40,7 +45,8 @@ export function MobileAppShell() {
       {/* Page content — scrollable, accounts for tab bar */}
       <main className="mobile-app-content" style={{
         flex: 1, overflowY: isChat ? 'hidden' : 'auto', overflowX: 'hidden',
-        padding: isChat ? 0 : undefined,
+        ...(isChat ? { padding: 0 } : {}),
+        ...(needsGutter ? { paddingTop: 14, paddingLeft: 14, paddingRight: 14 } : {}),
       }}>
         <ScreenErrorBoundary><Outlet /></ScreenErrorBoundary>
       </main>
