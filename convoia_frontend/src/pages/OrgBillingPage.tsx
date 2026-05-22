@@ -25,10 +25,9 @@ interface PoolData {
 
 interface Purchase {
   id: string
-  amount: number
-  tokensReceived: number
-  pricePerMillionTokens: number
-  status: string
+  amountPaid: number
+  tokensPurchased: number
+  packageName: string
   createdAt: string
 }
 
@@ -247,15 +246,19 @@ export function OrgBillingPage() {
               <div key={p.id} className="px-5 py-3 flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-text-primary">
-                    +{fmtTokens(p.tokensReceived)} tokens
+                    +{fmtTokens(p.tokensPurchased)} tokens
                   </p>
                   <p className="text-xs text-text-muted">
-                    {formatDate(p.createdAt)}
+                    {p.packageName ? `${p.packageName} · ` : ''}{formatDate(p.createdAt)}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-mono text-text-primary">${(Number(p.amount) || 0).toFixed(2)}</p>
-                  <p className="text-xs text-text-muted">${p.pricePerMillionTokens}/M</p>
+                  <p className="text-sm font-mono text-text-primary">${(Number(p.amountPaid) || 0).toFixed(2)}</p>
+                  <p className="text-xs text-text-muted">
+                    {p.tokensPurchased > 0
+                      ? `$${(Number(p.amountPaid) / (p.tokensPurchased / 1_000_000)).toFixed(2)}/M`
+                      : ''}
+                  </p>
                 </div>
               </div>
             ))}

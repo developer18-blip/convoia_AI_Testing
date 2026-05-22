@@ -71,6 +71,33 @@ export const getTokenPoolStatus = asyncHandler(
       where: { organizationId: user.organizationId },
     });
 
+    // The org's tokens live on the OWNER's TokenWallet (Stripe purchases credit the
+    // owner; allocations move tokens to members). The legacy TokenPool table is only
+    // populated for orgs using the explicit allocation flow, so it's empty for most
+    // orgs — falling back to it showed Billing as all zeros while the Wallet showed a
+    // real balance. Prefer a real pool row when present, else derive from the owner's
+    // wallet so Billing matches the Wallet (token-wallet/balance).
+    let poolData = pool && pool.totalTokens > 0
+      ? {
+          totalTokens: pool.totalTokens,
+          allocatedTokens: pool.allocatedTokens,
+          usedTokens: pool.usedTokens,
+          availableTokens: pool.availableTokens,
+        }
+      : null;
+
+    if (!poolData) {
+      const ownerWallet = user.organization
+        ? await prisma.tokenWallet.findUnique({ where: { userId: user.organization.ownerId } })
+        : null;
+      poolData = {
+        totalTokens: ownerWallet?.totalTokensPurchased ?? 0,
+        allocatedTokens: ownerWallet?.allocatedTokens ?? 0,
+        usedTokens: ownerWallet?.totalTokensUsed ?? 0,
+        availableTokens: ownerWallet?.tokenBalance ?? 0,
+      };
+    }
+
     const purchases = await prisma.tokenPurchase.findMany({
       where: { organizationId: user.organizationId },
       orderBy: { createdAt: 'desc' },
@@ -80,7 +107,7 @@ export const getTokenPoolStatus = asyncHandler(
     res.json({
       success: true,
       data: {
-        pool: pool || { totalTokens: 0, allocatedTokens: 0, usedTokens: 0, availableTokens: 0 },
+        pool: poolData,
         purchases,
       },
       timestamp: new Date().toISOString(),
