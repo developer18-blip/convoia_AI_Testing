@@ -12,6 +12,8 @@ import { Menu, Plus, X, Clock, ChevronDown, Sparkles } from 'lucide-react'
 import type { Agent, Message } from '../../types'
 import { CouncilChip } from '../../components/council/CouncilChip'
 import { CouncilPicker } from '../../components/council/CouncilPicker'
+import { useAccent } from '../../contexts/AccentContext'
+import { getThemeForModel } from '../../config/providers'
 
 export function MobileChatPage() {
   const { models } = useModels()
@@ -19,6 +21,7 @@ export function MobileChatPage() {
   const { user: authUser } = useAuth()
   const { tokenBalance, hasTokens } = useTokens()
   const toast = useToast()
+  const { setActiveModel, setCouncilModels } = useAccent()
   const {
     conversations, activeConversationId, messages, isStreaming, stopStreaming,
     selectedAgent, setSelectedAgent, setAgentMode,
@@ -60,6 +63,23 @@ export function MobileChatPage() {
   const selectedModel = models.find((m) => m.id === selectedModelId) || null
   const activeModels = models.filter(m => m.isActive)
   const activeAgents = agents.filter(a => a.isActive)
+
+  // Drive the app accent from the active model: brand turquoise by default,
+  // the model's provider color once one is chosen (council blends up to 3).
+  useEffect(() => {
+    if (councilMode && councilModelIds.length > 0) {
+      setCouncilModels(
+        councilModelIds.map((id) => models.find((m) => m.id === id)?.modelId || '').filter(Boolean),
+      )
+    } else {
+      setCouncilModels([])
+      setActiveModel(selectedModel?.modelId || '')
+    }
+  }, [selectedModel, councilMode, councilModelIds, models, setActiveModel, setCouncilModels])
+
+  // Leaving chat resets the accent to brand turquoise (Home/Settings shouldn't
+  // keep the last model's color).
+  useEffect(() => () => { setActiveModel(''); setCouncilModels([]) }, [setActiveModel, setCouncilModels])
 
   const handleAgentSelect = (agent: Agent | null) => {
     setSelectedAgent(agent)
@@ -202,7 +222,7 @@ export function MobileChatPage() {
                     <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: '2px 0 0' }}>{m.provider}</p>
                   </div>
                   {selectedModelId === m.id && (
-                    <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#7C3AED', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#14B8CD', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'white' }} />
                     </div>
                   )}
@@ -251,7 +271,7 @@ export function MobileChatPage() {
                     </p>
                   </div>
                   {selectedAgent?.id === agent.id && (
-                    <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#7C3AED', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#14B8CD', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'white' }} />
                     </div>
                   )}
@@ -282,7 +302,7 @@ export function MobileChatPage() {
                 if (next) toast.warning('Thinking mode ON — uses 2x tokens per message')
               }}
               style={{ padding: '5px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 600, border: 'none', cursor: 'pointer',
-                background: thinkingEnabled ? '#7C3AED' : 'var(--color-surface-2)', color: thinkingEnabled ? 'white' : 'var(--color-text-muted)' }}>
+                background: thinkingEnabled ? '#14B8CD' : 'var(--color-surface-2)', color: thinkingEnabled ? 'white' : 'var(--color-text-muted)' }}>
               🧠
             </button>
             <button onClick={() => { setActiveConversation(null); setSelectedAgent(null); setAgentMode(false) }}
@@ -323,13 +343,15 @@ export function MobileChatPage() {
             {activeModels.slice(0, 8).map(m => {
               const isActive = !councilMode && selectedModelId === m.id
               const shortName = m.name.replace('Claude ', '').replace('Gemini ', '').replace('GPT-', 'GPT ').replace(' (Groq)', '')
+              // Each model wears its provider's color — selected = filled, others = tinted.
+              const pColor = getThemeForModel(m.modelId).primary
               return (
                 <button key={m.id} onClick={() => { setCouncilMode(false); setSelectedModelId(m.id) }}
                   style={{
                     padding: '6px 12px', borderRadius: '100px', fontSize: '11px', fontWeight: 600,
-                    border: isActive ? '1.5px solid #7C3AED' : '1px solid var(--color-border)',
-                    background: isActive ? '#7C3AED' : 'var(--color-surface)',
-                    color: isActive ? 'white' : 'var(--color-text-muted)',
+                    border: `1.5px solid ${isActive ? pColor : 'var(--color-border)'}`,
+                    background: isActive ? pColor : 'var(--color-surface)',
+                    color: isActive ? '#fff' : pColor,
                     cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
                   }}>
                   {shortName}
@@ -352,8 +374,8 @@ export function MobileChatPage() {
           <button onClick={() => setShowAgentPicker(true)}
             style={{
               padding: '6px 10px', borderRadius: '100px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
-              border: selectedAgent ? '1.5px solid #7C3AED' : '1px solid var(--color-border)',
-              background: selectedAgent ? 'rgba(124,58,237,0.08)' : 'var(--color-surface)',
+              border: selectedAgent ? '1.5px solid #14B8CD' : '1px solid var(--color-border)',
+              background: selectedAgent ? 'rgba(20, 184, 205,0.08)' : 'var(--color-surface)',
               whiteSpace: 'nowrap', flexShrink: 0,
             }}>
             {selectedAgent ? (
@@ -361,7 +383,7 @@ export function MobileChatPage() {
             ) : (
               <Sparkles size={12} style={{ color: 'var(--color-text-muted)' }} />
             )}
-            <ChevronDown size={10} style={{ color: selectedAgent ? '#7C3AED' : 'var(--color-text-muted)' }} />
+            <ChevronDown size={10} style={{ color: selectedAgent ? '#14B8CD' : 'var(--color-text-muted)' }} />
           </button>
         </div>
       </div>
@@ -370,17 +392,17 @@ export function MobileChatPage() {
       {selectedAgent && (
         <div style={{
           flexShrink: 0, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '10px',
-          background: 'rgba(124,58,237,0.06)', borderBottom: '1px solid rgba(124,58,237,0.12)',
+          background: 'rgba(20, 184, 205,0.06)', borderBottom: '1px solid rgba(20, 184, 205,0.12)',
         }}>
           <span style={{ fontSize: '18px' }}>{selectedAgent.avatar}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: '12px', fontWeight: 700, color: '#7C3AED', margin: 0 }}>{selectedAgent.name}</p>
+            <p style={{ fontSize: '12px', fontWeight: 700, color: '#14B8CD', margin: 0 }}>{selectedAgent.name}</p>
             <p style={{ fontSize: '10px', color: 'var(--color-text-muted)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {selectedAgent.role}
             </p>
           </div>
           <button onClick={() => handleAgentSelect(null)}
-            style={{ padding: '4px', borderRadius: '6px', border: 'none', background: 'rgba(124,58,237,0.1)', color: '#7C3AED', cursor: 'pointer' }}>
+            style={{ padding: '4px', borderRadius: '6px', border: 'none', background: 'rgba(20, 184, 205,0.1)', color: '#14B8CD', cursor: 'pointer' }}>
             <X size={14} />
           </button>
         </div>
@@ -392,8 +414,8 @@ export function MobileChatPage() {
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '24px', textAlign: 'center', background: 'var(--chat-bg)' }}>
             <div style={{
               width: '48px', height: '48px', borderRadius: '14px', marginBottom: '16px',
-              background: 'linear-gradient(135deg, var(--color-primary-light), rgba(124,58,237,0.05))',
-              border: '1px solid rgba(124,58,237,0.15)',
+              background: 'linear-gradient(135deg, var(--color-primary-light), rgba(20, 184, 205,0.05))',
+              border: '1px solid rgba(20, 184, 205,0.15)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: '22px', color: 'var(--color-primary)',
             }}>

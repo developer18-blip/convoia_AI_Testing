@@ -60,8 +60,8 @@ export function MobileHomePage() {
           <span style={{
             display: 'inline-block', marginTop: '6px', padding: '3px 10px', borderRadius: '8px', fontSize: '10px', fontWeight: 700,
             textTransform: 'uppercase', letterSpacing: '0.05em',
-            background: isAdmin ? 'rgba(239,68,68,0.1)' : isOwner ? 'rgba(124,58,237,0.1)' : isManager ? 'rgba(16,185,129,0.1)' : 'rgba(59,130,246,0.1)',
-            color: isAdmin ? '#EF4444' : isOwner ? '#7C3AED' : isManager ? '#10B981' : '#3B82F6',
+            background: isAdmin ? 'rgba(239,68,68,0.1)' : isOwner ? 'rgba(20, 184, 205,0.1)' : isManager ? 'rgba(16,185,129,0.1)' : 'rgba(59,130,246,0.1)',
+            color: isAdmin ? '#EF4444' : isOwner ? '#14B8CD' : isManager ? '#10B981' : '#3B82F6',
           }}>
             {isAdmin ? 'Platform Admin' : isOwner ? 'Org Owner' : isManager ? 'Manager' : hasOrg ? 'Employee' : 'Personal'}
           </span>
@@ -71,9 +71,9 @@ export function MobileHomePage() {
 
       {/* Token Balance Hero Card */}
       <div style={{
-        background: 'linear-gradient(135deg, #7C3AED, #6D28D9, #5B21B6)',
+        background: 'linear-gradient(135deg, #14B8CD, #0891B2, #0E7490)',
         borderRadius: '20px', padding: '24px', color: 'white',
-        boxShadow: '0 8px 32px rgba(124, 58, 237, 0.3)',
+        boxShadow: '0 8px 32px rgba(20, 184, 205, 0.3)',
       }}>
         <p style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.8, margin: '0 0 8px' }}>
           {isEmployee ? 'Your Token Budget' : 'Available Tokens'}
@@ -137,13 +137,13 @@ export function MobileHomePage() {
               <QuickAction icon={<Users size={20} />} label="Team" sub="Manage members" color="#3B82F6" onClick={() => navigate('/team')} />
             )}
             {(isManager || isOwner) && (
-              <QuickAction icon={<Target size={20} />} label="Budgets" sub="Team caps & limits" color="#7C3AED" onClick={() => navigate('/budgets')} />
+              <QuickAction icon={<Target size={20} />} label="Budgets" sub="Team caps & limits" color="#14B8CD" onClick={() => navigate('/budgets')} />
             )}
             {isEmployee && (
-              <QuickAction icon={<Target size={20} />} label="My Budget" sub="Spend & limit" color="#7C3AED" onClick={() => navigate('/budget')} />
+              <QuickAction icon={<Target size={20} />} label="My Budget" sub="Spend & limit" color="#14B8CD" onClick={() => navigate('/budget')} />
             )}
             {isOwner && (
-              <QuickAction icon={<Building2 size={20} />} label="Organization" sub="Settings" color="#8B5CF6" onClick={() => navigate('/org')} />
+              <QuickAction icon={<Building2 size={20} />} label="Organization" sub="Settings" color="#22D3EE" onClick={() => navigate('/org')} />
             )}
             {isOwner && (
               <QuickAction icon={<DollarSign size={20} />} label="Billing" sub="Payments & invoices" color="#10B981" onClick={() => navigate('/org/billing')} />
@@ -168,12 +168,12 @@ export function MobileHomePage() {
         <div>
           <h2 style={sectionTitle}>Admin Panel</h2>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            <QuickAction icon={<Building2 size={20} />} label="Organizations" sub="Manage orgs" color="#7C3AED" onClick={() => navigate('/admin/orgs')} />
+            <QuickAction icon={<Building2 size={20} />} label="Organizations" sub="Manage orgs" color="#14B8CD" onClick={() => navigate('/admin/orgs')} />
             <QuickAction icon={<Users size={20} />} label="Users" sub="All users" color="#3B82F6" onClick={() => navigate('/admin/users')} />
             <QuickAction icon={<DollarSign size={20} />} label="Revenue" sub="Platform revenue" color="#10B981" onClick={() => navigate('/admin/revenue')} />
             <QuickAction icon={<BarChart3 size={20} />} label="Analytics" sub="Full analytics" color="#F59E0B" onClick={() => navigate('/admin/analytics')} />
             <QuickAction icon={<Shield size={20} />} label="Models" sub="AI model config" color="#EF4444" onClick={() => navigate('/admin/models')} />
-            <QuickAction icon={<Coins size={20} />} label="Send Tokens" sub="Grant tokens" color="#8B5CF6" onClick={() => navigate('/admin/send-tokens')} />
+            <QuickAction icon={<Coins size={20} />} label="Send Tokens" sub="Grant tokens" color="#22D3EE" onClick={() => navigate('/admin/send-tokens')} />
           </div>
         </div>
       )}
@@ -185,7 +185,7 @@ export function MobileHomePage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <StatCard icon={<DollarSign size={20} />} iconColor="#10B981" iconBg="rgba(16,185,129,0.1)"
               value={`$${(Number(stats?.thisMonth?.cost) || 0).toFixed(2)}`} label="This month" />
-            <StatCard icon={<TrendingUp size={20} />} iconColor="#7C3AED" iconBg="rgba(124,58,237,0.1)"
+            <StatCard icon={<TrendingUp size={20} />} iconColor="#14B8CD" iconBg="rgba(20, 184, 205,0.1)"
               value={`$${(Number(wallet?.totalSpent) || 0).toFixed(2)}`} label="Total spent" />
           </div>
         </div>
@@ -195,7 +195,7 @@ export function MobileHomePage() {
       <div>
         <h2 style={sectionTitle}>This week</h2>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <StatCard icon={<MessageSquare size={20} />} iconColor="#7C3AED" iconBg="rgba(124,58,237,0.1)" value={stats?.thisWeek?.queries?.toString() || '0'} label="This week" />
+          <StatCard icon={<MessageSquare size={20} />} iconColor="#14B8CD" iconBg="rgba(20, 184, 205,0.1)" value={stats?.thisWeek?.queries?.toString() || '0'} label="This week" />
           <StatCard icon={<Zap size={20} />} iconColor="#F59E0B" iconBg="rgba(245,158,11,0.1)" value={stats?.allTime?.queries?.toString() || '0'} label="Total queries" />
           <StatCard icon={<Coins size={20} />} iconColor="#10B981" iconBg="rgba(16,185,129,0.1)" value={stats?.topModels?.[0]?.name?.split(' ')[0] || '—'} label="Top model" />
           <StatCard icon={<Clock size={20} />} iconColor="#EF4444" iconBg="rgba(239,68,68,0.1)" value={`$${(Number(stats?.thisWeek?.cost) || 0).toFixed(2)}`} label="Week cost" />

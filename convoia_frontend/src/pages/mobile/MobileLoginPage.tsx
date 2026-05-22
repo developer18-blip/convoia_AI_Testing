@@ -67,7 +67,7 @@ export function MobileLoginPage() {
     }}>
       {/* Purple gradient hero */}
       <div style={{
-        background: 'linear-gradient(135deg, #7C3AED 0%, #5B21B6 50%, #4C1D95 100%)',
+        background: 'linear-gradient(135deg, #14B8CD 0%, #0E7490 50%, #4C1D95 100%)',
         padding: '40px 24px 60px',
         position: 'relative', overflow: 'hidden',
         borderRadius: '0 0 32px 32px',
@@ -114,7 +114,7 @@ export function MobileLoginPage() {
       }}>
         <div style={{
           background: 'white', borderRadius: '24px', padding: '28px 24px',
-          boxShadow: '0 8px 40px rgba(124,58,237,0.12)',
+          boxShadow: '0 8px 40px rgba(20, 184, 205,0.12)',
         }}>
           {/* Google OAuth — native Google Play Services first, system-browser fallback */}
           <div style={{ marginBottom: '20px' }}>
@@ -172,7 +172,7 @@ export function MobileLoginPage() {
                     background: '#F8F7FF', color: '#1A1A2E', outline: 'none',
                     transition: 'border-color 200ms',
                   }}
-                  onFocus={e => { if (!errors.email) e.target.style.borderColor = '#7C3AED' }}
+                  onFocus={e => { if (!errors.email) e.target.style.borderColor = '#14B8CD' }}
                   onBlur={e => { if (!errors.email) e.target.style.borderColor = '#E8E5F0' }}
                 />
               </div>
@@ -195,7 +195,7 @@ export function MobileLoginPage() {
                     background: '#F8F7FF', color: '#1A1A2E', outline: 'none',
                     transition: 'border-color 200ms',
                   }}
-                  onFocus={e => { if (!errors.password) e.target.style.borderColor = '#7C3AED' }}
+                  onFocus={e => { if (!errors.password) e.target.style.borderColor = '#14B8CD' }}
                   onBlur={e => { if (!errors.password) e.target.style.borderColor = '#E8E5F0' }}
                 />
                 <button type="button" onClick={() => setShowPassword(!showPassword)}
@@ -219,7 +219,7 @@ export function MobileLoginPage() {
                 <span>Remember me</span>
               </label>
               <button type="button" onClick={() => { setShowForgot(true); setForgotEmail(email); setForgotSent(false) }}
-                style={{ fontSize: '13px', fontWeight: 600, color: '#7C3AED', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                style={{ fontSize: '13px', fontWeight: 600, color: '#14B8CD', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                 Forgot password?
               </button>
             </div>
@@ -228,10 +228,10 @@ export function MobileLoginPage() {
             <button type="submit" disabled={isLoading}
               style={{
                 width: '100%', padding: '16px', borderRadius: '16px', border: 'none',
-                background: 'linear-gradient(135deg, #7C3AED, #5B21B6)',
+                background: 'linear-gradient(135deg, #14B8CD, #0E7490)',
                 color: 'white', fontSize: '16px', fontWeight: 700, cursor: isLoading ? 'wait' : 'pointer',
                 opacity: isLoading ? 0.7 : 1, transition: 'opacity 200ms',
-                boxShadow: '0 4px 20px rgba(124,58,237,0.35)',
+                boxShadow: '0 4px 20px rgba(20, 184, 205,0.35)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
               }}>
               {isLoading ? (
@@ -249,7 +249,7 @@ export function MobileLoginPage() {
         {/* Register link */}
         <p style={{ textAlign: 'center', fontSize: '14px', color: '#8E8EA0', marginTop: '24px' }}>
           Don't have an account?{' '}
-          <Link to="/register" style={{ color: '#7C3AED', fontWeight: 700, textDecoration: 'none' }}>
+          <Link to="/register" style={{ color: '#14B8CD', fontWeight: 700, textDecoration: 'none' }}>
             Create one free
           </Link>
         </p>
@@ -271,16 +271,16 @@ export function MobileLoginPage() {
               <div style={{ textAlign: 'center' }}>
                 <div style={{
                   width: '56px', height: '56px', borderRadius: '16px', margin: '0 auto 16px',
-                  background: 'rgba(124,58,237,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(20, 184, 205,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  <Mail size={28} color="#7C3AED" />
+                  <Mail size={28} color="#14B8CD" />
                 </div>
                 <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#1A1A2E', marginBottom: '8px' }}>Check your email</h3>
                 <p style={{ fontSize: '14px', color: '#8E8EA0', marginBottom: '24px', lineHeight: 1.5 }}>
                   If an account exists for <strong style={{ color: '#4A4A6A' }}>{forgotEmail}</strong>, we've sent a password reset link.
                 </p>
                 <button onClick={() => setShowForgot(false)}
-                  style={{ width: '100%', padding: '14px', borderRadius: '14px', border: 'none', background: '#7C3AED', color: 'white', fontSize: '15px', fontWeight: 700, cursor: 'pointer' }}>
+                  style={{ width: '100%', padding: '14px', borderRadius: '14px', border: 'none', background: '#14B8CD', color: 'white', fontSize: '15px', fontWeight: 700, cursor: 'pointer' }}>
                   Got it
                 </button>
               </div>
@@ -320,7 +320,7 @@ export function MobileLoginPage() {
                       Cancel
                     </button>
                     <button type="submit" disabled={forgotLoading}
-                      style={{ flex: 1, padding: '14px', borderRadius: '14px', border: 'none', background: '#7C3AED', color: 'white', fontSize: '15px', fontWeight: 700, cursor: forgotLoading ? 'wait' : 'pointer', opacity: forgotLoading ? 0.7 : 1 }}>
+                      style={{ flex: 1, padding: '14px', borderRadius: '14px', border: 'none', background: '#14B8CD', color: 'white', fontSize: '15px', fontWeight: 700, cursor: forgotLoading ? 'wait' : 'pointer', opacity: forgotLoading ? 0.7 : 1 }}>
                       {forgotLoading ? 'Sending...' : 'Send link'}
                     </button>
                   </div>

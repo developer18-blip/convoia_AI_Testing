@@ -21,15 +21,17 @@
   --mobile-tabbar-base-height: 72px;
   --mobile-tabbar-reserved: calc(98px + env(safe-area-inset-bottom, 0px));
 
-  /* ── Primary: Purple ── */
-  --color-primary: #7C3AED !important;
-  --color-primary-hover: #6D28D9 !important;
-  --color-primary-light: rgba(124, 58, 237, 0.10) !important;
-  --color-primary-glow: rgba(124, 58, 237, 0.06) !important;
+  /* ── Primary: Convoia turquoise, provider-aware ──
+     Defaults to brand turquoise; AccentContext sets --provider-* per active
+     model so the accent follows the selected model (Anthropic, OpenAI, …). */
+  --color-primary: var(--provider-light, #14B8CD) !important;
+  --color-primary-hover: var(--provider-primary, #0891B2) !important;
+  --color-primary-light: var(--provider-soft, rgba(20, 184, 205, 0.10)) !important;
+  --color-primary-glow: var(--provider-glow, rgba(20, 184, 205, 0.06)) !important;
 
-  --color-accent-start: #7C3AED !important;
-  --color-accent-mid: #8B5CF6 !important;
-  --color-accent-end: #A78BFA !important;
+  --color-accent-start: var(--provider-primary, #14B8CD) !important;
+  --color-accent-mid: var(--provider-light, #22D3EE) !important;
+  --color-accent-end: var(--provider-light, #67E8F9) !important;
 
   /* ── Light background ── */
   --color-background: #F7F6FC !important;
@@ -62,11 +64,11 @@
   --chat-code-bg: #F5F3FF !important;
   --chat-code-header: #EBE5FF !important;
   --chat-input-bg: #FFFFFF !important;
-  --chat-user-bubble: #7C3AED !important;
+  --chat-user-bubble: #14B8CD !important;
 
   /* ── Glass ── */
   --color-glass: rgba(255, 255, 255, 0.92) !important;
-  --color-glass-border: rgba(124, 58, 237, 0.08) !important;
+  --color-glass-border: rgba(20, 184, 205, 0.08) !important;
 
   /* ── Force light color scheme ── */
   color-scheme: light !important;
@@ -117,18 +119,18 @@
 /* ── Mobile code blocks ── */
 .mobile-app code:not(pre code) {
   background: #F0EDF8 !important;
-  color: #5B21B6 !important;
+  color: #0E7490 !important;
   border: 1px solid #E0DCF0 !important;
 }
 
 /* ── Text selection: plain purple highlight, no box inheritance ── */
 .mobile-app ::selection {
-  background-color: rgba(124, 58, 237, 0.25) !important;
+  background-color: rgba(20, 184, 205, 0.25) !important;
   color: inherit !important;
   -webkit-text-fill-color: inherit !important;
 }
 .mobile-app ::-moz-selection {
-  background-color: rgba(124, 58, 237, 0.25) !important;
+  background-color: rgba(20, 184, 205, 0.25) !important;
   color: inherit !important;
 }
 
@@ -147,7 +149,7 @@
   overflow: hidden;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.88));
-  border: 1px solid rgba(124, 58, 237, 0.12);
+  border: 1px solid rgba(20, 184, 205, 0.12);
   border-radius: 28px;
   box-shadow:
     0 20px 48px rgba(26, 26, 46, 0.16),
@@ -178,8 +180,8 @@
 }
 
 .mobile-tab-bar__item.is-active {
-  color: #6D28D9;
-  background: rgba(124, 58, 237, 0.10);
+  color: #0891B2;
+  background: rgba(20, 184, 205, 0.10);
 }
 
 .mobile-tab-bar__icon {
@@ -292,7 +294,7 @@ body.keyboard-open .mobile-tab-bar {
 .mobile-page-back {
   width: 40px;
   height: 40px;
-  border: 1px solid rgba(124, 58, 237, 0.14);
+  border: 1px solid rgba(20, 184, 205, 0.14);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.88);
   color: var(--color-text-primary);
@@ -330,7 +332,7 @@ body.keyboard-open .mobile-tab-bar {
 
 .mobile-card {
   background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(124, 58, 237, 0.10);
+  border: 1px solid rgba(20, 184, 205, 0.10);
   border-radius: 22px;
   box-shadow: 0 14px 36px rgba(26, 26, 46, 0.06);
 }
@@ -374,7 +376,7 @@ body.keyboard-open .mobile-page {
 /* ── CSS variable for chat top bar (overridden in dark mode) ── */
 .mobile-app {
   --mobile-topbar-bg: rgba(255, 255, 255, 0.94);
-  --mobile-topbar-border: rgba(124, 58, 237, 0.10);
+  --mobile-topbar-border: rgba(20, 184, 205, 0.10);
   --mobile-btn-neutral-bg: var(--color-surface-2);
   --mobile-newchat-bg: #111827;
   --mobile-newchat-color: #ffffff;
@@ -384,11 +386,11 @@ body.keyboard-open .mobile-page {
    DARK MODE — applies when html.dark is set by ThemeContext
    ════════════════════════════════════════════════════════ */
 .dark .mobile-app {
-  /* ── Primary stays purple ── */
-  --color-primary: #8B5CF6 !important;
-  --color-primary-hover: #7C3AED !important;
-  --color-primary-light: rgba(139, 92, 246, 0.14) !important;
-  --color-primary-glow: rgba(139, 92, 246, 0.08) !important;
+  /* ── Primary: turquoise (provider-aware), brighter for dark bg ── */
+  --color-primary: var(--provider-primary, #22D3EE) !important;
+  --color-primary-hover: var(--provider-light, #14B8CD) !important;
+  --color-primary-light: var(--provider-soft, rgba(34, 211, 238, 0.14)) !important;
+  --color-primary-glow: var(--provider-glow, rgba(34, 211, 238, 0.08)) !important;
 
   /* ── Dark backgrounds ── */
   --color-background: #0D0D16 !important;
@@ -399,7 +401,7 @@ body.keyboard-open .mobile-page {
   /* ── Dark borders ── */
   --color-border: #2C2C42 !important;
   --color-border-subtle: #1F1F30 !important;
-  --color-border-hover: #6D28D9 !important;
+  --color-border-hover: #0891B2 !important;
 
   /* ── Light text on dark ── */
   --color-text-primary: #EEEEFF !important;
@@ -421,15 +423,15 @@ body.keyboard-open .mobile-page {
   --chat-code-bg: #1C1C2C !important;
   --chat-code-header: #232336 !important;
   --chat-input-bg: #14141F !important;
-  --chat-user-bubble: #7C3AED !important;
+  --chat-user-bubble: #14B8CD !important;
 
   /* ── Dark glass ── */
   --color-glass: rgba(20, 20, 31, 0.94) !important;
-  --color-glass-border: rgba(139, 92, 246, 0.14) !important;
+  --color-glass-border: rgba(34, 211, 238, 0.14) !important;
 
   /* ── Dark topbar ── */
   --mobile-topbar-bg: rgba(13, 13, 22, 0.96);
-  --mobile-topbar-border: rgba(139, 92, 246, 0.14);
+  --mobile-topbar-border: rgba(34, 211, 238, 0.14);
   --mobile-btn-neutral-bg: #1C1C2C;
   --mobile-newchat-bg: #232336;
   --mobile-newchat-color: #EEEEFF;
@@ -455,7 +457,7 @@ body.keyboard-open .mobile-page {
 /* ── Dark code blocks ── */
 .dark .mobile-app code:not(pre code) {
   background: #1C1C2C !important;
-  color: #A78BFA !important;
+  color: #67E8F9 !important;
   border: 1px solid #2C2C42 !important;
 }
 
@@ -463,30 +465,30 @@ body.keyboard-open .mobile-page {
 .dark .mobile-tab-bar {
   background:
     linear-gradient(180deg, rgba(20, 20, 31, 0.97), rgba(13, 13, 22, 0.92));
-  border: 1px solid rgba(139, 92, 246, 0.18);
+  border: 1px solid rgba(34, 211, 238, 0.18);
   box-shadow:
     0 20px 48px rgba(0, 0, 0, 0.40),
     0 2px 8px rgba(0, 0, 0, 0.24),
-    inset 0 1px 0 rgba(139, 92, 246, 0.10);
+    inset 0 1px 0 rgba(34, 211, 238, 0.10);
 }
 .dark .mobile-tab-bar__item {
   color: #4A4A64;
 }
 .dark .mobile-tab-bar__item.is-active {
-  color: #A78BFA;
-  background: rgba(139, 92, 246, 0.16);
+  color: #67E8F9;
+  background: rgba(34, 211, 238, 0.16);
 }
 
 /* ── Dark page-back button ── */
 .dark .mobile-page-back {
   background: rgba(20, 20, 31, 0.90);
-  border-color: rgba(139, 92, 246, 0.18);
+  border-color: rgba(34, 211, 238, 0.18);
 }
 
 /* ── Dark mobile-card ── */
 .dark .mobile-card {
   background: rgba(20, 20, 31, 0.96);
-  border: 1px solid rgba(139, 92, 246, 0.12);
+  border: 1px solid rgba(34, 211, 238, 0.12);
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.28);
 }
 

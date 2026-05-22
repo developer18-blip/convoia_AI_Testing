@@ -113,7 +113,7 @@ export function MobileRegisterPage() {
     }}>
       {/* Purple gradient hero */}
       <div style={{
-        background: 'linear-gradient(160deg, #5B21B6 0%, #7C3AED 50%, #8B5CF6 100%)',
+        background: 'linear-gradient(160deg, #0E7490 0%, #14B8CD 50%, #22D3EE 100%)',
         padding: '36px 24px 56px',
         position: 'relative', overflow: 'hidden',
         borderRadius: '0 0 32px 32px',
@@ -152,7 +152,7 @@ export function MobileRegisterPage() {
       }}>
         <div style={{
           background: 'white', borderRadius: '24px', padding: '28px 24px',
-          boxShadow: '0 8px 40px rgba(124,58,237,0.12)',
+          boxShadow: '0 8px 40px rgba(20, 184, 205,0.12)',
         }}>
 
           {/* Step 1: Account Type */}
@@ -172,10 +172,10 @@ export function MobileRegisterPage() {
                   }}>
                   <div style={{
                     width: '48px', height: '48px', borderRadius: '14px', marginBottom: '14px',
-                    background: 'linear-gradient(135deg, rgba(124,58,237,0.12), rgba(124,58,237,0.05))',
+                    background: 'linear-gradient(135deg, rgba(20, 184, 205,0.12), rgba(20, 184, 205,0.05))',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
-                    <User size={24} color="#7C3AED" />
+                    <User size={24} color="#14B8CD" />
                   </div>
                   <p style={{ fontSize: '14px', fontWeight: 700, color: '#1A1A2E', margin: '0 0 4px' }}>Individual</p>
                   <p style={{ fontSize: '12px', color: '#8E8EA0', margin: 0, lineHeight: 1.4 }}>
@@ -192,10 +192,10 @@ export function MobileRegisterPage() {
                   }}>
                   <div style={{
                     width: '48px', height: '48px', borderRadius: '14px', marginBottom: '14px',
-                    background: 'linear-gradient(135deg, rgba(124,58,237,0.12), rgba(124,58,237,0.05))',
+                    background: 'linear-gradient(135deg, rgba(20, 184, 205,0.12), rgba(20, 184, 205,0.05))',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
-                    <Building2 size={24} color="#7C3AED" />
+                    <Building2 size={24} color="#14B8CD" />
                   </div>
                   <p style={{ fontSize: '14px', fontWeight: 700, color: '#1A1A2E', margin: '0 0 4px' }}>Team / Business</p>
                   <p style={{ fontSize: '12px', color: '#8E8EA0', margin: 0, lineHeight: 1.4 }}>
@@ -246,8 +246,8 @@ export function MobileRegisterPage() {
                   'Team management with budgets',
                 ].map(b => (
                   <div key={b} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 0' }}>
-                    <div style={{ width: '20px', height: '20px', borderRadius: '6px', background: 'rgba(124,58,237,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Check size={12} color="#7C3AED" />
+                    <div style={{ width: '20px', height: '20px', borderRadius: '6px', background: 'rgba(20, 184, 205,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Check size={12} color="#14B8CD" />
                     </div>
                     <span style={{ fontSize: '12px', color: '#4A4A6A', fontWeight: 500 }}>{b}</span>
                   </div>
@@ -262,7 +262,7 @@ export function MobileRegisterPage() {
               {/* Back button */}
               {!inviteToken && (
                 <button type="button" onClick={() => setStep(1)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 600, color: '#7C3AED', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: '16px' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 600, color: '#14B8CD', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: '16px' }}>
                   <ArrowLeft size={14} /> Change account type
                 </button>
               )}
@@ -270,7 +270,7 @@ export function MobileRegisterPage() {
               {/* Invite banner */}
               {inviteToken && inviteOrg && (
                 <div style={{
-                  background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)',
+                  background: 'rgba(20, 184, 205,0.08)', border: '1px solid rgba(20, 184, 205,0.2)',
                   borderRadius: '14px', padding: '14px 16px', marginBottom: '16px',
                   display: 'flex', alignItems: 'center', gap: '12px',
                 }}>
@@ -290,7 +290,7 @@ export function MobileRegisterPage() {
                   <input value={form.name} placeholder="John Doe"
                     onChange={e => updateField('name', e.target.value)}
                     style={inputStyle(!!errors.name)}
-                    onFocus={e => { if (!errors.name) e.target.style.borderColor = '#7C3AED' }}
+                    onFocus={e => { if (!errors.name) e.target.style.borderColor = '#14B8CD' }}
                     onBlur={e => { if (!errors.name) e.target.style.borderColor = '#E8E5F0' }}
                   />
                 </div>
@@ -305,7 +305,7 @@ export function MobileRegisterPage() {
                   <input type="email" value={form.email} placeholder="name@company.com"
                     onChange={e => updateField('email', e.target.value)}
                     style={inputStyle(!!errors.email)}
-                    onFocus={e => { if (!errors.email) e.target.style.borderColor = '#7C3AED' }}
+                    onFocus={e => { if (!errors.email) e.target.style.borderColor = '#14B8CD' }}
                     onBlur={e => { if (!errors.email) e.target.style.borderColor = '#E8E5F0' }}
                   />
                 </div>
@@ -320,7 +320,7 @@ export function MobileRegisterPage() {
                   <input type={showPassword ? 'text' : 'password'} value={form.password} placeholder="Min 8 characters"
                     onChange={e => updateField('password', e.target.value)}
                     style={{ ...inputStyle(!!errors.password), paddingRight: '44px' }}
-                    onFocus={e => { if (!errors.password) e.target.style.borderColor = '#7C3AED' }}
+                    onFocus={e => { if (!errors.password) e.target.style.borderColor = '#14B8CD' }}
                     onBlur={e => { if (!errors.password) e.target.style.borderColor = '#E8E5F0' }}
                   />
                   <button type="button" onClick={() => setShowPassword(!showPassword)}
@@ -355,7 +355,7 @@ export function MobileRegisterPage() {
                   <input type={showConfirm ? 'text' : 'password'} value={form.confirmPassword} placeholder="Confirm your password"
                     onChange={e => updateField('confirmPassword', e.target.value)}
                     style={{ ...inputStyle(!!errors.confirmPassword), paddingRight: '44px' }}
-                    onFocus={e => { if (!errors.confirmPassword) e.target.style.borderColor = '#7C3AED' }}
+                    onFocus={e => { if (!errors.confirmPassword) e.target.style.borderColor = '#14B8CD' }}
                     onBlur={e => { if (!errors.confirmPassword) e.target.style.borderColor = '#E8E5F0' }}
                   />
                   <button type="button" onClick={() => setShowConfirm(!showConfirm)}
@@ -376,7 +376,7 @@ export function MobileRegisterPage() {
                       <input value={form.organizationName} placeholder="Acme Inc."
                         onChange={e => updateField('organizationName', e.target.value)}
                         style={inputStyle(!!errors.organizationName)}
-                        onFocus={e => { if (!errors.organizationName) e.target.style.borderColor = '#7C3AED' }}
+                        onFocus={e => { if (!errors.organizationName) e.target.style.borderColor = '#14B8CD' }}
                         onBlur={e => { if (!errors.organizationName) e.target.style.borderColor = '#E8E5F0' }}
                       />
                     </div>
@@ -411,7 +411,7 @@ export function MobileRegisterPage() {
                   style={{
                     width: '22px', height: '22px', borderRadius: '7px', flexShrink: 0, marginTop: '1px',
                     border: agreed ? 'none' : '1.5px solid #E8E5F0',
-                    background: agreed ? '#7C3AED' : 'white',
+                    background: agreed ? '#14B8CD' : 'white',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     cursor: 'pointer', transition: 'all 200ms',
                   }}>
@@ -419,9 +419,9 @@ export function MobileRegisterPage() {
                 </div>
                 <span style={{ fontSize: '13px', color: '#4A4A6A', lineHeight: 1.5 }}>
                   I agree to the{' '}
-                  <Link to="/terms" target="_blank" style={{ color: '#7C3AED', fontWeight: 600, textDecoration: 'none' }}>Terms</Link>
+                  <Link to="/terms" target="_blank" style={{ color: '#14B8CD', fontWeight: 600, textDecoration: 'none' }}>Terms</Link>
                   {' '}and{' '}
-                  <Link to="/privacy" target="_blank" style={{ color: '#7C3AED', fontWeight: 600, textDecoration: 'none' }}>Privacy Policy</Link>
+                  <Link to="/privacy" target="_blank" style={{ color: '#14B8CD', fontWeight: 600, textDecoration: 'none' }}>Privacy Policy</Link>
                 </span>
               </label>
               {errors.terms && <p style={{ fontSize: '12px', color: '#EF4444', margin: '2px 0 0 32px' }}>{errors.terms}</p>}
@@ -430,10 +430,10 @@ export function MobileRegisterPage() {
               <button type="submit" disabled={isLoading}
                 style={{
                   width: '100%', padding: '16px', borderRadius: '16px', border: 'none', marginTop: '16px',
-                  background: 'linear-gradient(135deg, #7C3AED, #5B21B6)',
+                  background: 'linear-gradient(135deg, #14B8CD, #0E7490)',
                   color: 'white', fontSize: '16px', fontWeight: 700, cursor: isLoading ? 'wait' : 'pointer',
                   opacity: isLoading ? 0.7 : 1, transition: 'opacity 200ms',
-                  boxShadow: '0 4px 20px rgba(124,58,237,0.35)',
+                  boxShadow: '0 4px 20px rgba(20, 184, 205,0.35)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                 }}>
                 {isLoading ? (
@@ -452,7 +452,7 @@ export function MobileRegisterPage() {
         {/* Login link */}
         <p style={{ textAlign: 'center', fontSize: '14px', color: '#8E8EA0', marginTop: '24px' }}>
           Already have an account?{' '}
-          <Link to="/login" style={{ color: '#7C3AED', fontWeight: 700, textDecoration: 'none' }}>
+          <Link to="/login" style={{ color: '#14B8CD', fontWeight: 700, textDecoration: 'none' }}>
             Sign in
           </Link>
         </p>
