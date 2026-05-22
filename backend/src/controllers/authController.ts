@@ -3,9 +3,11 @@ import path from 'path';
 import fs from 'fs';
 import AuthService from '../services/authService.js';
 import prisma from '../config/db.js';
+import logger from '../config/logger.js';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { isValidEmail } from '../utils/validators.js';
 import { sanitizeEmail, validatePasswordStrength } from '../utils/security.js';
+import { purgeUserAndData } from '../services/userDeletionService.js';
 import { RegisterRequest, LoginRequest } from '../types/index.js';
 
 export const register = asyncHandler(async (req: Request, res: Response) => {
@@ -244,6 +246,49 @@ export const changePassword = asyncHandler(async (req: Request, res: Response) =
     success: true,
     statusCode: 200,
     message: 'Password changed successfully',
+    data: null,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+/**
+ * Permanently delete the authenticated user's own account and data.
+ * - Requires the client to echo back the account email (typed confirmation).
+ * - Blocks organization owners (Organization.owner is onDelete: Restrict, and
+ *   deleting an owner would orphan the org + members + billing).
+ */
+export const deleteAccount = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError('Unauthorized', 401);
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  // Typed-confirmation guard — works for both password and Google accounts.
+  const { confirmEmail } = req.body as { confirmEmail?: string };
+  if (!confirmEmail || sanitizeEmail(confirmEmail) !== sanitizeEmail(user.email)) {
+    throw new AppError('Please type your account email exactly to confirm deletion', 400);
+  }
+
+  // Org owners cannot self-delete here — must transfer ownership first.
+  const ownedOrg = await prisma.organization.findFirst({ where: { ownerId: user.id } });
+  if (user.role === 'org_owner' || ownedOrg) {
+    throw new AppError(
+      'Organization owners cannot delete their account here. Please transfer ownership or contact support@convoia.com first.',
+      403
+    );
+  }
+
+  await purgeUserAndData(user.id);
+  logger.info(`Self-service account deletion completed: userId=${user.id}`);
+
+  res.json({
+    success: true,
+    statusCode: 200,
+    message: 'Your account and associated data have been permanently deleted.',
     data: null,
     timestamp: new Date().toISOString(),
   });

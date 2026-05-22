@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { Zap, ArrowLeft, Shield } from 'lucide-react'
 
 const EFFECTIVE_DATE = 'March 23, 2026'
-const COMPANY_NAME = 'ConvoiaAI'
+const COMPANY_NAME = 'Convoia AI'
 const COMPANY_ENTITY = 'Convoia Inc.'
 const CONTACT_EMAIL = 'privacy@convoia.com'
 const WEBSITE = 'convoia.ai'
@@ -39,9 +39,9 @@ export function PrivacyPolicyPage() {
             {/* Intro */}
             <section>
               <p>
-                {COMPANY_ENTITY} ("{COMPANY_NAME}", "we", "us", or "our") operates the {WEBSITE} platform and related services
-                (collectively, the "Service"). This Privacy Policy describes how we collect, use, disclose, and protect your
-                personal information when you access or use our Service.
+                {COMPANY_ENTITY} ("{COMPANY_NAME}", "we", "us", or "our") operates the {WEBSITE} website, our iOS and Android
+                mobile applications, and related services (collectively, the "Service"). This Privacy Policy describes how we
+                collect, use, disclose, and protect your personal information when you access or use our Service.
               </p>
               <p>
                 We are committed to protecting your privacy and complying with applicable U.S. federal and state privacy

@@ -47,7 +47,18 @@ export function AccountDeletionPage() {
 
             {/* 1. How to request */}
             <section>
-              <h2>How to request account deletion</h2>
+              <h2>Option 1 — Delete instantly in the app (fastest)</h2>
+              <ol>
+                <li>Sign in to the {COMPANY_NAME} app or website.</li>
+                <li>Go to <strong>Settings → Danger Zone → Delete Account</strong>.</li>
+                <li>Type your account email to confirm, then tap <strong>Delete Forever</strong>.</li>
+              </ol>
+              <p>
+                Your account and associated personal data are deleted immediately and you are signed out.
+                This action is permanent and cannot be undone.
+              </p>
+
+              <h2>Option 2 — Request deletion by email</h2>
               <ol>
                 <li>From the email address registered on your {COMPANY_NAME} account, send an email to <a href={`mailto:${CONTACT_EMAIL}`} className="text-primary hover:underline">{CONTACT_EMAIL}</a>.</li>
                 <li>Use the subject line: <code>Account Deletion Request</code></li>
@@ -56,6 +67,10 @@ export function AccountDeletionPage() {
               <p>
                 We will verify the request originated from the registered email and complete deletion
                 within 30 days. You will receive a confirmation email once the deletion is complete.
+              </p>
+              <p className="text-sm text-text-muted">
+                Note: organization owners cannot self-delete in the app (it would orphan the organization and its members).
+                Please transfer ownership first, or email us and we will assist.
               </p>
             </section>
 

@@ -37,6 +37,11 @@ export function MobileSettingsPage() {
   const [showNewPw, setShowNewPw] = useState(false)
   const [changingPw, setChangingPw] = useState(false)
 
+  // Account deletion
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteConfirmEmail, setDeleteConfirmEmail] = useState('')
+  const [deletingAccount, setDeletingAccount] = useState(false)
+
   const strength = passwordStrength(newPw)
   const strengthColors = ['#EF4444', '#EF4444', '#F59E0B', '#F59E0B', '#10B981', '#10B981']
 
@@ -83,6 +88,22 @@ export function MobileSettingsPage() {
   const handleLogout = () => {
     logout()
   }
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmEmail.trim().toLowerCase() !== (user?.email || '').toLowerCase()) {
+      toast.error('Email does not match'); return
+    }
+    try {
+      setDeletingAccount(true)
+      await api.delete('/auth/account', { data: { confirmEmail: deleteConfirmEmail.trim() } })
+      toast.success('Your account has been permanently deleted')
+      logout()
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to delete account')
+    } finally { setDeletingAccount(false) }
+  }
+
+  const deleteEmailMatches = deleteConfirmEmail.trim().toLowerCase() === (user?.email || '').toLowerCase()
 
   return (
     <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '100px' }}>
@@ -230,6 +251,50 @@ export function MobileSettingsPage() {
         <LogOut size={18} />
         Log Out
       </button>
+
+      {/* ─── DANGER ZONE — account deletion (Play Store requirement) ─── */}
+      <div>
+        <h2 style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#EF4444', margin: '0 0 10px', paddingLeft: '4px' }}>
+          Danger Zone
+        </h2>
+        <div style={{ background: 'var(--color-surface)', borderRadius: '16px', border: '1px solid rgba(239,68,68,0.25)', padding: '16px' }}>
+          {isOwner ? (
+            <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: 0, lineHeight: 1.5 }}>
+              As the organization owner, you can't delete your account from here. Transfer ownership to another member or contact{' '}
+              <a href="mailto:support@convoia.com" style={{ color: '#7C3AED', fontWeight: 600 }}>support@convoia.com</a> first.
+            </p>
+          ) : !showDeleteConfirm ? (
+            <>
+              <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: '0 0 12px', lineHeight: 1.5 }}>
+                Permanently delete your account and all associated data — conversations, usage history, tokens, and files. This cannot be undone.
+              </p>
+              <button onClick={() => setShowDeleteConfirm(true)}
+                style={{ width: '100%', padding: '14px', borderRadius: '14px', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.06)', color: '#EF4444', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
+                Delete Account
+              </button>
+            </>
+          ) : (
+            <>
+              <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: '0 0 10px', lineHeight: 1.5 }}>
+                This is permanent. Type your email <strong style={{ color: 'var(--color-text-primary)' }}>{user?.email}</strong> to confirm.
+              </p>
+              <input type="email" value={deleteConfirmEmail} onChange={e => setDeleteConfirmEmail(e.target.value)}
+                placeholder="Type your email to confirm" autoCapitalize="none" autoCorrect="off"
+                style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', fontSize: '14px', border: '1.5px solid rgba(239,68,68,0.3)', background: 'var(--color-surface-2)', color: 'var(--color-text-primary)', outline: 'none', marginBottom: '12px' }} />
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmEmail('') }}
+                  style={{ flex: 1, padding: '14px', borderRadius: '14px', border: '1px solid var(--color-border)', background: 'var(--color-surface-2)', color: 'var(--color-text-primary)', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
+                  Cancel
+                </button>
+                <button onClick={handleDeleteAccount} disabled={deletingAccount || !deleteEmailMatches}
+                  style={{ flex: 1, padding: '14px', borderRadius: '14px', border: 'none', background: '#EF4444', color: 'white', fontSize: '14px', fontWeight: 700, cursor: (deletingAccount || !deleteEmailMatches) ? 'not-allowed' : 'pointer', opacity: (deletingAccount || !deleteEmailMatches) ? 0.5 : 1 }}>
+                  {deletingAccount ? 'Deleting…' : 'Delete Forever'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

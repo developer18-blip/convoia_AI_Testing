@@ -108,6 +108,25 @@ export function SettingsPage() {
   const [passwordErrors, setPasswordErrors] = useState<Record<string, string>>({})
   const [isChangingPassword, setIsChangingPassword] = useState(false)
 
+  // Account deletion
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteConfirmEmail, setDeleteConfirmEmail] = useState('')
+  const [deletingAccount, setDeletingAccount] = useState(false)
+  const deleteEmailMatches = deleteConfirmEmail.trim().toLowerCase() === (user?.email || '').toLowerCase()
+
+  const handleDeleteAccount = async () => {
+    if (!deleteEmailMatches) { toast.error('Email does not match'); return }
+    try {
+      setDeletingAccount(true)
+      await api.delete('/auth/account', { data: { confirmEmail: deleteConfirmEmail.trim() } })
+      toast.success('Your account has been permanently deleted')
+      localStorage.clear()
+      window.location.href = '/login'
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to delete account')
+    } finally { setDeletingAccount(false) }
+  }
+
   // Avatar
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
@@ -455,6 +474,35 @@ export function SettingsPage() {
             <p className="mt-3 text-xs text-text-muted">
               Account disconnect coming soon — you'll be able to unlink third-party providers here.
             </p>
+          </Card>
+
+          {/* Danger Zone — account deletion (Play Store / GDPR requirement) */}
+          <Card padding="lg">
+            <h3 className="text-lg font-semibold text-danger mb-1">Danger Zone</h3>
+            {user?.role === 'org_owner' ? (
+              <p className="text-sm text-text-secondary">
+                As the organization owner, you can't delete your account here. Transfer ownership to another member or contact{' '}
+                <a href="mailto:support@convoia.com" className="text-primary hover:underline">support@convoia.com</a> first.
+              </p>
+            ) : !showDeleteConfirm ? (
+              <>
+                <p className="text-sm text-text-secondary mb-4">
+                  Permanently delete your account and all associated data — conversations, usage history, tokens, and files. This cannot be undone.
+                </p>
+                <Button variant="danger" onClick={() => setShowDeleteConfirm(true)}>Delete Account</Button>
+              </>
+            ) : (
+              <div className="space-y-3 max-w-md">
+                <p className="text-sm text-text-secondary">
+                  This is permanent. Type your email <span className="font-semibold text-text-primary">{user?.email}</span> to confirm.
+                </p>
+                <Input label="Confirm your email" type="email" value={deleteConfirmEmail} onChange={(e) => setDeleteConfirmEmail(e.target.value)} placeholder="Type your email to confirm" />
+                <div className="flex gap-3">
+                  <Button variant="secondary" onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmEmail('') }}>Cancel</Button>
+                  <Button variant="danger" isLoading={deletingAccount} disabled={!deleteEmailMatches} onClick={handleDeleteAccount}>Delete Forever</Button>
+                </div>
+              </div>
+            )}
           </Card>
         </div>
       )}

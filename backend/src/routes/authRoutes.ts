@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { register, login, getProfile, updateProfile, changePassword, verifyToken, refreshToken, googleAuth, googleMobileRedirect, googleCallback, verifyEmail, resendVerification, uploadAvatar, selectAvatar, forgotPassword, resetPassword } from '../controllers/authController.js';
+import { register, login, getProfile, updateProfile, changePassword, verifyToken, refreshToken, googleAuth, googleMobileRedirect, googleCallback, verifyEmail, resendVerification, uploadAvatar, selectAvatar, forgotPassword, resetPassword, deleteAccount } from '../controllers/authController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
 
@@ -27,5 +27,6 @@ router.put('/profile', authMiddleware, updateProfile);
 router.post('/avatar/upload', authMiddleware, uploadSingle, uploadAvatar);
 router.post('/avatar/select', authMiddleware, selectAvatar);
 router.put('/password', authMiddleware, changePassword);
+router.delete('/account', authMiddleware, deleteAccount);
 
 export default router;
