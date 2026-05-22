@@ -23,7 +23,8 @@ import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../hooks/useToast'
 import { useTokens } from '../contexts/TokenContext'
 import { useModels } from '../hooks/useModels'
-import { formatCurrency, formatNumber, formatTokens, formatDate } from '../lib/utils'
+import { formatCurrency, formatNumber, formatTokens, formatDate, cn } from '../lib/utils'
+import type { AIModel } from '../types'
 import api from '../lib/api'
 
 interface TeamMember {
@@ -118,21 +119,6 @@ export function TeamPage() {
     setBudgetAutoDowngrade(m.budget?.autoDowngrade ?? true)
     setBudgetFallbackId(m.budget?.fallbackModelId ?? '')
   }
-
-  // Fallback options, cheapest first — a fallback should be the economical choice.
-  const fallbackOptions = useMemo(
-    () => [
-      { value: '', label: 'Select a fallback model…' },
-      ...[...models]
-        .filter((m) => m.isActive)
-        .sort(
-          (a, b) =>
-            a.inputTokenPrice + a.outputTokenPrice - (b.inputTokenPrice + b.outputTokenPrice),
-        )
-        .map((m) => ({ value: m.id, label: `${m.name} · ${m.provider}` })),
-    ],
-    [models],
-  )
 
   // Role change modal
   const [roleChangeTarget, setRoleChangeTarget] = useState<TeamMember | null>(null)
@@ -701,7 +687,7 @@ export function TeamPage() {
           />
 
           {/* Auto-downgrade toggle */}
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start justify-between gap-4 rounded-xl border border-border bg-surface-2/40 px-3.5 py-3">
             <div className="min-w-0">
               <p className="text-sm font-medium text-text-primary">Auto-downgrade at cap</p>
               <p className="text-xs text-text-muted mt-0.5">
@@ -713,11 +699,10 @@ export function TeamPage() {
 
           {/* Fallback model — only relevant in downgrade mode */}
           {budgetAutoDowngrade && (
-            <Select
-              label="Fallback model"
-              options={fallbackOptions}
+            <FallbackModelPicker
+              models={models}
               value={budgetFallbackId}
-              onChange={(e) => setBudgetFallbackId(e.target.value)}
+              onChange={setBudgetFallbackId}
             />
           )}
 
@@ -985,6 +970,157 @@ function BudgetOutcomeNote({
     >
       <span className="mt-0.5 shrink-0" style={{ color: tint.color }}>{icon}</span>
       <p className="text-xs leading-relaxed" style={{ color: tint.color }}>{text}</p>
+    </div>
+  )
+}
+
+// ── Fallback model picker — custom dropdown replacing the native <select>,
+// which rendered a giant OS list that opened over the whole screen. This one
+// opens downward, stays compact with an internal scroll, and is searchable. ──
+const PROVIDER_DOT: Record<string, string> = {
+  openai: '#10A37F',
+  anthropic: '#D97757',
+  google: '#4285F4',
+  xai: '#9CA3AF',
+  mistral: '#FF7000',
+  deepseek: '#4D6BFE',
+  perplexity: '#20808D',
+  groq: '#F55036',
+}
+
+function ProviderDot({ provider }: { provider: string }) {
+  const color = PROVIDER_DOT[provider?.toLowerCase()] || 'var(--color-text-muted)'
+  return <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+}
+
+function FallbackModelPicker({
+  models,
+  value,
+  onChange,
+}: {
+  models: AIModel[]
+  value: string
+  onChange: (id: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const ref = useRef<HTMLDivElement>(null)
+
+  // Active models, cheapest first — a fallback should be the economical choice.
+  const sorted = useMemo(
+    () =>
+      [...models]
+        .filter((m) => m.isActive)
+        .sort(
+          (a, b) =>
+            a.inputTokenPrice + a.outputTokenPrice - (b.inputTokenPrice + b.outputTokenPrice),
+        ),
+    [models],
+  )
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return sorted
+    return sorted.filter(
+      (m) => m.name.toLowerCase().includes(q) || m.provider.toLowerCase().includes(q),
+    )
+  }, [sorted, query])
+
+  const selected = models.find((m) => m.id === value)
+
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [])
+
+  useEffect(() => {
+    if (open) setQuery('')
+  }, [open])
+
+  return (
+    <div className="relative" ref={ref}>
+      <label className="block text-sm font-medium text-text-secondary mb-1.5">Fallback model</label>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between gap-2 bg-surface border border-border rounded-xl px-3 py-2.5 text-sm hover:border-border/80 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all"
+      >
+        {selected ? (
+          <span className="flex items-center gap-2 min-w-0">
+            <ProviderDot provider={selected.provider} />
+            <span className="truncate text-text-primary">{selected.name}</span>
+            <span className="text-xs text-text-muted shrink-0">· {selected.provider}</span>
+          </span>
+        ) : (
+          <span className="text-text-muted">Select a fallback model…</span>
+        )}
+        <ChevronDown
+          size={16}
+          className={cn('text-text-muted transition-transform duration-200 shrink-0', open && 'rotate-180')}
+        />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.12, ease: 'easeOut' }}
+            className="absolute left-0 right-0 top-full mt-2 z-50 bg-surface border border-border rounded-xl shadow-2xl shadow-black/40 overflow-hidden"
+          >
+            <div className="p-2 border-b border-border/60">
+              <div className="relative">
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
+                <input
+                  autoFocus
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search models…"
+                  className="w-full pl-8 pr-2 py-2 text-sm bg-surface-2 border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:border-primary"
+                />
+              </div>
+            </div>
+            <div className="max-h-52 overflow-y-auto py-1">
+              {filtered.length === 0 ? (
+                <p className="px-3 py-4 text-sm text-text-muted text-center">No models match.</p>
+              ) : (
+                filtered.map((m, i) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => {
+                      onChange(m.id)
+                      setOpen(false)
+                    }}
+                    className={cn(
+                      'w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-colors',
+                      m.id === value
+                        ? 'bg-primary/10 text-text-primary'
+                        : 'text-text-secondary hover:bg-surface-2 hover:text-text-primary',
+                    )}
+                  >
+                    <ProviderDot provider={m.provider} />
+                    <span className="truncate flex-1">{m.name}</span>
+                    {i === 0 && !query && (
+                      <span
+                        className="text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0"
+                        style={{ background: 'rgba(20,184,166,0.15)', color: '#2DD4BF' }}
+                      >
+                        cheapest
+                      </span>
+                    )}
+                    <span className="text-xs text-text-muted shrink-0">{m.provider}</span>
+                    {m.id === value && <Check size={14} className="text-primary shrink-0" />}
+                  </button>
+                ))
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
