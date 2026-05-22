@@ -323,6 +323,8 @@ export const getTeamMembers = asyncHandler(async (req: Request, res: Response) =
             monthlyCap: budget.monthlyCap,
             currentUsage: budget.currentUsage,
             alertThreshold: budget.alertThreshold,
+            autoDowngrade: budget.autoDowngrade,
+            fallbackModelId: budget.fallbackModelId,
             percentUsed: budget.monthlyCap > 0 ? (budget.currentUsage / budget.monthlyCap) * 100 : 0,
           }
         : null,

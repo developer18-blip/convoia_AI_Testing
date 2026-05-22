@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Users, Activity, DollarSign, UserPlus, Mail, Copy, Check, X,
   MoreHorizontal, Shield, ArrowRight, Search, RefreshCw, Trash2, ChevronDown, Zap,
+  ArrowDownCircle, Ban, AlertTriangle,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { StatCard } from '../components/shared/StatCard'
@@ -13,6 +14,7 @@ import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
 import { Input } from '../components/ui/Input'
 import { Select } from '../components/ui/Select'
+import { Toggle } from '../components/ui/Toggle'
 import { ProgressBar } from '../components/ui/ProgressBar'
 import { LoadingPage } from '../components/shared/LoadingPage'
 import { ErrorState } from '../components/shared/ErrorState'
@@ -20,6 +22,7 @@ import { EmptyState } from '../components/shared/EmptyState'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../hooks/useToast'
 import { useTokens } from '../contexts/TokenContext'
+import { useModels } from '../hooks/useModels'
 import { formatCurrency, formatNumber, formatTokens, formatDate } from '../lib/utils'
 import api from '../lib/api'
 
@@ -42,6 +45,8 @@ interface TeamMember {
     currentUsage: number
     alertThreshold: number
     percentUsed: number
+    autoDowngrade?: boolean
+    fallbackModelId?: string | null
   } | null
 }
 
@@ -71,6 +76,7 @@ export function TeamPage() {
   const toast = useToast()
   const { user } = useAuth()
   const { tokenBalance, formattedBalance, refresh: refreshTokens } = useTokens()
+  const { models } = useModels()
   const isOwner = user?.role === 'org_owner' || user?.role === 'platform_admin'
   const canAssignTokens = isOwner || user?.role === 'manager'
 
@@ -101,7 +107,32 @@ export function TeamPage() {
   // Budget modal
   const [budgetTarget, setBudgetTarget] = useState<TeamMember | null>(null)
   const [budgetCap, setBudgetCap] = useState('')
+  const [budgetAutoDowngrade, setBudgetAutoDowngrade] = useState(true)
+  const [budgetFallbackId, setBudgetFallbackId] = useState('')
   const [isSavingBudget, setIsSavingBudget] = useState(false)
+
+  // Open the budget modal pre-filled from a member's existing budget (or defaults).
+  const openBudgetModal = (m: TeamMember) => {
+    setBudgetTarget(m)
+    setBudgetCap(String(m.budget?.monthlyCap || ''))
+    setBudgetAutoDowngrade(m.budget?.autoDowngrade ?? true)
+    setBudgetFallbackId(m.budget?.fallbackModelId ?? '')
+  }
+
+  // Fallback options, cheapest first — a fallback should be the economical choice.
+  const fallbackOptions = useMemo(
+    () => [
+      { value: '', label: 'Select a fallback model…' },
+      ...[...models]
+        .filter((m) => m.isActive)
+        .sort(
+          (a, b) =>
+            a.inputTokenPrice + a.outputTokenPrice - (b.inputTokenPrice + b.outputTokenPrice),
+        )
+        .map((m) => ({ value: m.id, label: `${m.name} · ${m.provider}` })),
+    ],
+    [models],
+  )
 
   // Role change modal
   const [roleChangeTarget, setRoleChangeTarget] = useState<TeamMember | null>(null)
@@ -247,7 +278,13 @@ export function TeamPage() {
     if (!budgetTarget || !budgetCap) return
     try {
       setIsSavingBudget(true)
-      await api.put('/budget/set', { userId: budgetTarget.id, monthlyCap: parseFloat(budgetCap) })
+      await api.put('/budget/set', {
+        userId: budgetTarget.id,
+        monthlyCap: parseFloat(budgetCap),
+        autoDowngrade: budgetAutoDowngrade,
+        // Block mode (auto-downgrade off) clears any fallback; downgrade mode keeps it.
+        fallbackModelId: budgetAutoDowngrade ? budgetFallbackId || null : null,
+      })
       toast.success(`Budget updated for ${budgetTarget.name}`)
       setBudgetTarget(null)
       setBudgetCap('')
@@ -517,8 +554,7 @@ export function TeamPage() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
-                            setBudgetTarget(m)
-                            setBudgetCap('')
+                            openBudgetModal(m)
                           }}
                           className="text-xs text-primary hover:text-primary-hover"
                         >
@@ -537,7 +573,7 @@ export function TeamPage() {
                           member={m}
                           isOwner={isOwner}
                           onViewProfile={() => navigate(`/team/${m.id}`)}
-                          onSetBudget={() => { setBudgetTarget(m); setBudgetCap(String(m.budget?.monthlyCap || '')) }}
+                          onSetBudget={() => openBudgetModal(m)}
                           onAssignTokens={
                             canAssignTokens && m.id !== user?.id && m.role !== 'org_owner'
                               ? () => { setAssignTokensTarget(m); setAssignTokensAmount('') }
@@ -663,6 +699,35 @@ export function TeamPage() {
             onChange={(e) => setBudgetCap(e.target.value)}
             placeholder="e.g. 50"
           />
+
+          {/* Auto-downgrade toggle */}
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-text-primary">Auto-downgrade at cap</p>
+              <p className="text-xs text-text-muted mt-0.5">
+                Switch to a cheaper model instead of blocking access.
+              </p>
+            </div>
+            <Toggle checked={budgetAutoDowngrade} onChange={setBudgetAutoDowngrade} label="Auto-downgrade at cap" />
+          </div>
+
+          {/* Fallback model — only relevant in downgrade mode */}
+          {budgetAutoDowngrade && (
+            <Select
+              label="Fallback model"
+              options={fallbackOptions}
+              value={budgetFallbackId}
+              onChange={(e) => setBudgetFallbackId(e.target.value)}
+            />
+          )}
+
+          {/* Live "what happens at the cap" explainer */}
+          <BudgetOutcomeNote
+            cap={parseFloat(budgetCap) || 0}
+            autoDowngrade={budgetAutoDowngrade}
+            fallbackName={models.find((m) => m.id === budgetFallbackId)?.name}
+          />
+
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setBudgetTarget(null)}>Cancel</Button>
             <Button onClick={handleSaveBudget} isLoading={isSavingBudget}>Save Budget</Button>
@@ -877,6 +942,49 @@ function MemberActions({
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+// ── Live "what happens at the cap" explainer ───
+function BudgetOutcomeNote({
+  cap,
+  autoDowngrade,
+  fallbackName,
+}: {
+  cap: number
+  autoDowngrade: boolean
+  fallbackName?: string
+}) {
+  let icon: React.ReactNode
+  let text: string
+  let tint: { bg: string; border: string; color: string }
+
+  if (cap <= 0) {
+    icon = <DollarSign size={16} />
+    text = 'Set a monthly cap to start controlling this member’s spend.'
+    tint = { bg: 'rgba(148,163,184,0.08)', border: 'rgba(148,163,184,0.20)', color: 'var(--color-text-muted)' }
+  } else if (!autoDowngrade) {
+    icon = <Ban size={16} />
+    text = `At ${formatCurrency(cap)}, new requests are blocked until the budget resets on the 1st.`
+    tint = { bg: 'rgba(239,68,68,0.10)', border: 'rgba(239,68,68,0.22)', color: '#EF4444' }
+  } else if (fallbackName) {
+    icon = <ArrowDownCircle size={16} />
+    text = `At ${formatCurrency(cap)}, requests switch to ${fallbackName} for the rest of the month.`
+    tint = { bg: 'rgba(20,184,166,0.10)', border: 'rgba(20,184,166,0.25)', color: '#2DD4BF' }
+  } else {
+    icon = <AlertTriangle size={16} />
+    text = 'Pick a fallback model — without one, reaching the cap won’t change anything and usage continues at full cost.'
+    tint = { bg: 'rgba(245,158,11,0.10)', border: 'rgba(245,158,11,0.25)', color: '#F59E0B' }
+  }
+
+  return (
+    <div
+      className="flex items-start gap-2.5 rounded-xl px-3.5 py-3"
+      style={{ background: tint.bg, border: `1px solid ${tint.border}` }}
+    >
+      <span className="mt-0.5 shrink-0" style={{ color: tint.color }}>{icon}</span>
+      <p className="text-xs leading-relaxed" style={{ color: tint.color }}>{text}</p>
     </div>
   )
 }
