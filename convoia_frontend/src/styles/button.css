@@ -27,11 +27,15 @@
   background: var(--accent);
   color: var(--accent-on);
   border-color: var(--accent);
+  /* Premium: glossy top-edge highlight + soft accent glow */
+  box-shadow: 0 4px 14px var(--accent-glow), 0 1px 0 rgba(255, 255, 255, 0.18) inset;
 }
 .btn--primary:hover:not(:disabled) {
   background: var(--accent-hover);
-  box-shadow: var(--shadow-accent);
+  box-shadow: 0 8px 26px var(--accent-glow), 0 1px 0 rgba(255, 255, 255, 0.22) inset;
+  transform: translateY(-1px);
 }
+.btn--primary:active:not(:disabled) { transform: translateY(0); }
 
 .btn--secondary {
   background: var(--surface-1);
