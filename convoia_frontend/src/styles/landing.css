@@ -782,3 +782,89 @@
   .lp-providers-grid { grid-template-columns: 1fr; }
   .lp-pricing__grid { grid-template-columns: 1fr; }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   PREMIUM POLISH (appended) — depth · glass · glow · motion
+   Elevates the flat surfaces with layered shadows, a crisp
+   top-edge highlight and a gradient sheen, plus richer hover
+   glow. All via design tokens, so light + dark both adapt.
+   ═══════════════════════════════════════════════════════════ */
+
+/* Elevated card surface — sheen overlay + depth + crisp top edge.
+   Only background-IMAGE is set so each card keeps its own bg color. */
+.lp-provider-card,
+.lp-problem-card,
+.lp-feature,
+.lp-proof-card,
+.lp-how-step,
+.lp-testimonial,
+.lp-tier {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0) 42%);
+  box-shadow: var(--shadow-lg), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+  transition: transform var(--duration-base) var(--ease-default),
+              box-shadow var(--duration-base) var(--ease-default),
+              border-color var(--duration-base) var(--ease-default);
+}
+
+/* Generic premium hover — float + deepen + soft accent glow */
+.lp-feature:hover,
+.lp-proof-card:hover,
+.lp-how-step:hover,
+.lp-testimonial:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-xl), var(--shadow-accent), 0 1px 0 rgba(255, 255, 255, 0.08) inset;
+}
+
+/* Provider cards lift with their own brand glow */
+.lp-provider-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-xl), 0 12px 34px var(--p-soft), 0 1px 0 rgba(255, 255, 255, 0.08) inset;
+}
+
+/* Problem cards — danger-tinted depth on hover */
+.lp-problem-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-xl), 0 12px 34px var(--color-error-bg), 0 1px 0 rgba(255, 255, 255, 0.08) inset;
+}
+
+/* Luminous hero accent — gradient text + glow (drop-shadow survives the
+   transparent text-fill that background-clip needs) */
+.lp-hero__title-accent {
+  background: linear-gradient(120deg, var(--accent-300) 0%, var(--accent) 48%, var(--accent-600) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 30px var(--accent-glow));
+}
+.lp-hero__ambient { opacity: 0.95; }
+
+/* Dashboard mock floats with an accent halo */
+.lp-dashboard-mock {
+  box-shadow: var(--shadow-xl), 0 0 90px var(--accent-glow), 0 1px 0 rgba(255, 255, 255, 0.06) inset !important;
+}
+.lp-metric-tile {
+  box-shadow: var(--shadow-md), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+}
+
+/* Featured pricing tier — stronger accent presence + deeper hover */
+.lp-tier--featured {
+  box-shadow: var(--shadow-xl), 0 0 56px var(--accent-glow), 0 1px 0 rgba(255, 255, 255, 0.08) inset !important;
+}
+.lp-tier:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-xl), var(--shadow-accent), 0 1px 0 rgba(255, 255, 255, 0.08) inset;
+}
+
+/* Primary CTAs get a soft accent glow + lift */
+.lp-hero__actions .btn--primary,
+.lp-final .btn--primary {
+  box-shadow: 0 8px 26px var(--accent-glow);
+  transition: transform var(--duration-fast) var(--ease-default),
+              box-shadow var(--duration-base) var(--ease-default);
+}
+.lp-hero__actions .btn--primary:hover,
+.lp-final .btn--primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 38px var(--accent-glow);
+}
