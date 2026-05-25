@@ -398,6 +398,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   // pending useEffect cannot race the next-turn assignment.
   const [currentApolloTurnId, setCurrentApolloTurnId] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  // Handle on the active SSE reader. AbortController alone is unreliable in the
+  // Capacitor WebView (and some browsers): aborting does not always reject an
+  // in-flight reader.read(), so the read loop keeps draining buffered chunks and
+  // keeps rendering tool/status/search events (which bypass the typewriter
+  // guard below). Cancelling the reader directly resolves the pending read with
+  // done:true, so the loop exits deterministically. Belt-and-suspenders with abort.
+  const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null)
   // Set true by stopStreaming so the smooth-typing rAF loop freezes immediately.
   // Aborting the fetch stops NEW chunks, but without this the animator keeps
   // draining already-buffered text, making "Stop" look like it did nothing.
@@ -415,6 +422,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     if (abortRef.current) {
       abortRef.current.abort()
       abortRef.current = null
+    }
+    // Force the read loop to unblock even when abort doesn't propagate to the
+    // pending read() (WebView). cancel() rejects/resolves it; wrapped because a
+    // reader already released/closed by the finally block throws.
+    if (readerRef.current) {
+      try { readerRef.current.cancel() } catch { /* already closed */ }
+      readerRef.current = null
     }
     setIsStreaming(false)
     // Remove isLoading + isStreaming from any in-flight assistant message so
@@ -809,6 +823,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
       const reader = response.body?.getReader()
       if (!reader) throw new Error('No response body')
+      readerRef.current = reader
 
       const decoder = new TextDecoder()
       let buffer = ''
@@ -857,6 +872,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
+        // Stop pressed: bail before processing this batch. The non-'chunk' event
+        // types (status/tool/search/council) write setMessages directly and so
+        // bypass the typewriter's stoppedRef guard — only ending the loop here
+        // guarantees nothing more renders after Stop.
+        if (stoppedRef.current) break
 
         buffer += decoder.decode(value, { stream: true })
         const lines = buffer.split('\n')
@@ -987,18 +1007,24 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Drain animation BEFORE the final-state setMessages so any rAF that
-      // hasn't fired yet doesn't overwrite the metadata (videoUrl/imageUrl/etc)
-      // we're about to bake in.
-      drainAnim()
-      setMessages(bakeFinalAssistantState(assistantId, modelId, metadata, accumulated))
+      // Stop pressed mid-stream: the reader was cancelled, so the loop exited
+      // normally (done:true) instead of throwing. Skip the drain + final bake —
+      // stopStreaming already froze the partial content. Running them here would
+      // dump the buffered-but-unshown text and mark the message "complete".
+      if (!stoppedRef.current) {
+        // Drain animation BEFORE the final-state setMessages so any rAF that
+        // hasn't fired yet doesn't overwrite the metadata (videoUrl/imageUrl/etc)
+        // we're about to bake in.
+        drainAnim()
+        setMessages(bakeFinalAssistantState(assistantId, modelId, metadata, accumulated))
 
-      // Refresh wallet balance after tokens were used
-      window.dispatchEvent(new Event('tokens:refresh'))
+        // Refresh wallet balance after tokens were used
+        window.dispatchEvent(new Event('tokens:refresh'))
 
-      // Store final response for voice auto-speak
-      if (accumulated.trim()) {
-        setLatestCompletedResponse(accumulated)
+        // Store final response for voice auto-speak
+        if (accumulated.trim()) {
+          setLatestCompletedResponse(accumulated)
+        }
       }
     } catch (err: unknown) {
       // If user stopped, don't show error
@@ -1108,6 +1134,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
       const reader = response.body?.getReader()
       if (!reader) throw new Error('No response body')
+      readerRef.current = reader
 
       const decoder = new TextDecoder()
       let buffer = ''
@@ -1156,6 +1183,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
+        // Stop pressed: bail before processing this batch. The non-'chunk' event
+        // types (status/tool/search/council) write setMessages directly and so
+        // bypass the typewriter's stoppedRef guard — only ending the loop here
+        // guarantees nothing more renders after Stop.
+        if (stoppedRef.current) break
 
         buffer += decoder.decode(value, { stream: true })
         const lines = buffer.split('\n')
@@ -1283,18 +1315,24 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Drain animation BEFORE the final-state setMessages so any rAF that
-      // hasn't fired yet doesn't overwrite the metadata (videoUrl/imageUrl/etc)
-      // we're about to bake in.
-      drainAnim()
-      setMessages(bakeFinalAssistantState(assistantId, modelId, metadata, accumulated))
+      // Stop pressed mid-stream: the reader was cancelled, so the loop exited
+      // normally (done:true) instead of throwing. Skip the drain + final bake —
+      // stopStreaming already froze the partial content. Running them here would
+      // dump the buffered-but-unshown text and mark the message "complete".
+      if (!stoppedRef.current) {
+        // Drain animation BEFORE the final-state setMessages so any rAF that
+        // hasn't fired yet doesn't overwrite the metadata (videoUrl/imageUrl/etc)
+        // we're about to bake in.
+        drainAnim()
+        setMessages(bakeFinalAssistantState(assistantId, modelId, metadata, accumulated))
 
-      // Refresh wallet balance after tokens were used
-      window.dispatchEvent(new Event('tokens:refresh'))
+        // Refresh wallet balance after tokens were used
+        window.dispatchEvent(new Event('tokens:refresh'))
 
-      // Store final response for voice auto-speak
-      if (accumulated.trim()) {
-        setLatestCompletedResponse(accumulated)
+        // Store final response for voice auto-speak
+        if (accumulated.trim()) {
+          setLatestCompletedResponse(accumulated)
+        }
       }
     } catch (err: unknown) {
       // Treat user-initiated abort as a clean stop, not an error.
@@ -1331,10 +1369,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
     // Abort any in-flight stream so the new generation doesn't race with the
     // old one. Mirrors stopStreaming() but skips its placeholder-text mutation
-    // since we're about to drop the streaming message anyway.
+    // since we're about to drop the streaming message anyway. Cancel the reader
+    // too (abort alone doesn't reliably unblock the read in the WebView).
     if (abortRef.current) {
       abortRef.current.abort()
       abortRef.current = null
+    }
+    if (readerRef.current) {
+      try { readerRef.current.cancel() } catch { /* already closed */ }
+      readerRef.current = null
     }
     setIsStreaming(false)
 
