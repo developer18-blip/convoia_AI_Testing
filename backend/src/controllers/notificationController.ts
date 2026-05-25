@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import prisma from '../config/db.js';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { isValidUUID } from '../utils/validators.js';
+import { NotificationService } from '../services/notificationService.js';
 
 // ============ 1. GET /api/notifications ============
 export const getNotifications = asyncHandler(async (req: Request, res: Response) => {
@@ -121,6 +122,53 @@ export const deleteNotification = asyncHandler(async (req: Request, res: Respons
     success: true,
     statusCode: 200,
     message: 'Notification deleted',
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// ============ 6. GET /api/notifications/preferences ============
+// Always returns a full defaults object (never null/404). The "no row = all
+// true" model is hidden from the client — the backend is the single source of
+// truth for "what are my preferences".
+export const getPreferences = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new AppError('Unauthorized', 401);
+
+  const preferences = await NotificationService.getPreferences(req.user.userId);
+
+  res.json({
+    success: true,
+    statusCode: 200,
+    message: 'Notification preferences retrieved',
+    data: preferences,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// ============ 7. PATCH /api/notifications/preferences ============
+// Partial update; lazily creates the row on first write. Scoped to req.user.
+export const updatePreferences = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new AppError('Unauthorized', 401);
+
+  const body = req.body ?? {};
+  const allowed = ['emailDigest', 'inAppNotifications', 'memberAlerts'] as const;
+  const patch: Partial<Record<(typeof allowed)[number], boolean>> = {};
+
+  for (const key of allowed) {
+    if (body[key] !== undefined) {
+      if (typeof body[key] !== 'boolean') {
+        throw new AppError(`${key} must be a boolean`, 400);
+      }
+      patch[key] = body[key];
+    }
+  }
+
+  const preferences = await NotificationService.updatePreferences(req.user.userId, patch);
+
+  res.json({
+    success: true,
+    statusCode: 200,
+    message: 'Notification preferences updated',
+    data: preferences,
     timestamp: new Date().toISOString(),
   });
 });

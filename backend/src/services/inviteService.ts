@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import prisma from '../config/db.js';
 import logger from '../config/logger.js';
 import { EmailService } from './emailService.js';
+import { NotificationService } from './notificationService.js';
 
 export class InviteService {
   /**
@@ -248,21 +249,16 @@ export class InviteService {
       }
     }
 
-    // Notify the inviter (in-app)
-    try {
-      await prisma.notification.create({
-        data: {
-          userId: invite.invitedById,
-          type: 'team_member_joined',
-          title: 'New team member joined',
-          message: `${updatedUser.name} accepted your invite and joined as ${invite.role}`,
-          referenceId: invite.organizationId,
-          referenceType: 'organization',
-        },
-      });
-    } catch (err) {
-      logger.warn('Failed to create invite-accepted notification', err);
-    }
+    // Notify the org owner + managers in-app (deduped, excludes the joiner,
+    // gated per-recipient by inAppNotifications && memberAlerts prefs).
+    await NotificationService.onMemberJoined({
+      organizationId: invite.organizationId,
+      joinerUserId: userId,
+      joinerName: updatedUser.name,
+      role: invite.role,
+    }).catch((err) => {
+      logger.warn(`Failed to create member-joined notifications: ${err instanceof Error ? err.message : String(err)}`);
+    });
 
     // Send email to org owner (fire-and-forget)
     try {
@@ -292,7 +288,11 @@ export class InviteService {
           details: { role: invite.role, invitedBy: invite.invitedById, tokensAllocated: tokensToAllocate },
         },
       });
-    } catch { /* activity log is optional */ }
+    } catch (err) {
+      // Best-effort, but log it: the daily digest counts joins from this row,
+      // so a silent failure would make the digest under-report new members.
+      logger.warn(`Failed to write member_joined activity log (digest may under-count): ${err instanceof Error ? err.message : String(err)}`);
+    }
 
     logger.info(`Invite accepted: org=${invite.organizationId} userId=${userId} role=${invite.role}`);
     return invite;

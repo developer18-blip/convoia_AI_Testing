@@ -6,12 +6,18 @@ import {
   markAllAsRead,
   getUnreadCount,
   deleteNotification,
+  getPreferences,
+  updatePreferences,
 } from '../controllers/notificationController.js';
 
 const router = Router();
 
 // All routes require authentication
 router.use(authMiddleware);
+
+// Notification preferences (literal path — declared before /:id routes)
+router.get('/preferences', getPreferences);
+router.patch('/preferences', updatePreferences);
 
 // Get notifications
 router.get('/', getNotifications);

@@ -1,6 +1,19 @@
 import prisma from '../config/db.js';
 import logger from '../config/logger.js';
 
+// Opt-out model: a user with no NotificationPreference row is treated as all-true.
+export const NOTIFICATION_PREFERENCE_DEFAULTS = {
+  emailDigest: true,
+  inAppNotifications: true,
+  memberAlerts: true,
+} as const;
+
+export interface ResolvedNotificationPreferences {
+  emailDigest: boolean;
+  inAppNotifications: boolean;
+  memberAlerts: boolean;
+}
+
 export class NotificationService {
   static async create(params: {
     userId: string;
@@ -69,6 +82,9 @@ export class NotificationService {
   }
 
   static async onLowBalance(userId: string, balance: number) {
+    // WALLET_LOW is an org-activity notification — respect the in-app channel toggle.
+    const prefs = await this.getPreferences(userId);
+    if (!prefs.inAppNotifications) return null;
     return this.create({
       userId,
       type: 'low_balance',
@@ -84,5 +100,82 @@ export class NotificationService {
       title: `Welcome to ConvoiaAI!`,
       message: `Hi ${name.split(' ')[0]}, your account is ready. Start chatting with 30+ AI models.`,
     });
+  }
+
+  /**
+   * MEMBER_JOINED — notify the org owner + managers (deduped, excluding the
+   * joiner) when someone joins the organization. Gated per-recipient by the
+   * in-app channel toggle AND the member-alerts type toggle. Reuses the
+   * existing 'team_member_joined' notification type.
+   */
+  static async onMemberJoined(params: {
+    organizationId: string;
+    joinerUserId: string;
+    joinerName: string;
+    role: string;
+  }) {
+    const { organizationId, joinerUserId, joinerName, role } = params;
+
+    const org = await prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { ownerId: true, name: true },
+    });
+    if (!org) return;
+
+    const privileged = await prisma.user.findMany({
+      where: { organizationId, role: { in: ['org_owner', 'manager'] } },
+      select: { id: true },
+    });
+
+    const recipientIds = new Set<string>(privileged.map(u => u.id));
+    recipientIds.add(org.ownerId);
+    recipientIds.delete(joinerUserId); // never notify the person who just joined
+
+    for (const userId of recipientIds) {
+      const prefs = await this.getPreferences(userId);
+      if (!prefs.inAppNotifications || !prefs.memberAlerts) continue;
+      await this.create({
+        userId,
+        type: 'team_member_joined',
+        title: 'New team member joined',
+        message: `${joinerName} joined ${org.name} as ${role}.`,
+        referenceId: organizationId,
+        referenceType: 'organization',
+      });
+    }
+  }
+
+  /**
+   * Resolve a user's notification preferences, applying the "no row = all
+   * defaults true" (opt-out) model so callers never see null.
+   */
+  static async getPreferences(userId: string): Promise<ResolvedNotificationPreferences> {
+    const row = await prisma.notificationPreference.findUnique({ where: { userId } });
+    return {
+      emailDigest: row?.emailDigest ?? NOTIFICATION_PREFERENCE_DEFAULTS.emailDigest,
+      inAppNotifications: row?.inAppNotifications ?? NOTIFICATION_PREFERENCE_DEFAULTS.inAppNotifications,
+      memberAlerts: row?.memberAlerts ?? NOTIFICATION_PREFERENCE_DEFAULTS.memberAlerts,
+    };
+  }
+
+  /**
+   * Upsert a user's notification preferences (lazy row creation on first
+   * write). Accepts a partial patch; unspecified fields keep their current
+   * value (or the default if no row exists yet).
+   */
+  static async updatePreferences(
+    userId: string,
+    patch: Partial<ResolvedNotificationPreferences>,
+  ): Promise<ResolvedNotificationPreferences> {
+    const row = await prisma.notificationPreference.upsert({
+      where: { userId },
+      create: { userId, ...patch },
+      update: { ...patch },
+    });
+    return {
+      emailDigest: row.emailDigest,
+      inAppNotifications: row.inAppNotifications,
+      memberAlerts: row.memberAlerts,
+    };
   }
 }
