@@ -880,6 +880,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               setMessages((prev) => prev.map((m) =>
                 m.id === assistantId ? { ...m, content: '', isLoading: false, webSearch: { query: parsed.query, sources: parsed.sources || [] } } : m
               ))
+            } else if (parsed.type === 'sources') {
+              // Perplexity sonar models return their citations AFTER the answer
+              // has streamed. Attach them as pills WITHOUT wiping content
+              // (unlike 'web_search', which fires pre-answer in the tool path).
+              setMessages((prev) => prev.map((m) =>
+                m.id === assistantId ? { ...m, webSearch: { query: parsed.query, sources: parsed.sources || [] } } : m
+              ))
             } else if (parsed.type === 'thinking_result') {
               // Deep thinking result — show as blockquote (markdown-native, no raw HTML)
               const thinkBlock = `> **🧠 Deep Thinking**\n>\n> ${parsed.content.replace(/\n/g, '\n> ')}\n\n---\n\n`
@@ -1167,6 +1174,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               syncDisplayedTo('')
               setMessages((prev) => prev.map((m) =>
                 m.id === assistantId ? { ...m, content: '', isLoading: false, webSearch: { query: parsed.query, sources: parsed.sources || [] } } : m
+              ))
+            } else if (parsed.type === 'sources') {
+              // Perplexity sonar models return their citations AFTER the answer
+              // has streamed. Attach them as pills WITHOUT wiping content
+              // (unlike 'web_search', which fires pre-answer in the tool path).
+              setMessages((prev) => prev.map((m) =>
+                m.id === assistantId ? { ...m, webSearch: { query: parsed.query, sources: parsed.sources || [] } } : m
               ))
             } else if (parsed.type === 'thinking_result') {
               const thinkBlock = `> **🧠 Deep Thinking**\n>\n> ${parsed.content.replace(/\n/g, '\n> ')}\n\n---\n\n`

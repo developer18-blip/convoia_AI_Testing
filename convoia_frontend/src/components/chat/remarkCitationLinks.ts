@@ -26,7 +26,9 @@ type MdNode = {
   position?: unknown
 }
 
-const CITATION_RE = /\[(\d{1,2})\]/g
+// 1–3 digits: Deep Research routinely cites 20–40+ sources and sometimes >99,
+// so [100]+ must linkify too.
+const CITATION_RE = /\[(\d{1,3})\]/g
 
 function walk(node: MdNode, prefix?: string): MdNode {
   if (!node || typeof node !== 'object') return node

@@ -1171,6 +1171,10 @@ async function findFallbackModel(excludeProvider: string) {
 export interface StreamUsageMeta {
   reasoningTokens?: number;
   searchQueries?: number;
+  // Perplexity sonar models return their cited source URLs. Surfaced here so
+  // the controller can emit a structured 'sources' SSE event (→ clickable
+  // CitationPills) instead of the old non-clickable plain-text "Sources:" list.
+  citations?: string[];
   // Raw terminal signal from the provider: 'stop' | 'length' | 'max_tokens' | 'MAX_TOKENS' | 'end_turn' | etc.
   // When it's a length/max_tokens variant, the response was truncated and the caller
   // should surface a hint to the user + log for diagnostics.
@@ -1855,13 +1859,11 @@ function callPerplexityStream(
           thinkBuffer = '';
         }
 
-        // Append citation block before signaling done
-        if (citations.length > 0) {
-          const citationBlock = '\n\n---\n**Sources:**\n' +
-            citations.map((url: string, i: number) => `${i + 1}. ${url}`).join('\n');
-          callbacks.onChunk(citationBlock);
-        }
-        callbacks.onDone(inputTokens, outputTokens, { reasoningTokens, searchQueries });
+        // Surface citations as structured metadata so the controller can emit
+        // a 'sources' event → clickable CitationPills. (Previously appended a
+        // plain-text "**Sources:**" list that wasn't clickable and whose
+        // numbers didn't anchor to the inline [N] markers.)
+        callbacks.onDone(inputTokens, outputTokens, { reasoningTokens, searchQueries, citations });
         resolve();
       });
       response.data.on('error', (err: Error) => {

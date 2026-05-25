@@ -1488,7 +1488,11 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
           })),
         })
       : null;
-    if (searchDecision?.needsSearch) {
+    // Skip our web-search tool for Perplexity models: sonar searches natively
+    // and returns its own citations (surfaced via the 'sources' event in
+    // onDone below). Running both double-bills Perplexity and conflicts the
+    // [N] numbering the sonar model emits.
+    if (searchDecision?.needsSearch && streamModelCheck?.provider !== 'perplexity') {
       logger.info(
         `Search decision [${searchDecision.source}]: YES — query="${(searchDecision.searchQuery || userQuery).substring(0, 80)}" reason="${searchDecision.reason}"`,
       );
@@ -1957,7 +1961,7 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
           fullResponse += text;
           res.write(`data: ${JSON.stringify({ type: 'chunk', content: text })}\n\n`);
         },
-        onDone: (rawInputTokens: number, rawOutputTokens: number, meta?: { reasoningTokens?: number; searchQueries?: number; finishReason?: string }) => {
+        onDone: (rawInputTokens: number, rawOutputTokens: number, meta?: { reasoningTokens?: number; searchQueries?: number; finishReason?: string; citations?: string[] }) => {
           // Quality gate: strip any leading thinking preamble or meta-
           // commentary from the ASSEMBLED response before persisting.
           // This runs post-stream, so the user has already seen the
@@ -1990,6 +1994,15 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
             }
           } else if (hitLengthSignal) {
             logger.warn(`[stream] Provider-side early finish (not at cap) — user=${user.id} model=${finalModelId} intent=${intent.intent} cap=${cap} outputTokens=${rawOutputTokens} finishReason=${fr}`);
+          }
+
+          // Perplexity sonar models return their own cited URLs (meta.citations)
+          // AFTER the answer has streamed. Emit a 'sources' event so the frontend
+          // renders clickable CitationPills WITHOUT wiping the streamed answer
+          // (unlike 'web_search', which fires pre-answer in the tool path).
+          if (meta?.citations && meta.citations.length > 0 && !streamEnded && !res.writableEnded) {
+            const citeSources = meta.citations.slice(0, 40).map((url) => ({ title: url, url }));
+            res.write(`data: ${JSON.stringify({ type: 'sources', query: userQuery || 'Sources', sources: citeSources })}\n\n`);
           }
 
           // Fire-and-forget the async post-processing
