@@ -60,7 +60,7 @@ export function MobileLoginPage() {
   }
 
   return (
-    <div className="mobile-app" style={{
+    <div className="mobile-app mobile-app--auth" style={{
       minHeight: '100dvh', display: 'flex', flexDirection: 'column',
       background: '#F8F7FF',
       paddingTop: 'env(safe-area-inset-top, 0px)',

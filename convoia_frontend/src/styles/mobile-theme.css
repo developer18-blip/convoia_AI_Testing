@@ -5,17 +5,11 @@
    Desktop website is COMPLETELY UNAFFECTED.
    ═══════════════════════════════════════════════════════ */
 
-:root {
-  --vh: 1dvh;
-  --keyboard-height: 0px;
-}
-
 .mobile-app {
-  /* height must live here, NOT in an inline React style — iOS WKWebView caches
-     calc(var(--x)) at style-set time for inline styles and does not recompute
-     when --x changes, so the keyboard-driven --vh update has no effect. A CSS
-     class rule with var() IS reactive and reflows when --vh changes. */
-  height: calc(var(--vh, 1dvh) * 100);
+  /* Fill the dynamic viewport. With Keyboard resize:'native' (capacitor.config),
+     the WebView shrinks to the area above the keyboard when it opens, so 100dvh
+     tracks the visible height automatically — no JS --vh hack needed. */
+  height: 100dvh;
   overflow: hidden;
 
   --mobile-tabbar-base-height: 72px;
@@ -359,6 +353,18 @@ body.keyboard-open .mobile-tab-bar {
 
 body.keyboard-open .mobile-app {
   --tabbar-kb-offset: 0px;
+}
+
+/* ── Pre-auth pages (login / register) ──
+   These render OUTSIDE the app shell but reuse `.mobile-app` for its theme
+   tokens — which also carries `height:100dvh; overflow:hidden`. That clips the
+   form and makes a keyboard-focused field unreachable. Auth screens must scroll
+   instead, so the focused input can always be brought into view. */
+.mobile-app.mobile-app--auth {
+  height: auto;
+  min-height: 100dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Remove bottom padding reserved for tab bar when keyboard is open

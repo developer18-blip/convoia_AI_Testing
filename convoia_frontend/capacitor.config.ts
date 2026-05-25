@@ -37,8 +37,12 @@ const config: CapacitorConfig = {
       overlaysWebView: false,
     },
     Keyboard: {
-      resize: 'body',            // resize viewport when keyboard opens (critical for chat input)
-      resizeOnFullScreen: true,
+      // 'native' = Android adjustResize: the WebView itself shrinks to the area
+      // above the keyboard, so CSS 100dvh/100vh become keyboard-aware on their
+      // own. The old 'body' mode JS-resized document.body, which double-counted
+      // the keyboard height against our dvh-based layouts (the "twice the
+      // keyboard space" gap) and clipped the un-scrollable login form.
+      resize: 'native',
     },
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert'],
