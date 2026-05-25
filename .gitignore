@@ -35,3 +35,31 @@ scripts/apex-test-suite/day2-*/
 scripts/apex-test-suite/_*.mjs
 scripts/apex-test-suite/_gate*.md
 scripts/apex-test-suite/_backend-local.pid
+
+# ── Deploy/rollback backups, file snapshots & temp artifacts (created on the
+#    server during deploys — must never be committed) ──
+dist.pre-*/
+*.bak
+*.bak-*
+*.tsx.pre-*
+*.ts.pre-*
+*.css.pre-*
+convoia_frontend_temp@*
+
+# ── Env-file backups (hold REAL secrets — never commit) ──
+.env.bak
+.env.backup*
+.env.*.backup*
+.env.production.backup*
+
+# ── One-off / scratch scripts (ad-hoc audits, smoke tests, prompt probes) ──
+smoke-*.mjs
+_oneoff_*
+clawback-*.mjs
+verify-mem.mjs
+check-*-overcharge.mjs
+scripts/model-smoke-test*
+scripts/test-prompt-*.mjs
+
+# ── Local design handoff snapshot (reference only, not part of the app build) ──
+convoia-mac-handoff/
