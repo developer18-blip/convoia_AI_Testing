@@ -1029,9 +1029,18 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
     let streamEnded = false;
     let webSearched = false;
 
+    // Aborts the upstream provider request when the client presses Stop or the
+    // connection drops. Without this, streamEnded only stops *relaying* chunks —
+    // the model keeps generating and billing. Threaded into the provider axios
+    // calls via sendMessageStream's abortSignal. Never aborted on a normal run.
+    const providerAbort = new AbortController();
+
     // Handle client disconnect
     req.on('close', () => {
       streamEnded = true;
+      // Tear down the in-flight provider request. No-op if it already finished
+      // (close also fires after a normal res.end()).
+      try { providerAbort.abort(); } catch { /* already aborted/closed */ }
       logger.info(`Client disconnected from stream — User: ${user.id}`);
     });
 
@@ -1954,6 +1963,8 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
         // ignore them otherwise.
         thinkingBudget: thinkingEnabled ? depthThinkingBudget : undefined,
         reasoningEffort: thinkingEnabled ? depthReasoningEffort : undefined,
+        // Tears down the provider request on client Stop/disconnect.
+        abortSignal: providerAbort.signal,
       },
       {
         onChunk: (text: string) => {
@@ -2147,6 +2158,14 @@ Output ONLY the enhanced prompt — no explanations, no markdown, no quotes. Jus
           })();
         },
         onError: (error: Error & { response?: { data?: any; status?: number }; config?: { data?: any } }) => {
+          // User pressed Stop / client disconnected: we aborted the provider
+          // ourselves, so the resulting cancel is expected — not a real error.
+          // The socket is already gone, so there's nothing to write; just stop.
+          if (providerAbort.signal.aborted) {
+            streamEnded = true;
+            logger.info(`Stream aborted by client (Stop) — User: ${user.id}, Model: ${selectedModel?.modelId}`);
+            return;
+          }
           logger.error('Stream error', {
             provider: selectedModel?.provider,
             modelId: selectedModel?.modelId,

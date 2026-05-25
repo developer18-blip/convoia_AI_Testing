@@ -177,6 +177,7 @@ interface SendMessageParams {
   complexity?: 'simple' | 'standard' | 'complex'; // Query complexity for prompt sizing
   thinkingBudget?: number; // Claude budget_tokens + Gemini thinkingConfig.thinkingBudget
   reasoningEffort?: 'low' | 'medium' | 'high' | 'xhigh'; // 'xhigh' is Anthropic-only — runtime clamps to 'high' for OpenAI
+  abortSignal?: AbortSignal; // Aborted by the controller on client Stop/disconnect → tears down the provider request
 }
 
 interface SendVisionParams {
@@ -351,6 +352,11 @@ interface ProviderOverrides {
   thinkingEnabled?: boolean;
   thinkingBudget?: number; // Claude budget_tokens + Gemini thinkingBudget
   reasoningEffort?: 'low' | 'medium' | 'high' | 'xhigh'; // 'xhigh' is Anthropic-only — runtime clamps to 'high' for OpenAI
+  // When the client presses Stop (or disconnects), the controller aborts this
+  // signal so the upstream provider request is torn down — stops generation +
+  // billing instead of letting the model finish into a closed socket. Undefined
+  // for every normal request, so axios behaves identically when never aborted.
+  abortSignal?: AbortSignal;
 }
 
 // PURE reasoning models (o1/o3/o4-mini) — reject temperature, top_p; require 'developer' role
@@ -698,6 +704,7 @@ function callGoogleStream(
           params: { key: apiKey, alt: 'sse' },
           timeout: config.aiRequestTimeout,
           responseType: 'stream',
+          signal: overrides?.abortSignal,
         }
       );
 
@@ -1268,6 +1275,7 @@ ${systemPrompt}`;
           headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
           timeout: config.aiRequestTimeout,
           responseType: 'stream',
+          signal: overrides?.abortSignal,
         }
       );
 
@@ -1483,6 +1491,7 @@ function callAnthropicStream(
           headers,
           timeout: config.aiRequestTimeout,
           responseType: 'stream',
+          signal: overrides?.abortSignal,
         }
       );
 
@@ -1632,6 +1641,7 @@ function callOpenAICompatibleStream(
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
         timeout: config.aiRequestTimeout,
         responseType: 'stream',
+        signal: overrides?.abortSignal,
       });
 
       let inputTokens = 0, outputTokens = 0;
@@ -1755,6 +1765,7 @@ function callPerplexityStream(
           headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
           timeout: config.aiRequestTimeout,
           responseType: 'stream',
+          signal: overrides?.abortSignal,
         }
       );
 
@@ -2230,6 +2241,7 @@ export class AIGatewayService {
       thinkingEnabled: params.thinkingEnabled,
       thinkingBudget: params.thinkingBudget,
       reasoningEffort: params.reasoningEffort,
+      abortSignal: params.abortSignal,
     };
 
     await routeToProviderStream(effectiveModel, messages, systemPrompt, callbacks, overrides);
