@@ -238,4 +238,62 @@ export class EmailService {
 
     await sendEmail(recipientEmail, 'Reset your ConvoiaAI password', baseTemplate('Reset Your Password', body));
   }
+
+  /**
+   * Daily organization activity digest (sent to owners + admins). Gated upstream
+   * by the no-empty-digest rule and each recipient's emailDigest preference.
+   */
+  static async sendDailyDigest(params: {
+    recipientEmail: string;
+    recipientName: string;
+    digest: {
+      orgName: string;
+      newMembers: string[];
+      newMemberCount: number;
+      totalTokens: number;
+      spend: number;
+      topUsers: { name: string; tokens: number }[];
+      activeUsers: number;
+      walletBalance: number;
+    };
+  }) {
+    const { recipientEmail, recipientName, digest } = params;
+    const fmt = (n: number) => n.toLocaleString('en-US');
+    const tokenLabel = (n: number) =>
+      n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
+      : n >= 1_000 ? `${(n / 1_000).toFixed(0)}K`
+      : `${n}`;
+
+    const membersRow = digest.newMemberCount > 0
+      ? `<div class="row"><span class="label">New members</span><span class="value">${digest.newMemberCount} — ${digest.newMembers.join(', ')}</span></div>`
+      : '';
+
+    const topUsersHtml = digest.topUsers.length
+      ? digest.topUsers
+          .map((u, i) => `<div class="row"><span class="label">${i + 1}. ${u.name}</span><span class="value">${tokenLabel(u.tokens)} tokens</span></div>`)
+          .join('')
+      : '<div class="row" style="border:none;"><span class="label">No usage yet</span><span class="value">—</span></div>';
+
+    const body = `
+      <p style="color:#3f3f46; margin:0 0 8px;">Hi ${recipientName},</p>
+      <p style="color:#18181b; font-size:16px; margin:0 0 20px;">Here's what happened in <strong>${digest.orgName}</strong> yesterday.</p>
+      <div style="background:#fafafa; border-radius:10px; padding:16px; margin:0 0 20px;">
+        ${membersRow}
+        <div class="row"><span class="label">Tokens used</span><span class="value">${fmt(digest.totalTokens)}</span></div>
+        <div class="row"><span class="label">Spend</span><span class="value">$${digest.spend.toFixed(2)}</span></div>
+        <div class="row"><span class="label">Active users</span><span class="value">${digest.activeUsers}</span></div>
+        <div class="row" style="border:none;"><span class="label">Wallet balance</span><span class="value">${tokenLabel(digest.walletBalance)} tokens</span></div>
+      </div>
+      <p style="font-weight:600; color:#18181b; font-size:13px; margin:0 0 8px;">Top users yesterday</p>
+      <div style="background:#fafafa; border-radius:10px; padding:8px 16px; margin:0 0 20px;">
+        ${topUsersHtml}
+      </div>
+      <div style="text-align:center; margin:24px 0;">
+        <a href="${FRONTEND_URL}/org/analytics" class="btn">View Analytics</a>
+      </div>
+      <p class="muted" style="text-align:center; font-size:11px;">You're receiving this as an owner or admin of ${digest.orgName}. Manage notifications in Settings.</p>
+    `;
+
+    await sendEmail(recipientEmail, `${digest.orgName} — daily activity digest`, baseTemplate('Daily Activity Digest', body));
+  }
 }

@@ -5,6 +5,7 @@ import { StripeService, stripe } from '../services/stripeService.js';
 import { TOKEN_PACKAGES } from '../config/tokenPackages.js';
 import { TokenWalletService } from '../services/tokenWalletService.js';
 import { NotificationService } from '../services/notificationService.js';
+import { getOrgTokenBalance } from '../services/orgBalanceService.js';
 import prisma from '../config/db.js';
 import logger from '../config/logger.js';
 
@@ -67,36 +68,9 @@ export const getTokenPoolStatus = asyncHandler(
       throw new AppError('Not part of an organization', 400);
     }
 
-    const pool = await prisma.tokenPool.findUnique({
-      where: { organizationId: user.organizationId },
-    });
-
-    // The org's tokens live on the OWNER's TokenWallet (Stripe purchases credit the
-    // owner; allocations move tokens to members). The legacy TokenPool table is only
-    // populated for orgs using the explicit allocation flow, so it's empty for most
-    // orgs — falling back to it showed Billing as all zeros while the Wallet showed a
-    // real balance. Prefer a real pool row when present, else derive from the owner's
-    // wallet so Billing matches the Wallet (token-wallet/balance).
-    let poolData = pool && pool.totalTokens > 0
-      ? {
-          totalTokens: pool.totalTokens,
-          allocatedTokens: pool.allocatedTokens,
-          usedTokens: pool.usedTokens,
-          availableTokens: pool.availableTokens,
-        }
-      : null;
-
-    if (!poolData) {
-      const ownerWallet = user.organization
-        ? await prisma.tokenWallet.findUnique({ where: { userId: user.organization.ownerId } })
-        : null;
-      poolData = {
-        totalTokens: ownerWallet?.totalTokensPurchased ?? 0,
-        allocatedTokens: ownerWallet?.allocatedTokens ?? 0,
-        usedTokens: ownerWallet?.totalTokensUsed ?? 0,
-        availableTokens: ownerWallet?.tokenBalance ?? 0,
-      };
-    }
+    // Authoritative balance via the shared helper (prefers a real TokenPool row,
+    // else derives from the owner's TokenWallet). Same logic the daily digest uses.
+    const poolData = await getOrgTokenBalance(user.organizationId);
 
     const purchases = await prisma.tokenPurchase.findMany({
       where: { organizationId: user.organizationId },
