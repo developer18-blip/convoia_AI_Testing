@@ -7,7 +7,7 @@ import logger from '../config/logger.js';
 const resend = config.resendApiKey ? new Resend(config.resendApiKey) : null;
 
 const FROM = 'ConvoiaAI <ai@convoia.com>';
-const BRAND_COLOR = '#7C3AED';
+const BRAND_COLOR = '#14B8CD';
 const FRONTEND_URL = config.frontendUrl;
 
 // ── Send Email via Resend ────────────────────────────────────────────
