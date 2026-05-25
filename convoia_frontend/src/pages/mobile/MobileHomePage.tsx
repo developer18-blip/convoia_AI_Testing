@@ -99,7 +99,7 @@ export function MobileHomePage() {
             {!isEmployee && (
               <button onClick={() => navigate('/tokens/buy')}
                 style={{ padding: '7px 16px', borderRadius: '20px', background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.32)', color: 'white', fontSize: '12px', fontWeight: 800, cursor: 'pointer', backdropFilter: 'blur(8px)' }}>
-                Buy more →
+                View wallet →
               </button>
             )}
           </div>
@@ -166,7 +166,7 @@ export function MobileHomePage() {
             )}
             <QuickAction icon={<Receipt size={20} />} label="Transactions" sub="Billing history" color="#EC4899" onClick={() => navigate('/transactions')} />
             {!isEmployee && (
-              <QuickAction icon={<Coins size={20} />} label="Buy Tokens" sub="Top up balance" color="#A855F7" onClick={() => navigate('/tokens/buy')} />
+              <QuickAction icon={<Coins size={20} />} label="Wallet" sub="Balance & history" color="#A855F7" onClick={() => navigate('/tokens/buy')} />
             )}
             {!hasOrg && (
               <QuickAction icon={<Key size={20} />} label="API Keys" sub="Developer access" color="#0EA5E9" onClick={() => navigate('/api-keys')} />

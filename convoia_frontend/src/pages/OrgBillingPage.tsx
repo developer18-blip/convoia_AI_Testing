@@ -7,6 +7,7 @@ import { ProgressBar } from '../components/ui/ProgressBar'
 import { useToast } from '../hooks/useToast'
 import api from '../lib/api'
 import { formatDate } from '../lib/utils'
+import { isNative } from '../lib/capacitor'
 
 interface TokenPackage {
   id: string
@@ -157,12 +158,14 @@ export function OrgBillingPage() {
         <div className="flex items-center gap-3 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl">
           <AlertTriangle size={18} className="text-amber-400 shrink-0" />
           <p className="text-sm text-amber-300">
-            Your available token pool is running low ({fmtTokens(pool.availableTokens)} remaining). Purchase more tokens below.
+            Your available token pool is running low ({fmtTokens(pool.availableTokens)} remaining).{!isNative && ' Purchase more tokens below.'}
           </p>
         </div>
       )}
 
-      {/* Buy Tokens */}
+      {/* Buy Tokens — hidden in the native app: Google Play requires Play Billing
+          for in-app digital purchases, so purchasing stays on the web only. */}
+      {!isNative && (
       <div>
         <div className="flex items-center gap-2 mb-4">
           <ShoppingCart size={18} className="text-primary" />
@@ -201,6 +204,7 @@ export function OrgBillingPage() {
           ))}
         </div>
       </div>
+      )}
 
       {/* Allocation Breakdown */}
       {allocations.length > 0 && (
