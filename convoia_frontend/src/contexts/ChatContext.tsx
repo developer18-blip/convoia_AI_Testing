@@ -398,6 +398,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   // pending useEffect cannot race the next-turn assignment.
   const [currentApolloTurnId, setCurrentApolloTurnId] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  // Set true by stopStreaming so the smooth-typing rAF loop freezes immediately.
+  // Aborting the fetch stops NEW chunks, but without this the animator keeps
+  // draining already-buffered text, making "Stop" look like it did nothing.
+  const stoppedRef = useRef(false)
   // Mirror of `messages` so closure-bound callers (sendMessage, sendWithContext,
   // editAndResend) always read the latest list. Without this, an editAndResend
   // that calls setMessages(trimmed) and then sendMessage would have sendMessage
@@ -407,6 +411,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   useEffect(() => { messagesRef.current = messages }, [messages])
 
   const stopStreaming = useCallback(() => {
+    stoppedRef.current = true
     if (abortRef.current) {
       abortRef.current.abort()
       abortRef.current = null
@@ -764,6 +769,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     // Create abort controller for stop functionality
     const controller = new AbortController()
     abortRef.current = controller
+    stoppedRef.current = false // fresh turn — clear any prior stop
 
     try {
       // Cap history to last 20 messages to prevent token explosion in long conversations.
@@ -822,6 +828,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       let rafId: number | null = null
       const animate = () => {
         rafId = null
+        // Stop pressed: freeze the typewriter so buffered-but-unshown text
+        // doesn't keep appearing after the fetch was aborted.
+        if (stoppedRef.current) return
         const remaining = accumulated.length - displayed.length
         if (remaining <= 0) return
         const charsThisFrame = Math.max(4, Math.ceil(remaining / 30))
@@ -1039,6 +1048,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     // can hook up the close path cleanly).
     const controller = new AbortController()
     abortRef.current = controller
+    stoppedRef.current = false // fresh turn — clear any prior stop
 
     try {
       // Cap history to last 20 messages to prevent token explosion.
@@ -1117,6 +1127,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       let rafId: number | null = null
       const animate = () => {
         rafId = null
+        // Stop pressed: freeze the typewriter so buffered-but-unshown text
+        // doesn't keep appearing after the fetch was aborted.
+        if (stoppedRef.current) return
         const remaining = accumulated.length - displayed.length
         if (remaining <= 0) return
         const charsThisFrame = Math.max(4, Math.ceil(remaining / 30))
