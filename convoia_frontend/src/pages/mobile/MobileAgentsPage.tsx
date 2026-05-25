@@ -81,8 +81,11 @@ export function MobileAgentsPage() {
             <Zap size={21} fill="white" color="white" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ margin: 0, fontSize: 12, fontWeight: 900, opacity: 0.72, textTransform: 'uppercase', letterSpacing: '0.10em' }}>AI Specialists</p>
-            <h2 style={{ margin: '2px 0 0', fontSize: 20, fontWeight: 900, lineHeight: 1.1 }}>Pick the right brain</h2>
+            <p style={{ margin: 0, fontSize: 12, fontWeight: 900, opacity: 0.72, textTransform: 'uppercase', letterSpacing: '0.10em', color: 'white' }}>AI Specialists</p>
+            {/* Explicit white: the hero gradient is always dark, but the global
+                `html.light h2` rule (index.css) would otherwise force this title
+                dark and invisible in light mode. Inline color beats that rule. */}
+            <h2 style={{ margin: '2px 0 0', fontSize: 20, fontWeight: 900, lineHeight: 1.1, color: 'white' }}>Pick the right brain</h2>
           </div>
           <span style={heroPill}>{activeAgents.length} active</span>
         </div>
