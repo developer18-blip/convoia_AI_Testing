@@ -12,14 +12,18 @@ interface Source {
 interface CitationPillsProps {
   query: string
   sources: Source[]
+  /** Per-message id so pill anchors are unique across multiple search blocks
+   *  in one conversation (else `[N]` clicks land on the oldest block). */
+  idPrefix?: string
 }
 
 interface CitationPillProps {
   index: number
   source: Source
+  idPrefix?: string
 }
 
-const CitationPill = memo(function CitationPill({ index, source }: CitationPillProps) {
+const CitationPill = memo(function CitationPill({ index, source, idPrefix }: CitationPillProps) {
   const [faviconError, setFaviconError] = useState(false)
 
   let domain = ''
@@ -44,7 +48,7 @@ const CitationPill = memo(function CitationPill({ index, source }: CitationPillP
 
   return (
     <a
-      id={`citation-${index}`}
+      id={idPrefix ? `citation-${idPrefix}-${index}` : `citation-${index}`}
       href={source.url}
       target="_blank"
       rel="noopener noreferrer"
@@ -75,7 +79,7 @@ const CitationPill = memo(function CitationPill({ index, source }: CitationPillP
   )
 })
 
-export const CitationPills = memo(function CitationPills({ query, sources }: CitationPillsProps) {
+export const CitationPills = memo(function CitationPills({ query, sources, idPrefix }: CitationPillsProps) {
   if (!sources || sources.length === 0) return null
 
   return (
@@ -89,7 +93,7 @@ export const CitationPills = memo(function CitationPills({ query, sources }: Cit
       </span>
       <div className="citation-pills__row">
         {sources.map((src, i) => (
-          <CitationPill key={`${i}-${src.url}`} index={i + 1} source={src} />
+          <CitationPill key={`${i}-${src.url}`} index={i + 1} source={src} idPrefix={idPrefix} />
         ))}
       </div>
     </div>

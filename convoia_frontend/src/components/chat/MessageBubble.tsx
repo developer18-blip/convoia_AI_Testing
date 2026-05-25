@@ -25,10 +25,11 @@ import { useChat } from '../../hooks/useChat'
 import { isNative } from '../../lib/capacitor'
 import { PROVIDER_THEMES, getProviderFromModelId } from '../../config/providers'
 
-// Stable module-level reference — ReactMarkdown does a shallow compare
-// and rebuilds the rendered DOM if this array is recreated on each
-// parent re-render, which would wipe any active text selection mid-drag.
-const REMARK_PLUGINS = [remarkGfm, remarkBreaks, remarkCitationLinks]
+// Citation linking is applied per-message (see the `remarkPlugins` useMemo in
+// the component) so each message's `[N]` anchors are namespaced by message id.
+// The per-message array is memoized so its identity stays stable across
+// re-renders — ReactMarkdown shallow-compares it and would otherwise rebuild
+// the rendered DOM mid-drag and wipe the user's active text selection.
 
 // When an inline citation link (#citation-N) is clicked, scroll to the
 // matching pill and flash its background. Used from the custom `a`
@@ -118,6 +119,16 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
   const providerTheme = message.model
     ? PROVIDER_THEMES[getProviderFromModelId(message.model)]
     : activeTheme
+
+  // Citation anchors must be unique per message. Without a per-message prefix,
+  // a `[N]` click resolves (via getElementById) to the FIRST `#citation-N` in
+  // the DOM — an OLDER search block — so later answers misroute. Namespace by
+  // message.id. Memoized on message.id so the array identity stays stable
+  // across re-renders (preserves the user's text selection during streaming).
+  const remarkPlugins = useMemo(
+    () => [remarkGfm, remarkBreaks, () => remarkCitationLinks({ prefix: message.id })],
+    [message.id]
+  )
 
   // Apollo (council) messages — main column shows only the verdict / final
   // answer; all reasoning UI (model cards, cross-exam, response drill-down)
@@ -491,7 +502,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
           {/* Show accumulated content (e.g. thinking result) while still loading */}
           {hasContent && (
             <div className="message-content" style={{ fontSize: '15px', lineHeight: '1.75', color: 'var(--chat-text)' }}>
-              <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>{message.content}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={remarkPlugins}>{message.content}</ReactMarkdown>
             </div>
           )}
 
@@ -662,7 +673,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
                           maxHeight: showFullUserMsg ? 'none' : '120px', overflow: 'hidden',
                           position: 'relative', whiteSpace: 'pre-wrap',
                         }}>
-                          <ReactMarkdown remarkPlugins={REMARK_PLUGINS}
+                          <ReactMarkdown remarkPlugins={remarkPlugins}
                             components={{
                               code(codeProps: ComponentPropsWithoutRef<'code'> & { inline?: boolean; className?: string }) {
                                 const { inline, className, children: codeChildren, ...codeRest } = codeProps
@@ -696,7 +707,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
                     )
                   }
                   return (
-                    <ReactMarkdown remarkPlugins={REMARK_PLUGINS}
+                    <ReactMarkdown remarkPlugins={remarkPlugins}
                       components={{
                         code(codeProps: ComponentPropsWithoutRef<'code'> & { inline?: boolean; className?: string }) {
                           const { inline, className, children: codeChildren, ...codeRest } = codeProps
@@ -771,11 +782,12 @@ export const MessageBubble = memo(function MessageBubble({ message, onRetry, onE
           <CitationPills
             query={message.webSearch.query}
             sources={message.webSearch.sources}
+            idPrefix={message.id}
           />
         )}
 
         <div ref={contentRef} className="prose prose-sm max-w-none message-content" style={{ fontSize: '15px', lineHeight: '1.75', color: 'var(--chat-text)' }}>
-          <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={aiMessageComponents}>
+          <ReactMarkdown remarkPlugins={remarkPlugins} components={aiMessageComponents}>
             {cleanText || renderedContent}
           </ReactMarkdown>
 
