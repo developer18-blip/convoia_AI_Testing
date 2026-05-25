@@ -97,6 +97,7 @@ model User {
   tasksAssigned            Task[]                    @relation("TaskAssignee")
   taskComments             TaskComment[]
   notifications            Notification[]
+  notificationPreference   NotificationPreference?
   agents                   Agent[]
   invitesCreated           OrgInvite[]               @relation("InviteCreator")
   invitesAccepted          OrgInvite[]               @relation("InviteAcceptor")
@@ -482,6 +483,17 @@ model Notification {
   @@index([userId])
   @@index([isRead])
   @@index([createdAt])
+}
+
+model NotificationPreference {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailDigest        Boolean  @default(true)
+  inAppNotifications Boolean  @default(true)
+  memberAlerts       Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 }
 
 // ============== ORGANIZATION INVITES ==============
