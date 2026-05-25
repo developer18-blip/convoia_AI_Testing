@@ -28,10 +28,6 @@ const LS = {
   showCostEstimates: 'convoia_settings_show_cost_estimates',
   showTokenCounts: 'convoia_settings_show_token_counts',
   autoSave: 'convoia_settings_auto_save',
-  notifyTransactional: 'convoia_settings_notify_transactional',
-  notifyMarketing: 'convoia_settings_notify_marketing',
-  notifySecurity: 'convoia_settings_notify_security',
-  notifyWeeklyDigest: 'convoia_settings_notify_weekly_digest',
   timezone: 'convoia_settings_timezone',
   language: 'convoia_settings_language',
   fontSize: 'convoia_settings_font_size',
@@ -137,10 +133,9 @@ export function SettingsPage() {
   const [showCostEstimates, setShowCostEstimates] = useState(() => readBool(LS.showCostEstimates, true))
   const [showTokenCounts, setShowTokenCounts] = useState(() => readBool(LS.showTokenCounts, true))
   const [autoSave, setAutoSave] = useState(() => readBool(LS.autoSave, true))
-  const [notifyTransactional, setNotifyTransactional] = useState(() => readBool(LS.notifyTransactional, true))
-  const [notifyMarketing, setNotifyMarketing] = useState(() => readBool(LS.notifyMarketing, false))
-  const [notifySecurity, setNotifySecurity] = useState(() => readBool(LS.notifySecurity, true))
-  const [notifyWeeklyDigest, setNotifyWeeklyDigest] = useState(() => readBool(LS.notifyWeeklyDigest, false))
+
+  // Notification preferences — wired to the backend (GET/PATCH /notifications/preferences)
+  const [notifPrefs, setNotifPrefs] = useState<{ emailDigest: boolean; inAppNotifications: boolean; memberAlerts: boolean } | null>(null)
 
   // Appearance
   const { theme, setTheme } = useTheme()
@@ -157,10 +152,29 @@ export function SettingsPage() {
   useEffect(() => { writeBool(LS.showCostEstimates, showCostEstimates) }, [showCostEstimates])
   useEffect(() => { writeBool(LS.showTokenCounts, showTokenCounts) }, [showTokenCounts])
   useEffect(() => { writeBool(LS.autoSave, autoSave) }, [autoSave])
-  useEffect(() => { writeBool(LS.notifyTransactional, notifyTransactional) }, [notifyTransactional])
-  useEffect(() => { writeBool(LS.notifyMarketing, notifyMarketing) }, [notifyMarketing])
-  useEffect(() => { writeBool(LS.notifySecurity, notifySecurity) }, [notifySecurity])
-  useEffect(() => { writeBool(LS.notifyWeeklyDigest, notifyWeeklyDigest) }, [notifyWeeklyDigest])
+
+  // Load notification preferences from the backend. The GET always returns a
+  // full defaults object, so toggles render even when no row exists yet.
+  useEffect(() => {
+    let cancelled = false
+    api.get('/notifications/preferences')
+      .then((res) => { if (!cancelled) setNotifPrefs(res.data.data) })
+      .catch(() => { if (!cancelled) setNotifPrefs({ emailDigest: true, inAppNotifications: true, memberAlerts: true }) })
+    return () => { cancelled = true }
+  }, [])
+
+  const updateNotifPref = async (key: 'emailDigest' | 'inAppNotifications' | 'memberAlerts', value: boolean) => {
+    if (!notifPrefs) return
+    const previous = notifPrefs
+    setNotifPrefs({ ...notifPrefs, [key]: value }) // optimistic
+    try {
+      const res = await api.patch('/notifications/preferences', { [key]: value })
+      setNotifPrefs(res.data.data)
+    } catch {
+      setNotifPrefs(previous) // rollback
+      toast.error('Failed to update notification preference')
+    }
+  }
 
   // Apply font size to <html>: bumping the root font-size scales rem-based
   // tokens across the app. Three discrete steps avoid runaway layout shifts.
@@ -576,43 +590,39 @@ export function SettingsPage() {
           <Card padding="lg">
             <div className="mb-4">
               <h3 className="text-lg font-semibold text-text-primary flex items-center gap-2">
-                <Bell size={16} /> Email Notifications
+                <Bell size={16} /> Notifications
               </h3>
               <p className="text-xs text-text-muted mt-1">
-                Notification preferences are saved locally — server-side delivery coming soon.
+                Control how ConvoiaAI keeps you in the loop. Changes save instantly.
               </p>
             </div>
-            <div className="space-y-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-text-primary">Transactional emails</p>
-                  <p className="text-xs text-text-muted">Receipts, password resets, invitations</p>
+            {notifPrefs === null ? (
+              <p className="text-sm text-text-muted">Loading…</p>
+            ) : (
+              <div className="space-y-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-text-primary">Daily email digest</p>
+                    <p className="text-xs text-text-muted">A morning summary of your organization&rsquo;s activity — new members, usage, top users, balance. Org owners &amp; admins only.</p>
+                  </div>
+                  <Toggle checked={notifPrefs.emailDigest} onChange={(v) => updateNotifPref('emailDigest', v)} label="Daily email digest" />
                 </div>
-                <Toggle checked={notifyTransactional} onChange={setNotifyTransactional} label="Transactional emails" />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-text-primary">Security alerts</p>
-                  <p className="text-xs text-text-muted">New sign-ins and account-security events</p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-text-primary">In-app notifications</p>
+                    <p className="text-xs text-text-muted">Show activity alerts in the notification bell.</p>
+                  </div>
+                  <Toggle checked={notifPrefs.inAppNotifications} onChange={(v) => updateNotifPref('inAppNotifications', v)} label="In-app notifications" />
                 </div>
-                <Toggle checked={notifySecurity} onChange={setNotifySecurity} label="Security alerts" />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-text-primary">Weekly digest</p>
-                  <p className="text-xs text-text-muted">Usage summary and cost recap, every Monday</p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-text-primary">Member-join alerts</p>
+                    <p className="text-xs text-text-muted">Notify me when someone joins my organization.</p>
+                  </div>
+                  <Toggle checked={notifPrefs.memberAlerts} onChange={(v) => updateNotifPref('memberAlerts', v)} label="Member-join alerts" />
                 </div>
-                <Toggle checked={notifyWeeklyDigest} onChange={setNotifyWeeklyDigest} label="Weekly digest" />
               </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-text-primary">Product updates</p>
-                  <p className="text-xs text-text-muted">New features, roadmap notes, occasional offers</p>
-                </div>
-                <Toggle checked={notifyMarketing} onChange={setNotifyMarketing} label="Product updates" />
-              </div>
-            </div>
-            {/* TODO(settings): wire to backend when /api/notifications/preferences exists */}
+            )}
           </Card>
         </div>
       )}

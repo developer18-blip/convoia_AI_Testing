@@ -1,9 +1,10 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronRight, LogOut, Camera, Lock, Eye, EyeOff,
   Users, Building2, DollarSign, BarChart3, Shield,
   Key, FileText, Activity, Briefcase, Coins, UserPlus, Sun, Moon,
+  Bell, Mail,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
@@ -44,6 +45,28 @@ export function MobileSettingsPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteConfirmEmail, setDeleteConfirmEmail] = useState('')
   const [deletingAccount, setDeletingAccount] = useState(false)
+
+  // Notification preferences — wired to backend (GET/PATCH /notifications/preferences)
+  const [notifPrefs, setNotifPrefs] = useState<{ emailDigest: boolean; inAppNotifications: boolean; memberAlerts: boolean } | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    api.get('/notifications/preferences')
+      .then((res) => { if (!cancelled) setNotifPrefs(res.data.data) })
+      .catch(() => { if (!cancelled) setNotifPrefs({ emailDigest: true, inAppNotifications: true, memberAlerts: true }) })
+    return () => { cancelled = true }
+  }, [])
+  const updateNotifPref = async (key: 'emailDigest' | 'inAppNotifications' | 'memberAlerts', value: boolean) => {
+    if (!notifPrefs) return
+    const previous = notifPrefs
+    setNotifPrefs({ ...notifPrefs, [key]: value })
+    try {
+      const res = await api.patch('/notifications/preferences', { [key]: value })
+      setNotifPrefs(res.data.data)
+    } catch {
+      setNotifPrefs(previous)
+      toast.error('Failed to update')
+    }
+  }
 
   const strength = passwordStrength(newPw)
   const strengthColors = ['#EF4444', '#EF4444', '#F59E0B', '#F59E0B', '#10B981', '#10B981']
@@ -200,6 +223,15 @@ export function MobileSettingsPage() {
         {hasOrg && <NavItem icon={<Briefcase size={18} />} label="My Budget" sub="Your token budget" onClick={() => navigate('/budget')} />}
         <NavItem icon={<FileText size={18} />} label="Tasks" sub="Your tasks" onClick={() => navigate('/tasks')} last />
       </NavSection>
+
+      {/* ─── NOTIFICATIONS — backend-wired prefs (changes save instantly) ─── */}
+      {notifPrefs && (
+        <NavSection title="Notifications">
+          <ToggleRow icon={<Mail size={18} />} label="Daily email digest" sub="Morning summary of org activity" checked={notifPrefs.emailDigest} onChange={(v) => updateNotifPref('emailDigest', v)} />
+          <ToggleRow icon={<Bell size={18} />} label="In-app notifications" sub="Activity alerts in the bell" checked={notifPrefs.inAppNotifications} onChange={(v) => updateNotifPref('inAppNotifications', v)} />
+          <ToggleRow icon={<UserPlus size={18} />} label="Member-join alerts" sub="When someone joins your org" checked={notifPrefs.memberAlerts} onChange={(v) => updateNotifPref('memberAlerts', v)} last />
+        </NavSection>
+      )}
 
       {/* ─── APPEARANCE — dark / light toggle ─── */}
       <NavSection title="Appearance">
@@ -365,6 +397,36 @@ function NavItem({ icon, label, sub, onClick, last }: { icon: React.ReactNode; l
         <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: '2px 0 0' }}>{sub}</p>
       </div>
       <ChevronRight size={16} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+    </button>
+  )
+}
+
+function ToggleRow({ icon, label, sub, checked, onChange, last }: { icon: React.ReactNode; label: string; sub: string; checked: boolean; onChange: (v: boolean) => void; last?: boolean }) {
+  return (
+    <button onClick={() => onChange(!checked)}
+      style={{
+        width: '100%', padding: '14px 16px', border: 'none', background: 'transparent',
+        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px',
+        borderBottom: last ? 'none' : '1px solid var(--color-border)',
+      }}>
+      <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--color-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)', flexShrink: 0 }}>
+        {icon}
+      </div>
+      <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
+        <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)', margin: 0 }}>{label}</p>
+        <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: '2px 0 0' }}>{sub}</p>
+      </div>
+      <div style={{
+        width: '46px', height: '26px', borderRadius: '999px', flexShrink: 0,
+        background: checked ? 'var(--color-primary)' : 'var(--color-border)',
+        position: 'relative', transition: 'background 200ms',
+      }}>
+        <div style={{
+          position: 'absolute', top: '3px', left: checked ? '23px' : '3px',
+          width: '20px', height: '20px', borderRadius: '50%', background: '#FFFFFF',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.20)', transition: 'left 200ms ease',
+        }} />
+      </div>
     </button>
   )
 }
