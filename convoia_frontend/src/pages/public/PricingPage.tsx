@@ -116,11 +116,19 @@ export function PricingPage() {
                   ))}
                 </ul>
                 <div className="lp-tier__cta">
-                  <Link to={tier.name === 'Enterprise' ? '/contact' : '/register'}>
-                    <Button variant={tier.variant} size="md" style={{ width: '100%' }}>
-                      {tier.cta}
-                    </Button>
-                  </Link>
+                  {tier.name === 'Enterprise' ? (
+                    <a href="mailto:support@convoia.com?subject=Enterprise%20plan%20inquiry">
+                      <Button variant={tier.variant} size="md" style={{ width: '100%' }}>
+                        {tier.cta}
+                      </Button>
+                    </a>
+                  ) : (
+                    <Link to="/register">
+                      <Button variant={tier.variant} size="md" style={{ width: '100%' }}>
+                        {tier.cta}
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               </div>
             ))}
