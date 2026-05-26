@@ -8,6 +8,7 @@ import { useModels } from '../hooks/useModels'
 import { useToast } from '../hooks/useToast'
 import api from '../lib/api'
 import { cn } from '../lib/utils'
+import { isNative } from '../lib/capacitor'
 
 const sections = [
   { id: 'quickstart', label: 'Quick Start', icon: <Play size={14} /> },
@@ -383,7 +384,7 @@ console.log(response.choices[0].message.content)`} />
                   <tr className="border-b border-border/50">
                     <td className="py-2 px-3"><Badge size="sm" variant="warning">402</Badge></td>
                     <td className="py-2 px-3">Insufficient wallet balance</td>
-                    <td className="py-2 px-3">Top up your wallet at the dashboard</td>
+                    <td className="py-2 px-3">{isNative ? 'Your wallet needs a positive token balance.' : 'Top up your wallet at the dashboard'}</td>
                   </tr>
                   <tr className="border-b border-border/50">
                     <td className="py-2 px-3"><Badge size="sm" variant="warning">429</Badge></td>

@@ -9,6 +9,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useTokens } from '../contexts/TokenContext'
 import { formatDateTime, formatTokens } from '../lib/utils'
 import api from '../lib/api'
+import { isNative } from '../lib/capacitor'
 
 type TxType = 'purchase' | 'usage' | 'allocation_received' | 'allocation_given' | 'adjustment'
 
@@ -214,7 +215,9 @@ export function TransactionsPage() {
             description={
               filter === 'all'
                 ? (isIndividual
-                    ? 'Buy tokens or start a chat to see your activity here.'
+                    ? (isNative
+                        ? 'Start a chat to see your activity here.'
+                        : 'Buy tokens or start a chat to see your activity here.')
                     : 'Your token activity will appear here once you start using the platform.')
                 : 'Try a different filter or check back after more activity.'
             }
@@ -222,7 +225,9 @@ export function TransactionsPage() {
               filter !== 'all'
                 ? { label: 'Show all', onClick: () => setFilter('all') }
                 : isIndividual
-                  ? { label: 'Buy tokens', onClick: () => navigate('/tokens/buy') }
+                  ? (isNative
+                      ? { label: 'Go to chat', onClick: () => navigate('/chat') }
+                      : { label: 'Buy tokens', onClick: () => navigate('/tokens/buy') })
                   : { label: 'Go to chat', onClick: () => navigate('/chat') }
             }
           />

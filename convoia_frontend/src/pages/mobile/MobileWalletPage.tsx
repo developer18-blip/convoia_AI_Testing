@@ -108,6 +108,18 @@ export function MobileWalletPage() {
         <WalletMetric label="Status" value={canBuy ? 'Ready' : 'Managed'} icon={<ShieldCheck size={15} />} color="var(--color-primary)" bg="var(--color-primary-light)" />
       </div>
 
+      {/* ── Out of tokens (store-silent: no buy/steer copy on native) ── */}
+      {tokenBalance === 0 && (
+        <div className="mobile-card" style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 38, height: 38, borderRadius: 12, background: 'var(--color-primary-light)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Wallet size={18} />
+          </div>
+          <p style={{ margin: 0, fontSize: 13, fontWeight: 650, color: 'var(--color-text-primary)', lineHeight: 1.4 }}>
+            You're out of tokens. Your balance updates automatically when it's topped up.
+          </p>
+        </div>
+      )}
+
       {/* ── Transactions ── */}
       <section>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>

@@ -100,7 +100,7 @@ export function MobileChatPage() {
       return
     }
     if (tokenBalance <= 0) {
-      toast.error(authUser?.organizationId ? 'No tokens. Contact your admin.' : 'No tokens remaining.')
+      toast.error(authUser?.organizationId ? 'No tokens. Contact your admin.' : "You're out of tokens right now.")
       return
     }
     if (!activeConversationId) {
@@ -445,10 +445,12 @@ export function MobileChatPage() {
         )}
       </div>
 
-      {/* No tokens banner */}
+      {/* No tokens banner — store-silent on native (Google Play): no buy/steer copy */}
       {!hasTokens && (
         <div style={{ padding: '6px 16px', textAlign: 'center', fontSize: '12px', fontWeight: 500, background: 'rgba(239,68,68,0.08)', color: '#EF4444', flexShrink: 0 }}>
-          No tokens remaining.
+          {authUser?.organizationId
+            ? "You're out of tokens. Your manager can allocate more."
+            : "You're out of tokens for now. Chat resumes when your balance refreshes."}
         </div>
       )}
 
